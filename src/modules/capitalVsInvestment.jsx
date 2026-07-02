@@ -16,7 +16,6 @@ const fyLabel = (s) => { const d = new Date(s); const y = d.getMonth() >= 3 ? d.
 
 // Branch-aware money formatters. India branches keep ₹ + Indian grouping (Cr/L);
 // USD branches ($ — NBO/DAR/FBM) use en-US grouping and K/M/B short scale.
-const round0 = (n) => Math.round(Number(n) || 0);
 const localeOf = (cur) => (cur === '$' ? 'en-US' : 'en-IN');
 const fmtAmt = (cur, n) => (n < 0 ? '-' : '') + (cur || '₹') + Math.abs(Math.round(Number(n) || 0)).toLocaleString(localeOf(cur));
 const fmtShort = (cur, n) => {
@@ -105,7 +104,7 @@ const CSS = `
 .cvd .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden}
 .cvd .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
 .cvd .kpi.amber::before{background:var(--amber)}.cvd .kpi.violet::before{background:var(--violet)}
-.cvd .kpi.green::before{background:var(--green)}.cvd .kpi.slate::before{background:#64748b}
+.cvd .kpi.green::before{background:var(--green)}.cvd .kpi.slate::before{background:#64748b}.cvd .kpi.red::before{background:var(--red)}
 .cvd .kpi .l{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);font-weight:700;
   display:flex;align-items:center;justify-content:space-between;gap:8px}
 .cvd .kpi .v{font-size:23px;font-weight:800;margin-top:8px;letter-spacing:-.01em}
@@ -149,25 +148,35 @@ const CSS = `
 .cvd .sec-hd .tt{font-size:14.5px;font-weight:800}
 .cvd .sec-hd .ds{font-size:11.5px;color:var(--dim);margin-top:1px}
 .cvd .sec-hd .right{margin-left:auto;font-size:13px;font-weight:800;text-align:right;white-space:nowrap}
-.cvd table{width:100%;border-collapse:collapse}
-.cvd .reg{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.cvd .reg th{text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);font-weight:700;
-  padding:9px 18px;background:#f7f9fc;border-bottom:1px solid var(--line);white-space:nowrap}
-.cvd .reg th.r,.cvd .reg td.r{text-align:right}
-.cvd .reg td{padding:8px 18px;font-size:13px;border-bottom:1px solid var(--line2)}
-.cvd .reg tr.grp td{font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--primary-d);font-weight:800;
-  background:#fafbfd;padding-top:11px}
-.cvd .reg td.nm{color:var(--ink2)}
-.cvd .reg td.led{padding-left:34px;color:var(--ink2)}
-.cvd .reg td.amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-.cvd .reg td.amt.neg{color:var(--red)}
-.cvd .reg .tag{font-size:8.5px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:8px;letter-spacing:.4px;vertical-align:middle}
+/* collapsible statement tree — group ▸ sub-group ▸ ledger (ledgers collapse under sub-groups) */
+.cvd .stmt{padding:4px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.cvd .stmt-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 18px}
+.cvd .stmt-tools button{font-size:10.5px;font-weight:700;color:var(--dim);background:#f1f3f8;border:1px solid var(--line);border-radius:6px;padding:4px 9px;cursor:pointer}
+.cvd .stmt-tools button:hover{color:var(--primary-d);border-color:var(--primary)}
+.cvd .grphd,.cvd .row.led{display:flex;align-items:center;gap:8px;padding:7px 18px;border-bottom:1px solid var(--line2);font-size:13px}
+.cvd .grphd{background:#fafbfd;font-weight:800;color:var(--primary-d);text-transform:uppercase;font-size:10.5px;letter-spacing:.6px}
+.cvd .grphd .nm{flex:1;min-width:0;overflow-wrap:anywhere}.cvd .grphd .amt{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:800}
+.cvd .subhd{display:flex;align-items:center;gap:8px;padding:7px 18px;border-bottom:1px solid var(--line2);font-size:13px;
+  cursor:pointer;font-weight:700;color:var(--ink);width:100%;text-align:left;background:none;border-top:0;border-left:0;border-right:0;font-family:inherit}
+.cvd .subhd:hover{background:#f3f6fb}
+.cvd .subhd:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.cvd .subhd .chev{color:var(--primary);font-weight:800;font-size:11px;display:inline-block;transition:transform .15s}
+.cvd .subhd.open .chev{transform:rotate(90deg)}
+.cvd .subhd .nm{flex:1;min-width:0;overflow-wrap:anywhere}.cvd .subhd .cnt{color:var(--dim);font-weight:600;font-size:10.5px;flex:none}
+.cvd .row.led .nm{flex:1;min-width:0;overflow-wrap:anywhere;color:var(--ink2)}
+.cvd .amt{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;min-width:118px}.cvd .amt.neg{color:var(--red)}
+.cvd .tag{font-size:8.5px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:8px;letter-spacing:.4px;vertical-align:middle}
 .cvd .tag.bs{background:#eef2fb;color:var(--blue)}.cvd .tag.pl{background:#f3eefb;color:var(--violet)}
-.cvd .reg tr.sub td{font-weight:800;color:var(--ink);border-bottom:1px solid var(--line)}
-.cvd .reg tr.tot td{font-size:14px;font-weight:800;border-top:2px solid var(--ink);background:#f7f9fc}
-.cvd .reg tr.tot td.amt{color:var(--primary-d)}
-.cvd .reg tr.tot.amberT td.amt{color:var(--amber)}
-.cvd .reg tr.tot.greenT td.amt{color:var(--green)}
+.cvd .kids{padding-left:16px;border-left:2px solid #eef1f7;margin-left:18px}
+.cvd .kids.top{margin-left:0;padding-left:0;border-left:0}
+.cvd .totrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 18px;font-size:14px;font-weight:800;border-top:2px solid var(--ink);background:#f7f9fc}
+.cvd .totrow .amt{color:var(--primary-d);min-width:0}
+.cvd .totrow.amberT .amt{color:var(--amber)}.cvd .totrow.greenT .amt{color:var(--green)}.cvd .totrow.redT .amt{color:var(--red)}
+.cvd .totrow.subt{border-top:1px solid var(--line);font-size:13px;background:#fafbfe}.cvd .totrow.subt .amt{color:var(--ink)}
+.cvd .secband{padding:8px 18px;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#14396b;background:#f0f4fa;border-bottom:2px solid #14396b}
+.cvd .adjrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 18px;font-weight:600;color:var(--ink2);border-bottom:1px solid var(--line2);font-size:13px}
+.cvd .adjrow .amt{min-width:0}
+.cvd .emptyrow{padding:16px 18px;color:var(--dim);font-size:12.5px}
 
 /* formula + perf inside sections */
 .cvd .pad{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
@@ -211,78 +220,69 @@ const CSS = `
   .cvd .perfrow{grid-template-columns:1fr}
   .cvd .brow{grid-template-columns:104px 1fr 92px}
   .cvd .topbar{padding:11px 14px}
+  .cvd .kids{margin-left:10px;padding-left:8px}
+  .cvd .grphd,.cvd .subhd,.cvd .row.led{padding-left:12px;padding-right:12px}
+  .cvd .amt{min-width:96px}
 }
 `;
 
-// group ▸ ledgers ▸ subtotal rows — shared by Reg and the Capital-Employed table.
-function GroupRows({ groups, fmt }) {
-  return (groups || []).map((g, gi) => (
-    <React.Fragment key={gi}>
-      <tr className="grp"><td>{g.grp}</td><td className="r" /></tr>
-      {(g.ledgers || []).map((l, li) => (
-        <tr key={li}>
-          <td className="led">{l.n}<span className={`tag ${g.src === 'pl' ? 'pl' : 'bs'}`}>{g.src === 'pl' ? 'P&L' : 'BS'}</span></td>
-          <td className={`amt ${l.a < 0 ? 'neg' : ''}`}>{fmt(l.a)}</td>
-        </tr>
-      ))}
-      <tr className="sub"><td className="nm">{g.grp} — subtotal</td><td className="amt">{fmt(g.total)}</td></tr>
-    </React.Fragment>
-  ));
-}
+// ── collapsible Tally tree (group ▸ sub-group ▸ ledger, any depth) ─────────────
+// Nodes are { name, amount, isGroup, src, items }. Top-level groups stay expanded;
+// every deeper sub-group collapses its ledgers and expands on click. A section-level
+// TreeCtx carries the expand/collapse-all default; remounting on its key re-seeds it.
+const TreeCtx = React.createContext(false);
+const leafCount = (n) => (n.isGroup ? (n.items || []).reduce((s, c) => s + leafCount(c), 0) : 1);
+const Amt = ({ v, fmt }) => <span className={`amt ${v < 0 ? 'neg' : ''}`}>{fmt(v)}</span>;
 
-// ── register table (groups, then a bold total row) ─────────────────────────────
-function Reg({ groups, totalLabel, totalVal, tone, fmt }) {
-  const totClass = tone === 'amber' ? 'tot amberT' : tone === 'green' ? 'tot greenT' : 'tot';
+function LeafRow({ node, fmt }) {
   return (
-    <div className="reg">
-      <table>
-        <thead><tr><th>Ledger</th><th className="r">Amount</th></tr></thead>
-        <tbody>
-          <GroupRows groups={groups} fmt={fmt} />
-          {!(groups || []).length && <tr><td colSpan={2} style={{ padding: 16, color: '#6b7488', fontSize: 12.5 }}>No ledgers in this bucket.</td></tr>}
-          {totalLabel && <tr className={totClass}><td>{totalLabel}</td><td className="amt">{fmt(totalVal)}</td></tr>}
-        </tbody>
-      </table>
+    <div className="row led">
+      <span className="nm">{node.name}<span className={`tag ${node.src === 'pl' ? 'pl' : 'bs'}`}>{node.src === 'pl' ? 'P&L' : 'BS'}</span></span>
+      <Amt v={node.amount} fmt={fmt} />
     </div>
   );
 }
-
-// Section 1 — Capital Account + owner/partner loans = CAPITAL INVESTED, then the
-// retained-earnings adjust line bridges to CAPITAL EMPLOYED (net capital deployed).
-function CapitalTable({ capital, quasi, adjust, invested, employed, fmt }) {
+function SubNode({ node, depth, fmt }) {
+  const [open, setOpen] = useState(React.useContext(TreeCtx));
   return (
-    <div className="reg">
-      <table>
-        <thead><tr><th>Ledger</th><th className="r">Amount</th></tr></thead>
-        <tbody>
-          <GroupRows groups={[...(capital || []), ...(quasi || [])]} fmt={fmt} />
-          <tr className="tot"><td>CAPITAL INVESTED</td><td className="amt">{fmt(invested)}</td></tr>
-          {(adjust || []).map((a, i) => (
-            <tr key={i}><td className="led">{a.grp}</td><td className={`amt ${a.total < 0 ? 'neg' : ''}`}>{fmt(a.total)}</td></tr>
-          ))}
-          <tr className="tot"><td>CAPITAL EMPLOYED</td><td className="amt">{fmt(employed)}</td></tr>
-        </tbody>
-      </table>
+    <div className="node">
+      <button type="button" className={`subhd ${open ? 'open' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className="chev">›</span><span className="nm">{node.name}</span><span className="cnt">{leafCount(node)}</span><Amt v={node.amount} fmt={fmt} />
+      </button>
+      {open && <div className="kids">{(node.items || []).map((c, i) => <TreeNode key={i} node={c} depth={depth + 1} fmt={fmt} />)}</div>}
     </div>
   );
 }
+function TreeNode({ node, depth, fmt }) {
+  if (!node.isGroup) return <LeafRow node={node} fmt={fmt} />;
+  if (depth === 0) {
+    return (
+      <div className="node">
+        <div className="grphd"><span className="nm">{node.name}</span><Amt v={node.amount} fmt={fmt} /></div>
+        <div className="kids top">{(node.items || []).map((c, i) => <TreeNode key={i} node={c} depth={1} fmt={fmt} />)}</div>
+      </div>
+    );
+  }
+  return <SubNode node={node} depth={depth} fmt={fmt} />;
+}
+const TreeList = ({ nodes, fmt }) => (nodes || []).map((n, i) => <TreeNode key={i} node={n} depth={0} fmt={fmt} />);
 
-// ── compact group-level list (used for the two-sided Balance Sheet) ────────────
-function GroupList({ head, groups, totalLabel, totalVal, fmt }) {
+// Statement wrapper — provides the expand/collapse-all controls and default open state.
+function Stmt({ children }) {
+  const [gen, setGen] = useState({ open: false, k: 0 });
   return (
-    <div className="reg">
-      <table>
-        <thead><tr><th>{head}</th><th className="r">Amount</th></tr></thead>
-        <tbody>
-          {(groups || []).map((g, i) => (
-            <tr key={i}><td className="nm">{g.grp}</td><td className={`amt ${g.total < 0 ? 'neg' : ''}`}>{fmt(g.total)}</td></tr>
-          ))}
-          <tr className="tot"><td>{totalLabel}</td><td className="amt">{fmt(totalVal)}</td></tr>
-        </tbody>
-      </table>
+    <div className="stmt">
+      <div className="stmt-tools">
+        <button type="button" onClick={() => setGen((g) => ({ open: true, k: g.k + 1 }))}>⊞ Expand all</button>
+        <button type="button" onClick={() => setGen((g) => ({ open: false, k: g.k + 1 }))}>⊟ Collapse all</button>
+      </div>
+      <TreeCtx.Provider value={gen.open}><div key={gen.k}>{children}</div></TreeCtx.Provider>
     </div>
   );
 }
+const TotRow = ({ label, val, tone, fmt }) => <div className={`totrow ${tone || ''}`}><span>{label}</span><Amt v={val} fmt={fmt} /></div>;
+const SecBand = ({ label }) => <div className="secband">{label}</div>;
+const Empty = ({ txt }) => <div className="emptyrow">{txt}</div>;
 
 const NAV = [
   ['ov', 'Overview', '◆'], ['s1', 'Capital Employed', '①'], ['s2', 'Capital Blocked', '②'],
@@ -312,22 +312,16 @@ export function CapitalVsInvestmentLive({ branch }) {
   const reconciles = Math.abs(flowComp - (t.inflowCapital || 0)) < 1;
   const hasData = Math.abs(t.capitalInvested || 0) > 0.5 || Math.abs(employed) > 0.5 || Math.abs(t.grossProfit || 0) > 0.5 || Math.abs(t.inflowCapital || 0) > 0.5 || Math.abs(t.grossRevenue || 0) > 0.5;
 
-  // Complete P&L statement (all accounts) for Section 6.
+  // Complete P&L (all accounts) — the backend returns a signed statement tree; split it
+  // into the trading part (Sales → Less COGS) and the indirect part (Add Other Income
+  // → Less Operating Exp) so Gross Profit can sit between them.
   const plFull = data?.profitAndLoss || {};
-  const signGrp = (arr, prefix, factor) => (arr || []).map((g) => ({
-    ...g, grp: prefix + g.grp, total: round0(factor * g.total),
-    ledgers: (g.ledgers || []).map((l) => ({ ...l, a: round0(factor * l.a) })),
-  }));
-  const plStatement = [
-    ...(plFull.sales || []),
-    ...signGrp(plFull.cogs, 'Less: ', -1),
-    ...signGrp(plFull.indirectIncome, 'Add: ', 1),
-    ...signGrp(plFull.indirectExpense, 'Less: ', -1),
-  ];
+  const nTrade = (plFull.sales || []).length + (plFull.cogs || []).length;
+  const plIndirect = (plFull.statement || []).slice(nTrade);
 
   // Capital-bridge rows (sources → invested → employed → in-flow) — magnitudes only.
-  const capSum = (data?.capital || []).reduce((s, g) => s + g.total, 0);
-  const retSum = (data?.capitalAdjust || []).reduce((s, g) => s + g.total, 0); // + profit / − loss
+  const capSum = (data?.capital || []).reduce((s, g) => s + (g.amount || 0), 0);
+  const retSum = (data?.capitalAdjust || []).reduce((s, g) => s + (g.amount || 0), 0); // + profit / − loss
   const bridge = [
     { nm: 'Capital & Reserves', v: capSum, c: '#0d9488' },
     ...((t.quasiCapital || 0) > 0.5 ? [{ nm: 'Owner & Partner Loans', v: t.quasiCapital, c: '#0d9488' }] : []),
@@ -346,7 +340,8 @@ export function CapitalVsInvestmentLive({ branch }) {
   const ARC = 257.6; // π·82 semicircle
   const gaugeFill = (ARC * Math.max(0, Math.min(40, t.gpYield || 0)) / 40).toFixed(1);
   const needleAng = (Math.max(0, Math.min(40, hurdle)) / 40 * 180 - 90).toFixed(1);
-  const yieldDiff = ((t.gpYield || 0) - hurdle).toFixed(1);
+  const yieldDiffN = (t.gpYield || 0) - hurdle;      // signed points above/below hurdle
+  const yieldDiff = Math.abs(yieldDiffN).toFixed(1); // magnitude for display
 
   // Scroll-spy: highlight the rail link for whatever section is in view.
   useEffect(() => {
@@ -423,7 +418,9 @@ export function CapitalVsInvestmentLive({ branch }) {
               <div>
                 <div className="t">{good ? 'In-Flow capital IS generating enough gross profit' : 'In-Flow capital is NOT generating enough gross profit'}</div>
                 <div className="s">{good
-                  ? <>{(t.gpYield || 0).toFixed(1)}% GP-yield on in-flow capital — <b>above</b> the {hurdle}% cost-of-capital hurdle. Working capital recycled {(t.flowTurnover || 0).toFixed(2)}× a year at a {(t.gpMargin || 0).toFixed(1)}% margin into {cr(t.grossRevenue)} of turnover.</>
+                  ? <>{(t.gpYield || 0).toFixed(1)}% GP-yield on in-flow capital — <b>above</b> the {hurdle}% cost-of-capital hurdle. {(t.netProfit || 0) < 0
+                    ? <>But operating costs of {cr(t.indirectExpense)} turn it into a <b>net loss of {cr(t.netProfit)}</b>.</>
+                    : <>Working capital recycled {(t.flowTurnover || 0).toFixed(2)}× a year at a {(t.gpMargin || 0).toFixed(1)}% margin into {cr(t.grossRevenue)} of turnover.</>}</>
                   : <>{(t.gpYield || 0).toFixed(1)}% GP-yield on in-flow capital — <b>below</b> the {hurdle}% hurdle. Improve margin (currently {(t.gpMargin || 0).toFixed(1)}%), recycle capital faster (currently {(t.flowTurnover || 0).toFixed(2)}×), or release blocked capital into flow.</>}
                 </div>
               </div>
@@ -436,8 +433,8 @@ export function CapitalVsInvestmentLive({ branch }) {
               <div className="kpi amber"><div className="l">Capital Blocked <span className="pill warn">{(t.blockedPct || 0).toFixed(1)}%</span></div><div className="v num">{cr(t.capitalBlocked)}</div><div className="s">Fixed &amp; slow assets — tied up</div></div>
               <div className="kpi"><div className="l">In-Flow Capital <span className="pill up">{(t.inflowPct || 0).toFixed(1)}%</span></div><div className="v num">{cr(t.inflowCapital)}</div><div className="s">Circulating working capital</div></div>
               <div className="kpi violet"><div className="l">Gross Profit</div><div className="v num">{cr(t.grossProfit)}</div><div className="s">{(t.gpMargin || 0).toFixed(1)}% margin on turnover</div></div>
-              <div className="kpi green"><div className="l">Net Profit</div><div className="v num">{cr(t.netProfit)}</div><div className="s">After operating costs</div></div>
-              <div className="kpi"><div className="l">GP Yield on In-Flow</div><div className="v num">{(t.gpYield || 0).toFixed(1)}%</div><div className="s">vs {hurdle}% hurdle · <span style={{ color: good ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>{yieldDiff >= 0 ? '+' : ''}{yieldDiff} pts</span></div></div>
+              <div className={`kpi ${(t.netProfit || 0) < 0 ? 'red' : 'green'}`}><div className="l">Net {(t.netProfit || 0) < 0 ? 'Loss' : 'Profit'}</div><div className="v num" style={{ color: (t.netProfit || 0) < 0 ? 'var(--red)' : undefined }}>{cr(t.netProfit)}</div><div className="s">After {cr(t.indirectExpense)} operating costs</div></div>
+              <div className="kpi"><div className="l">GP Yield on In-Flow</div><div className="v num">{(t.gpYield || 0).toFixed(1)}%</div><div className="s">vs {hurdle}% hurdle · <span style={{ color: good ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>{yieldDiffN >= 0 ? '+' : '−'}{yieldDiff} pts</span></div></div>
               <div className="kpi slate"><div className="l">Flow Turnover</div><div className="v num">{(t.flowTurnover || 0).toFixed(2)}×</div><div className="s">Turnover ÷ In-Flow</div></div>
             </div>
 
@@ -498,19 +495,30 @@ export function CapitalVsInvestmentLive({ branch }) {
 
             {/* Section 1 · Capital Invested → Employed */}
             <div className="card section" id="cvd-s1">
-              <div className="sec-hd"><span className="no teal">1</span><div><div className="tt">Capital Invested → Employed</div><div className="ds">Capital Account{(t.quasiCapital || 0) > 0.5 ? ' + owner & partner loans' : ''} = Invested; net of retained earnings = Employed — from Balance Sheet</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(employed)}</span></div>
-              <CapitalTable capital={data.capital} quasi={data.quasi} adjust={data.capitalAdjust} invested={t.capitalInvested} employed={employed} fmt={inr} />
+              <div className="sec-hd"><span className="no teal">1</span><div><div className="tt">Capital Invested → Employed</div><div className="ds">Group ▸ sub-group ▸ ledger · Capital Account{(t.quasiCapital || 0) > 0.5 ? ' + owner & partner loans' : ''} = Invested; net of retained earnings = Employed</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(employed)}</span></div>
+              <Stmt>
+                <TreeList nodes={[...(data.capital || []), ...(data.quasi || [])]} fmt={inr} />
+                <TotRow label="CAPITAL INVESTED" val={t.capitalInvested} fmt={inr} />
+                {(data.capitalAdjust || []).map((a, i) => (
+                  <div className="adjrow" key={i}><span>{a.name}</span><Amt v={a.amount} fmt={inr} /></div>
+                ))}
+                <TotRow label="CAPITAL EMPLOYED" val={employed} fmt={inr} />
+              </Stmt>
             </div>
 
             {/* Section 2 · Capital Blocked */}
             <div className="card section" id="cvd-s2">
-              <div className="sec-hd"><span className="no amber">2</span><div><div className="tt">Capital Blocked</div><div className="ds">Fixed &amp; slow assets — tied up, not circulating</div></div><span className="right num" style={{ color: 'var(--amber)' }}>{inr(t.capitalBlocked)}</span></div>
-              <Reg groups={data.blocked} totalLabel="TOTAL BLOCKED" totalVal={t.capitalBlocked} tone="amber" fmt={inr} />
+              <div className="sec-hd"><span className="no amber">2</span><div><div className="tt">Capital Blocked</div><div className="ds">Fixed assets · investments · deposits · advances — group ▸ sub-group ▸ ledger</div></div><span className="right num" style={{ color: 'var(--amber)' }}>{inr(t.capitalBlocked)}</span></div>
+              <Stmt>
+                <TreeList nodes={data.blocked} fmt={inr} />
+                {!(data.blocked || []).length && <Empty txt="No blocked-capital accounts in this period." />}
+                <TotRow label="TOTAL BLOCKED" val={t.capitalBlocked} tone="amberT" fmt={inr} />
+              </Stmt>
             </div>
 
             {/* Section 3 · In-Flow Capital */}
             <div className="card section" id="cvd-s3">
-              <div className="sec-hd"><span className="no teal">3</span><div><div className="tt">In-Flow Capital</div><div className="ds">What's left to circulate &amp; earn = Invested − Blocked</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(t.inflowCapital)}</span></div>
+              <div className="sec-hd"><span className="no teal">3</span><div><div className="tt">In-Flow Capital</div><div className="ds">Employed − Blocked · current-asset composition (group ▸ sub-group ▸ ledger)</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(t.inflowCapital)}</span></div>
               <div className="pad">
                 <div className="formula">
                   <div className="cell"><div className="l">Capital Employed</div><div className="v num">{cr(employed)}</div></div>
@@ -519,14 +527,18 @@ export function CapitalVsInvestmentLive({ branch }) {
                   <div className="op">=</div>
                   <div className="cell res"><div className="l">In-Flow Capital</div><div className="v num">{cr(t.inflowCapital)}</div></div>
                 </div>
-                <div className="recon">Composition of current-asset ledgers totals <b>{inr(flowComp)}</b> — {reconciles ? 'reconciles with the in-flow residual ✓' : <>the <b>{inr(flowComp - (t.inflowCapital || 0))}</b> gap is financed by external funding (creditors · loans · current liabilities), which totals <b>{inr(t.externalFunding)}</b> — see the complete Balance Sheet below.</>}</div>
+                <div className="recon">Composition of current-asset ledgers totals <b>{inr(flowComp)}</b> — {reconciles ? 'reconciles with the in-flow residual ✓' : <>the <b>{inr(flowComp - (t.inflowCapital || 0))}</b> gap is financed by external funding (creditors · loans · current liabilities), which totals <b>{inr(t.externalFunding)}</b>.</>}</div>
               </div>
-              <Reg groups={data.flow} totalLabel="COMPOSITION TOTAL (CURRENT ASSETS)" totalVal={flowComp} fmt={inr} />
+              <Stmt>
+                <TreeList nodes={data.flow} fmt={inr} />
+                {!(data.flow || []).length && <Empty txt="No current-asset ledgers in this period." />}
+                <TotRow label="COMPOSITION TOTAL (CURRENT ASSETS)" val={flowComp} fmt={inr} />
+              </Stmt>
             </div>
 
             {/* Section 4 · Performance */}
             <div className="card section" id="cvd-s4">
-              <div className="sec-hd"><span className="no">4</span><div><div className="tt">Turnover · Gross Profit · Net Profit</div><div className="ds">Is the in-flow capital generating enough profit? — from P&amp;L</div></div><span className="right num" style={{ color: 'var(--violet)' }}>{inr(t.grossProfit)} GP</span></div>
+              <div className="sec-hd"><span className="no">4</span><div><div className="tt">Turnover · Gross Profit · Net Profit</div><div className="ds">Trading — group ▸ sub-group (module) ▸ ledger</div></div><span className="right num" style={{ color: 'var(--violet)' }}>{inr(t.grossProfit)} GP</span></div>
               <div className="pad">
                 <div className="formula">
                   <div className="cell"><div className="l">Gross Profit</div><div className="v num">{cr(t.grossProfit)}</div></div>
@@ -535,30 +547,44 @@ export function CapitalVsInvestmentLive({ branch }) {
                   <div className="op">−</div>
                   <div className="cell blk"><div className="l">Operating Exp.</div><div className="v num">{cr(t.indirectExpense)}</div></div>
                   <div className="op">=</div>
-                  <div className="cell res"><div className="l">Net Profit</div><div className="v num">{cr(t.netProfit)}</div></div>
+                  <div className="cell res"><div className="l">Net Profit</div><div className="v num" style={{ color: (t.netProfit || 0) < 0 ? 'var(--red)' : 'var(--primary-d)' }}>{cr(t.netProfit)}</div></div>
                 </div>
                 <div className="perfrow">
                   <div className="pcard"><div className="l">Flow Turnover</div><div className="v num">{(t.flowTurnover || 0).toFixed(2)}×</div><div className="d">Turnover ÷ In-Flow Capital — times working capital is recycled</div></div>
                   <div className="pcard"><div className="l">GP Yield on In-Flow</div><div className="v num">{(t.gpYield || 0).toFixed(1)}%</div><div className="d">Gross Profit ÷ In-Flow Capital — pre-operating return</div></div>
-                  <div className="pcard"><div className="l">Net Yield on In-Flow</div><div className="v num">{(t.netYield || 0).toFixed(1)}%</div><div className="d">Net Profit ÷ In-Flow Capital — after operating costs</div></div>
+                  <div className="pcard"><div className="l">Net Yield on In-Flow</div><div className="v num" style={{ color: (t.netYield || 0) < 0 ? 'var(--red)' : 'var(--primary-d)' }}>{(t.netYield || 0).toFixed(1)}%</div><div className="d">Net Profit ÷ In-Flow Capital — after operating costs</div></div>
                 </div>
               </div>
-              <Reg groups={data.revenue} totalLabel="GROSS PROFIT" totalVal={t.grossProfit} fmt={inr} />
+              <Stmt>
+                <TreeList nodes={data.revenue} fmt={inr} />
+                <TotRow label={`GROSS PROFIT · ${(t.gpMargin || 0).toFixed(1)}% margin`} val={t.grossProfit} fmt={inr} />
+              </Stmt>
             </div>
 
-            {/* Section 5 · Complete Balance Sheet */}
+            {/* Section 5 · Complete Balance Sheet — vertical, collapsible */}
             <div className="card section" id="cvd-s5">
               <div className="sec-hd"><span className="no">5</span><div><div className="tt">Complete Balance Sheet</div><div className="ds">Every account, both sides — as on {dmy(range.to)} · {data.balanceSheet?.balanced ? 'balanced ✓' : '⚠ unbalanced'}</div></div><span className="right num">{inr(t.totalAssets)}</span></div>
-              <div className="bsgrid">
-                <GroupList head="Liabilities & Equity" groups={data.balanceSheet?.liabilities} totalLabel="TOTAL LIABILITIES & EQUITY" totalVal={t.totalLiabilities} fmt={inr} />
-                <GroupList head="Assets" groups={data.balanceSheet?.assets} totalLabel="TOTAL ASSETS" totalVal={t.totalAssets} fmt={inr} />
-              </div>
+              <Stmt>
+                <SecBand label="I.  Equity & Liabilities" />
+                <TreeList nodes={data.balanceSheet?.liabilities} fmt={inr} />
+                <TotRow label="TOTAL — EQUITY & LIABILITIES" val={t.totalLiabilities} fmt={inr} />
+                <SecBand label="II. Assets" />
+                <TreeList nodes={data.balanceSheet?.assets} fmt={inr} />
+                <TotRow label="TOTAL — ASSETS" val={t.totalAssets} fmt={inr} />
+              </Stmt>
             </div>
 
-            {/* Section 6 · Complete P&L */}
+            {/* Section 6 · Complete P&L — vertical, collapsible */}
             <div className="card section" id="cvd-s6">
-              <div className="sec-hd"><span className="no">6</span><div><div className="tt">Complete Profit &amp; Loss</div><div className="ds">Every account — trading → Gross Profit {cr(t.grossProfit)} → Net Profit</div></div><span className="right num" style={{ color: 'var(--green)' }}>{inr(t.netProfit)} NP</span></div>
-              <Reg groups={plStatement} totalLabel="NET PROFIT" totalVal={t.netProfit} tone="green" fmt={inr} />
+              <div className="sec-hd"><span className="no">6</span><div><div className="tt">Complete Profit &amp; Loss</div><div className="ds">Trading → Gross Profit → Net {(t.netProfit || 0) < 0 ? 'Loss' : 'Profit'} · group ▸ sub-group ▸ ledger</div></div><span className="right num" style={{ color: (t.netProfit || 0) < 0 ? 'var(--red)' : 'var(--green)' }}>{inr(t.netProfit)} {(t.netProfit || 0) < 0 ? 'NL' : 'NP'}</span></div>
+              <Stmt>
+                <SecBand label="Income — Revenue & Direct Income, less Cost of Sales" />
+                <TreeList nodes={data.revenue} fmt={inr} />
+                <TotRow label="GROSS PROFIT" val={t.grossProfit} tone="subt" fmt={inr} />
+                <SecBand label="Add: Other Income · Less: Indirect / Operating Expenses" />
+                <TreeList nodes={plIndirect} fmt={inr} />
+                <TotRow label={`NET ${(t.netProfit || 0) < 0 ? 'LOSS' : 'PROFIT'} (to Capital A/c)`} val={t.netProfit} tone={(t.netProfit || 0) < 0 ? 'redT' : 'greenT'} fmt={inr} />
+              </Stmt>
             </div>
 
             <div className="foot">Read-only · live from the posted <b>Balance Sheet</b> and <b>Profit &amp; Loss</b>. Sequence: Capital Invested → less Capital Blocked → the residual In-Flow Capital that circulates. Section 4 tests whether that in-flow capital generates enough gross profit, benchmarked against the editable {hurdle}% cost-of-capital hurdle.</div>
