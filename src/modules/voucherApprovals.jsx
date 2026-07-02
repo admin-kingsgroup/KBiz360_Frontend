@@ -776,7 +776,11 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     const used = new Set();
     const mk = (sale, purchase) => {
       const lead = sale || purchase;
-      const st = lead.status === 'saved' ? 'approved' : (lead.status || 'pending');
+      // Bucket the deal into the 4-tab INB model: Pending · Un-Pushed · Approved & Pushed
+      // (raw 'approved'/'saved') · Deleted (raw 'deleted'/legacy 'rejected'). rawStatus is
+      // kept for display in the non-action tabs.
+      const raw = lead.status || 'pending';
+      const st = raw === 'saved' ? 'approved' : (raw === 'rejected' ? 'deleted' : raw);
       const saleNet = sale ? (Number(sale.total) || 0) - (Number(sale.taxAmt) || 0) : 0;
       const purNet = purchase ? (Number(purchase.total) || 0) - (Number(purchase.taxAmt) || 0) : 0;
       // Show the real INB Link No when the voucher carries it (sourceRef = INB/…),
@@ -786,7 +790,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       const margin = Math.round((saleNet - purNet) * 100) / 100;
       return {
         key: (sale && sale.vno) || (purchase && purchase.vno), linkNo: inbLink || (sale && sale.vno) || (purchase && purchase.vno),
-        sale, purchase, status: st, from: lead.branch, to: toOf((sale || lead).party), date: lead.date,
+        sale, purchase, status: st, rawStatus: raw, from: lead.branch, to: toOf((sale || lead).party), date: lead.date,
         module: inbModuleOf(sale || purchase), saleVno: (sale && sale.vno) || '', purchaseVno: (purchase && purchase.vno) || '',
         approvedAt: (sale && (sale.approvedAt || sale.updatedAt)) || '',
         saleTotal, purTotal: purchase ? Number(purchase.total) || 0 : 0,
@@ -816,7 +820,9 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const needle = search.trim().toLowerCase();
   const matchDeal = (d) => !needle || [d.linkNo, d.saleVno, d.purchaseVno, d.from, d.to, d.module, String(Math.round(d.saleTotal))].filter(Boolean).join(' ').toLowerCase().includes(needle);
   const shown = deals.filter((d) => d.status === status && matchDeal(d));
-  const pendingTab = status === 'pending';
+  const pendingTab = status === 'pending';       // Approve/Reject actions + bulk approve
+  const unpushedTab = status === 'unpushed';     // Push/Revoke actions + bulk push
+  const actionTab = pendingTab || unpushedTab;   // tabs that show the checkbox + Actions column
   const allKeys = shown.map((d) => d.key);
   const toggleAll = () => setSel((s) => (s.size === allKeys.length ? new Set() : new Set(allKeys)));
   // Only PENDING legs can be approved/rejected; an already-approved leg is skipped.
@@ -826,14 +832,34 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const doApprove = async (list) => {
     const ids = list.flatMap(idsOf);
     if (!ids.length) return;
-    const { confirmed } = await confirmDialog({ title: `Approve ${list.length} INB deal(s)?`, message: 'Each posts its INB Sale + airline Purchase to the books.', confirmLabel: 'Approve' });
+    const { confirmed } = await confirmDialog({ title: `Approve ${list.length} INB deal(s)?`, message: 'Both legs move to Un-Pushed (validated, NOT yet posted). Push them to commit to the books and surface the deal in the buyer branch.', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusy(true);
     approveMany.mutate({ ids, approver: 'admin' }, {
-      onSuccess: (res) => { setSel(new Set()); const a = (res && res.approved) != null ? res.approved : ids.length, f = (res && res.failed) || 0; toast(f ? `Approved ${a}, ${f} failed` : `Approved ${list.length} INB deal(s)`, f ? 'error' : 'success'); },
+      onSuccess: (res) => { setSel(new Set()); const a = (res && res.approved) != null ? res.approved : ids.length, f = (res && res.failed) || 0; toast(f ? `Approved ${a}, ${f} failed` : `${list.length} INB deal(s) → Un-Pushed`, f ? 'error' : 'success'); },
       onError: (e) => toast((e && e.message) || 'Approve failed', 'error'),
       onSettled: () => setBusy(false),
     });
+  };
+
+  // Push an approved (un-pushed) INB deal → posts BOTH legs to the books and opens the
+  // link to the buyer branch's INB pipeline. Deal-level, by INB Link No. Accepts a list
+  // so the same handler serves the per-row button and the "Push selected" bulk action.
+  const doPush = async (list) => {
+    const targets = list.filter((d) => d.status === 'unpushed' && /^INB\//.test(d.linkNo));
+    if (!targets.length) { toast('Nothing to push — approve the deal first.', 'error'); return; }
+    const { confirmed } = await confirmDialog({ title: `Push ${targets.length} INB deal(s)?`, message: 'Posts each deal’s INB Sale + airline Purchase to the books and sends it to the buyer branch’s INB pipeline as pending.', confirmLabel: 'Push' });
+    if (!confirmed) return;
+    setBusy(true);
+    let ok = 0, fail = 0;
+    for (const d of targets) {
+      try { await apiPost('/api/inter-branch/push', { linkNo: d.linkNo }); ok++; }
+      catch (e) { fail++; toast(`${d.linkNo}: ${(e && e.message) || 'push failed'}`, 'error'); }
+    }
+    setSel(new Set());
+    if (ok) toast(`Pushed ${ok} INB deal(s) → Approved & Pushed`, 'success');
+    qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] });
+    setBusy(false);
   };
 
   const doReject = async (d) => {
@@ -893,9 +919,9 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     </button>
   );
 
-  const COLS = pendingTab
+  const COLS = actionTab
     ? ['', 'INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', 'Actions']
-    : ['INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', status === 'approved' ? 'Approved' : 'Status'];
+    : ['INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', status === 'approved' ? 'Pushed' : 'Status'];
   const colSpan = COLS.length;
 
   return (
@@ -903,13 +929,13 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: C.dark }}>INB SPG Approvals</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: C.dim }}>Pending have no books impact; approving posts the linked INB Sale + airline Purchase under one INB Link No. Each row is one inter-branch deal.</p>
+          <p style={{ margin: 0, fontSize: 11.5, color: C.dim }}>Two-step: <b>Approve</b> a Pending deal → <b>Un-Pushed</b> (validated, no books impact), then <b>Push</b> → <b>Approved &amp; Pushed</b> (posts both legs to the books and sends it to the buyer branch). Each row is one inter-branch deal.</p>
         </div>
         {setRoute && <button onClick={() => setRoute('/bookings/inter-branch')} style={{ padding: '8px 14px', background: C.dark, color: C.gold, border: 'none', borderRadius: 7, fontWeight: 800, fontSize: 12.5, cursor: 'pointer' }}>+ New INB Voucher</button>}
       </div>
 
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('rejected', 'Rejected')}</div>
+        <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('unpushed', 'Un-Pushed')}{tab('approved', 'Approved & Pushed')}{tab('deleted', 'Deleted')}</div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -920,17 +946,18 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
           {search && <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#9197a3', fontSize: 14, lineHeight: 1 }}>✕</button>}
         </div>
         {needle && <span style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{shown.length} match{shown.length === 1 ? '' : 'es'}</span>}
-        {pendingTab && shown.length > 0 && (
+        {actionTab && shown.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAll} style={{ padding: '5px 11px', fontSize: 11, color: C.blue, background: '#fff', border: '1px solid #bcd4ee', borderRadius: 6, cursor: 'pointer' }}>{sel.size === allKeys.length && allKeys.length ? '☑ Clear' : `☐ Select all (${allKeys.length})`}</button>
-            {sel.size > 0 && isApprover && <button disabled={busy} onClick={() => doApprove(shown.filter((d) => sel.has(d.key)))} style={{ padding: '5px 13px', fontSize: 11.5, background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Approve selected ({sel.size})</button>}
+            {sel.size > 0 && isApprover && pendingTab && <button disabled={busy} onClick={() => doApprove(shown.filter((d) => sel.has(d.key)))} style={{ padding: '5px 13px', fontSize: 11.5, background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Approve selected ({sel.size})</button>}
+            {sel.size > 0 && isApprover && unpushedTab && <button disabled={busy} onClick={() => doPush(shown.filter((d) => sel.has(d.key)))} style={{ padding: '5px 13px', fontSize: 11.5, background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Push selected ({sel.size})</button>}
           </span>
         )}
       </div>
 
       <div style={{ ...card, overflowX: 'auto' }}>
         {q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={6} cols={COLS.length} /></div>
-          : shown.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: C.dim, fontSize: 12 }}>{pendingTab ? 'No pending INB deals. Create one under “INB Voucher”.' : `No ${status} INB deals.`}</div>
+          : shown.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: C.dim, fontSize: 12 }}>{pendingTab ? 'No pending INB deals. Create one under “INB Voucher”.' : unpushedTab ? 'No un-pushed INB deals. Approve a Pending deal to move it here, then Push it.' : status === 'approved' ? 'No approved & pushed INB deals.' : `No ${status} INB deals.`}</div>
           : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
@@ -942,7 +969,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                 {shown.map((d) => (
                   <React.Fragment key={d.key}>
                     <tr style={{ borderTop: `1px solid ${C.border}` }}>
-                      {pendingTab && <td style={{ padding: '7px 12px' }}><input type="checkbox" checked={sel.has(d.key)} onChange={() => toggle(d.key)} aria-label={`select ${d.linkNo}`} /></td>}
+                      {actionTab && <td style={{ padding: '7px 12px' }}><input type="checkbox" checked={sel.has(d.key)} onChange={() => toggle(d.key)} aria-label={`select ${d.linkNo}`} /></td>}
                       <td {...clickable(() => setOpen((o) => (o === d.key ? null : d.key)))} title="Show JV details" style={{ padding: '7px 12px', fontFamily: 'monospace', color: C.blue, cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}>{open === d.key ? '▾ ' : '▸ '}{d.linkNo}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{fmtDate(d.date)}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{d.from} → {d.to}</td>
@@ -953,21 +980,25 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                       <td style={{ padding: '7px 12px', ...num }}>{d.purchase ? money(d.purTotal) : '—'}</td>
                       <td style={{ padding: '7px 12px', ...num, color: C.green, fontWeight: 700 }}>{money(d.margin)}</td>
                       <td style={{ padding: '7px 12px', ...num, color: C.dim }}>{d.gpPct}%</td>
-                      {pendingTab
+                      {actionTab
                         ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                            {isApprover ? <>
+                            {!isApprover ? <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>
+                              : pendingTab ? <>
                               {d.sale && <button disabled={busy} onClick={() => setEditId(d.sale.id || d.sale._id)} title="Edit the INB sale leg, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Sale</button>}
                               {d.purchase && <button disabled={busy} onClick={() => setEditId(d.purchase.id || d.purchase._id)} title="Edit the airline purchase leg, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Pur</button>}
-                              <button disabled={busy} onClick={() => doApprove([d])} style={{ marginRight: 6, padding: '5px 10px', background: C.green, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
+                              <button disabled={busy} onClick={() => doApprove([d])} title="Approve both legs → Un-Pushed (not yet posted)" style={{ marginRight: 6, padding: '5px 10px', background: C.green, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Approve</button>
                               <button disabled={busy} onClick={() => doReject(d)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
-                            </> : <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
+                            </> : <>{/* Un-Pushed: Push commits to the books; Revoke drops back to Pending */}
+                              <button disabled={busy} onClick={() => doPush([d])} title="Push → post both legs to the books and send to the buyer branch" style={{ marginRight: 6, padding: '5px 12px', background: C.blue, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 800, cursor: 'pointer' }}>⇪ Push</button>
+                              <button disabled={busy} onClick={() => doRevoke(d)} title="Revoke → back to Pending (numbers kept)" style={{ padding: '5px 10px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>⟲ Revoke</button>
+                            </>}
                           </td>
                         : <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: C.dim }}>{status === 'approved'
                             ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
                                 <span>{fmtDate(d.approvedAt) || 'Posted'}</span>
                                 {isApprover && <button disabled={busy} onClick={() => doRevoke(d)} title="Revoke this INB deal — un-post both legs to Pending (numbers kept)" style={{ padding: '4px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer', fontSize: 11 }}>⟲ Revoke</button>}
                               </span>
-                            : d.status}</td>}
+                            : (d.rawStatus || d.status)}</td>}
                     </tr>
                     {open === d.key && (
                       <tr><td colSpan={colSpan} style={{ padding: 0, background: '#fbfcfd' }}>
@@ -980,7 +1011,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
             </table>
           )}
       </div>
-      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>INB SPG vouchers post as <b>Pending</b> and hit the books only on approval — the INB Sale and its airline Purchase post together under one INB Link No. Click a row for the JV (Dr/Cr) of both legs.</div>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>INB SPG deals are two-step: <b>Approve</b> (Pending → Un-Pushed, no books impact) then <b>Push</b> (Un-Pushed → Approved &amp; Pushed) — Push posts the INB Sale + airline Purchase together under one INB Link No and sends the deal to the buyer branch. A deal can be <b>Revoked</b> back to Pending in either Un-Pushed or Approved &amp; Pushed. Click a row for the JV (Dr/Cr) of both legs.</div>
 
       {/* INB Refunds — RF/RI vouchers that reverse an INB deal. Routed here (not the
           SO/PO/GP queue); each is a single voucher, approved/rejected on its own row. */}

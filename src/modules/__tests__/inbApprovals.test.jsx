@@ -3,11 +3,12 @@
 // approve-many) or rejected; an already-posted ('saved') deal shows under Approved.
 // (jest.mock factories may only reference vars prefixed `mock`.)
 const mockApiGet = jest.fn();
+const mockApiPost = jest.fn(() => Promise.resolve({}));
 const mockApproveMany = jest.fn();
 const mockRejectAsync = jest.fn(() => Promise.resolve());
 const mockConfirm = jest.fn(() => Promise.resolve({ confirmed: true, reason: 'x' }));
 
-jest.mock('../../core/api', () => ({ apiGet: (...a) => mockApiGet(...a), getAuthToken: jest.fn(() => 'open') }));
+jest.mock('../../core/api', () => ({ apiGet: (...a) => mockApiGet(...a), apiPost: (...a) => mockApiPost(...a), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../../core/useAccounting', () => ({
   useVoucherApprovals: jest.fn(() => ({ data: {} })),
   useApproveVoucher: jest.fn(() => ({ mutate: jest.fn() })),
@@ -94,13 +95,28 @@ describe('INB SPG Approvals', () => {
     expect(screen.getAllByText('BOM → AMD', { exact: false })).toHaveLength(1);
   });
 
-  test('a posted (saved) deal shows under Approved, not Pending', async () => {
+  test('a posted (saved) deal shows under Approved & Pushed, not Pending', async () => {
     mockApiGet.mockResolvedValue(mkLegs('saved'));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
     expect(await screen.findByText('No pending INB deals.', { exact: false })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Approved/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Approved & Pushed/ }));
     expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
+  // Two-step INB workflow: an approved-but-un-pushed deal lands in the Un-Pushed tab and
+  // exposes a Push action that posts both legs via the deal-level /inter-branch/push.
+  test('an un-pushed deal sits in the Un-Pushed tab and Push posts it by INB Link No', async () => {
+    mockApiGet.mockResolvedValue(mkLegs('unpushed'));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    // not in Pending
+    expect(await screen.findByText('No pending INB deals.', { exact: false })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Un-Pushed/ }));
+    const pushBtn = await screen.findByRole('button', { name: /Push$/ });  // row "⇪ Push", not the tab
+    expect(pushBtn).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();   // already approved
+    fireEvent.click(pushBtn);
+    await waitFor(() => expect(mockApiPost).toHaveBeenCalledWith('/api/inter-branch/push', { linkNo: LINK }));
   });
 
   // INB refunds (RF/RI reversing an INB deal) are routed to THIS pipeline and render in
