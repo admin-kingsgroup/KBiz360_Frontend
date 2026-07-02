@@ -1703,6 +1703,11 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const [msg, setMsg] = useState('');
   const [editing, setEditing] = useState(null);
   const [groupBy, setGroupBy] = useState('none');
+  // Forward vs reversal filter. Refund/Reissue are SO/PO/GP reversal modules (RF/RI)
+  // that live in this same queue — this bar lets an approver focus on just those.
+  const [modFilter, setModFilter] = useState('all'); // all | forward | refund | reissue
+  const modOf = (b) => (b.module === 'RF' ? 'refund' : b.module === 'RI' ? 'reissue' : 'forward');
+  const matchMod = (b) => modFilter === 'all' || modOf(b) === modFilter;
   const [sel, setSel] = useState(() => new Set());
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const [search, setSearch] = useState(initialSearch || '');
@@ -1728,7 +1733,15 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const bucket = (b) => (b.status === 'posted' ? 'approved' : b.status);
   const counts = { pending: 0, approved: 0, rejected: 0, deleted: 0, edited: editedRows.length };
   data.forEach((b) => { if (counts[bucket(b)] !== undefined && inRange(b.date || '')) counts[bucket(b)]++; });
-  const rows = data.filter((b) => bucket(b) === status && inRange(b.date || '') && matchBooking(b)).sort(cmpLatest);
+  // Rows in the current status+range (before the search/module filters) — drives both
+  // the module-filter chip counts and the final visible list.
+  const statusRows = data.filter((b) => bucket(b) === status && inRange(b.date || ''));
+  const modCounts = { all: statusRows.length, forward: 0, refund: 0, reissue: 0 };
+  statusRows.forEach((b) => { modCounts[modOf(b)]++; });
+  // Only surface the Forward/Refund/Reissue filter when this branch actually has
+  // reversal bookings (else a forward-only branch just sees noise). Stable across tabs.
+  const hasReversals = data.some((b) => b.module === 'RF' || b.module === 'RI');
+  const rows = statusRows.filter((b) => matchBooking(b) && matchMod(b)).sort(cmpLatest);
   const allIds = rows.map((b) => b.id);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
@@ -1801,6 +1814,13 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       {msg && <div style={{ ...card, marginBottom: 12, fontSize: 12, padding: '8px 12px', color: msg.startsWith('⚠') ? '#dc2626' : '#16a34a', background: msg.startsWith('⚠') ? '#fbe9e9' : '#e8f6ed', border: '1px solid ' + (msg.startsWith('⚠') ? '#f3c9c9' : '#cde3b6') }}>{msg}</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
         <GroupByBar value={groupBy} onChange={setGroupBy} extra={status === 'approved' ? [['recent', 'Recently Approved']] : []} />
+        {hasReversals && status !== 'edited' && (
+          <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }} role="group" aria-label="Filter by module type">
+            {[['all', 'All'], ['forward', 'Forward'], ['refund', 'Refund'], ['reissue', 'Reissue']].map(([k, l]) => (
+              <button key={k} onClick={() => setModFilter(k)} aria-pressed={modFilter === k} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: modFilter === k ? BLUE : '#fff', color: modFilter === k ? '#fff' : '#5b616e' }}>{l} <span style={{ opacity: 0.75 }}>({modCounts[k]})</span></button>
+            ))}
+          </div>
+        )}
         <div style={{ position: 'relative', flex: '0 1 360px', minWidth: 200 }}>
           <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#9197a3', pointerEvents: 'none' }}>🔍</span>
           <input

@@ -204,13 +204,13 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
     <>
       {/* Link No → fetch the original SO/PO/GP booking (read-only) */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr auto', gap: 12, marginBottom: 14, alignItems: 'end' }}>
-        <FL label="Link No  (or booking / Sales / Purchase invoice no)">
+        <FL label="Link No  (or booking / Sales / Purchase / INB voucher no)">
           <input
             value={linkInput}
             onChange={(e) => setLinkInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); fetchLink(); } }}
             style={inp}
-            placeholder="LK/BOM/00524  ·  BKG/BOM/26/0357  ·  SF/BOM/26/0001"
+            placeholder="LK/BOM/00524  ·  BOM/0626/SF00495  ·  INB/BOM-AMD/26/0001"
           />
         </FL>
         <button type="button" onClick={fetchLink} disabled={fetching || !linkInput.trim()}
@@ -248,7 +248,7 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       {booking && (
         <div style={{ border: '1px solid #dfe2e7', borderRadius: 10, padding: 14, marginBottom: 16, background: '#fbfcfe' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: '#14161a' }}>SO/PO/GP voucher — {booking.bookingNo} <span style={{ color: '#9197a3', fontWeight: 600 }}>({booking.module} · {booking.status})</span></div>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: '#14161a' }}>{booking.isInterBranch ? 'Inter-branch (INB) deal' : 'SO/PO/GP voucher'} — {booking.bookingNo} <span style={{ color: '#9197a3', fontWeight: 600 }}>({booking.module || 'INB'} · {booking.status})</span></div>
             <button type="button" onClick={() => { setBooking(null); setBookingJv(null); }} style={{ border: 'none', background: 'none', color: '#9197a3', cursor: 'pointer', fontSize: 11 }}>hide ✕</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 16px', fontSize: 10.5, color: '#5b616e', marginBottom: 12 }}>

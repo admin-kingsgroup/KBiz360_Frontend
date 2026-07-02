@@ -519,6 +519,9 @@ export default function KB360App(){
     if(route==="/transactions/approvals")          return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     if(route==="/transactions/voucher-approvals")  return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
     if(route==="/transactions/inb-approvals")       return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="inbspg"/>;
+    // Per-type approval screens: /transactions/approvals/<category> opens the split
+    // screen for one gated voucher type (Receipt / Payment / … / ACM), bookmarkable.
+    if(/^\/transactions\/approvals\/(receipt|payment|contra|journal|purchase-expense|debit-note|credit-note|adm|acm)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain={route.split('/').pop()}/>;
     if(/^\/bookings\/(pending|approved|rejected|deleted|list)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     // Per-module Sale/Purchase ENTRY is retired — all product entry is via SO/PO/GP.
     // These routes now open the read-only Module Register (view + print invoices).
@@ -531,10 +534,10 @@ export default function KB360App(){
     if(route==="/payments")           return <PaymentVoucher branch={branch}/>;
     if(route==="/purchase-expense")          return <PurchaseExpenseVoucher branch={branch} setRoute={navigate}/>;
     // Purchase-Expense pending/approved/etc. now live in the unified Voucher Approvals queue.
-    if(/^\/purchase-expense\/(pending|approved|rejected|deleted)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
+    if(/^\/purchase-expense\/(pending|approved|rejected|deleted)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="purchase-expense"/>;
     if(route==="/debit-note")         return <DebitNoteVoucher branch={branch} setRoute={navigate}/>;
     // Debit-Note pending/approved/etc. share the unified Voucher Approvals queue.
-    if(/^\/debit-note\/(pending|approved|rejected|deleted)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
+    if(/^\/debit-note\/(pending|approved|rejected|deleted)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="debit-note"/>;
     // Refund / Reissue are now SO/PO/GP reversal modules — these routes open the
     // booking entry with the module preselected (the standalone RefundVoucher/
     // ReissueVoucher are retired; old links land on the new flow).

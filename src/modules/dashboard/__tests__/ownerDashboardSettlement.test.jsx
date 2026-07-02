@@ -136,33 +136,44 @@ describe('Owner Dashboard — Sales Reconciliation bridge (single branch)', () =
     useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: RECON }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
   });
 
-  test('renders the origin buckets and shows the refund as an ABSOLUTE subtraction (no double negative)', () => {
+  // Design 2: the Sales Reconciliation is no longer a standalone page panel — it folds
+  // into the pipeline "Approved Sales" card (inline buckets) and opens as a popup.
+  test('the Approved Sales card folds in the reconciliation buckets (refund as an ABSOLUTE subtraction)', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
-    expect(screen.getByText(/Sales Reconciliation/)).toBeInTheDocument();
     expect(screen.getByText('SO/PO/GP (forward sales)')).toBeInTheDocument();
     expect(screen.getByText('INB inter-branch')).toBeInTheDocument();
     expect(screen.getByText('Refund / Reissue')).toBeInTheDocument();
-    expect(screen.getByText('₹21,81,143')).toBeInTheDocument();  // refund rendered as |amount|, full grouped so it foots
+    expect(screen.getByText('₹21,81,143')).toBeInTheDocument();  // refund as |amount|, full grouped so it foots
     expect(screen.queryByText('₹-21,81,143')).toBeNull();         // never a double-negative
-    expect(screen.getByText('₹3,14,90,745')).toBeInTheDocument(); // bridge top == Revenue KPI value, full precision
+    expect(screen.getByText(/✓ matches Revenue/)).toBeInTheDocument();  // the card chip (✓ distinguishes it from the section title)
   });
 
-  test('a bucket row drills into its Approvals register', () => {
+  test('clicking the Approved Sales card opens the full Sales Reconciliation popup (foots to Revenue)', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
-    fireEvent.click(screen.getByText('Refund / Reissue').closest('button'));
-    expect(mockNavigate).toHaveBeenCalledWith('/transactions/approvals?tab=refund');
+    fireEvent.click(screen.getByText(/Approved Sales/).closest('[role="button"]'));
+    expect(screen.getByText(/Sales Reconciliation/)).toBeInTheDocument();      // popup title
+    expect(screen.getAllByText('₹3,14,90,745').length).toBeGreaterThan(0);     // popup total == Revenue KPI, full precision
   });
 
-  test('flags drift (residual) when the endpoint does not reconcile', () => {
+  test('the Sales popup footer opens the full P&L report', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText(/Approved Sales/).closest('[role="button"]'));
+    fireEvent.click(screen.getByText(/Open full report/));
+    expect(mockNavigate).toHaveBeenCalledWith('/reports/pnl');
+  });
+
+  test('flags drift (residual) inside the popup when the endpoint does not reconcile', () => {
     useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: { ...RECON, reconciles: false, residual: 5000 } }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText(/Approved Sales/).closest('[role="button"]'));
     expect(screen.getByText(/Unreconciled by/)).toBeInTheDocument();
   });
 
-  test('hides the bridge on Group/ALL scope (no cross-currency merge)', () => {
+  test('hides the reconciliation on Group/ALL scope (no cross-currency merge)', () => {
     useDirectorDashboard.mockReturnValue({ data: { ...LOADED, salesRecon: RECON, bookingsByBranch: [] }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
     expect(screen.queryByText(/Sales Reconciliation/)).toBeNull();
+    expect(screen.queryByText(/✓ matches Revenue/)).toBeNull();
   });
 });
 
@@ -183,22 +194,29 @@ describe('Owner Dashboard — Gross Profit Reconciliation bridge (single branch)
     useDirectorDashboard.mockReturnValue({ data: { ...LOADED, gpRecon: GP_RECON }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
   });
 
-  test('renders the GP bridge incl the material Commission/Adjustments bucket', () => {
+  test('the Approved GP card folds in the GP reconciliation incl the material Commission/Adjustments bucket', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
-    expect(screen.getByText(/Gross Profit Reconciliation/)).toBeInTheDocument();
     expect(screen.getByText('SO/PO/GP (sale − cost)')).toBeInTheDocument();
     expect(screen.getByText('Commission / Discounts / JV')).toBeInTheDocument();
-    expect(screen.getByText('₹15,48,000')).toBeInTheDocument(); // bridge top == GP KPI value, full precision
-    expect(screen.getByText('₹1,79,000')).toBeInTheDocument();  // commission bucket
+    expect(screen.getByText('₹1,79,000')).toBeInTheDocument();  // commission bucket, inline on the card
+    expect(screen.getByText(/✓ matches Gross Profit/)).toBeInTheDocument();
   });
 
-  test('a GP bucket row drills into its Approvals register', () => {
+  test('clicking the Approved GP card opens the full Gross Profit Reconciliation popup', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
-    fireEvent.click(screen.getByText('Commission / Discounts / JV').closest('button'));
-    expect(mockNavigate).toHaveBeenCalledWith('/transactions/approvals?tab=adjustments');
+    fireEvent.click(screen.getByText(/Approved GP/).closest('[role="button"]'));
+    expect(screen.getByText(/Gross Profit Reconciliation/)).toBeInTheDocument();
+    expect(screen.getAllByText('₹15,48,000').length).toBeGreaterThan(0); // popup total == GP KPI value, full precision
   });
 
-  test('hides the GP bridge on Group/ALL scope', () => {
+  test('the GP popup footer opens the full GP report', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText(/Approved GP/).closest('[role="button"]'));
+    fireEvent.click(screen.getByText(/Open full report/));
+    expect(mockNavigate).toHaveBeenCalledWith('/reports/gp');
+  });
+
+  test('hides the GP reconciliation on Group/ALL scope', () => {
     useDirectorDashboard.mockReturnValue({ data: { ...LOADED, gpRecon: GP_RECON, bookingsByBranch: [] }, totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn() });
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
     expect(screen.queryByText(/Gross Profit Reconciliation/)).toBeNull();
@@ -229,5 +247,41 @@ describe('Owner Dashboard — Group / ALL', () => {
     expect(screen.getByText(/its 13-week cash forecast/)).toBeInTheDocument();
     expect(screen.getByText(/its consultant leaderboard/)).toBeInTheDocument();
     expect(screen.queryByText('PNL')).toBeNull();
+  });
+});
+
+describe('AD Dashboard — KPI drill-downs (Design 2, single branch)', () => {
+  beforeEach(() => {
+    mockUseAgeing.mockReturnValue({ data: {
+      receivables: { totals: { d0: 400, d30: 300, d60: 200, d90: 100, total: 1000, onAccount: 240 } },
+      payables: { totals: { d0: 0, d30: 0, d60: 0, d90: 600, total: 600, onAccount: 150 } },
+    } });
+    useDirectorDashboard.mockReturnValue({
+      data: { ...LOADED, figures: { ...LOADED.figures, revenue: 100000, gp: 3000, netProfit: -5000, outstanding: 1000, payable: 600 } },
+      totalCashInr: 0, isLoading: false, isError: false, refetch: jest.fn(),
+    });
+  });
+
+  test('clicking the Net Profit KPI opens the Profit Bridge popup', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    expect(screen.queryByText(/Net Profit Bridge/)).toBeNull();       // popup closed by default
+    fireEvent.click(screen.getByText(/KPI\|Net Profit/));
+    expect(screen.getByText(/Net Profit Bridge/)).toBeInTheDocument(); // popup opens
+    expect(screen.getByText('Indirect Expenses')).toBeInTheDocument();
+  });
+
+  test('clicking the Receivables KPI opens the ageing popup incl the 90+ bucket, footing to the KPI', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText(/KPI\|Receivables/));
+    expect(screen.getByText('Receivables — Ageing')).toBeInTheDocument(); // exact — distinct from the "…— Ageing & Settlement" widget
+    expect(screen.getByText('90+ days (overdue)')).toBeInTheDocument();
+    expect(screen.getAllByText('₹1,000').length).toBeGreaterThan(0);  // popup total == Receivables KPI
+  });
+
+  test('the Receivables popup footer opens the AR/AP dashboard', () => {
+    render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={{ code: 'BOM' }} />);
+    fireEvent.click(screen.getByText(/KPI\|Receivables/));
+    fireEvent.click(screen.getByText(/Open full report/));
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboards/arap');
   });
 });

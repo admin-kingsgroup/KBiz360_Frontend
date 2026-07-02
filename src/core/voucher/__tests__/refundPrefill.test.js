@@ -238,6 +238,41 @@ describe('refundPrefillFromLeg (Phase 4)', () => {
   });
 });
 
+// ── Inter-branch (INB): refund raised against a single INB Link No ────────────
+// The backend by-link lookup shapes an INB deal into this booking-like object (see
+// inb.service.inbToBookingLike), so refundPrefillFromBooking must fill against-sale +
+// against-purchase (and the buyer-branch debtor / airline supplier) from one INB no.
+const INB_BOOKING = {
+  isInterBranch: true,
+  saleVno: 'INB/BOM/26/0001',
+  purchaseVno: 'INB/BOM/26/0002',
+  customer: { name: 'Travkings Tours and Travels AMD', ledgerName: 'Travkings Tours and Travels AMD' },
+  supplier: { name: 'TRIP JACK', ledgerName: 'TRIP JACK' },
+  gstMode: 'inter',
+  so: { lines: [{ ledger: 'IT-SVF [IB]' }], total: 30551, gst: 21.81, gstMode: 'inter' },
+  po: { total: 29113, serviceCharge: 0, gst: 0, incentiveAmt: 200, incentiveGst: 0, incentiveTds: 20 },
+  purchases: [],
+};
+
+describe('refundPrefillFromBooking — INB deal', () => {
+  test('fills against-sale + against-purchase from the one fetched INB deal', () => {
+    const p = refundPrefillFromBooking(INB_BOOKING, {}, true);
+    expect(p.againstInvoice).toBe('INB/BOM/26/0001');
+    expect(p.againstPurchase).toBe('INB/BOM/26/0002');
+  });
+  test('party = buyer-branch debtor; counterParty = airline; gstMode inter', () => {
+    const p = refundPrefillFromBooking(INB_BOOKING, {}, true);
+    expect(p.party).toBe('Travkings Tours and Travels AMD');
+    expect(p.counterParty).toBe('TRIP JACK');
+    expect(p.gstMode).toBe('inter');
+  });
+  test('supplier refund = purchase net (no supplier service charge); commission clawback carried', () => {
+    const p = refundPrefillFromBooking(INB_BOOKING, {}, true);
+    expect(p.supplierAmt).toBe(29113);   // po.total − serviceCharge − gst
+    expect(p.incentiveAmt).toBe(200);    // commission clawed back on cancellation
+  });
+});
+
 // The "Refund payable to customer" caption must equal what actually posts to the client
 // (customer leg of the full-reversal JV, net of the cancellation recovered) — not the old
 // net-settlement formula. Regression guard for the RF00063 "client amount differs" report.

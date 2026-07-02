@@ -19,6 +19,7 @@ import { KeyAlertsPanel } from '../components/shared/KeyAlertsPanel';
 import { PnlWaterfallPanel } from '../components/shared/PnlWaterfallPanel';
 import { CashForecastPanel } from '../components/shared/CashForecastPanel';
 import { TopEntitiesTable } from '../components/tables/TopEntitiesTable';
+import { DrilldownModal, ApprovedReconCard } from '../components/shared/DashboardDrilldown';
 import { useModulePL, useBalanceSheet, useAgeing, useTaxSummary, useTrialBalance, useTargetsVsActual } from '../../../core/useAccounting';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { DashboardError } from '../../../core/ux/DashboardError';
@@ -129,6 +130,8 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL' || effScope === 'ALL';
   const branchArg = scopeBranchArg(effScope);
   const [period, setPeriod] = React.useState(() => periodRange('all', { branch: branchArg }));
+  // Design 2: which KPI/Approved card drill-down popup is open (null = none).
+  const [drill, setDrill] = React.useState(null);
   const dates = period;
   const { data, totalCashInr, isLoading, isError, error, refetch } = useDirectorDashboard({ scope: effScope, from: period.from, to: period.to });
   const cur = bc(branch).cur;
@@ -225,7 +228,6 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   const { revenueTrend, topCustomers, topSuppliers, topConsultants = [], keyAlerts = [] } = data;
   const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0, cash: 0 };
   const pb = data.pendingBookings || { count: 0, sales: 0, gp: 0 };
-  const ab = data.approvedBookings || { count: 0, sales: 0, gp: 0 };
   const rangeShort = period.label || 'Period';
 
   const assets = bs.assets || [], liabs = bs.liabilities || [];
@@ -234,6 +236,99 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   const liquid = bankRows.reduce((s, r) => s + bal(r), 0) || fig.cash || totalCashInr;
   const arOverdue = age?.receivables?.totals?.d90 || 0;
   const mods = (mpl.modules || []).slice().sort((a, b) => (b.gp || 0) - (a.gp || 0));
+
+  // ── Design 2 drill-downs ── every headline KPI (and the pipeline Approved cards)
+  // opens a popup proving its figure by origin. Configs are built from the SAME live
+  // data the cards read, so each popup foots to the card to the rupee. Consolidated
+  // (single-branch) scope only — the Group/ALL per-branch cards keep report navigation.
+  const reconRows = (recon) => (recon?.buckets || []).map((b) => ({
+    label: b.label, sign: b.amount < 0 ? '−' : '+', count: b.count || null,
+    value: mFull(Math.abs(b.amount)), muted: b.amount === 0 && !b.count,
+  }));
+  // Surface reconciliation drift (a Sales/GP-ledger posting not classified) inside the popup.
+  const driftRow = (recon) => (recon && recon.reconciles === false)
+    ? [{ label: `Unreconciled by ${mFull(Math.abs(recon.residual || 0))} — a posting isn't classified; see the Other/Manual bucket`, memo: true, value: '' }]
+    : [];
+  const ageRows = (tot = {}) => ([
+    { label: 'Current (0–30 days)', value: mFull(tot.d0 || 0) },
+    { label: '31–60 days', value: mFull(tot.d30 || 0) },
+    { label: '61–90 days', value: mFull(tot.d60 || 0) },
+    { label: '90+ days (overdue)', value: mFull(tot.d90 || 0), neg: (tot.d90 || 0) > 0 },
+  ]);
+  const arT = age?.receivables?.totals || {}, apT = age?.payables?.totals || {};
+  const DRILL = {
+    cash: {
+      title: 'Cash & Bank', sub: 'Live balance by account', totalLabel: 'Net Cash & Bank',
+      total: mFull(liquid), totalColor: liquid < 0 ? C.red : C.green,
+      rows: (bankRows || []).map((r) => ({ label: r.ledger, value: mFull(bal(r)), neg: bal(r) < 0 }))
+        .concat([{ label: 'Net', value: mFull(liquid), total: true, neg: liquid < 0 }]),
+      route: '/dashboards/cash',
+    },
+    revenue: {
+      title: `Sales Reconciliation · ${rangeShort}`, sub: 'How the Revenue figure is composed',
+      totalLabel: `Revenue · ${rangeShort}`, total: mFull(data.salesRecon?.revenue ?? fig.revenue), totalColor: '#c2a04a',
+      rows: reconRows(data.salesRecon).concat(driftRow(data.salesRecon)).concat([{ label: `Revenue · ${rangeShort}`, total: true, value: mFull(data.salesRecon?.revenue ?? fig.revenue) }]),
+      route: '/reports/pnl',
+    },
+    gp: {
+      title: `Gross Profit Reconciliation · ${rangeShort}`, sub: 'How the GP figure is composed',
+      totalLabel: `Gross Profit · ${rangeShort}`, total: mFull(data.gpRecon?.gp ?? fig.gp), totalColor: C.green,
+      rows: reconRows(data.gpRecon).concat(driftRow(data.gpRecon)).concat([{ label: `Gross Profit · ${rangeShort}`, total: true, value: mFull(data.gpRecon?.gp ?? fig.gp) }]),
+      route: '/reports/gp',
+    },
+    netprofit: {
+      title: `Net Profit Bridge · ${rangeShort}`, sub: 'GP less indirect expenses',
+      totalLabel: `Net Profit · ${rangeShort}`,
+      total: mFull(fig.netProfit), totalColor: fig.netProfit >= 0 ? C.green : C.red,
+      rows: [
+        { label: 'Gross Profit', sign: '+', value: mFull(mpl.totals?.gp ?? fig.gp) },
+        { label: 'Indirect / Other Income', sign: '+', muted: true, value: mFull(mpl.indirect?.income || 0) },
+        { label: 'Indirect Expenses', sign: '−', value: mFull(mpl.indirect?.expense || 0) },
+        { label: `Net Profit · ${rangeShort}`, total: true, value: mFull(fig.netProfit), neg: fig.netProfit < 0 },
+      ],
+      route: '/reports/pnl',
+    },
+    receivables: {
+      title: 'Receivables — Ageing', sub: 'Open bills by bucket', totalLabel: 'Receivables (open)',
+      total: mFull(fig.outstanding), totalColor: C.gold,
+      rows: ageRows(arT).concat([
+        { label: 'Total to collect', total: true, value: mFull(fig.outstanding) },
+        { label: 'Memo · on-account (unapplied receipts)', memo: true, value: mFull(arT.onAccount || 0) },
+      ]),
+      route: '/dashboards/arap',
+    },
+    payables: {
+      title: 'Payables — Ageing', sub: 'Open bills by bucket', totalLabel: 'Payables (open)',
+      total: mFull(fig.payable), totalColor: C.red,
+      rows: ageRows(apT).concat([
+        { label: 'Total to pay', total: true, value: mFull(fig.payable), neg: true },
+        { label: 'Memo · on-account (unapplied payments)', memo: true, value: mFull(apT.onAccount || 0) },
+      ]),
+      route: '/dashboards/arap',
+    },
+    tax: {
+      title: 'GST / Tax Net', sub: 'Output less input', totalLabel: 'Net GST Payable',
+      total: mFull(tax.netPayable || 0), totalColor: '#2563eb',
+      rows: [
+        { label: 'Output GST (on sales)', sign: '+', value: mFull(tax.output?.total || 0) },
+        { label: 'Input Tax Credit (ITC)', sign: '−', value: mFull(tax.input?.total || 0) },
+        { label: 'Net GST payable', total: true, value: mFull(tax.netPayable || 0) },
+        { label: 'Memo · TDS payable', memo: true, value: mFull(tax.withholding?.payable || 0) },
+        { label: 'Memo · TDS receivable', memo: true, value: mFull(tax.withholding?.receivable || 0) },
+      ],
+      route: '/reports/tax-summary',
+    },
+    pending: {
+      title: 'Pending Approvals', sub: `${pb.count} awaiting`, totalLabel: 'Pending Sales',
+      total: mFull(pb.sales), totalColor: '#d97706',
+      rows: [
+        { label: 'Pending Sales', value: mFull(pb.sales) },
+        { label: 'Pending GP', value: mFull(pb.gp) },
+        { label: `${pb.count} vouchers to approve`, total: true, value: '' },
+      ],
+      route: '/transactions/approvals',
+    },
+  };
 
   // Per-branch slice accessors for the consolidated financial-detail tables (Group/ALL):
   // each branch's GP-by-module / balance sheet / ageing / cash from its own `byBranch`
@@ -288,109 +383,31 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
         </div>
       ) : (
         <ResponsiveGrid min="180px" gap="md" className="mb-4">
-          <KPICard label="Cash & Bank" value={m0(liquid)} delta={liquid < 0 ? 'overdrawn' : 'liquid'} color={liquid < 0 ? C.red : '#16a34a'} onClick={() => navigate('/dashboards/cash')} />
-          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta={mFull(fig.revenue)} color="#c2a04a" onClick={() => navigate('/reports/pnl')} />
-          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={`${fig.gpPct ? Number(fig.gpPct).toFixed(1) + '% GP · ' : ''}${mFull(fig.gp)}`} color="#16a34a" onClick={() => navigate('/reports/gp')} />
-          <KPICard label="Net Profit" value={m0(fig.netProfit)} delta={fig.revenue ? `${((fig.netProfit / fig.revenue) * 100).toFixed(1)}% margin` : ''} color={fig.netProfit >= 0 ? C.green : C.red} onClick={() => navigate('/reports/pnl')} />
-          <KPICard label="Receivables" value={m0(fig.outstanding)} delta={arOverdue ? `${m0(arOverdue)} overdue 90+` : 'to collect'} color={arOverdue ? C.red : C.gold} onClick={() => navigate('/dashboards/arap')} />
-          <KPICard label="Payables" value={m0(fig.payable)} delta="to pay" color={C.red} onClick={() => navigate('/dashboards/arap')} />
-          <KPICard label="GST / Tax Net" value={m0(tax.netPayable || 0)} delta={(tax.netPayable || 0) >= 0 ? 'payable' : 'refundable'} color="#2563eb" onClick={() => navigate('/reports/tax-summary')} />
-          <KPICard label="Pending Approvals" value={m0(pb.sales)} delta={`${pb.count} awaiting`} color={pb.count ? '#d97706' : '#16a34a'} onClick={() => navigate('/transactions/approvals')} />
+          <KPICard label="Cash & Bank" value={m0(liquid)} delta={liquid < 0 ? 'overdrawn' : 'liquid'} color={liquid < 0 ? C.red : '#16a34a'} onClick={() => setDrill('cash')} />
+          <KPICard label={`Revenue · ${rangeShort}`} value={m0(fig.revenue)} delta={mFull(fig.revenue)} color="#c2a04a" onClick={() => setDrill('revenue')} />
+          <KPICard label="Gross Profit" value={m0(fig.gp)} delta={`${fig.gpPct ? Number(fig.gpPct).toFixed(1) + '% GP · ' : ''}${mFull(fig.gp)}`} color="#16a34a" onClick={() => setDrill('gp')} />
+          <KPICard label="Net Profit" value={m0(fig.netProfit)} delta={fig.revenue ? `${((fig.netProfit / fig.revenue) * 100).toFixed(1)}% margin` : ''} color={fig.netProfit >= 0 ? C.green : C.red} onClick={() => setDrill('netprofit')} />
+          <KPICard label="Receivables" value={m0(fig.outstanding)} delta={arOverdue ? `${m0(arOverdue)} overdue 90+` : 'to collect'} color={arOverdue ? C.red : C.gold} onClick={() => setDrill('receivables')} />
+          <KPICard label="Payables" value={m0(fig.payable)} delta="to pay" color={C.red} onClick={() => setDrill('payables')} />
+          <KPICard label="GST / Tax Net" value={m0(tax.netPayable || 0)} delta={(tax.netPayable || 0) >= 0 ? 'payable' : 'refundable'} color="#2563eb" onClick={() => setDrill('tax')} />
+          <KPICard label="Pending Approvals" value={m0(pb.sales)} delta={`${pb.count} awaiting`} color={pb.count ? '#d97706' : '#16a34a'} onClick={() => setDrill('pending')} />
         </ResponsiveGrid>
       )}
 
-      {/* ── Sales Reconciliation (single-branch only — no cross-currency merge on Group) ──
-          Proves the Revenue KPI BY ORIGIN: Revenue = SO/PO/GP + INB − Refund/Reissue
-          (+ Other/Manual). Same Sales-Accounts source as the Revenue card, so it foots
-          to the rupee; each line drills into its Approvals register. */}
-      {!isAll && data.salesRecon && (data.salesRecon.buckets || []).length > 0 && (data.salesRecon.revenue || data.salesRecon.bucketSum) ? (
-        <div className="mb-4">
-          <div className="mb-1.5 text-xs font-semibold text-ink-muted">
-            Sales Reconciliation · {rangeShort} <span className="font-normal">— how the Revenue figure is composed</span>
-          </div>
-          <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
-            <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: '#185FA5' }}>
-              <span className="text-sm font-extrabold text-ink">Revenue · {rangeShort}</span>
-              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#c2a04a' }}>{mFull(data.salesRecon.revenue)}</span>
-            </div>
-            {data.salesRecon.buckets.map((b) => {
-              // Operator + colour follow the SIGNED amount (refund is naturally negative),
-              // and we render the absolute value so a subtracted line reads "− ₹21.8L",
-              // not a confusing "− … -₹21.8L". Empty catch-all (Other = 0) is inert & dim.
-              const neg = b.amount < 0;
-              const empty = b.amount === 0 && b.count === 0;
-              const inner = (
-                <>
-                  <span className="flex items-center gap-2 text-xs text-ink-muted">
-                    <span className="w-3 text-center font-bold" style={{ color: neg ? C.red : C.green }}>{neg ? '−' : '+'}</span>
-                    {b.label}
-                    {b.count ? <span className="text-[11px] text-ink-muted">· {b.count}</span> : null}
-                  </span>
-                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{mFull(Math.abs(b.amount))}</span>
-                </>
-              );
-              return empty ? (
-                <div key={b.key} className="flex w-full items-center justify-between py-1.5 opacity-60">{inner}</div>
-              ) : (
-                <button key={b.key} type="button" onClick={() => navigate(`/transactions/approvals?tab=${b.key}`)} className="flex w-full items-center justify-between py-1.5 text-left hover:opacity-80">{inner}</button>
-              );
-            })}
-            {!data.salesRecon.reconciles && (
-              <div className="mt-1 rounded border px-2 py-1 text-[11px] font-semibold" style={{ borderColor: C.red, color: C.red }}>
-                Unreconciled by {mFull(Math.abs(data.salesRecon.residual))} — a Sales-ledger posting isn't classified; see the Other/Manual bucket.
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {/* ── Gross-Profit Reconciliation (single-branch only) ──
-          Proves the GP KPI BY ORIGIN: GP = SO/PO/GP + INB + Refund/Reissue +
-          Commission/Adjustments (+ Other). Same 6 GP heads as the GP card, so it foots
-          to the rupee; the Commission/Discounts/JV line is a material, real bucket. */}
-      {!isAll && data.gpRecon && (data.gpRecon.buckets || []).length > 0 && (data.gpRecon.gp || data.gpRecon.bucketSum) ? (
-        <div className="mb-4">
-          <div className="mb-1.5 text-xs font-semibold text-ink-muted">
-            Gross Profit Reconciliation · {rangeShort} <span className="font-normal">— how the GP figure is composed</span>
-          </div>
-          <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
-            <div className="flex items-baseline justify-between border-b-2 pb-2" style={{ borderColor: '#185FA5' }}>
-              <span className="text-sm font-extrabold text-ink">Gross Profit · {rangeShort}</span>
-              <span className="text-lg font-extrabold tabular-nums" style={{ color: '#16a34a' }}>{mFull(data.gpRecon.gp)}</span>
-            </div>
-            {data.gpRecon.buckets.map((b) => {
-              const neg = b.amount < 0;
-              const empty = b.amount === 0 && b.count === 0;
-              const inner = (
-                <>
-                  <span className="flex items-center gap-2 text-xs text-ink-muted">
-                    <span className="w-3 text-center font-bold" style={{ color: neg ? C.red : C.green }}>{neg ? '−' : '+'}</span>
-                    {b.label}
-                    {b.count ? <span className="text-[11px] text-ink-muted">· {b.count}</span> : null}
-                  </span>
-                  <span className={`text-sm font-bold tabular-nums ${empty ? 'text-ink-muted' : 'text-ink'}`}>{mFull(Math.abs(b.amount))}</span>
-                </>
-              );
-              return empty ? (
-                <div key={b.key} className="flex w-full items-center justify-between py-1.5 opacity-60">{inner}</div>
-              ) : (
-                <button key={b.key} type="button" onClick={() => navigate(`/transactions/approvals?tab=${b.key}`)} className="flex w-full items-center justify-between py-1.5 text-left hover:opacity-80">{inner}</button>
-              );
-            })}
-            {!data.gpRecon.reconciles && (
-              <div className="mt-1 rounded border px-2 py-1 text-[11px] font-semibold" style={{ borderColor: C.red, color: C.red }}>
-                Unreconciled by {mFull(Math.abs(data.gpRecon.residual))} — a GP-ledger posting isn't classified; see the Other/Manual bucket.
-              </div>
-            )}
-          </div>
-        </div>
-      ) : null}
+      {/* ── Design 2: the Sales & GP Reconciliation panels were removed from the page
+          body; they now open as a drill-down popup from the Revenue / Gross Profit KPI
+          cards above and from the pipeline Approved cards below (see DRILL configs). ── */}
 
       {/* ── Bookings pipeline (condensed) ── on Group/ALL: per branch, each in its own
-          currency (Sales/GP money never summed across branches). The booking queue is
-          NOT date-bound, so the header says "whole queue" (not the selected period) to
-          avoid implying it's period-scoped like the Revenue/GP figures above. */}
-      <div className="mb-1.5 text-xs font-semibold text-ink-muted">SO/PO/GP Pipeline <span className="font-normal">· whole queue (not date-bound)</span></div>
+          currency (Sales/GP money never summed across branches). Consolidated scope
+          (single branch) ⇒ the Approved cards fold in the reconciliation (Design 2):
+          they equal Revenue·All / Gross Profit·All and open the full breakdown on click.
+          Group/ALL keeps the whole-queue booking figures (not date-bound). */}
+      <div className="mb-1.5 text-xs font-semibold text-ink-muted">
+        {isAll
+          ? <>SO/PO/GP Pipeline <span className="font-normal">· whole queue (not date-bound)</span></>
+          : <>Sales &amp; GP Pipeline <span className="font-normal">· all sources — Approved matches Revenue · {rangeShort}</span></>}
+      </div>
       {isAll && Array.isArray(data.bookingsByBranch) ? (
         <div className="mb-4">
           {data.bookingsByBranch.length === 0 && (
@@ -413,10 +430,24 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
         </div>
       ) : (
         <ResponsiveGrid min="180px" gap="md" className="mb-4">
-          <KPICard label="Approved Sales" value={m0(ab.sales)} delta={`${ab.count} posted`} color="#c2a04a" onClick={() => navigate('/transactions/approvals')} />
-          <KPICard label="Approved GP" value={m0(ab.gp)} delta={ab.sales > 0 ? `${((ab.gp / ab.sales) * 100).toFixed(1)}% GP` : ''} color="#16a34a" onClick={() => navigate('/transactions/approvals')} />
-          <KPICard label="Pending Sales" value={m0(pb.sales)} delta={`${pb.count} to approve`} color="#d97706" onClick={() => navigate('/transactions/approvals')} />
-          <KPICard label="Pending GP" value={m0(pb.gp)} delta="not yet posted" color="#d97706" onClick={() => navigate('/transactions/approvals')} />
+          <ApprovedReconCard
+            label={`Approved Sales · ${rangeShort}`}
+            value={m0(data.salesRecon?.revenue ?? fig.revenue)}
+            matchText={`✓ matches Revenue · ${rangeShort}`}
+            color="#c2a04a"
+            buckets={data.salesRecon?.buckets || []}
+            fmt={mFull}
+            onClick={() => setDrill('revenue')} />
+          <ApprovedReconCard
+            label={`Approved GP · ${rangeShort}`}
+            value={m0(data.gpRecon?.gp ?? fig.gp)}
+            matchText={`✓ matches Gross Profit · ${rangeShort}${fig.gpPct ? ' · ' + Number(fig.gpPct).toFixed(1) + '%' : ''}`}
+            color="#16a34a"
+            buckets={data.gpRecon?.buckets || []}
+            fmt={mFull}
+            onClick={() => setDrill('gp')} />
+          <KPICard label="Pending Sales" value={m0(pb.sales)} delta={`${pb.count} to approve`} color="#d97706" onClick={() => setDrill('pending')} />
+          <KPICard label="Pending GP" value={m0(pb.gp)} delta="not yet posted" color="#d97706" onClick={() => setDrill('pending')} />
         </ResponsiveGrid>
       )}
 
@@ -512,6 +543,8 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
             : <TopEntitiesTable rows={topSuppliers} kind="supplier" valueKey="spend" countKey="vouchers" formatMoney={m0} />}
         </WidgetCard>
       </div>
+      {/* Design 2 drill-down popup — proves the clicked KPI / Approved card by origin. */}
+      <DrilldownModal cfg={drill ? DRILL[drill] : null} onClose={() => setDrill(null)} onNavigate={navigate} />
     </PageLayout>
   );
 }

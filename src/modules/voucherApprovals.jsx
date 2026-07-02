@@ -55,7 +55,11 @@ const drCrOf = (e) => {
   return { drLedger: name(dr), crLedger: name(cr), drAmt: dr.reduce((s, p) => s + (p.debit || 0), 0), crAmt: cr.reduce((s, p) => s + (p.credit || 0), 0) };
 };
 
-export function VoucherApprovals({ branch, currentUser }) {
+export function VoucherApprovals({ branch, currentUser, category = '' }) {
+  // `category` (receipt / payment / …) turns this into a single-type approval screen:
+  // the query is scoped server-side, "Voucher Type wise" is dropped (redundant), the
+  // heading names the type, and Approve-all only touches that type. Empty = combined queue.
+  const single = !!category;
   // Deleting a voucher is admin-only (Super Admin / Director). A Branch Accountant
   // can EDIT (which returns it to Pending for re-approval) but never delete — so the
   // Delete button is hidden for non-admins (the backend also 403s the delete).
@@ -70,6 +74,9 @@ export function VoucherApprovals({ branch, currentUser }) {
   const [viewId, setViewId] = useState(null);      // voucher being viewed (read-only formatted view)
   const viewRef = useRef(null);
   const [view, setView] = useState('tree');        // entry | voucher | tree (Group-Subgroup-Ledger)
+  // On a single-type screen the "Voucher Type wise" view is meaningless (one type) —
+  // fall back to the tree so a stale 'voucher' selection never shows an empty view.
+  const effView = single && view === 'voucher' ? 'tree' : view;
   useModalEsc(() => setViewId(null), !!viewId);     // Esc closes the view modal
   useModalEsc(() => setEditId(null), !!editId);     // Esc closes the edit modal
   const cur = (bc(branch) || {}).cur || '₹';
@@ -84,14 +91,15 @@ export function VoucherApprovals({ branch, currentUser }) {
   // PENDING shows every pending voucher with NO date filter and NO period bar — always
   // "all" regardless of any range left over from another tab. The settled tabs use `range`.
   const effRange = status === 'pending' ? periodRange('all', { branch }) : range;
-  const q = useVoucherApprovals(branch, status, { from: effRange.from, to: effRange.to });
+  const q = useVoucherApprovals(branch, status, { from: effRange.from, to: effRange.to, category });
   const d = q.data || {};
   // Vouchers edited ≥ once (cross-cuts status) — its own source for the Edited tab.
   // Uses the SAME branch resolution as every other voucher query (branchCode →
   // undefined for "ALL", which apiGet omits → all branches).
   const brCode = branchCode(branch);
   const editedQ = useQuery({ queryKey: ['voucher-edited', brCode || 'all'], queryFn: () => apiGet('/api/vouchers/edited', brCode ? { branch: brCode } : {}) });
-  const editedRows = editedQ.data || [];
+  // The edited feed spans all types; a single-type screen shows only its own edits.
+  const editedRows = useMemo(() => (single ? (editedQ.data || []).filter((r) => r.category === category) : (editedQ.data || [])), [editedQ.data, single, category]);
   const counts = {
     ...(d.counts || { pending: { n: 0, amount: 0 }, approved: { n: 0, amount: 0 }, rejected: { n: 0, amount: 0 }, deleted: { n: 0, amount: 0 } }),
     edited: { n: editedRows.length, amount: editedRows.reduce((s, r) => s + (r.total || 0), 0) },
@@ -197,7 +205,7 @@ export function VoucherApprovals({ branch, currentUser }) {
   };
   const doApproveAll = async () => {
     const { confirmed } = await confirmDialog({ title: `Approve all ${counts.pending.n} pending vouchers?`, message: `For ${branchLabel(branch)}. They will post to the books.`, confirmLabel: 'Approve all' });
-    if (confirmed) approveAll.mutate({ branch, approver: 'admin' }, {
+    if (confirmed) approveAll.mutate({ branch, category, approver: 'admin' }, {
       onSuccess: (res) => {
         const a = res?.approved ?? 0, f = res?.failed ?? 0, t = res?.total ?? a + f;
         if (f > 0) toast(`Approved ${a} of ${t} · ${f} failed`, 'error');
@@ -453,8 +461,8 @@ export function VoucherApprovals({ branch, currentUser }) {
     <div style={{ margin: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
         <div>
-          <div className="kbiz-page-title">Voucher Approvals</div>
-          <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense — manual & bulk post only when approved</div>
+          <div className="kbiz-page-title">{single ? `${VCH[category] || category} Approvals` : 'Voucher Approvals'}</div>
+          <div style={{ fontSize: 12, color: C.dim }}>{branchLabel(branch)} · {single ? `${VCH[category] || category} vouchers` : 'Payment · Receipt · Contra · Journal · Credit/Debit Note · Purchase Expense'} — manual & bulk post only when approved</div>
         </div>
         {status !== 'pending' && (
           <PeriodBar key={status} branch={branch} compact defaultPreset={presetFor(status)} onChange={setRange} />
@@ -493,8 +501,8 @@ export function VoucherApprovals({ branch, currentUser }) {
         </div>
         {status !== 'edited' && <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
-            {[['entry', 'Entry wise'], ['columnar', 'Columnar (all heads)'], ['voucher', 'Voucher Type wise'], ['tree', 'Group-Subgroup-Ledger-Entry']].map(([v, l]) => (
-              <button key={v} onClick={() => setView(v)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: view === v ? C.blue : '#fff', color: view === v ? '#fff' : C.dim }}>{l}</button>
+            {[['entry', 'Entry wise'], ['columnar', 'Columnar (all heads)'], ...(single ? [] : [['voucher', 'Voucher Type wise']]), ['tree', 'Group-Subgroup-Ledger-Entry']].map(([v, l]) => (
+              <button key={v} onClick={() => setView(v)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: effView === v ? C.blue : '#fff', color: effView === v ? '#fff' : C.dim }}>{l}</button>
             ))}
           </div>
           <span style={{ fontSize: 11, color: C.dim, fontWeight: 700 }} title="Total Debit = Total Credit = the tab total. A purchase with TDS credits the supplier net; the TDS sits in Duties & Taxes.">Σ Dr {money(totDr)} = Cr {money(totCr)}</span>
@@ -502,9 +510,9 @@ export function VoucherApprovals({ branch, currentUser }) {
             {status === 'pending' && allIds.length > 0 && (
               <button onClick={toggleAllSel} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}`, borderRadius: 5, background: sel.size === allIds.length ? C.blue : '#fff', color: sel.size === allIds.length ? '#fff' : C.blue, cursor: 'pointer' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
             )}
-            {(view === 'tree' || view === 'voucher') && <>
-              <button onClick={() => setMany(view === 'tree' ? allKeys : typeKeys, true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊞ Expand all</button>
-              <button onClick={() => setMany(view === 'tree' ? allKeys : typeKeys, false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊟ Collapse all</button>
+            {(effView === 'tree' || effView === 'voucher') && <>
+              <button onClick={() => setMany(effView === 'tree' ? allKeys : typeKeys, true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊞ Expand all</button>
+              <button onClick={() => setMany(effView === 'tree' ? allKeys : typeKeys, false)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.dark}`, borderRadius: 5, background: '#fff', color: C.dark, cursor: 'pointer' }}>⊟ Collapse all</button>
             </>}
           </span>
           {q.isFetching && <span style={{ fontSize: 11, color: C.dim }}>updating…</span>}
@@ -518,10 +526,10 @@ export function VoucherApprovals({ branch, currentUser }) {
         {q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={8} cols={5} /></div> : (
           <div style={{ maxHeight: '72vh', overflow: 'auto', fontSize: 12.5 }}>
             {flatEntries.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: C.dim }}>{needle ? `No ${status} vouchers match “${search.trim()}”.` : `No ${status} vouchers.`}</div>}
-            {flatEntries.length > 0 && view === 'voucher' && voucherTypeWise()}
-            {flatEntries.length > 0 && view === 'entry' && entryWise()}
-            {flatEntries.length > 0 && view === 'columnar' && columnarWise()}
-            {view === 'tree' && tree.map((g) => {
+            {flatEntries.length > 0 && effView === 'voucher' && voucherTypeWise()}
+            {flatEntries.length > 0 && effView === 'entry' && entryWise()}
+            {flatEntries.length > 0 && effView === 'columnar' && columnarWise()}
+            {effView === 'tree' && tree.map((g) => {
               const gk = 'g:' + g.name, gOpen = isOpen(gk, false);
               return (
                 <div key={gk}>
@@ -963,29 +971,45 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
 }
 
 // ─── Unified Approvals ────────────────────────────────────────────────────────
-// One screen for ALL approvals: a top toggle switches between SO/PO/GP bookings,
-// Vouchers, and INB SPG; each shows Pending · Approved · Rejected (· Deleted · Edited).
+// One screen for ALL approvals: a top segment bar switches between SO/PO/GP bookings
+// (which also carry the Refund/Reissue reversal modules), INB SPG, and a dedicated
+// screen per gated voucher type (Receipt · Payment · … · ACM). Each shows
+// Pending · Approved · Rejected (· Deleted · Edited).
+// Refund & Reissue have NO tab of their own here — they are SO/PO/GP reversal modules
+// (BookingOrder module RF/RI), so they live under SO/PO/GP with a module filter.
+const VOUCHER_TABS = [
+  ['receipt', 'Receipt'], ['payment', 'Payment'], ['contra', 'Contra'], ['journal', 'Journal'],
+  ['purchase-expense', 'Purchase Expense'], ['debit-note', 'Debit Note'], ['credit-note', 'Credit Note'],
+  ['adm', 'ADM'], ['acm', 'ACM'],
+];
+const VOUCHER_KEYS = new Set(VOUCHER_TABS.map(([k]) => k));
 export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain = 'sopogp' }) {
-  // Opened from an Alert deep-link targeting a voucher → start on the Vouchers tab.
+  // Opened from an Alert deep-link targeting a voucher → start on the combined Vouchers
+  // queue (the deep-link auto-opens the flagged voucher's editor, which VoucherApprovals
+  // handles for any type without needing to know its category up front).
   const navFocus = useNavFocusStore((s) => s.focus);
   const focusVoucher = navFocus && navFocus.params && navFocus.params.kind === 'voucher';
   // File deep-link (from a read-only booking/INB leg) → land on its domain, filtered.
   const fileFocus = navFocus && navFocus.params && navFocus.params.kind === 'file' ? navFocus.params : null;
   const [domain, setDomain] = useState(fileFocus ? fileFocus.domain : (focusVoucher ? 'vouchers' : initialDomain));
   const seg = (k, label) => (
-    <button key={k} onClick={() => setDomain(k)} style={{ padding: '8px 18px', fontSize: 13, fontWeight: 800, border: `1px solid ${domain === k ? C.dark : '#d6dbe6'}`, background: domain === k ? C.dark : '#fff', color: domain === k ? C.gold : C.dim, cursor: 'pointer' }}>{label}</button>
+    <button key={k} onClick={() => setDomain(k)} style={{ padding: '8px 16px', fontSize: 12.5, fontWeight: 800, borderRadius: 7, border: `1px solid ${domain === k ? C.dark : '#d6dbe6'}`, background: domain === k ? C.dark : '#fff', color: domain === k ? C.gold : C.dim, cursor: 'pointer' }}>{label}</button>
   );
+  // A category domain (receipt / payment / …) drives the single-type VoucherApprovals;
+  // 'vouchers' keeps the combined queue for alert deep-links.
+  const catDomain = VOUCHER_KEYS.has(domain) ? domain : '';
   return (
     <div style={{ margin: 12 }}>
       <FocusBanner />
-      <div style={{ display: 'inline-flex', borderRadius: 8, overflow: 'hidden', marginBottom: 4 }}>
-        {seg('sopogp', 'SO / PO / GP')}{seg('vouchers', 'Vouchers')}{seg('inbspg', 'INB SPG')}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+        {seg('sopogp', 'SO / PO / GP')}{seg('inbspg', 'INB')}
+        {VOUCHER_TABS.map(([k, l]) => seg(k, l))}
       </div>
       {domain === 'sopogp'
         ? <BookingApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} initialSearch={fileFocus?.search || ''} initialStatus={fileFocus?.status || ''} />
         : domain === 'inbspg'
           ? <InbApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} initialSearch={fileFocus?.search || ''} initialStatus={fileFocus?.status || ''} />
-          : <VoucherApprovals branch={branch} currentUser={currentUser} />}
+          : <VoucherApprovals branch={branch} currentUser={currentUser} category={catDomain} />}
     </div>
   );
 }
