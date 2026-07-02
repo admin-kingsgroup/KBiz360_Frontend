@@ -23,8 +23,8 @@ export function RefundPartialFields({ state, setState, ctx }) {
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
-        <FL label="Against sales invoice"><input value={state.againstInvoice || ''} onChange={(e) => patch({ againstInvoice: e.target.value })} style={inp} placeholder="SF/BOM/26/0001" /></FL>
-        <FL label="Related purchase invoice"><input value={state.againstPurchase || ''} onChange={(e) => patch({ againstPurchase: e.target.value })} style={inp} placeholder="PF/BOM/26/0001" /></FL>
+        <FL label="Against sales invoice"><input value={state.againstInvoice || ''} onChange={(e) => patch({ againstInvoice: e.target.value })} style={inp} placeholder="BOM/0626/SF00495" /></FL>
+        <FL label="Related purchase invoice"><input value={state.againstPurchase || ''} onChange={(e) => patch({ againstPurchase: e.target.value })} style={inp} placeholder="BOM/0626/PF00495" /></FL>
         <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} />
       </div>
 
