@@ -274,9 +274,15 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 //   3. OUTSTANDING  — Receivables · Payables · Cash & Bank · Reconciliation
 //   4. REPORTING    — Books & Scrutiny · Branch MIS (financial statements)
 //   5. CLOSE/MASTER — Period Close · Accounts Master
-// Dashboard Accountant stays a title-less leaf → renders as a featured pill on top.
+// Dashboard Accountant / Receivables / Payables stay title-less leaves → render as
+// featured pills on top. The latter two open the same Ageing & Settlement card the
+// AD dashboard shows (WidgetCard + ArApSettlementView, collapsed to sub-group
+// subtotals) on its own page — NOT the full drilled report at /reports/rec|pay
+// (which carries its own Ageing / Settle / Net tabs).
 export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Dashboard Accountant", href:"/accounts/dashboard"},
+  {label:"Receivables — Ageing & Settlement", href:"/accounts/receivables-ageing-settlement"},
+  {label:"Payables — Ageing & Settlement", href:"/accounts/payables-ageing-settlement"},
 
   /* ── 1 · ENTRY ───────────────────────────────────────────── */
   // The 13 voucher types are split by family (Sales · Receipts/Payments · Journal/
