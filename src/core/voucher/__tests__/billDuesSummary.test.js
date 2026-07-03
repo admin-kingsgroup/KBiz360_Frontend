@@ -35,8 +35,22 @@ describe('billDuesSummary', () => {
     expect(d.overdueAfter).toBe(0);
   });
 
+  // An over-settled bill (ledger shows it Overpaid) rides in with outstanding 0 and
+  // `overpaidAmt` = the party's credit: counted in overpaidCredit, NOT netted into
+  // the dues. Real case: BOM/0626/SF00838 — ₹3,16,375 billed, ₹6,23,216 settled.
+  test('overpaid bills surface as a separate credit, never netted into dues', () => {
+    const bills = [
+      B('2026-03-09', 163745),
+      { date: '2026-01-19', outstanding: 0, creditDays: 0, overpaidAmt: 306841 },
+    ];
+    const d = billDuesSummary(bills, '2026-04-16', 0);
+    expect(d.overpaidCredit).toBe(306841);
+    expect(d.overdueAsOn).toBe(163745); // credit shown separately, dues untouched
+    expect(d.totalOpen).toBe(163745);
+  });
+
   test('empty / missing bills are all-zero', () => {
-    expect(billDuesSummary([], '2026-04-16', 100)).toEqual({ overdueAsOn: 0, overdueAfter: 0, totalOpen: 0 });
-    expect(billDuesSummary(undefined, '2026-04-16', 100)).toEqual({ overdueAsOn: 0, overdueAfter: 0, totalOpen: 0 });
+    expect(billDuesSummary([], '2026-04-16', 100)).toEqual({ overdueAsOn: 0, overdueAfter: 0, totalOpen: 0, overpaidCredit: 0 });
+    expect(billDuesSummary(undefined, '2026-04-16', 100)).toEqual({ overdueAsOn: 0, overdueAfter: 0, totalOpen: 0, overpaidCredit: 0 });
   });
 });

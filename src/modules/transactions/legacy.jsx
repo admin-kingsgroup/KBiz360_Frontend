@@ -181,13 +181,15 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
       </div>
 
       {/* Party dues strip — overdue as on the voucher date, what stays overdue after
-          this settlement, and the total open balance. Hidden in refund/advances mode
-          (the rows there are the client's open receipts, not bills). */}
+          this settlement, the total open balance, and any Overpaid credit (excess on
+          over-settled bills, owed back to the party — shown, never silently netted).
+          Hidden in refund/advances mode (the rows there are receipts, not bills). */}
       {!isRefund&&party&&bills.length>0&&(
         <div style={{display:"flex",gap:22,flexWrap:"wrap",padding:"8px 14px",background:"#fffdf5",borderBottom:"1px solid #cdd1d8"}}>
           {[["Overdue as on "+(vDate||"today"),vf2(cur,dues.overdueAsOn),"#dc2626"],
             [`Overdue after this ${settleWord}`,vf2(cur,dues.overdueAfter),dues.overdueAfter>0.005?"#dc2626":"#16a34a"],
-            ["Total open bills",vf2(cur,dues.totalOpen),"#1a1c22"]].map(([l,v,c],i)=>(
+            ["Total open bills",vf2(cur,dues.totalOpen),"#1a1c22"],
+            ...(dues.overpaidCredit>0.005?[["Overpaid credit (owed back)","−"+vf2(cur,dues.overpaidCredit),"#C0651A"]]:[])].map(([l,v,c],i)=>(
             <div key={i}>
               <p style={{margin:0,fontSize:8.5,fontWeight:700,letterSpacing:"0.5px",color:"#5b616e",textTransform:"uppercase"}}>{l}</p>
               <p style={{margin:"2px 0 0",fontSize:13.5,fontWeight:800,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</p>
@@ -229,18 +231,26 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
                         </td>
                         <td style={{padding:"8px 12px",fontSize:10.5,color:"#5b616e"}}>{b.date}</td>
                         <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,fontWeight:700,padding:"2px 7px",borderRadius:999,background:abg,color:ac}}>{b.ageDays}d</span></td>
-                        <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,b.outstanding)}</td>
+                        <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>
+                          {b.status==="overpaid"
+                            ? <span title={`Settled ${vf2(cur,b.allocated)} against ${vf2(cur,b.total)} billed — ${vf2(cur,b.overpaidAmt)} is the party's credit`} style={{color:"#C0651A"}}>−{vf2(cur,b.overpaidAmt)}</span>
+                            : vf2(cur,b.outstanding)}
+                        </td>
                         <td style={{padding:"8px 12px",textAlign:"center"}}>
-                          {b.overpaid
+                          {b.overpaid||b.status==="overpaid"
                             ? <span title="This bill was settled for more than billed — the excess is payable back to the party" style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,textTransform:"uppercase",background:"#fff1e0",color:"#C0651A"}}>Overpaid</span>
                             : <span style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,textTransform:"uppercase",
                                 background:b.status==="partial"?"#fbeedb":"#fbe9e9",color:b.status==="partial"?"#d97706":"#dc2626"}}>{isRefund?(b.status==="partial"?"Part-refunded":"To refund"):b.status}</span>}
                         </td>
                         <td style={{padding:"6px 12px",textAlign:"right",whiteSpace:"nowrap"}}>
-                          <input type="number" min="0" max={b.outstanding} value={alloc[b.billVno]||""} placeholder="0"
-                            onChange={e=>onSetAlloc(b.billVno,e.target.value,b.outstanding)}
-                            style={{...inp,width:104,display:"inline-block",textAlign:"right",fontWeight:600,minHeight:28}}/>
-                          <button onClick={()=>onFull(b.billVno,b.outstanding)} style={{border:"none",background:"transparent",color:"#c2a04a",fontSize:10,fontWeight:700,cursor:"pointer",textDecoration:"underline",marginLeft:6,fontFamily:"inherit"}}>Full</button>
+                          {b.status==="overpaid"
+                            ? <span style={{fontSize:10.5,color:"#5b616e"}}>—</span>
+                            : <>
+                                <input type="number" min="0" max={b.outstanding} value={alloc[b.billVno]||""} placeholder="0"
+                                  onChange={e=>onSetAlloc(b.billVno,e.target.value,b.outstanding)}
+                                  style={{...inp,width:104,display:"inline-block",textAlign:"right",fontWeight:600,minHeight:28}}/>
+                                <button onClick={()=>onFull(b.billVno,b.outstanding)} style={{border:"none",background:"transparent",color:"#c2a04a",fontSize:10,fontWeight:700,cursor:"pointer",textDecoration:"underline",marginLeft:6,fontFamily:"inherit"}}>Full</button>
+                              </>}
                         </td>
                       </tr>
                     );
