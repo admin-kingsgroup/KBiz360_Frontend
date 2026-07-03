@@ -1132,7 +1132,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
                 <tr style={{ background: '#f3f4f8' }}>
-                  {['Vch No', 'Reverses (INB)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
+                  {['Vch No', 'Date', 'Reverses (INB)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
                     <th key={i} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
                   ))}
                 </tr>
@@ -1144,6 +1144,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                       {e.vno}
                       <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>INB {e.category === 'reissue' ? 'RI' : 'RF'}</span>
                     </td>
+                    <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: C.dim }}>{fmtDate(e.date)}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{e.againstInvoice || e.linkNo || '—'}</td>
                     <td style={{ padding: '7px 12px' }}>{e.party || '—'}</td>
                     <td style={{ padding: '7px 12px', ...num }}>{money(e.total || 0)}</td>
