@@ -61,6 +61,7 @@ const { InterBranchRegister } = lazyModule(() => import('./modules/interBranchRe
 const { InterBranchMatrix } = lazyModule(() => import('./modules/interBranchMatrix'));
 const { InterBranchCounterpartyLedger } = lazyModule(() => import('./modules/interBranchCounterpartyLedger'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/voucherApprovals'));
+const { PaymentVerificationLive } = lazyModule(() => import('./modules/paymentVerification'));
 const { ModuleRegister } = lazyModule(() => import('./modules/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/chartBuilder'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/pnlTally'));
@@ -483,6 +484,9 @@ export default function KB360App(){
     if(route==="/accounts/payables-ageing-settlement")    return <PayablesAgeingSettlementPage branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/accounts/net-ageing")    return <PayablesLive branch={branch} setRoute={navigate} initialTab="net"/>;
     if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
+    // CRM payment-verification inbox — salespeople submit payments in the CRM;
+    // finance verifies/rejects here (drives the CRM's own endpoints via SSO).
+    if(route==="/accounts/payment-verification") return <PaymentVerificationLive/>;
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/client-reco")   return <ClientReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/interbranch-reco") return <InterBranchReco branch={branch} setRoute={navigate}/>;

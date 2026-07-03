@@ -11,7 +11,16 @@
 
 import { getAuthToken } from './api';
 
-const CRM_BASE = import.meta.env.VITE_CRM_API_BASE || 'http://localhost:8080/api';
+// Base-URL resolution: an explicit VITE_CRM_API_BASE wins, but a localhost value
+// is only honoured when the app itself runs on localhost — the committed .env is
+// dev-tuned, and an Amplify/production build without the env var must never call
+// localhost. Deployed builds fall back to the production CRM API.
+const PROD_CRM_BASE = 'https://kb360crm.duckdns.org/api';
+const envBase = import.meta.env.VITE_CRM_API_BASE || '';
+const onLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+const CRM_BASE = (envBase && (!/localhost|127\.0\.0\.1/.test(envBase) || onLocalhost))
+  ? envBase
+  : (onLocalhost ? 'http://localhost:8080/api' : PROD_CRM_BASE);
 
 async function request(method, path, { params, body } = {}) {
   const url = new URL(CRM_BASE + path);

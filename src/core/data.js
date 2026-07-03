@@ -318,6 +318,7 @@ export const ROUTE_TITLES={
   "/purchase/misc":        "Purchase — Miscellaneous",
   "/receipts":             "Receipt Voucher",
   "/payments":             "Payment Voucher",
+  "/accounts/payment-verification": "Payment Verification — CRM Payments",
   "/contra":               "Contra Voucher",
   "/bank-reco":            "Bank Reconciliation",
   "/journal":              "Journal Entry",
