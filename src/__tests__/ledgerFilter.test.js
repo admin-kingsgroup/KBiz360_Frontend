@@ -4,7 +4,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { ledgerMatchesFilter, validParentGroups } from '../modules/mastersLive.jsx';
+import { ledgerMatchesFilter, validParentGroups } from '../modules/masters/mastersLive.jsx';
 
 const acme = { name: 'ACME', group: 'Sundry Debtors', subGroup: 'B2B' };
 const globe = { name: 'Globe', group: 'Sundry Debtors', subGroup: 'B2C' };

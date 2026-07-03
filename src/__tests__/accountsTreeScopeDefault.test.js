@@ -5,7 +5,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { defaultScopeFor } from '../modules/chartBuilder.jsx';
+import { defaultScopeFor } from '../modules/masters/chartBuilder.jsx';
 
 describe('Accounts Tree View — default Ledger scope per Branch view', () => {
   test('a specific branch defaults to its own ledgers only (scope "branch")', () => {

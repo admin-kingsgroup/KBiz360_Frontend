@@ -33,7 +33,7 @@ jest.mock('../../core/styles', () => ({ bc: () => ({ cur: '₹' }) }));
 jest.mock('../../core/data', () => ({ CONSOLIDATED_LABEL: 'TK Head Office Group' }));
 jest.mock('../../core/AuditTrail', () => ({ AuditTrail: () => null }));
 jest.mock('../../core/voucher/JvBlock', () => ({ JvBlock: () => null }));
-jest.mock('../pnlTally', () => ({ VoucherView: () => null }));
+jest.mock('../reportsFinancial/pnlTally', () => ({ VoucherView: () => null }));
 jest.mock('../accountingLive', () => ({ VoucherEditor: () => null }));
 jest.mock('../bookingOrder', () => ({ BookingApprovals: () => null }));
 jest.mock('../../core/voucher-print', () => ({ openPrintWindow: jest.fn() }));
@@ -48,7 +48,7 @@ jest.mock('../../shell/primitives', () => ({ SkeletonTable: () => null }));
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { VoucherApprovals } from '../voucherApprovals';
+import { VoucherApprovals } from '../approvals';
 
 const wrap = (ui) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

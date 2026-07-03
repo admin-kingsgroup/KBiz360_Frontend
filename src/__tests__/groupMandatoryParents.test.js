@@ -6,7 +6,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { validParentGroups } from '../modules/mastersLive.jsx';
+import { validParentGroups } from '../modules/masters/mastersLive.jsx';
 
 const GROUPS = [
   { name: 'Sales Accounts', system: true, parent: '' },              // level 0 Parent Group

@@ -7,7 +7,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { partitionLedgers } from '../modules/chartBuilder.jsx';
+import { partitionLedgers } from '../modules/masters/chartBuilder.jsx';
 
 const LEDGERS = [
   { id: 1, name: 'Cash', active: true },

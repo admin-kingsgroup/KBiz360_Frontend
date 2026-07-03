@@ -151,7 +151,7 @@ export function allocSummary(alloc,amount,parkOnAcc,mode){
 // Bill-wise allocation panel (Receipt / Payment) — open bills with ageing, an
 // allocate box + "Full" per bill, an Against-Bills / On-Account mode toggle and a
 // summary foot. Controlled by the parent voucher form. Mirrors the HTML panel.
-export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode,onMode,parkOnAcc,onParkOnAcc,cur,heading,itemLabel,emptyHint}){
+export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode,onMode,parkOnAcc,onParkOnAcc,cur,heading,itemLabel,emptyHint,isRefund}){
   const bills=q?.data?.bills||[];
   const advances=q?.data?.advances||0;
   const {allocated,un,onAcc}=allocSummary(alloc,amount,parkOnAcc,mode);
@@ -213,8 +213,10 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
                         <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,fontWeight:700,padding:"2px 7px",borderRadius:999,background:abg,color:ac}}>{b.ageDays}d</span></td>
                         <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,b.outstanding)}</td>
                         <td style={{padding:"8px 12px",textAlign:"center"}}>
-                          <span style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,textTransform:"uppercase",
-                            background:b.status==="partial"?"#fbeedb":"#fbe9e9",color:b.status==="partial"?"#d97706":"#dc2626"}}>{b.status}</span>
+                          {b.overpaid
+                            ? <span title="This bill was settled for more than billed — the excess is payable back to the party" style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,textTransform:"uppercase",background:"#fff1e0",color:"#C0651A"}}>Overpaid</span>
+                            : <span style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,textTransform:"uppercase",
+                                background:b.status==="partial"?"#fbeedb":"#fbe9e9",color:b.status==="partial"?"#d97706":"#dc2626"}}>{isRefund?(b.status==="partial"?"Part-refunded":"To refund"):b.status}</span>}
                         </td>
                         <td style={{padding:"6px 12px",textAlign:"right",whiteSpace:"nowrap"}}>
                           <input type="number" min="0" max={b.outstanding} value={alloc[b.billVno]||""} placeholder="0"

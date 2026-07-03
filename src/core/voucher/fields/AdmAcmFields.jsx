@@ -8,14 +8,14 @@ import { useAdmReasonCodes } from '../../useReference';
 import { money2, r2 } from '../ui';
 
 // ADM/ACM are BSP-ONLY memos: NO tax, NO markup, NO Sales/customer leg. The airline
-// leg is always IATA BSP (locked); the cost/credit posts to ADM Charges / ACM Recovery
-// (Direct Expenses). See posting.builder admLines/acmLines.
+// leg is always IATA BSP (locked). ADM is a Direct Expense (ADM Charges); ACM is
+// Direct Income (ACM Income). See posting.builder admLines/acmLines.
 const BSP_LEDGER = 'IATA-BSP [Stock]';
 
 /**
  * ADM (Agent Debit Memo) / ACM (Agent Credit Memo) body.
  *   ADM: Dr ADM Charges (Direct Expenses)  · Cr IATA BSP (Sundry Creditor)
- *   ACM: Dr IATA BSP (Sundry Creditor)      · Cr ACM Recovery (Direct Expenses, contra)
+ *   ACM: Dr IATA BSP (Sundry Creditor)      · Cr ACM Income (Direct Income)
  */
 export function AdmAcmFields({ state, setState, ctx, kind }) {
   const { cur } = ctx;
@@ -67,7 +67,7 @@ export function AdmAcmFields({ state, setState, ctx, kind }) {
       </div>
 
       <p style={{ margin: '2px 0 12px', fontSize: 10.5, color: '#5a6691' }}>
-        {isAdm ? 'Booked as ADM Charges (Direct Expenses)' : 'Booked as ACM Recovery (Direct Expenses, contra)'} · {isAdm ? 'payable to' : 'credit from'} <b>IATA BSP</b> {money2(cur, amount)} · <b>no tax</b>
+        {isAdm ? 'Booked as ADM Charges (Direct Expenses)' : 'Booked as ACM Income (Direct Income)'} · {isAdm ? 'payable to' : 'credit from'} <b>IATA BSP</b> {money2(cur, amount)} · <b>no tax</b>
       </p>
 
       <FL label="Narration"><textarea value={state.remarks || ''} onChange={(e) => patch({ remarks: e.target.value })} rows={2} style={{ ...inp, resize: 'vertical' }} placeholder={`Being ${isAdm ? 'Agent Debit' : 'Agent Credit'} Memo${state.reasonCode ? ` (${state.reasonCode})` : ''}`} /></FL>

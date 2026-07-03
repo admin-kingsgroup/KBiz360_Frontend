@@ -1,5 +1,5 @@
 /* Feature 4 — Payment Run payload builder + selection summary. */
-import { buildPaymentRunPayload, paymentRunSummary } from '../modules/paymentRunPayload';
+import { buildPaymentRunPayload, paymentRunSummary } from '../modules/payments/paymentRunPayload';
 
 const rows = [
   { party: 'Akbar Travels', billVno: 'PUR-1', billId: 'b1', outstanding: 600, amount: 600, selected: true },
