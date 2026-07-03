@@ -14,7 +14,7 @@ import { apiGet, getAuthToken } from '../../core/api';
 import { exportToExcel } from '../../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../../core/dates';
 import { VoucherEditor } from '../accountingLive';
-import { OutstandingOnAccount } from '../outstanding';
+import { OutstandingOnAccount } from './outstanding';
 import { useMobile } from '../../core/hooks';
 import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, moduleSideRows } from '../../core/pnlDetail';
 import { openPrintPreview } from '../../core/PrintPreview';

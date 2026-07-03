@@ -30,7 +30,7 @@ import {
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../../core/useAccounting';
 import { apiGet } from '../../core/api';
-import { LedgerVouchers } from '../pnlTally.jsx';
+import { LedgerVouchers } from '../reportsFinancial/pnlTally.jsx';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { editorVoucherTotal } from '../../core/voucher/ui';

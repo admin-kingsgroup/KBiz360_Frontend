@@ -35,7 +35,7 @@ jest.mock('../../core/styles', () => ({ bc: () => ({ cur: '₹' }) }));
 jest.mock('../../core/data', () => ({ CONSOLIDATED_LABEL: 'TK Head Office Group' }));
 jest.mock('../../core/AuditTrail', () => ({ AuditTrail: () => null }));
 jest.mock('../../core/voucher/JvBlock', () => ({ JvBlock: () => null }));
-jest.mock('../pnlTally', () => ({ VoucherView: () => null }));
+jest.mock('../reportsFinancial/pnlTally', () => ({ VoucherView: () => null }));
 jest.mock('../accountingLive', () => ({ VoucherEditor: () => null }));
 jest.mock('../bookingOrder', () => ({ BookingApprovals: () => null }));
 jest.mock('../../core/voucher-print', () => ({ openPrintWindow: jest.fn() }));
@@ -50,7 +50,7 @@ jest.mock('../../shell/primitives', () => ({ SkeletonTable: () => null }));
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { InbApprovals } from '../voucherApprovals';
+import { InbApprovals } from '../approvals';
 
 // One INB deal = a SALE leg + a PURCHASE leg sharing the same sourceRef (INB Link No).
 const LINK = 'INB/BOM-AMD/26/0001';

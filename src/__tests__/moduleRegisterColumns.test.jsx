@@ -5,7 +5,7 @@
 // are mocked and the real DataTable does the actual ordering/sorting we assert on.
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { ModuleRegister } from '../modules/moduleRegister';
+import { ModuleRegister } from '../modules/reports/moduleRegister';
 
 const BOOKINGS = [
   { id: 'b1', bookingNo: 'SF0002', linkNo: 'LK-2', date: '2026-06-20', module: 'SF', status: 'approved',
