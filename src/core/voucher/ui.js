@@ -64,6 +64,21 @@ export function allocSummary(alloc, amount, parkOnAcc, mode) {
   return { allocated, un, onAcc, valid, count };
 }
 
+// Party dues context for the bill-wise panel — the figures an accountant checks
+// before settling: how much is OVERDUE as on the voucher date (bills whose due
+// date — bill date + credit days — falls on/before it), how much of that stays
+// overdue after this settlement, and the party's total open balance. Pure, so the
+// panel and tests share one source of truth.
+export function billDuesSummary(bills, vDate, amount) {
+  const ref = (() => { const d = vDate ? new Date(vDate) : new Date(); return Number.isNaN(+d) ? new Date() : d; })();
+  const isDue = (b) => { const d = new Date(b.date); if (Number.isNaN(+d)) return true; d.setDate(d.getDate() + (+b.creditDays || 0)); return d <= ref; };
+  const sum = (arr) => r2(arr.reduce((s, b) => s + (+b.outstanding || 0), 0));
+  const overdueAsOn = sum((bills || []).filter(isDue));
+  const totalOpen = sum(bills || []);
+  const overdueAfter = r2(Math.max(0, overdueAsOn - (+amount || 0)));
+  return { overdueAsOn, overdueAfter, totalOpen };
+}
+
 // Whether the counter-account on a Receipt / Payment settles bill-wise, and against
 // what. Returns { party, partyType, obSide, mode }:
 //   Receipt + Debtor   → settle the client's open SALE bills          (mode 'bills')

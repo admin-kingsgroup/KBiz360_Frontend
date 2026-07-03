@@ -132,7 +132,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
       {/* Bill-wise allocation — open bills, or (client refund) the client's open receipts */}
       {isParty && (
       <BillAllocPanel
-        side={side} party={state.party} q={billsQ} amount={gross}
+        side={side} party={state.party} q={billsQ} amount={gross} vDate={state.date}
         alloc={state.alloc} onSetAlloc={setAllocFor} onFull={fullAlloc}
         mode={state.applyMode} onMode={(m) => patch({ applyMode: m })}
         parkOnAcc={state.parkOnAcc} onParkOnAcc={(v) => patch({ parkOnAcc: v })} cur={cur}

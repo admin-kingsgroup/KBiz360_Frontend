@@ -35,6 +35,7 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
+import { billDuesSummary } from '../../core/voucher/ui';
 import { clickable } from '../../core/ux/clickable';
 import { Menu as StatusMenu } from '../../core/ux/Menu';
 import { listKeyNav } from '../../core/ux/listKeys';
@@ -151,13 +152,14 @@ export function allocSummary(alloc,amount,parkOnAcc,mode){
 // Bill-wise allocation panel (Receipt / Payment) — open bills with ageing, an
 // allocate box + "Full" per bill, an Against-Bills / On-Account mode toggle and a
 // summary foot. Controlled by the parent voucher form. Mirrors the HTML panel.
-export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode,onMode,parkOnAcc,onParkOnAcc,cur,heading,itemLabel,emptyHint,isRefund}){
+export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode,onMode,parkOnAcc,onParkOnAcc,cur,heading,itemLabel,emptyHint,isRefund,vDate}){
   const bills=q?.data?.bills||[];
   const advances=q?.data?.advances||0;
   const {allocated,un,onAcc}=allocSummary(alloc,amount,parkOnAcc,mode);
   const settleWord=side==="supplier"?"payment":"receipt";
   const showOnAccToggle=mode==="bills"&&un>0.001&&allocated>0&&allocated<=amount+0.001;
   const ageTone=(d)=>d<=7?["#16a34a","#e8f6ed"]:d<=30?["#d97706","#fbeedb"]:["#dc2626","#fbe9e9"];
+  const dues=billDuesSummary(bills,vDate,amount);
 
   return (
     <div style={{border:"1px solid #cdd1d8",borderRadius:10,overflow:"hidden",marginBottom:12}}>
@@ -177,6 +179,22 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
           </div>
         </div>
       </div>
+
+      {/* Party dues strip — overdue as on the voucher date, what stays overdue after
+          this settlement, and the total open balance. Hidden in refund/advances mode
+          (the rows there are the client's open receipts, not bills). */}
+      {!isRefund&&party&&bills.length>0&&(
+        <div style={{display:"flex",gap:22,flexWrap:"wrap",padding:"8px 14px",background:"#fffdf5",borderBottom:"1px solid #cdd1d8"}}>
+          {[["Overdue as on "+(vDate||"today"),vf2(cur,dues.overdueAsOn),"#dc2626"],
+            [`Overdue after this ${settleWord}`,vf2(cur,dues.overdueAfter),dues.overdueAfter>0.005?"#dc2626":"#16a34a"],
+            ["Total open bills",vf2(cur,dues.totalOpen),"#1a1c22"]].map(([l,v,c],i)=>(
+            <div key={i}>
+              <p style={{margin:0,fontSize:8.5,fontWeight:700,letterSpacing:"0.5px",color:"#5b616e",textTransform:"uppercase"}}>{l}</p>
+              <p style={{margin:"2px 0 0",fontSize:13.5,fontWeight:800,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {mode==="onaccount"?(
         <div style={{padding:"20px 16px",textAlign:"center"}}>
