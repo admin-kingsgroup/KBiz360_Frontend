@@ -138,6 +138,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
         parkOnAcc={state.parkOnAcc} onParkOnAcc={(v) => patch({ parkOnAcc: v })} cur={cur}
         heading={isRefund ? 'Refund Against Received Payments' : undefined}
         itemLabel={isRefund ? 'Receipt No.' : undefined}
+        isRefund={isRefund}
         emptyHint={isRefund ? `No open receipts with a leftover balance for ${state.party || 'this client'}. Use “On Account” to pay it as an advance.` : undefined}
       />
       )}
