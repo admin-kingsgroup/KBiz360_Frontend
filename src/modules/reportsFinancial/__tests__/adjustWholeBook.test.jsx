@@ -54,4 +54,27 @@ describe('Adjust ▸ → whole-book Outstanding & On-Account', () => {
     expect(p.initialParty).toBe('Travkings Tours and Travels DAR'); // ONLY the clicked party's vouchers
     expect(p.initialTab).toBe('recAdv');     // lands on On-Account Receipts
   });
+
+  // The focus lives in the URL (?party=), so a refresh on the settle tab must
+  // reopen the SAME single-party view — never fall back to the whole book mixed.
+  test('fresh load on ?tab=settle&party=X keeps the single-party focus', () => {
+    render(
+      <MemoryRouter initialEntries={['/reports/rec?tab=settle&party=NeuIQ%20Technologies%20Private%20Limited']}>
+        <ReceivablesLive branch="BOM" setRoute={() => {}} />
+      </MemoryRouter>,
+    );
+    const p = outstandingProps[outstandingProps.length - 1];
+    expect(p.initialParty).toBe('NeuIQ Technologies Private Limited');
+    expect(p.initialTab).toBe('recAdv');
+  });
+
+  test('opening the Settle tab directly (no Adjust) shows the unfiltered whole book', () => {
+    render(<ReceivablesLive branch="BOM" setRoute={() => {}} />, { wrapper: MemoryRouter });
+
+    fireEvent.click(screen.getByText('Open Bills & On-Account ▸ Settle'));
+
+    const p = outstandingProps[outstandingProps.length - 1];
+    expect(p.initialParty).toBeUndefined();
+    expect(p.initialTab).toBeUndefined();
+  });
 });

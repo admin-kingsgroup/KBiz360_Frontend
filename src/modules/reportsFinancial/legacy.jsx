@@ -2193,9 +2193,13 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
   // into Settle, then Back, used to skip Ageing entirely).
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || initialTab || 'ageing'; // 'ageing' | 'settlement' | 'settle' | 'net'
-  const setTab = (next) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', next); return p; });
-  const [advFocus, setAdvFocus] = useState(''); // party whose advances to focus
-  const adjustAdvance = (party) => { setAdvFocus(party); setTab('settle'); };
+  // The Adjust-focused party ALSO lives in the URL (`?party=`), not React state: a
+  // refresh / stale-bundle reload on ?tab=settle must reopen the SAME single-party
+  // view, never fall back to the whole book mixed. Tab buttons clear it, so opening
+  // the Settle tab directly is the unfiltered whole-book view.
+  const advFocus = searchParams.get('party') || '';
+  const setTab = (next) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', next); p.delete('party'); return p; });
+  const adjustAdvance = (party) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', 'settle'); p.set('party', party); return p; });
 
   const TABS = [['ageing', 'Ageing'], ['settlement', 'Ageing & Settlement'], ['settle', 'Open Bills & On-Account ▸ Settle'], ['net', 'Net (Debtors − Creditors)']];
   const tabBtn = (active) => ({
@@ -2218,7 +2222,7 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
             // reachable. "Adjust ▸" focuses the clicked party via initialParty so the
             // window shows ONLY that customer's vouchers ("show all parties" clears it);
             // opening the tab directly shows the whole book.
-            : <OutstandingOnAccount branch={branch}
+            : <OutstandingOnAccount key={advFocus || 'all'} branch={branch}
                 initialTab={advFocus ? (isRec ? 'recAdv' : 'payAdv') : undefined} initialParty={advFocus || undefined} />}
     </>
   );
