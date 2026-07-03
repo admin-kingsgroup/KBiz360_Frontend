@@ -22,7 +22,7 @@ import { toastSuccess, toastError } from './ux/toast';
 import { CONSOLIDATED_LABEL } from './data';
 import {
   esc, fmt, fmtB, dmy, vtLabel, billwiseSide, isBillwiseLedger,
-  mapLedger, mapBills, groupByBranch, branchSeg, AGE_BUCKETS, AGE_COLORS, ageingOf,
+  mapLedger, mapBills, groupByBranch, branchSeg, AGE_BUCKETS, AGE_COLORS, ageingOf, billwiseStatus,
 } from './ledgerMath';
 
 export { billwiseSide, isBillwiseLedger } from './ledgerMath';
@@ -112,6 +112,7 @@ export const LEDGER_CSS = `
 .kbled .lpill.paid{background:#eaf5ef;color:var(--dr);border:1px solid #c8e6d5}
 .kbled .lpill.part{background:#fbf0db;color:var(--amber);border:1px solid #ecd9a8}
 .kbled .lpill.open{background:#f3f4f8;color:var(--ink4);border:1px solid #dfe2e7}
+.kbled .lpill.overpaid{background:#fff1e0;color:#C0651A;border:1px solid #f0d0a8}
 /* Shift+Enter settlement drill — caret, cursor row, inline themed breakup */
 .kbled .caret{display:inline-block;width:15px;color:var(--gold);font-weight:800;cursor:pointer;user-select:none}
 .kbled .caret.ghost{cursor:default;color:transparent}
@@ -160,8 +161,11 @@ export const LEDGER_CSS = `
 .kbled .bw-status.part{background:#fbf0db;color:var(--amber)}
 .kbled .bw-status.over{background:#fbeaea;color:var(--cr)}
 .kbled .bw-status.curr{background:#eef2f8;color:#2C5C8F}
+.kbled .bw-status.overpaid{background:#fff1e0;color:#C0651A}
 .kbled td.over{color:var(--cr);font-weight:700}
 .kbled td.pend{font-weight:800;color:var(--gold)}
+.kbled td.overpaid{font-weight:800;color:#C0651A}
+.kbled .bk-cap b.overpaid-txt{color:#C0651A}
 .kbled .notmaintained{padding:30px;text-align:center;color:var(--ink4);font-size:12.5px;font-style:italic}
 .kbled .ageing{margin:4px 6px 14px;border:1px solid var(--rule);border-radius:9px;padding:14px 16px;background:var(--bg-lt)}
 .kbled .age-title{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--ink);text-transform:uppercase;margin-bottom:10px}
@@ -254,11 +258,15 @@ export function LedgerAccountView({
           { key: 'amt', label: `Bill Amount (${cur})` }, { key: 'settled', label: `Settled (${cur})` },
           { key: 'pend', label: `Pending (${cur})` }, { key: 'age', label: 'Age (days)' }, { key: 'status', label: 'Status' },
         ];
-        const rows = bills.map((b) => ({
-          ref: b.ref, bdate: b.bdate, amt: b.amt, settled: b.settled, pend: b.pend,
-          age: b.pend > 0 && b.age > 0 ? b.age : '',
-          status: b.pend <= 0 ? 'Settled' : b.age > 0 ? `${b.age}d overdue` : b.settled > 0 ? 'Part-paid' : 'Current',
-        }));
+        const rows = bills.map((b) => {
+          const { label, overpaid, overAmt } = billwiseStatus(b);
+          return {
+            ref: b.ref, bdate: b.bdate, amt: b.amt, settled: b.settled,
+            pend: overpaid ? -overAmt : b.pend, // overpaid shows as a negative (credit) pending
+            age: b.pend > 0 && b.age > 0 ? b.age : '',
+            status: label,
+          };
+        });
         exportToExcel(`ledger-${name}-bills`, cols, rows);
       } else {
         if (!d) return;
@@ -403,7 +411,8 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
     const settleInfo = r.alloc && r.alloc.length > 0;
     let pillTxt = '', pillCls = '';
     if (billInfo) {
-      if (r.pending <= 0.01 && (r.settled || 0) > 0) { pillTxt = 'Settled'; pillCls = 'paid'; }
+      if (r.pending < -0.01 && (r.settled || 0) > 0) { pillTxt = `Overpaid · ${fmt(-r.pending)}`; pillCls = 'overpaid'; }
+      else if (r.pending <= 0.01 && (r.settled || 0) > 0) { pillTxt = 'Settled'; pillCls = 'paid'; }
       else if ((r.settled || 0) > 0) { pillTxt = `Part · ${fmt(r.settled)}`; pillCls = 'part'; }
       else { pillTxt = 'Open'; pillCls = 'open'; }
     } else if (settleInfo) { pillTxt = 'Settled'; pillCls = 'paid'; }
@@ -556,7 +565,9 @@ function BillBreakup({ party, branch, billVno, side, cur, colSpan }) {
             ))}
             {set.length === 0
               ? <div className="bk-cap">No settlements yet — bill fully open.</div>
-              : <div className="bk-cap">{set.length} settlement{set.length === 1 ? '' : 's'} · settled <b>{cur}{fmt(d.settled) || '0.00'}</b> · closing pending <b>{cur}{fmt(d.pending) || '0.00'}</b></div>}
+              : d.pending < -0.01
+                ? <div className="bk-cap">{set.length} settlement{set.length === 1 ? '' : 's'} · settled <b>{cur}{fmt(d.settled) || '0.00'}</b> · <b className="overpaid-txt">overpaid {cur}{fmt(-d.pending)}</b></div>
+                : <div className="bk-cap">{set.length} settlement{set.length === 1 ? '' : 's'} · settled <b>{cur}{fmt(d.settled) || '0.00'}</b> · closing pending <b>{cur}{fmt(d.pending) || '0.00'}</b></div>}
           </>
         )}
       </div>
@@ -675,11 +686,9 @@ function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
                     : 'No outstanding bills.'
             }</td></tr>}
             {visible.map((b, i) => {
-              let status, scls;
-              if (b.pend <= 0) { status = 'Settled'; scls = 'paid'; }
-              else if (b.age > 0) { status = b.age + 'd overdue'; scls = 'over'; }
-              else if (b.settled > 0) { status = 'Part-paid'; scls = 'part'; }
-              else { status = 'Current'; scls = 'curr'; }
+              // Over-settled = settled MORE than billed (e.g. paid then refunded) → we owe
+              // the party the excess. It is NOT "Settled": show Overpaid + the excess amount.
+              const { label: status, cls: scls, overpaid, overAmt } = billwiseStatus(b);
               const isOpen = open.has(b.ref);
               return (
                 <React.Fragment key={i}>
@@ -690,7 +699,7 @@ function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
                     <td className="l dt">{b.bdate}</td>
                     <td className="num">{fmt(b.amt)}</td>
                     <td className="num drc">{fmt(b.settled)}</td>
-                    <td className="num pend">{fmt(b.pend)}</td>
+                    <td className={'num ' + (overpaid ? 'overpaid' : 'pend')} title={overpaid ? 'Overpaid — settled more than billed (payable to the party)' : undefined}>{overpaid ? fmt(overAmt) : fmt(b.pend)}</td>
                     <td className={b.age > 0 && b.pend > 0 ? 'over' : ''}>{b.pend > 0 && b.age > 0 ? b.age + ' d' : '—'}</td>
                     <td className="l"><span className={'bw-status ' + scls}>{status}</span></td>
                   </tr>
@@ -796,7 +805,8 @@ function ledgerPrintHTML({ m, showNarr, showDetail, cur = '₹' }) {
     const settleInfo = r.alloc && r.alloc.length;
     let pillTxt = '', pillCls = '';
     if (billInfo) {
-      if (r.pending <= 0.01 && (r.settled || 0) > 0) { pillTxt = 'Settled'; pillCls = 'paid'; }
+      if (r.pending < -0.01 && (r.settled || 0) > 0) { pillTxt = `Overpaid · ${fmt(-r.pending)}`; pillCls = 'overpaid'; }
+      else if (r.pending <= 0.01 && (r.settled || 0) > 0) { pillTxt = 'Settled'; pillCls = 'paid'; }
       else if ((r.settled || 0) > 0) { pillTxt = `Part · ${fmt(r.settled)}`; pillCls = 'part'; }
       else { pillTxt = 'Open'; pillCls = 'open'; }
     } else if (settleInfo) { pillTxt = 'Settled'; pillCls = 'paid'; }
@@ -861,14 +871,10 @@ function billwisePrintHTML({ side, bills, group, name, cur = '₹' }) {
   let totAmt = 0, totSet = 0, totPend = 0;
   const rows = bills.map((b) => {
     totAmt += b.amt; totSet += b.settled; totPend += b.pend;
-    let status, scls;
-    if (b.pend <= 0) { status = 'Settled'; scls = 'paid'; }
-    else if (b.age > 0) { status = b.age + 'd overdue'; scls = 'over'; }
-    else if (b.settled > 0) { status = 'Part-paid'; scls = 'part'; }
-    else { status = 'Current'; scls = 'curr'; }
+    const { label: status, cls: scls, overpaid, overAmt } = billwiseStatus(b);
     return `<tr>
       <td class="l part">${esc(b.ref)}</td><td class="l dt">${esc(b.bdate)}</td>
-      <td class="num">${fmt(b.amt)}</td><td class="num drc">${fmt(b.settled)}</td><td class="num pend">${fmt(b.pend)}</td>
+      <td class="num">${fmt(b.amt)}</td><td class="num drc">${fmt(b.settled)}</td><td class="num ${overpaid ? 'overpaid' : 'pend'}">${overpaid ? fmt(overAmt) : fmt(b.pend)}</td>
       <td class="${b.age > 0 && b.pend > 0 ? 'over' : ''}">${b.pend > 0 && b.age > 0 ? b.age + ' d' : '—'}</td>
       <td class="l"><span class="bw-status ${scls}">${esc(status)}</span></td></tr>`;
   }).join('');

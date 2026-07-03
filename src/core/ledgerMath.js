@@ -78,6 +78,19 @@ export const branchSeg = (code) => (!code || code === '—' || code === 'ALL') ?
 
 export const AGE_BUCKETS = ['Not Due', '0-30', '31-60', '61-90', '90+'];
 export const AGE_COLORS = { 'Not Due': '#2C5C8F', '0-30': '#1B6B4C', '31-60': '#B7791F', '61-90': '#C0651A', '90+': '#9B2C2C' };
+// Bill-wise status for a mapped bill row { amt, settled, pend, age }. A bill settled for MORE
+// than it was billed (e.g. paid, then the booking was refunded) is 'Overpaid' — we owe the
+// party the excess — NOT 'Settled'. `overAmt` is that excess (0 otherwise). Single source of
+// truth for the on-screen row, the Excel export and the print sheet so all three agree.
+export function billwiseStatus(b = {}) {
+  const overAmt = Math.round(((b.settled || 0) - (b.amt || 0)) * 100) / 100;
+  if (overAmt > 0.01) return { label: 'Overpaid', cls: 'overpaid', overpaid: true, overAmt };
+  if ((b.pend || 0) <= 0) return { label: 'Settled', cls: 'paid', overpaid: false, overAmt: 0 };
+  if (b.age > 0) return { label: `${b.age}d overdue`, cls: 'over', overpaid: false, overAmt: 0 };
+  if ((b.settled || 0) > 0) return { label: 'Part-paid', cls: 'part', overpaid: false, overAmt: 0 };
+  return { label: 'Current', cls: 'curr', overpaid: false, overAmt: 0 };
+}
+
 export function ageingOf(bills) {
   const age = { 'Not Due': 0, '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
   let totPend = 0;
