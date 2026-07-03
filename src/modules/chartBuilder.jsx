@@ -67,6 +67,9 @@ export function rollupEntries(node, usage = {}) {
   let s = 0; names.forEach((nm) => { s += usage[nm] || 0; });
   return s;
 }
+// Default Ledger-scope for a Branch view: a specific branch shows only its OWN
+// ledgers (Common org-wide ledgers hidden); the consolidated view shows all. Pure.
+export const defaultScopeFor = (branchView) => (branchView && branchView !== 'ALL' ? 'branch' : 'all');
 // "8 common · 4 BOM" style mini-summary for a node's ledger set.
 const countNote = (leds) => {
   const c = leds.filter(isCommon).length, b = leds.length - c;
@@ -77,7 +80,8 @@ const countNote = (leds) => {
 export function AccountsTreeView({ branch }) {
   const brc = branchCode(branch);                    // undefined for ALL → shows all
   const [branchView, setBranchView] = useState(() => brc || 'ALL'); // in-page branch picker
-  const [scope, setScope] = useState('all');         // 'all' | 'common' | 'branch'
+  // Default to the branch's OWN ledgers in a specific branch view; 'all' when consolidated.
+  const [scope, setScope] = useState(() => defaultScopeFor(brc || 'ALL')); // 'all' | 'common' | 'branch'
   const groupsQ = useMasterList('groups');           // groups/sub-groups are SHARED across branches
   // Ledgers are branch-scoped. A specific branch view fetches that branch + the
   // org-wide 'ALL' ledgers; "All branches" fetches every branch's ledgers.
@@ -91,6 +95,9 @@ export function AccountsTreeView({ branch }) {
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState({ pg: '', g: '', sg: '' });
   const [includeInactive, setIncludeInactive] = useState(false); // hide deactivated ledgers by default
+  // Re-apply the scope default whenever the Branch view changes: pick a branch → its
+  // own ledgers only; switch to consolidated → all. The pills still override within a view.
+  useEffect(() => { setScope(defaultScopeFor(branchView)); }, [branchView]);
 
   const groups = groupsQ.data || [];
 
