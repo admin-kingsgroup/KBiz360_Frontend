@@ -55,12 +55,15 @@ export const escHtml = (s) =>
 // registry (toBody/validate) can compute it without importing transactions.jsx.
 // `amount` is the gross settlement value; `onAcc` is the parked advance remainder.
 export function allocSummary(alloc, amount, parkOnAcc, mode) {
+  // `allocated` is the NET of the entries: negative entries are adjust-credits
+  // (drawing down a bill's Overpaid excess), which free extra settling capacity
+  // for the positive rows — so net (not gross) is what caps at the voucher amount.
   const allocated = r2(Object.values(alloc || {}).reduce((s, v) => s + (+v || 0), 0));
   if (mode === 'onaccount') return { allocated: 0, un: 0, onAcc: r2(amount), valid: amount > 0, count: 0 };
   const un = r2(amount - allocated);
   const onAcc = (un > 0.001 && parkOnAcc) ? un : 0;
-  const count = Object.values(alloc || {}).filter((v) => (+v || 0) > 0).length;
-  const valid = amount > 0 && allocated > 0 && allocated <= amount + 0.001 && (un <= 0.001 || parkOnAcc);
+  const count = Object.values(alloc || {}).filter((v) => Math.abs(+v || 0) > 0.001).length;
+  const valid = amount > 0 && count > 0 && allocated <= amount + 0.001 && (un <= 0.001 || parkOnAcc);
   return { allocated, un, onAcc, valid, count };
 }
 

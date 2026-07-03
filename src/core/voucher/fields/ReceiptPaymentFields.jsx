@@ -57,11 +57,19 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   const gross = Math.round((net + tds) * 100) / 100;
   const sum = allocSummary(state.alloc, gross, state.parkOnAcc, state.applyMode);
 
+  // `out` is the row's allocatable bound: positive = the bill's outstanding;
+  // NEGATIVE = an Overpaid row's adjust-credit limit (−overpaidAmt) — the entry is
+  // clamped to [out, 0] there, un-applying the excess instead of adding to it.
   const setAllocFor = (vno, val, out) => {
-    let v = +val || 0; if (v < 0) v = 0; if (v > out) v = out;
+    let v = +val || 0;
+    if (out >= 0) { if (v < 0) v = 0; if (v > out) v = out; }
+    else { if (v > 0) v = 0; if (v < out) v = out; }
     setState((s) => ({ ...s, alloc: { ...s.alloc, [vno]: v } }));
   };
   const fullAlloc = (vno, out) => {
+    // Adjust-credit rows take their full (negative) bound — a credit ADDS settling
+    // capacity, so it is never limited by the voucher's remaining amount.
+    if (out < 0) { setState((s) => ({ ...s, alloc: { ...s.alloc, [vno]: out } })); return; }
     const others = Object.entries(state.alloc || {}).reduce((s, [k, v]) => (k === vno ? s : s + (+v || 0)), 0);
     const remain = Math.max(0, Math.round((gross - others) * 100) / 100);
     setState((s) => ({ ...s, alloc: { ...s.alloc, [vno]: gross > 0 ? Math.min(out, remain) : out } }));
