@@ -12,7 +12,7 @@
 // structure never changes, only which ledgers are shown / how they're tagged.
 import React, { useState, useEffect, useRef } from 'react';
 import { useMasterList } from '../../core/useMasters';
-import { branchCode, useLedgerUsage } from '../../core/useAccounting';
+import { branchCode, useLedgerUsage, useBranchParity } from '../../core/useAccounting';
 import { FocusBanner } from '../../core/ux/FocusBanner';
 import { useNavFocusStore } from '../../core/ux/navFocus';
 import { clickable } from '../../core/ux/clickable';
@@ -407,7 +407,10 @@ export function AccountsTreeView({ branch }) {
         <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>~*</span><span style={{ marginLeft: 4 }}>= sub-group wired to a module (locked — non-editable, non-deletable)</span></span>
       </div>
 
-      {/* Controls: in-page Branch view + Ledger Scope filter */}
+      {/* Controls: in-page Branch view + Ledger Scope filter. Hidden on the
+          Travkings Group View — it is org-wide (all branches as columns) and
+          carries its own scope/search controls. */}
+      {tab !== 'parity' && (
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 10 }}>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
           Branch view
@@ -431,9 +434,10 @@ export function AccountsTreeView({ branch }) {
           <b style={{ color: DARK }}>{tierCounts.parents}</b> Parent Groups · <b style={{ color: DARK }}>{tierCounts.groups}</b> Groups · <b style={{ color: DARK }}>{tierCounts.subGroups}</b> Sub-Groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers{scope === 'all' && <> (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)</>}
         </span>
       </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #cdd1d8', marginBottom: 12 }}>
-        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
+        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('parity', 'Travkings Group View')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
         {tab === 'tree' && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, padding: '4px 0' }}>
             <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊞ Expand all</button>
@@ -442,12 +446,186 @@ export function AccountsTreeView({ branch }) {
         )}
       </div>
 
-      {(groupsQ.isLoading || ledgersQ.isLoading) && (
+      {tab !== 'parity' && (groupsQ.isLoading || ledgersQ.isLoading) && (
         <div style={{ padding: 14 }}>
           {Array.from({ length: 7 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}
         </div>
       )}
-      {tab === 'tree' ? treeView() : tab === 'side' ? sideView() : inactiveView()}
+      {tab === 'tree' ? treeView() : tab === 'side' ? sideView() : tab === 'parity' ? <TravkingsGroupView /> : inactiveView()}
+    </div>
+  );
+}
+
+// ─── Travkings Group View — branch-parity of the chart of accounts ───────────
+// One master list where every row (Parent Group ▸ Group ▸ Sub-Group ▸ Ledger)
+// shows, per branch, a 4-way status. BACKBONE heads — system-seeded (*) and
+// module-wired (~*) — exist in every branch by design (★, never ✗); branch-
+// specific ledgers (auto/manual/import) show ✓ where they live, ✗ elsewhere.
+const PARITY_LBL = { used: 'used', dormant: 'no entry yet', local: 'branch-specific (auto/manual/import)', absent: 'not in this branch' };
+const P_GREEN = '#14795f', P_AMBER = '#9a6a12', P_RED = '#b23c2b', P_LOCAL_BD = '#8fc7ae';
+const TIER_TAG = { parent: 'Parent', group: 'Group', sub: 'Sub', ledger: 'Ledger' };
+
+// PURE: build the nested tree from the tiered parity payload. Groups nest by
+// `parent`, ledgers by `group`; each node gets a stable id, depth and leafCount.
+// Exported for unit tests.
+export function buildParityTree(data) {
+  const D = data || {};
+  const branches = D.branches || [];
+  const mk = (r, type) => ({
+    name: r.name, type, parent: (type === 'ledger' ? r.group : r.parent) || '',
+    states: r.states || [], posts: r.posts || [], total: r.total || 0,
+    star: !!r.star, tilde: !!r.tilde, backbone: !!r.backbone,
+    present: r.present != null ? r.present : (r.states || []).filter((s) => s !== 'absent').length,
+    children: [],
+  });
+  const groupNodes = [
+    ...(D.parentGroups || []).map((r) => mk(r, 'parent')),
+    ...(D.groups || []).map((r) => mk(r, 'group')),
+    ...(D.subGroups || []).map((r) => mk(r, 'sub')),
+  ];
+  const ledgerNodes = (D.ledgers || []).map((r) => mk(r, 'ledger'));
+  const byName = new Map(groupNodes.map((n) => [n.name, n]));
+  const roots = [];
+  groupNodes.forEach((n) => { if (!n.parent) { roots.push(n); } else { const p = byName.get(n.parent); (p ? p.children : roots).push(n); } });
+  ledgerNodes.forEach((n) => { const p = byName.get(n.parent); if (p) p.children.push(n); else roots.push(n); });
+  const rank = { parent: 0, group: 1, sub: 2, ledger: 3 };
+  const sortKids = (n) => { n.children.sort((a, b) => (rank[a.type] - rank[b.type]) || a.name.localeCompare(b.name)); n.children.forEach(sortKids); };
+  roots.sort((a, b) => a.name.localeCompare(b.name)); roots.forEach(sortKids);
+  let uid = 0;
+  const stamp = (n, d) => { n.id = 'p' + (uid++); n.depth = d; n.leafCount = n.type === 'ledger' ? 1 : 0; n.children.forEach((c) => { stamp(c, d + 1); n.leafCount += c.leafCount; }); };
+  roots.forEach((r) => stamp(r, 0));
+  return { roots, branches };
+}
+
+// The ★ / ~★ / ✓ / ✗ glyph for one branch cell.
+function parityGlyph(state, tilde) {
+  const box = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, fontSize: 13, fontWeight: 700 };
+  const star = tilde ? <span><span style={{ fontSize: 10, fontWeight: 800 }}>~</span>★</span> : '★';
+  if (state === 'used') return <span style={{ ...box, background: P_GREEN, color: '#fff' }}>{star}</span>;
+  if (state === 'dormant') return <span style={{ ...box, background: '#fff', border: `1.5px solid #d8c084`, color: P_AMBER }}>{star}</span>;
+  if (state === 'local') return <span style={{ ...box, background: '#fff', border: `1.5px solid ${P_LOCAL_BD}`, color: P_GREEN }}>✓</span>;
+  return <span style={{ ...box, color: '#c4907f' }}>✗</span>;
+}
+
+function TravkingsGroupView() {
+  const parityQ = useBranchParity();
+  const { roots, branches } = React.useMemo(() => buildParityTree(parityQ.data), [parityQ.data]);
+  const [collapsed, setCollapsed] = useState(() => new Set());
+  const [scope, setScope] = useState('all');   // 'all' | 'backbone' | 'specific'
+  const [gapOnly, setGapOnly] = useState(false);
+  const [q, setQ] = useState('');
+  // Default: parent + group levels open, deeper collapsed (set once when tree first loads).
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current || !roots.length) return;
+    const s = new Set();
+    const walk = (n) => { if (n.children.length && n.depth >= 1) s.add(n.id); n.children.forEach(walk); };
+    roots.forEach(walk); setCollapsed(s); seededRef.current = true;
+  }, [roots]);
+
+  const filtering = !!q || gapOnly || scope !== 'all';
+  const selfMatch = (n) => {
+    if (n.present === 0) return false;
+    if (scope === 'backbone' && !n.backbone) return false;
+    if (scope === 'specific' && n.backbone) return false;
+    if (gapOnly && n.present === branches.length) return false;
+    if (q && !n.name.toLowerCase().includes(q.toLowerCase())) return false;
+    return true;
+  };
+  // A node is visible if it self-matches OR any descendant does (keeps ancestors).
+  const visible = (n) => {
+    let anyChild = false; n.children.forEach((c) => { if (visible(c)) anyChild = true; });
+    n._vis = n.present > 0 && (selfMatch(n) || anyChild);
+    return n._vis;
+  };
+  roots.forEach(visible);
+
+  const toggle = (id) => setCollapsed((prev) => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
+  const rows = [];
+  const push = (n) => {
+    if (filtering && !n._vis) return;
+    if (n.present === 0) return;
+    rows.push(n);
+    const isCol = collapsed.has(n.id) && !filtering;
+    if (n.children.length && !isCol) n.children.forEach(push);
+  };
+  roots.forEach(push);
+
+  const tag = (t) => <span style={{ flex: 'none', fontSize: 9, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 5, background: '#eef0f4', color: '#556' }}>{TIER_TAG[t]}</span>;
+  const sign = (n) => (n.star ? <span style={{ color: P_GREEN, fontWeight: 800, fontFamily: 'monospace' }}>*</span> : n.tilde ? <span style={{ color: P_AMBER, fontWeight: 800, fontFamily: 'monospace' }}>~*</span> : null);
+  const scopePill = (k, l) => <button key={k} onClick={() => setScope(k)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: scope === k ? BLUE : '#fff', color: scope === k ? '#fff' : DIM }}>{l}</button>;
+
+  if (parityQ.isLoading) return <div style={{ padding: 14 }}>{Array.from({ length: 8 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}</div>;
+  if (parityQ.isError) return <div style={{ padding: 16, fontSize: 12, color: RED }}>Couldn’t load branch parity. Try again.</div>;
+
+  return (
+    <div>
+      {/* Legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', fontSize: 11.5, color: DIM, marginBottom: 10 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{parityGlyph('used', false)} Used — backbone, has entries</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{parityGlyph('dormant', false)} No entry yet</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{parityGlyph('used', true)} Wired backbone (~★)</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{parityGlyph('local', false)} Branch-specific (auto/manual/import)</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{parityGlyph('absent', false)} Not in this branch</span>
+      </div>
+      {/* Controls */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value.trim())} placeholder="Search groups & ledgers…" style={{ flex: 1, minWidth: 200, padding: '8px 11px', border: '1px solid #cdd1d8', borderRadius: 7, fontSize: 12 }} />
+        <span style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
+          {scopePill('all', 'All')}{scopePill('backbone', '★ Backbone')}{scopePill('specific', 'Branch-specific')}
+        </span>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM, cursor: 'pointer' }}>
+          <input type="checkbox" checked={gapOnly} onChange={(e) => setGapOnly(e.target.checked)} /> Not in all branches
+        </label>
+      </div>
+
+      <div style={{ overflow: 'auto', maxHeight: '70vh', border: '1px solid #cdd1d8', borderRadius: 10 }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 860 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left', position: 'sticky', top: 0, background: '#fff', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: DIM, padding: '10px 12px', borderBottom: '1.5px solid #cdd1d8', whiteSpace: 'nowrap' }}>Group / Ledger</th>
+              {branches.map((b) => <th key={b} style={{ textAlign: 'center', width: 56, fontSize: 11, color: DIM, padding: '10px 6px', borderBottom: '1.5px solid #cdd1d8' }}>{b}</th>)}
+              <th style={{ textAlign: 'right', width: 74, fontSize: 11, color: DIM, padding: '10px 12px', borderBottom: '1.5px solid #cdd1d8' }}>Posts</th>
+              <th style={{ textAlign: 'center', width: 92, fontSize: 11, color: DIM, padding: '10px 8px', borderBottom: '1.5px solid #cdd1d8' }}>Coverage</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((n) => {
+              const hasKids = n.children.length > 0;
+              const isCol = collapsed.has(n.id) && !filtering;
+              const full = n.present === branches.length;
+              return (
+                <tr key={n.id} style={{ borderBottom: '1px solid #eef1f5' }}>
+                  <td style={{ padding: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 12px', paddingLeft: 8 + n.depth * 20, boxShadow: n.depth === 0 ? `inset 4px 0 0 ${GOLD}` : 'none' }}>
+                      {hasKids
+                        ? <button type="button" onClick={() => toggle(n.id)} aria-expanded={!isCol} aria-label={`${isCol ? 'Expand' : 'Collapse'} ${n.name}`} style={{ width: 16, height: 16, padding: 0, border: 'none', background: 'transparent', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', color: DIM, fontSize: 10, transform: isCol ? 'none' : 'rotate(90deg)' }}>▶</button>
+                        : <span style={{ width: 16, display: 'inline-block' }} />}
+                      {tag(n.type)}
+                      {sign(n)}
+                      <span style={{ fontWeight: n.type === 'parent' ? 700 : n.type === 'ledger' ? 500 : 620, fontSize: n.type === 'parent' ? 14 : 13, color: n.type === 'ledger' ? '#2a3a34' : DARK }}>{n.name}</span>
+                      {hasKids && <span style={{ fontSize: 11, color: '#9aa2c0' }}>{n.leafCount} led{n.leafCount === 1 ? '' : 's'}</span>}
+                    </div>
+                  </td>
+                  {n.states.map((s, i) => (
+                    <td key={i} title={`${branches[i]} · ${(n.posts[i] || 0).toLocaleString('en-IN')} posting${(n.posts[i] || 0) === 1 ? '' : 's'} · ${PARITY_LBL[s]}`} style={{ textAlign: 'center', padding: '4px 0', background: s === 'absent' ? '#fcfbfa' : 'transparent' }}>
+                      {parityGlyph(s, n.tilde)}
+                    </td>
+                  ))}
+                  <td style={{ textAlign: 'right', padding: '4px 12px', fontFamily: 'monospace', fontSize: 12.5, color: n.total ? DARK : '#b7c0ba' }}>{(n.total || 0).toLocaleString('en-IN')}</td>
+                  <td style={{ textAlign: 'center', padding: '4px 8px' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600 }}>{n.present}/{branches.length}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: full ? '#e5f3ea' : '#f8efdc', color: full ? '#137a4b' : P_AMBER }}>{full ? 'ALL' : 'PARTLY'}</span>
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+            {!rows.length && <tr><td colSpan={branches.length + 3} style={{ padding: 30, textAlign: 'center', color: '#9aa2c0' }}>Nothing matches.</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

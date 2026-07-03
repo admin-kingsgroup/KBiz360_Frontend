@@ -69,6 +69,19 @@ export function useLedgerUsage(branch) {
   });
 }
 
+// Travkings Group View — branch-parity of the whole chart of accounts. Org-wide
+// (not branch-scoped): returns { branches, parentGroups, groups, subGroups, ledgers }
+// with a per-branch 4-way state (used/dormant/local/absent) + posting counts and
+// */~* provenance flags. Powers the "Travkings Group View" tab in the Accounts Tree.
+export function useBranchParity() {
+  return useQuery({
+    queryKey: ['accounting', 'branch-parity'],
+    queryFn: () => apiGet('/api/accounting/branch-parity'),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}
+
 export function useProfitAndLoss(branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({
