@@ -36,7 +36,13 @@ const scopeBadge = (l) => (isCommon(l) ? badge('Common', GREY) : badge(l.branch,
 // Deactivated ledgers are hidden by default; the "Include inactive" toggle reveals
 // them, dimmed and flagged, so the chart can show the full picture on demand.
 const AMBER = '#b45309';
+const RED = '#dc2626', RED_TINT = '#fef2f2';
 const isInactive = (l) => l.active === false;
+// A ledger is "removable" (safe to delete) when it's deactivated AND holds no
+// postings — the backend blocks deleting a ledger that has entries, so an inactive
+// ledger WITH entries stays amber ("retired, can't delete yet"), only 0-entry ones
+// go red. `n` is the ledger's entry count from the usage map.
+export const isRemovable = (l, n) => isInactive(l) && (n || 0) === 0;
 // A tree root is a top-level primary group ONLY: a system group with no parent.
 // The 13 seeded system SUB-groups carry a parent and must render nested under it,
 // never also as a second top-level "Parent Group".
@@ -131,6 +137,11 @@ export function AccountsTreeView({ branch }) {
   // ── Entry-count statistics (Count column) ──
   const usage = usageQ.data || {};
   const entriesFor = (l) => usage[(l.name || '').toLowerCase()] || 0;
+  // Trust the "removable/red" flag ONLY once the usage counts have actually loaded —
+  // otherwise a ledger that has postings would flash red (falsely "safe to delete")
+  // during load, or if the endpoint errors. Until then, inactive ledgers stay amber.
+  const usageReady = usageQ.isSuccess;
+  const removableOf = (l, n) => usageReady && isRemovable(l, n);
   // Roll a group node's entries up from its whole subtree, counting each distinct
   // ledger NAME once (so a ledger that appears as several branch copies of the same
   // name in the consolidated view isn't double-counted).
@@ -177,13 +188,16 @@ export function AccountsTreeView({ branch }) {
   const countChip = (n, auto = true) => (
     <span title={`${n} ${n === 1 ? 'entry' : 'entries'}`} style={{ marginLeft: auto ? 'auto' : 8, fontSize: 10, fontWeight: 700, color: n ? '#334155' : '#c3cbe0', background: n ? '#eef2f7' : 'transparent', border: `1px solid ${n ? '#d7deea' : 'transparent'}`, padding: '0px 7px', borderRadius: 10, minWidth: 20, textAlign: 'center' }}>{n}</span>
   );
-  const ledgerRow = (l, indent) => (
-    <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #dfe2e7', color: isInactive(l) ? '#9aa2c0' : DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : undefined }}>
-      <span style={{ color: isInactive(l) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}{isInactive(l) && badge('Inactive', AMBER)}
-      {l._overrides && <span style={{ fontSize: 9, color: GOLD, marginLeft: 6, fontStyle: 'italic' }}>overrides Common</span>}
-      {countChip(entriesFor(l))}
-    </div>
-  );
+  const ledgerRow = (l, indent) => {
+    const n = entriesFor(l), rm = removableOf(l, n);
+    return (
+      <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #dfe2e7', color: rm ? RED : isInactive(l) ? '#9aa2c0' : DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : rm ? RED_TINT : undefined }}>
+        <span style={{ color: rm ? RED : isInactive(l) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}{rm ? badge('Removable', RED) : isInactive(l) && badge('Inactive', AMBER)}
+        {l._overrides && <span style={{ fontSize: 9, color: GOLD, marginLeft: 6, fontStyle: 'italic' }}>overrides Common</span>}
+        {countChip(n)}
+      </div>
+    );
+  };
   // Subheading shown above ledgers that hang straight off a Group/Parent Group
   // (no intermediate sub-group) — only when that node also has child groups, so
   // it's clear these ledgers aren't nested under one of those groups.
@@ -243,12 +257,16 @@ export function AccountsTreeView({ branch }) {
     <div style={{ flex: 1, minWidth: 180, border: '1px solid #cdd1d8', borderRadius: 8, background: '#fff', display: 'flex', flexDirection: 'column', maxHeight: '64vh' }}>
       <div style={{ padding: '8px 10px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #dfe2e7', background: '#f7f8fb' }}>{title} <span style={{ color: '#9aa2c0' }}>({items.length})</span></div>
       <div style={{ overflow: 'auto' }} onKeyDown={onPick ? listKeyNav() : undefined}>
-        {items.map((it) => (
-          <div key={kind === 'ledger' ? 'L' + it.id : (it.name || it.id)} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : 'transparent', borderBottom: '1px solid #dfe2e7', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={kind === 'ledger' && isInactive(it) ? { color: '#9aa2c0' } : undefined}>{kind === 'ledger' ? <><span style={{ color: isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{isInactive(it) && badge('Inactive', AMBER)}</> : it.name}</span>
-            {kind === 'ledger' ? countChip(entriesFor(it)) : (onPick && <span style={{ color: '#c3cbe0' }}>›</span>)}
+        {items.map((it) => {
+          const n = kind === 'ledger' ? entriesFor(it) : 0;
+          const rm = kind === 'ledger' && removableOf(it, n);
+          return (
+          <div key={kind === 'ledger' ? 'L' + it.id : (it.name || it.id)} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : rm ? RED_TINT : 'transparent', borderBottom: '1px solid #dfe2e7', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={kind === 'ledger' ? (rm ? { color: RED } : isInactive(it) ? { color: '#9aa2c0' } : undefined) : undefined}>{kind === 'ledger' ? <><span style={{ color: rm ? RED : isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{rm ? badge('Removable', RED) : isInactive(it) && badge('Inactive', AMBER)}</> : it.name}</span>
+            {kind === 'ledger' ? countChip(n) : (onPick && <span style={{ color: '#c3cbe0' }}>›</span>)}
           </div>
-        ))}
+          );
+        })}
         {!items.length && <div style={{ padding: 12, fontSize: 11, color: '#9aa2c0' }}>—</div>}
       </div>
     </div>
@@ -273,10 +291,11 @@ export function AccountsTreeView({ branch }) {
   // ── Inactive Ledgers (flat list, most-used first) ──
   const inactiveView = () => {
     const th = (t, w) => <th style={{ textAlign: t === 'Entries' || t === 'Opening' ? 'right' : 'left', padding: '8px 12px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #cdd1d8', width: w }}>{t}</th>;
+    const removableCount = usageReady ? inactiveLedgers.filter((l) => entriesFor(l) === 0).length : 0;
     return (
       <div style={{ border: '1px solid #cdd1d8', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
         <div style={{ padding: '8px 12px', fontSize: 11.5, color: DIM, background: '#fbfcfe', borderBottom: '1px solid #dfe2e7' }}>
-          <b style={{ color: DARK }}>{inactiveLedgers.length}</b> deactivated ledger{inactiveLedgers.length === 1 ? '' : 's'} in this view. A non-zero <b style={{ color: DARK }}>Entries</b> count means the ledger is inactive but still holds postings — likely deactivated by mistake or a merge candidate; <b style={{ color: DARK }}>0</b> means it's empty and safe to leave or purge.
+          <b style={{ color: DARK }}>{inactiveLedgers.length}</b> deactivated ledger{inactiveLedgers.length === 1 ? '' : 's'} in this view — <b style={{ color: RED }}>{removableCount}</b> shown in <span style={{ color: RED, fontWeight: 700 }}>red</span> are <b style={{ color: RED }}>Removable</b> (0 entries, safe to delete). The rest hold postings (<span style={{ color: AMBER, fontWeight: 700 }}>amber</span>) and can't be deleted until cleared.
         </div>
         {inactiveLedgers.length ? (
           <div style={{ overflow: 'auto', maxHeight: '68vh' }}>
@@ -286,14 +305,14 @@ export function AccountsTreeView({ branch }) {
               </thead>
               <tbody>
                 {inactiveLedgers.map((l) => {
-                  const n = entriesFor(l);
+                  const n = entriesFor(l), rm = removableOf(l, n);
                   return (
-                    <tr key={'IL' + l.id} style={{ borderBottom: '1px solid #dfe2e7' }}>
-                      <td style={{ padding: '6px 12px', fontSize: 12, color: DARK, fontWeight: 600 }}>{l.name}{badge('Inactive', AMBER)}</td>
+                    <tr key={'IL' + l.id} style={{ borderBottom: '1px solid #dfe2e7', background: rm ? RED_TINT : undefined }}>
+                      <td style={{ padding: '6px 12px', fontSize: 12, color: rm ? RED : DARK, fontWeight: 600 }}>{l.name}{rm ? badge('Removable', RED) : badge('Inactive', AMBER)}</td>
                       <td style={{ padding: '6px 12px', fontSize: 11.5, color: DIM }}>{l.group || '—'}</td>
                       <td style={{ padding: '6px 12px', fontSize: 11.5, color: DIM }}>{l.subGroup || '—'}</td>
                       <td style={{ padding: '6px 12px' }}>{scopeBadge(l)}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: n ? '#b45309' : '#9aa2c0' }}>{n}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: n ? AMBER : RED }}>{n}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'right', fontSize: 11.5, color: DIM }}>{Number(l.openingBalance || 0).toLocaleString('en-IN')} {l.drCr || ''}</td>
                     </tr>
                   );
@@ -322,6 +341,7 @@ export function AccountsTreeView({ branch }) {
         <span><b style={{ color: DARK }}>Groups & Sub-Groups</b> are shared across all branches (org-wide). Only <b style={{ color: DARK }}>Ledgers</b> are branch-scoped:</span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Removable', RED)}<span style={{ marginLeft: 4 }}>= deactivated + 0 entries (safe to delete)</span></span>
       </div>
 
       {/* Controls: in-page Branch view + Ledger Scope filter */}
