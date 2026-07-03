@@ -40,7 +40,9 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
 
   // Live open items for the chosen party. When editing, exclude this voucher's own
   // settlement so what it cleared reappears and stays re-allocatable. In refund mode the
-  // rows are the client's open receipts (leftover each); otherwise their open bills.
+  // rows are the client's open receipts (leftover each); otherwise their open bills —
+  // over-settled ones included (useOpenBills defaults includeOverpaid), so the party's
+  // Overpaid credit that the ledger bill-wise shows is visible here too while allocating.
   const billsQ = useOpenBills(isParty ? state.party : '', branch, spec.obSide, ctx.editId, false, spec.mode);
 
   // Keep billVno→billId in sync as bills load, so toBody can carry billId.
@@ -55,11 +57,19 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   const gross = Math.round((net + tds) * 100) / 100;
   const sum = allocSummary(state.alloc, gross, state.parkOnAcc, state.applyMode);
 
+  // `out` is the row's allocatable bound: positive = the bill's outstanding;
+  // NEGATIVE = an Overpaid row's adjust-credit limit (−overpaidAmt) — the entry is
+  // clamped to [out, 0] there, un-applying the excess instead of adding to it.
   const setAllocFor = (vno, val, out) => {
-    let v = +val || 0; if (v < 0) v = 0; if (v > out) v = out;
+    let v = +val || 0;
+    if (out >= 0) { if (v < 0) v = 0; if (v > out) v = out; }
+    else { if (v > 0) v = 0; if (v < out) v = out; }
     setState((s) => ({ ...s, alloc: { ...s.alloc, [vno]: v } }));
   };
   const fullAlloc = (vno, out) => {
+    // Adjust-credit rows take their full (negative) bound — a credit ADDS settling
+    // capacity, so it is never limited by the voucher's remaining amount.
+    if (out < 0) { setState((s) => ({ ...s, alloc: { ...s.alloc, [vno]: out } })); return; }
     const others = Object.entries(state.alloc || {}).reduce((s, [k, v]) => (k === vno ? s : s + (+v || 0)), 0);
     const remain = Math.max(0, Math.round((gross - others) * 100) / 100);
     setState((s) => ({ ...s, alloc: { ...s.alloc, [vno]: gross > 0 ? Math.min(out, remain) : out } }));
@@ -132,7 +142,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
       {/* Bill-wise allocation — open bills, or (client refund) the client's open receipts */}
       {isParty && (
       <BillAllocPanel
-        side={side} party={state.party} q={billsQ} amount={gross}
+        side={side} party={state.party} q={billsQ} amount={gross} vDate={state.date}
         alloc={state.alloc} onSetAlloc={setAllocFor} onFull={fullAlloc}
         mode={state.applyMode} onMode={(m) => patch({ applyMode: m })}
         parkOnAcc={state.parkOnAcc} onParkOnAcc={(v) => patch({ parkOnAcc: v })} cur={cur}

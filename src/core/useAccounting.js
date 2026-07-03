@@ -528,11 +528,17 @@ export function useRegisterSummary(branch, { category, from, to } = {}) {
 // `mode` (optional) — 'advances' returns the party's open RECEIPTS (leftover per
 // receipt), shaped as bills, so a Payment voucher can refund a Sundry Debtor's
 // on-account money by settling against specific receipts. Default → open bills.
-export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false, mode) {
+// `includeOverpaid` (default TRUE) — ALSO receive over-settled bills (status
+// 'overpaid', outstanding 0, `overpaidAmt` = the party's credit). Every UI that
+// lists a party's bills must show that credit — its invisibility is exactly how an
+// Overpaid bill (ledger) went missing from the Receipt edit modal. Rows stay
+// non-allocatable (outstanding 0), so allocation math is unaffected; pass false
+// ONLY for a consumer that must strictly mirror the raw settle math.
+export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false, mode, includeOverpaid = true) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open', mode || 'bills'],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, mode, includeSettled: includeSettled ? '1' : undefined }),
+    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open', mode || 'bills', includeOverpaid ? 'op' : ''],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, mode, includeSettled: includeSettled ? '1' : undefined, includeOverpaid: includeOverpaid ? '1' : undefined }),
     enabled: enabled() && !!party && !!code,
     staleTime: 15_000,
   });

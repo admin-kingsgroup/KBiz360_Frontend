@@ -43,7 +43,7 @@ import {
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
-import { invalidateBooks, useVoucherApprovals, useApproveMany, useRejectVoucher } from '../../core/useAccounting';
+import { invalidateBooks, useVoucherApprovals, useApproveMany, useApproveVoucher, useRejectVoucher } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
@@ -1461,7 +1461,7 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onInvoice, busyId, sel, onToggleSel }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onEditPax, onInvoice, busyId, sel, onToggleSel }) {
   const chainCfg = useApprovalChain(); // three-level chain assignees (drives the stage-aware button)
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Voucher Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
@@ -1555,9 +1555,10 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                       // returns it to Pending (edit there, then re-approve under the SAME
                       // numbers). Revoke is approver-only; Delete is admin-only.
                       <div style={{ display: 'flex', gap: 6 }}>
+                        {onEditPax && sp && <button disabled={busyId === b.id} onClick={() => onEditPax(b)} title="Edit passenger details (names / ticket & document refs / sectors) in place — amounts unchanged, booking stays approved. No revoke needed." style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit Pax</button>}
                         {canRevoke && onRevoke && <button disabled={busyId === b.id} onClick={() => onRevoke(b)} title="Revoke — un-post the Sales/Purchase and return this booking to Pending so it can be edited & re-approved (numbers kept)" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: GOLD, borderColor: '#e3cd97' }}><RotateCcw size={12} /> Revoke</button>}
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={12} /> Delete</button>}
-                        {!(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
+                        {!(onEditPax && sp) && !(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
                       </div>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#9197a3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
@@ -1741,6 +1742,100 @@ function makeOnRevoke({ qc, setBusyId, setOpen, toastFn }) {
   };
 }
 
+// ── Edit passenger details on an APPROVED booking ────────────────────────────
+// Identity-only fix — names, document refs (Ticket/PNR, Hotel/Conf, Passport…)
+// and Flight sectors — saved in place via POST /:id/passengers. The server applies
+// ONLY these identity columns, so amounts/ledgers can't change: the booking stays
+// approved and its posted Sales/Purchase stay posted. No Revoke → Edit → re-Approve
+// cycle for a name typo.
+function EditPaxModal({ booking, onClose, onSaved }) {
+  const spec = VSPECS[booking.module];
+  const [rows, setRows] = useState(() => (Array.isArray(booking.rows) ? booking.rows : []).map((r) => JSON.parse(JSON.stringify(r || {}))));
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  useModalEsc(onClose, true);
+  if (!spec) return null;
+  const setId = (i, key, val) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
+  const setSector = (i, si, key, val) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: (r.sectors || []).map((s, sx) => (sx === si ? { ...s, [key]: val } : s)) } : r)));
+  const addSector = (i) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: [...(r.sectors || []), Object.fromEntries(spec.sectorCols.map((c) => [c.key, '']))] } : r)));
+  const delSector = (i, si) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: (r.sectors || []).filter((_, sx) => sx !== si) } : r)));
+  const save = async () => {
+    setSaving(true); setErr('');
+    try {
+      await apiPost('/api/booking-orders/' + booking.id + '/passengers', { rows, editReason: reason });
+      toast('Passenger details saved — booking stays approved & posted');
+      onSaved();
+    } catch (e) { setErr(e.message || 'Save failed'); setSaving(false); }
+  };
+  const smallInp = { ...inp, height: 30, fontSize: 12, padding: '4px 8px' };
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,19,38,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: 'min(860px, 96vw)', maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(13,19,38,.28)', padding: '18px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 15, color: DARK, display: 'flex', alignItems: 'center', gap: 7 }}><Pencil size={15} style={{ color: BLUE }} /> Edit passenger details · {booking.bookingNo}</h3>
+            <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#5b616e' }}>
+              {spec.icon} {spec.name} · Link <b style={{ fontFamily: 'monospace' }}>{booking.linkNo}</b> · saved in place — <b>amounts are untouched and the booking stays approved</b> (no revoke needed).
+            </p>
+          </div>
+          <button onClick={onClose} style={{ ...btnGh, padding: '4px 10px' }}>✕</button>
+        </div>
+        {err && <div style={{ margin: '10px 0', padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>{err}</div>}
+        {!rows.length && <div style={{ padding: 18, fontSize: 12, color: '#9197a3' }}>This booking has no passenger grid to edit (legacy import). Use Revoke → Edit for changes.</div>}
+        {rows.map((l, i) => (
+          <div key={i} style={{ border: '1px solid #e3e6ee', borderRadius: 8, padding: '10px 12px', marginTop: 10, background: '#fbfaf7' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#9197a3', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Passenger {i + 1}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${spec.idCols.length}, minmax(140px, 1fr))`, gap: 8 }}>
+              {spec.idCols.map((c) => (
+                <label key={c.key} style={{ fontSize: 10.5, color: '#5b616e', fontWeight: 600 }}>{c.label}
+                  <input value={l[c.key] ?? ''} onChange={(e) => setId(i, c.key, e.target.value)} style={{ ...smallInp, marginTop: 3, width: '100%' }} />
+                </label>
+              ))}
+            </div>
+            {spec.sectors && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#9197a3', textTransform: 'uppercase', letterSpacing: '.5px' }}>Sectors / Tickets</span>
+                  <button onClick={() => addSector(i)} style={{ ...btnGh, padding: '2px 8px', fontSize: 10 }}><Plus size={11} /> Sector</button>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 640 }}>
+                    <thead><tr>{spec.sectorCols.map((c) => <th key={c.key} style={{ padding: '3px 6px', fontSize: 9.5, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', textAlign: 'left' }}>{c.label}</th>)}<th /></tr></thead>
+                    <tbody>
+                      {(l.sectors || []).map((s, si) => (
+                        <tr key={si}>
+                          {spec.sectorCols.map((c) => (
+                            <td key={c.key} style={{ padding: 2 }}>
+                              {c.type === 'date'
+                                ? <SmartDateInput value={s[c.key] ?? ''} onChange={(v) => setSector(i, si, c.key, v)} style={{ ...smallInp, width: '100%' }} />
+                                : <input value={s[c.key] ?? ''} onChange={(e) => setSector(i, si, c.key, e.target.value)} style={{ ...smallInp, width: '100%' }} />}
+                            </td>
+                          ))}
+                          <td style={{ padding: 2 }}><button onClick={() => delSector(i, si)} title="Remove sector" style={{ ...btnGh, padding: '4px 7px', color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={11} /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {rows.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+            <label style={{ flex: 1, minWidth: 260, fontSize: 10.5, color: '#5b616e', fontWeight: 600 }}>Reason (audit trail — optional)
+              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Name spelling corrected per passport" style={{ ...smallInp, marginTop: 3, width: '100%' }} />
+            </label>
+            <button onClick={onClose} disabled={saving} style={btnGh}>Cancel</button>
+            <button onClick={save} disabled={saving} style={btnG}>{saving ? <RefreshCw size={13} className="spin" /> : <Save size={13} />} Save passenger details</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const brCode = brCodeOf(branch) || 'ALL';
   const cur = bc(branch).cur;
@@ -1749,6 +1844,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [groupBy, setGroupBy] = useState('none');
+  const [paxEdit, setPaxEdit] = useState(null); // booking whose passenger details are being edited in place
   const canDelete = isAdminRole(currentUser);
   const canRevoke = isApproverRole(currentUser);
   const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: toast });
@@ -1778,7 +1874,9 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
       <div style={{ marginBottom: 12 }}><GroupByBar value={groupBy} onChange={setGroupBy} extra={[['recent', 'Recently Approved']]} /></div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} busyId={busyId} />
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onEditPax={setPaxEdit} busyId={busyId} />
+      {paxEdit && <EditPaxModal booking={paxEdit} onClose={() => setPaxEdit(null)}
+        onSaved={() => { setPaxEdit(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); /* voucher meta.detail changed → refresh voucher views */ }} />}
     </div>
   );
 }
@@ -1823,8 +1921,10 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
   const cur = bc(branch).cur;
   const isApprover = isApproverRole(currentUser);
   const q = useVoucherApprovals(branch, status, { refundScope: 'sopogp' });
-  const approveMany = useApproveMany();
+  const approveOne = useApproveVoucher();
   const reject = useRejectVoucher();
+  const qc = useQueryClient();
+  const chainCfg = useApprovalChain(); // three-level chain assignees (Check → Verify → Approve)
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null); // fix a blocked refund voucher in place, then approve
   useModalEsc(() => setEditId(null), !!editId);
@@ -1836,17 +1936,28 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
       .filter((e) => !needle || [e.vno, e.party, e.againstInvoice, e.linkNo, String(Math.round(e.total || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle));
   }, [q.data, needle]);
 
-  // A refund/reissue is one voucher — approve/reject it on its own (shared voucher
-  // mutations, exactly like the INB Refunds section).
+  // A refund/reissue is one voucher — approve/reject it on its own (exactly like the
+  // INB Refunds section). Single-voucher approve (NOT approveMany) so the backend's
+  // real refusal ("Awaiting Check…", validation error) reaches the toast instead of
+  // being flattened to "failed to post".
   const doApprove = async (e) => {
     const { confirmed } = await confirmDialog({ title: `Approve refund ${e.vno}?`, message: 'Posts this refund / reissue to the books (reverses the linked sale).', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusy(true);
-    approveMany.mutate({ ids: [e.id], approver: 'admin' }, {
-      onSuccess: (res) => { const f = (res && res.failed) || 0; toast(f ? `${e.vno} failed to post` : `Approved ${e.vno}`, f ? 'error' : 'success'); },
-      onError: (err) => toast((err && err.message) || 'Approve failed', 'error'),
-      onSettled: () => setBusy(false),
-    });
+    try { await approveOne.mutateAsync({ id: e.id, approver: 'admin' }); toast(`Approved ${e.vno} — posted to the books`); }
+    catch (err) { toast(`${e.vno}: ${(err && err.message) || 'failed to post'}`, 'error'); }
+    finally { setBusy(false); }
+  };
+  // Levels 1 & 2 of the chain (no books impact) — the server enforces stage order
+  // and who may act; these buttons only route the click. Mirrors the Vouchers queue.
+  const doReview = async (e, action) => {
+    setBusy(true);
+    try {
+      await apiPost(`/api/vouchers/${e.id}/review`, { action });
+      toast(action === 'check' ? `Checked ${e.vno} (level 1) — awaiting Verify` : `Verified ${e.vno} (level 2) — awaiting final Approval`);
+      qc.invalidateQueries({ queryKey: ['vouchers'] });
+    } catch (err) { toast((err && err.message) || `${action} failed`, 'error'); }
+    finally { setBusy(false); }
   };
   const doReject = async (e) => {
     const { confirmed, reason } = await confirmDialog({ title: `Reject refund ${e.vno}?`, message: 'Marks it Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
@@ -1886,14 +1997,24 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><RefundAmountCell entry={e} cur={cur} fmt={fmt} /></td>
                   {pendingTab
                     ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                        {isApprover ? <>
+                        <StageChip e={e} />
+                        {isApprover && <>
                           {/* Edit in place (reuses the shared voucher editor); saving reverts it to
-                              Pending, then Approve. Lets an approver fix a blocked refund inline. */}
-                          <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this refund / reissue voucher, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: BLUE, border: `1px solid ${BLUE}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
-                          <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
-                          <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
-                          {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
-                        </> : <span style={{ fontSize: 11, color: '#9197a3' }}>Approver only</span>}
+                              Pending, then re-enter the chain. Lets an approver fix a blocked refund inline. */}
+                          <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this refund / reissue voucher, then approve" style={{ margin: '0 6px', padding: '5px 10px', background: '#fff', color: BLUE, border: `1px solid ${BLUE}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
+                        </>}
+                        {(() => {
+                          // Stage-aware action (mirrors the Vouchers queue): Check (L1, anyone in
+                          // branch) → Verify (L2) → Approve & Post (L3). Server re-enforces all gates.
+                          const na = nextActionFor(e, chainCfg);
+                          if (na.action !== 'approve') {
+                            return <button disabled={busy || !na.allowed} title={na.hint} onClick={() => doReview(e, na.action)} style={{ margin: isApprover ? 0 : '0 0 0 6px', marginRight: 6, padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? BLUE : GOLD) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                          }
+                          const ok = e.postable && na.allowed;
+                          return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                        })()}
+                        {isApprover && <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
+                        {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
                       </td>
                     : <td style={{ padding: '7px 12px', color: '#5b616e', textTransform: 'capitalize' }}>{e.status}</td>}
                 </tr>

@@ -128,8 +128,10 @@ function makeRcptPmt(side) {
       const tds = (s.tds && spec.mode !== 'advances') ? (+s.tdsAmt || 0) : 0;
       const gross = r2(net + tds);
       const sum = allocSummary(s.alloc, gross, s.parkOnAcc, s.applyMode);
+      // Negative entries are adjust-credits (use of a bill's Overpaid excess) — sent
+      // as-is; the backend nets them into the bill's directed total.
       const allocations = Object.entries(s.alloc || {})
-        .filter(([, v]) => (+v || 0) > 0)
+        .filter(([, v]) => Math.abs(+v || 0) > 0.001)
         .map(([vno, v]) => ({ billVno: vno, billId: (s._billIds || {})[vno] || '', amount: +v }));
       return {
         ...common, party: s.party, partyType: spec.partyType,

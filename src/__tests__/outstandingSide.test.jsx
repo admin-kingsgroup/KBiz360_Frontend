@@ -17,12 +17,17 @@ const OUT = {
 };
 jest.mock('../core/useAccounting', () => ({
   useOutstanding: () => ({ data: OUT, isLoading: false, isError: false }),
-  useOpenBills: () => ({ data: { bills: [] }, isLoading: false }),
+  // One open bill + one OVER-settled bill (the party's Overpaid credit) — the settle
+  // modal must show the credit for context but never offer to allocate against it.
+  useOpenBills: () => ({ data: { bills: [
+    { billId: 'b1', billVno: 'S9', date: '2026-01-01', total: 500, allocated: 0, outstanding: 500, status: 'pending', ageDays: 5 },
+    { billId: 'b2', billVno: 'SF00838', date: '2026-01-19', total: 316375, allocated: 623216, outstanding: 0, status: 'overpaid', overpaidAmt: 306841, ageDays: 20 },
+  ] }, isLoading: false }),
   useSettleAdvance: () => ({ mutate: jest.fn(), isPending: false, isError: false }),
 }));
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { OutstandingOnAccount } from '../modules/reportsFinancial/outstanding';
 
 const has = (re) => screen.queryAllByText(re).length > 0;
@@ -51,6 +56,20 @@ describe('OutstandingOnAccount — side scoping', () => {
     expect(has(/Unsettled Purchase Bills/)).toBe(true);
     expect(has(/On-Account Receipts/)).toBe(true);
     expect(has(/On-Account Payments/)).toBe(true);
+  });
+
+  // The settle modal shows an OVER-settled bill as the party's Overpaid credit —
+  // visible (like the ledger bill-wise) but with no allocate box or Max button.
+  test('settle modal lists Overpaid bills as a credit, not an allocatable row', () => {
+    render(<OutstandingOnAccount branch="BOM" side="customer" initialTab="recAdv" />);
+    fireEvent.click(screen.getByText('Settle bill-wise')); // open the modal for ACME's advance
+
+    expect(has(/SF00838/)).toBe(true);            // the over-settled bill is listed
+    expect(has(/Overpaid/)).toBe(true);           // flagged as the party's credit
+    expect(has(/3,06,841/)).toBe(true);           // the credit amount is visible
+    // Exactly ONE allocatable row (S9): one number input + one Max button.
+    expect(document.querySelectorAll('input[type="number"]').length).toBe(1);
+    expect(screen.queryAllByText('Max').length).toBe(1);
   });
 
   // Feature 3 — "Adjust advance" deep-link opens the on-account payments tab

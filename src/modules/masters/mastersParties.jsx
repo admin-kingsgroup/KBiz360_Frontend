@@ -275,7 +275,7 @@ function OutstandingTab({ q, side, branch }) {
   const total = bills.reduce((s, b) => s + (Number(b.outstanding) || 0), 0);
   const settledTotal = bills.reduce((s, b) => s + (Number(b.allocated) || 0), 0);
   if (!bills.length && !data.advances) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>{side === 'supplier' ? 'No bills recorded for this supplier.' : 'No invoices recorded for this customer.'}</p>);
-  const STATUS_BG = { settled: '#e3f0e3', partial: '#fbeedb', pending: '#e6e8f1' };
+  const STATUS_BG = { settled: '#e3f0e3', partial: '#fbeedb', pending: '#e6e8f1', overpaid: '#fff1e0' };
   return tabPanel(
     <div className="kbiz-card">
       <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 10 }}>{side === 'supplier' ? 'Bill-wise — billed, settled & payable' : 'Bill-wise — invoiced, settled & receivable'}</p>

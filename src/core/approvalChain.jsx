@@ -46,7 +46,11 @@ export function useApprovalChain() {
 export const stageOf = (e) => (e && e.reviewStage) || (!e?.checkedBy ? 'check' : (!e?.verifiedBy ? 'verify' : 'approve'));
 
 // The single action the CURRENT user may take on a pending entry at its stage.
+// The chain applies ONLY to CRM-created entries — the server marks those with a
+// non-empty reviewStage. ERP-entered/legacy entries (blank reviewStage) keep the
+// original single-step Approve, open to everyone exactly as before.
 export function nextActionFor(e, cfg, user = chainUser()) {
+  if (!e || !e.reviewStage) return { stage: '', action: 'approve', label: 'Approve', allowed: true, hint: '' };
   const stage = stageOf(e);
   const su = SUPER.test(user.role);
   if (stage === 'check') return { stage, action: 'check', label: 'Check', allowed: true, hint: 'Level 1 · branch accountant' };
@@ -63,7 +67,10 @@ const BADGE = {
 };
 
 // Small stage chip for pending rows: shows the level + who signed the earlier ones.
+// Rendered ONLY for CRM-created entries (server sets reviewStage); ERP-entered /
+// legacy entries show no chip — they keep the plain single-step Approve.
 export function StageChip({ e }) {
+  if (!e || !e.reviewStage) return null;
   const s = stageOf(e);
   const b = BADGE[s] || BADGE.check;
   const trail = [e?.checkedBy && `✓ Checked · ${e.checkedBy}`, e?.verifiedBy && `✓ Verified · ${e.verifiedBy}`].filter(Boolean).join('\n');
