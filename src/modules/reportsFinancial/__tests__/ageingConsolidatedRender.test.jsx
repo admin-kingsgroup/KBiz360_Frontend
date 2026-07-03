@@ -6,7 +6,7 @@
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})), apiPost: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../../../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }), { virtual: true });
 jest.mock('../../accountingLive', () => ({ VoucherEditor: () => null }));
-jest.mock('../../outstanding', () => ({ OutstandingOnAccount: () => null }));
+jest.mock('../outstanding', () => ({ OutstandingOnAccount: () => null }));
 jest.mock('../../../core/exportExcel', () => ({ exportToExcel: jest.fn() }));
 jest.mock('../../../core/PrintPreview', () => ({ openPrintPreview: jest.fn() }));
 jest.mock('../../../core/ledgerActions', () => ({ LedgerActions: () => null }));

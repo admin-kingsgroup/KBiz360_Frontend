@@ -6,7 +6,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { isRemovable } from '../modules/chartBuilder.jsx';
+import { isRemovable } from '../modules/masters/chartBuilder.jsx';
 
 describe('Accounts Tree View — Removable (red) flag', () => {
   test('inactive + 0 entries → removable', () => {

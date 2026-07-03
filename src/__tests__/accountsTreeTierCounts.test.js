@@ -5,7 +5,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { groupTierCounts } from '../modules/chartBuilder.jsx';
+import { groupTierCounts } from '../modules/masters/chartBuilder.jsx';
 
 describe('groupTierCounts — Parent Group / Group / Sub-Group by level', () => {
   test('splits the three tiers by level', () => {

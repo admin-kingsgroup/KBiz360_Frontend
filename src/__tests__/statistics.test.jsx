@@ -25,7 +25,7 @@ jest.mock('../core/useAccounting', () => ({
   useStatistics: () => ({ data: SAMPLE, isLoading: false, isError: false, error: null }),
 }));
 
-import { Statistics, voucherRegister } from '../modules/statistics';
+import { Statistics, voucherRegister } from '../modules/reports/statistics';
 
 describe('voucherRegister', () => {
   test('maps each voucher category to its register route', () => {

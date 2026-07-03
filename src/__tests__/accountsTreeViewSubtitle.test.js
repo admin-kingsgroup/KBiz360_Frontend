@@ -2,13 +2,13 @@
    actually renders — Parent Group ▸ Group ▸ Sub-Group ▸ Ledger — not the internal
    "Primary Group / Primary Sub Group / ERP Group / ERP Sub Group" data-model
    wording. Regression guard for the subtitle drifting out of sync with the badge
-   / miller-column labels in modules/chartBuilder.jsx. */
+   / miller-column labels in modules/masters/chartBuilder.jsx. */
 
 const fs = require('fs');
 const path = require('path');
 
 const SRC = fs.readFileSync(
-  path.join(__dirname, '..', 'modules', 'chartBuilder.jsx'),
+  path.join(__dirname, '..', 'modules', 'masters', 'chartBuilder.jsx'),
   'utf8',
 );
 

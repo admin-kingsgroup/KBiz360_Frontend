@@ -8,7 +8,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { isPrimaryLocked, primaryTier } from '../modules/mastersLive.jsx';
+import { isPrimaryLocked, primaryTier } from '../modules/masters/mastersLive.jsx';
 
 describe('Primary Group / Primary Sub Group lock + tier', () => {
   test('a system group with no parent is a locked Primary Group', () => {

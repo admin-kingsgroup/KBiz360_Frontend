@@ -53,7 +53,7 @@ const mockData = {
 jest.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: mockData, isLoading: false, error: null }) }));
 
 import { render, screen, fireEvent } from '@testing-library/react';
-import { CapitalVsInvestmentLive } from '../capitalVsInvestment';
+import { CapitalVsInvestmentLive } from '../reportsFinancial/capitalVsInvestment';
 
 test('India branch (BOM) renders ₹ figures', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);

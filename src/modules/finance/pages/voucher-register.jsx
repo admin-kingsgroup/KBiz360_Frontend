@@ -4,7 +4,7 @@ import { DataTable } from '../../../shell/DataTable';
 import { StatusPill } from '../../../shell/primitives';
 import { Modal } from '../../../core/ux/Modal';
 import { toastError } from '../../../core/ux/toast';
-import { VoucherView } from '../../pnlTally';
+import { VoucherView } from '../../reportsFinancial/pnlTally';
 import { useVoucherRegister } from '../hooks/use-voucher-register';
 import { useFinanceStore } from '../store/finance.store';
 import { useFyStore } from '../../../store/fy';
