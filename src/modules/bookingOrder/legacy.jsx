@@ -491,7 +491,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         if (!confirmed) return;
         setError(''); setSaving(true);
         updateInb.mutate({ linkNo: editBooking.linkNo, ...inbBody, editReason: reason }, {
-          onSuccess: () => { setResult({ bookingNo: editBooking.linkNo, _approved: false, _inb: true, _edited: true }); toast(`Inter-branch deal ${editBooking.linkNo} saved — pending approval`); qc.invalidateQueries({ queryKey: ['inb'] }); invalidateBooks(qc); },
+          // Changing the destination branch renumbers the deal (INB/BOM-AMD → INB/BOM-DAR),
+          // so show the number the server actually minted, not the pre-edit one.
+          onSuccess: (data) => { const newLink = data?.linkNo || editBooking.linkNo; setResult({ bookingNo: newLink, _approved: false, _inb: true, _edited: true }); toast(`Inter-branch deal ${newLink} saved — pending approval`); qc.invalidateQueries({ queryKey: ['inb'] }); invalidateBooks(qc); },
           onError: (e) => { setError(e.message || 'Failed to save'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); },
           onSettled: () => setSaving(false),
         });
