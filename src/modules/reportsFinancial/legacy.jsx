@@ -2214,8 +2214,11 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
           ? <SettlementAgeingReport branch={branch} side={side} />
           : tab === 'net'
             ? <NetAgeingView branch={branch} setRoute={setRoute} />
-            : <OutstandingOnAccount branch={branch} side={isRec ? 'customer' : 'supplier'}
-                initialTab={advFocus ? (isRec ? 'recAdv' : 'payAdv') : undefined} initialParty={advFocus || undefined} />}
+            // Whole-book view (no `side` scoping, no party filter): "Adjust ▸" must land
+            // on ALL on-account receipts (incl. RF/ACM) AND payments — the full four-bucket
+            // Outstanding & On-Account dashboard — not a single party's slice.
+            : <OutstandingOnAccount branch={branch}
+                initialTab={advFocus ? (isRec ? 'recAdv' : 'payAdv') : undefined} />}
     </>
   );
 }
