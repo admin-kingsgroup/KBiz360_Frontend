@@ -468,8 +468,8 @@ export const GroupsMaster = () => {
   return (
     <MasterCrud title="Groups" subtitle="Chart-of-Accounts groups & sub-groups (Parent Group ▸ Group ▸ Sub-Group)"
       resource="subgroups"
-      lockedRow={(r) => (r.level || 0) <= 1}
-      note="Groups are SHARED across all branches (not branch-scoped) — the same chart applies to every branch. Parent Groups and Groups are the MANDATORY backbone: they're fixed and shown 🔒 (cannot be created, edited or deleted). You create Sub-Groups only — pick a Group under 'Nest under a Group'; Nature & Statement (BS/PL) are inherited. For the P&L Fixed/Variable split, nest your expense sub-groups under the 'Fixed Expenses' / 'Variable Expenses' Groups. To see the full tree, open Chart of Accounts (Tree view)."
+      readOnly
+      note="The Chart of Accounts STRUCTURE is fixed — Parent Groups, Groups and Sub-Groups cannot be created, edited or deleted (all shown 🔒, shared by every branch). Only LEDGERS are user-managed; new groups are added by a super-admin. Module-wired sub-groups (trading / inter-branch / tax heads) show ~* in the tree. To see the full tree, open Chart of Accounts (Tree view)."
       fields={[
         { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
         // Display-only columns: the fixed primary root + the immediate parent.

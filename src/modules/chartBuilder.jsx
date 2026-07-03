@@ -234,6 +234,8 @@ export function AccountsTreeView({ branch }) {
   // Parent Group + Group are the MANDATORY chart backbone — fixed in every branch,
   // and can't be created / edited / deleted. A red * marks them.
   const mandatoryStar = <span title="Mandatory — fixed in all branches; cannot be created, edited or deleted" style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>*</span>;
+  // A sub-group wired to a module/posting/tax path → locked. ~ = module-wired, * = non-editable / non-deletable.
+  const wiredMark = <span title="Wired to a module — locked (non-editable, non-deletable)" style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>~*</span>;
   const ledgerRow = (l, indent) => {
     const n = entriesFor(l), rm = removableOf(l, n);
     return (
@@ -276,7 +278,7 @@ export function AccountsTreeView({ branch }) {
                     {grp.children.map((sg) => (
                       <div key={sg.name}>
                         <div style={{ display: 'flex', alignItems: 'center', padding: '6px 12px 6px 46px', fontWeight: 600, color: DARK, borderBottom: '1px solid #dfe2e7' }}>
-                          <Caret k={sg.name} has={sg.ledgers.length} /><span {...(sg.ledgers.length ? clickable(() => tog(sg.name)) : {})} style={{ cursor: sg.ledgers.length ? 'pointer' : 'default' }}>{sg.name}</span>{badge('Sub-Group', GOLD)}
+                          <Caret k={sg.name} has={sg.ledgers.length} /><span {...(sg.ledgers.length ? clickable(() => tog(sg.name)) : {})} style={{ cursor: sg.ledgers.length ? 'pointer' : 'default' }}>{sg.name}</span>{badge('Sub-Group', GOLD)}{sg.wired ? wiredMark : mandatoryStar}
                           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: DIM }}>
                             {sg.ledgers.length > 0 && <span>{countNote(sg.ledgers)}</span>}{countChip(rollupCount(sg), false)}
                           </span>
@@ -307,10 +309,10 @@ export function AccountsTreeView({ branch }) {
           const direct = !!it.__direct;                       // the "Direct Ledgers" bucket (a leaf, not a group)
           const n = kind === 'ledger' ? entriesFor(it) : 0;
           const rm = kind === 'ledger' && removableOf(it, n);
-          const mand = kind !== 'ledger' && !direct && (it.level || 0) <= 1; // Parent Group / Group → mandatory *
+          const isGrp = kind !== 'ledger' && !direct;   // any group / sub-group item → locked (~* if wired, else *)
           return (
           <div key={kind === 'ledger' ? 'L' + it.id : (it.name || it.id)} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : rm ? RED_TINT : (direct ? '#fbfcfe' : 'transparent'), borderBottom: '1px solid #dfe2e7', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontStyle: direct ? 'italic' : undefined }}>
-            <span style={kind === 'ledger' ? (rm ? { color: RED } : isInactive(it) ? { color: '#9aa2c0' } : undefined) : (direct ? { color: DIM } : undefined)}>{kind === 'ledger' ? <><span style={{ color: rm ? RED : isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{rm ? badge('Removable', RED) : isInactive(it) && badge('Inactive', AMBER)}</> : direct ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>Direct Ledgers</> : <>{it.name}{mand && mandatoryStar}</>}</span>
+            <span style={kind === 'ledger' ? (rm ? { color: RED } : isInactive(it) ? { color: '#9aa2c0' } : undefined) : (direct ? { color: DIM } : undefined)}>{kind === 'ledger' ? <><span style={{ color: rm ? RED : isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{rm ? badge('Removable', RED) : isInactive(it) && badge('Inactive', AMBER)}</> : direct ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>Direct Ledgers</> : <>{it.name}{isGrp && (it.wired ? wiredMark : mandatoryStar)}</>}</span>
             {kind === 'ledger' ? countChip(n) : direct ? countChip(it.__count) : (onPick && <span style={{ color: '#c3cbe0' }}>›</span>)}
           </div>
           );
@@ -401,7 +403,8 @@ export function AccountsTreeView({ branch }) {
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Removable', RED)}<span style={{ marginLeft: 4 }}>= deactivated + 0 entries (safe to delete)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>*</span><span style={{ marginLeft: 4 }}>= mandatory Parent Group / Group (fixed in all branches; cannot be created, edited or deleted)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>*</span><span style={{ marginLeft: 4 }}>= fixed structure — Parent Group / Group / Sub-Group (cannot be created, edited or deleted)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>~*</span><span style={{ marginLeft: 4 }}>= sub-group wired to a module (locked — non-editable, non-deletable)</span></span>
       </div>
 
       {/* Controls: in-page Branch view + Ledger Scope filter */}
