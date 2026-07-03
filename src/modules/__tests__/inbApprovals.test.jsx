@@ -26,6 +26,10 @@ jest.mock('../../core/useAccounting', () => ({
   useApproveMany: jest.fn(() => ({ mutate: (...a) => mockApproveMany(...a) })),
   useApproveAll: jest.fn(() => ({ mutate: jest.fn() })),
   branchCode: jest.fn(() => 'BOM'),
+  // Refund/reissue Amount cells (useRefundLiveAmount) pull the saved voucher + a live
+  // preview to mirror the Edit modal; no data needed here, just the two hooks present.
+  useVoucher: jest.fn(() => ({ data: null, isLoading: false })),
+  useVoucherPreview: jest.fn(() => ({ data: {} })),
 }));
 jest.mock('../../core/styles', () => ({ bc: () => ({ cur: '₹' }) }));
 jest.mock('../../core/data', () => ({ CONSOLIDATED_LABEL: 'TK Head Office Group' }));

@@ -42,6 +42,7 @@ import {
   VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, tcs206cRate, lineCalc, isVatBranch, rowsFromSnapshots,
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
+import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
 import { invalidateBooks, useVoucherApprovals, useApproveMany, useRejectVoucher } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 
@@ -1761,6 +1762,13 @@ export function DeletedBookings({ branch, setRoute }) {
   );
 }
 
+// Amount cell for a refund/reissue queue row — its own component (not inlined in the
+// .map()) so useRefundLiveAmount's hooks run once per row, consistently, per the Rules
+// of Hooks. Mirrors the Edit modal's Live JV exactly instead of the bulk preview.
+function RefundAmountCell({ entry, cur, fmt }) {
+  return <>{cur} {fmt(useRefundLiveAmount(entry))}</>;
+}
+
 // SO/PO/GP Refunds & Reissues — RF/RI vouchers that reverse a SO/PO/GP sale. Unlike a
 // forward booking (a sale+purchase pair spawned from a booking master), a refund/reissue
 // is a SINGLE voucher (category 'refund'/'reissue'), so it lives in its own section under
@@ -1831,7 +1839,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                   </td>
                   <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5b616e' }}>{e.againstInvoice || e.linkNo || '—'}</td>
                   <td style={{ padding: '7px 12px' }}>{e.party || '—'}</td>
-                  <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cur} {fmt(e.total || 0)}</td>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><RefundAmountCell entry={e} cur={cur} fmt={fmt} /></td>
                   {pendingTab
                     ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                         {isApprover ? <>
