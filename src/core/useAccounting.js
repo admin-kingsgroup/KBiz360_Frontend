@@ -55,6 +55,20 @@ export function useTrialBalance(branch, { from, to } = {}) {
   });
 }
 
+// { lowerLedgerName: entryCount } — how many journal posting-lines reference each
+// ledger (all-time, branch-scoped). Powers the "Count" column in the Accounts Tree
+// View. `branch` here is already a code string ('ALL' | 'BOM' | …) from the in-page
+// selector; branchCode maps 'ALL'/blank → undefined so the server counts every branch.
+export function useLedgerUsage(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'ledger-usage', code || 'all'],
+    queryFn: () => apiGet('/api/accounting/ledger-usage', { branch: code }),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}
+
 export function useProfitAndLoss(branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({

@@ -12,7 +12,7 @@
 // structure never changes, only which ledgers are shown / how they're tagged.
 import React, { useState, useEffect, useRef } from 'react';
 import { useMasterList } from '../core/useMasters';
-import { branchCode } from '../core/useAccounting';
+import { branchCode, useLedgerUsage } from '../core/useAccounting';
 import { FocusBanner } from '../core/ux/FocusBanner';
 import { useNavFocusStore } from '../core/ux/navFocus';
 import { clickable } from '../core/ux/clickable';
@@ -49,6 +49,18 @@ export function partitionLedgers(fetched, includeInactive) {
   const sourceLedgers = includeInactive ? list : list.filter((l) => !isInactive(l));
   return { sourceLedgers, inactiveHidden };
 }
+// Sum the entry counts of every ledger in a group node's subtree, counting each
+// distinct ledger NAME once (a name that appears as several branch copies in the
+// consolidated view is one accounting head, so it isn't double-counted). `usage`
+// is the { lowerLedgerName: count } map from /api/accounting/ledger-usage. Pure.
+export function rollupEntries(node, usage = {}) {
+  if (!node) return 0;
+  const names = new Set();
+  const walk = (n) => { (n.ledgers || []).forEach((l) => names.add((l.name || '').toLowerCase())); (n.children || []).forEach(walk); };
+  walk(node);
+  let s = 0; names.forEach((nm) => { s += usage[nm] || 0; });
+  return s;
+}
 // "8 common · 4 BOM" style mini-summary for a node's ledger set.
 const countNote = (leds) => {
   const c = leds.filter(isCommon).length, b = leds.length - c;
@@ -66,6 +78,9 @@ export function AccountsTreeView({ branch }) {
   // Always fetch inactive ledgers too (includeInactive) so the toggle flips
   // instantly client-side and we can always report how many are hidden.
   const ledgersQ = useMasterList('ledgers', { ...(branchView === 'ALL' ? {} : { branch: branchView }), includeInactive: 'true' });
+  // Per-ledger entry counts (how many journal posting-lines reference each ledger),
+  // branch-scoped to the in-page Branch view → the "Count" statistics column.
+  const usageQ = useLedgerUsage(branchView);
   const [tab, setTab] = useState('tree');           // 'tree' | 'side'
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState({ pg: '', g: '', sg: '' });
@@ -113,6 +128,21 @@ export function AccountsTreeView({ branch }) {
   const roots = groups.filter(isRootGroup).map((g) => nodes[g.name]).sort((a, b) => (TALLY_ORDER.indexOf(a.name) - TALLY_ORDER.indexOf(b.name)));
   const allKeys = groups.map((g) => g.name);
 
+  // ── Entry-count statistics (Count column) ──
+  const usage = usageQ.data || {};
+  const entriesFor = (l) => usage[(l.name || '').toLowerCase()] || 0;
+  // Roll a group node's entries up from its whole subtree, counting each distinct
+  // ledger NAME once (so a ledger that appears as several branch copies of the same
+  // name in the consolidated view isn't double-counted).
+  const rollupCount = (node) => rollupEntries(node, usage);
+  // Flat list for the Inactive tab: every deactivated ledger in the current scope,
+  // most-used first (count > 0 ⇒ deactivated but still holds postings — a likely
+  // mistake or merge candidate; count 0 ⇒ truly empty, safe to leave/purge).
+  const inactiveLedgers = (ledgersQ.data || [])
+    .filter(isInactive)
+    .filter((l) => (scope === 'all' ? true : scope === 'common' ? isCommon(l) : !isCommon(l)))
+    .sort((a, b) => (entriesFor(b) - entriesFor(a)) || (a.name || '').localeCompare(b.name || ''));
+
   // Header summary counts.
   const subGroupCount = groups.filter((g) => !g.system).length;
   const commonCount = display.filter(isCommon).length;
@@ -142,10 +172,16 @@ export function AccountsTreeView({ branch }) {
   }, [fLedger, display.length, groups.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const Caret = ({ k, has }) => <span {...(has ? clickable(() => tog(k)) : {})} style={{ width: 14, display: 'inline-block', color: GOLD, cursor: has ? 'pointer' : 'default' }}>{has ? (open[k] ? '▾' : '▸') : ''}</span>;
+  // Entry-count pill shown at the right of every ledger / group row. Muted grey at 0
+  // (no postings), solid when the ledger/group has been used. `auto` right-aligns it.
+  const countChip = (n, auto = true) => (
+    <span title={`${n} ${n === 1 ? 'entry' : 'entries'}`} style={{ marginLeft: auto ? 'auto' : 8, fontSize: 10, fontWeight: 700, color: n ? '#334155' : '#c3cbe0', background: n ? '#eef2f7' : 'transparent', border: `1px solid ${n ? '#d7deea' : 'transparent'}`, padding: '0px 7px', borderRadius: 10, minWidth: 20, textAlign: 'center' }}>{n}</span>
+  );
   const ledgerRow = (l, indent) => (
     <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #dfe2e7', color: isInactive(l) ? '#9aa2c0' : DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : undefined }}>
       <span style={{ color: isInactive(l) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}{isInactive(l) && badge('Inactive', AMBER)}
       {l._overrides && <span style={{ fontSize: 9, color: GOLD, marginLeft: 6, fontStyle: 'italic' }}>overrides Common</span>}
+      {countChip(entriesFor(l))}
     </div>
   );
   // Subheading shown above ledgers that hang straight off a Group/Parent Group
@@ -162,7 +198,9 @@ export function AccountsTreeView({ branch }) {
           <div key={pg.name}>
             <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', fontWeight: 800, color: DARK }}>
               <Caret k={pg.name} has={pgHas} /><span {...(pgHas ? clickable(() => tog(pg.name)) : {})} style={{ cursor: pgHas ? 'pointer' : 'default' }}>{pg.name}</span>{badge('Parent Group', BLUE)}
-              <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM }}>{pg.children.length} group{pg.children.length === 1 ? '' : 's'}{pg.ledgers.length ? ` · ${countNote(pg.ledgers)}` : ''}</span>
+              <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10.5, color: DIM }}>
+                <span>{pg.children.length} group{pg.children.length === 1 ? '' : 's'}{pg.ledgers.length ? ` · ${countNote(pg.ledgers)}` : ''}</span>{countChip(rollupCount(pg), false)}
+              </span>
             </div>
             {open[pg.name] && pg.children.map((grp) => {
               const grpHas = grp.children.length || grp.ledgers.length;
@@ -170,14 +208,18 @@ export function AccountsTreeView({ branch }) {
                 <div key={grp.name}>
                   <div style={{ display: 'flex', alignItems: 'center', padding: '7px 12px 7px 26px', background: '#f6f9fd', fontWeight: 700, color: '#1a3a6e' }}>
                     <Caret k={grp.name} has={grpHas} /><span {...(grpHas ? clickable(() => tog(grp.name)) : {})} style={{ cursor: grpHas ? 'pointer' : 'default' }}>{grp.name}</span>{badge('Group', '#1a3a6e')}
-                    {grp.ledgers.length > 0 && <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{countNote(grp.ledgers)}</span>}
+                    <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: DIM }}>
+                      {grp.ledgers.length > 0 && <span>{countNote(grp.ledgers)}</span>}{countChip(rollupCount(grp), false)}
+                    </span>
                   </div>
                   {open[grp.name] && <>
                     {grp.children.map((sg) => (
                       <div key={sg.name}>
                         <div style={{ display: 'flex', alignItems: 'center', padding: '6px 12px 6px 46px', fontWeight: 600, color: DARK, borderBottom: '1px solid #dfe2e7' }}>
                           <Caret k={sg.name} has={sg.ledgers.length} /><span {...(sg.ledgers.length ? clickable(() => tog(sg.name)) : {})} style={{ cursor: sg.ledgers.length ? 'pointer' : 'default' }}>{sg.name}</span>{badge('Sub-Group', GOLD)}
-                          {sg.ledgers.length > 0 && <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{countNote(sg.ledgers)}</span>}
+                          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: DIM }}>
+                            {sg.ledgers.length > 0 && <span>{countNote(sg.ledgers)}</span>}{countChip(rollupCount(sg), false)}
+                          </span>
                         </div>
                         {open[sg.name] && sg.ledgers.map((l) => ledgerRow(l, 70))}
                       </div>
@@ -204,7 +246,7 @@ export function AccountsTreeView({ branch }) {
         {items.map((it) => (
           <div key={kind === 'ledger' ? 'L' + it.id : (it.name || it.id)} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : 'transparent', borderBottom: '1px solid #dfe2e7', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={kind === 'ledger' && isInactive(it) ? { color: '#9aa2c0' } : undefined}>{kind === 'ledger' ? <><span style={{ color: isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{isInactive(it) && badge('Inactive', AMBER)}</> : it.name}</span>
-            {onPick && kind !== 'ledger' && <span style={{ color: '#c3cbe0' }}>›</span>}
+            {kind === 'ledger' ? countChip(entriesFor(it)) : (onPick && <span style={{ color: '#c3cbe0' }}>›</span>)}
           </div>
         ))}
         {!items.length && <div style={{ padding: 12, fontSize: 11, color: '#9aa2c0' }}>—</div>}
@@ -227,6 +269,42 @@ export function AccountsTreeView({ branch }) {
       {col('Ledger', sgNode ? sgNode.ledgers : gNode ? gNode.ledgers : pgNode ? pgNode.ledgers : [], '', null, 'ledger')}
     </div>
   );
+
+  // ── Inactive Ledgers (flat list, most-used first) ──
+  const inactiveView = () => {
+    const th = (t, w) => <th style={{ textAlign: t === 'Entries' || t === 'Opening' ? 'right' : 'left', padding: '8px 12px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #cdd1d8', width: w }}>{t}</th>;
+    return (
+      <div style={{ border: '1px solid #cdd1d8', borderRadius: 8, overflow: 'hidden', background: '#fff' }}>
+        <div style={{ padding: '8px 12px', fontSize: 11.5, color: DIM, background: '#fbfcfe', borderBottom: '1px solid #dfe2e7' }}>
+          <b style={{ color: DARK }}>{inactiveLedgers.length}</b> deactivated ledger{inactiveLedgers.length === 1 ? '' : 's'} in this view. A non-zero <b style={{ color: DARK }}>Entries</b> count means the ledger is inactive but still holds postings — likely deactivated by mistake or a merge candidate; <b style={{ color: DARK }}>0</b> means it's empty and safe to leave or purge.
+        </div>
+        {inactiveLedgers.length ? (
+          <div style={{ overflow: 'auto', maxHeight: '68vh' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#f7f8fb', zIndex: 1 }}>
+                <tr>{th('Ledger')}{th('Group')}{th('Sub-Group')}{th('Scope', 110)}{th('Entries', 90)}{th('Opening', 120)}</tr>
+              </thead>
+              <tbody>
+                {inactiveLedgers.map((l) => {
+                  const n = entriesFor(l);
+                  return (
+                    <tr key={'IL' + l.id} style={{ borderBottom: '1px solid #dfe2e7' }}>
+                      <td style={{ padding: '6px 12px', fontSize: 12, color: DARK, fontWeight: 600 }}>{l.name}{badge('Inactive', AMBER)}</td>
+                      <td style={{ padding: '6px 12px', fontSize: 11.5, color: DIM }}>{l.group || '—'}</td>
+                      <td style={{ padding: '6px 12px', fontSize: 11.5, color: DIM }}>{l.subGroup || '—'}</td>
+                      <td style={{ padding: '6px 12px' }}>{scopeBadge(l)}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: n ? '#b45309' : '#9aa2c0' }}>{n}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right', fontSize: 11.5, color: DIM }}>{Number(l.openingBalance || 0).toLocaleString('en-IN')} {l.drCr || ''}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : <div style={{ padding: 16, fontSize: 12, color: '#9aa2c0' }}>No deactivated ledgers in this branch / scope.</div>}
+      </div>
+    );
+  };
 
   const tabBtn = (k, l) => <button key={k} onClick={() => setTab(k)} className="max-tablet:min-h-[44px]" style={{ padding: '7px 14px', fontSize: 12, fontWeight: 700, borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `3px solid ${tab === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', color: tab === k ? DARK : DIM }}>{l}</button>;
   const scopePill = (k, l) => <button key={k} onClick={() => setScope(k)} className="max-tablet:min-h-[44px]" style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: scope === k ? BLUE : '#fff', color: scope === k ? '#fff' : DIM }}>{l}</button>;
@@ -272,7 +350,7 @@ export function AccountsTreeView({ branch }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #cdd1d8', marginBottom: 12 }}>
-        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}
+        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
         {tab === 'tree' && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, padding: '4px 0' }}>
             <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊞ Expand all</button>
@@ -286,7 +364,7 @@ export function AccountsTreeView({ branch }) {
           {Array.from({ length: 7 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}
         </div>
       )}
-      {tab === 'tree' ? treeView() : sideView()}
+      {tab === 'tree' ? treeView() : tab === 'side' ? sideView() : inactiveView()}
     </div>
   );
 }
