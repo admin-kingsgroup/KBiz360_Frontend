@@ -25,6 +25,7 @@ import { localeOf } from '../core/format';
 import { PeriodBar, periodRange } from '../core/period';
 import { CONSOLIDATED_LABEL } from '../core/data';
 import { SkeletonTable } from '../shell/primitives';
+import { useRefundLiveAmount } from '../core/voucher/useRefundLiveAmount';
 
 // Full branch-currency amount (₹ India · $ USD branches) — NO Cr/L abbreviation.
 // Grouping follows the currency: Indian lakh/crore for ₹, Western thousands for $.
@@ -55,6 +56,12 @@ const drCrOf = (e) => {
   const name = (legs) => (legs.length ? legs[0].ledger + (legs.length > 1 ? ` (+${legs.length - 1})` : '') : '—');
   return { drLedger: name(dr), crLedger: name(cr), drAmt: dr.reduce((s, p) => s + (p.debit || 0), 0), crAmt: cr.reduce((s, p) => s + (p.credit || 0), 0) };
 };
+// Amount cell for an INB refund/reissue queue row — its own component (not inlined in
+// the .map()) so useRefundLiveAmount's hooks run once per row, consistently, per the
+// Rules of Hooks. Mirrors the Edit modal's Live JV exactly instead of the bulk preview.
+function RefundAmountCell({ entry, money }) {
+  return money(useRefundLiveAmount(entry));
+}
 
 export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // `category` (receipt / payment / …) turns this into a single-type approval screen:
@@ -1147,7 +1154,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                     <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: C.dim }}>{fmtDate(e.date)}</td>
                     <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{e.againstInvoice || e.linkNo || '—'}</td>
                     <td style={{ padding: '7px 12px' }}>{e.party || '—'}</td>
-                    <td style={{ padding: '7px 12px', ...num }}>{money(e.total || 0)}</td>
+                    <td style={{ padding: '7px 12px', ...num }}><RefundAmountCell entry={e} money={money} /></td>
                     {pendingTab
                       ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                           {isApprover ? <>
