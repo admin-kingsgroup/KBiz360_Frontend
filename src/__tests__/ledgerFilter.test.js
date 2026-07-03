@@ -27,20 +27,21 @@ describe('ledgerMatchesFilter — Group + Sub-Group ledger filter', () => {
   });
 });
 
-describe('validParentGroups — 3-tier chart guard (Primary Group ▸ Group ▸ Sub-Group)', () => {
-  // Tier 1: system primary. Tier 2: custom under primary. Tier 3: custom under custom.
+describe('validParentGroups — only Groups (level 1) are valid parents (Parent Group + Group mandatory)', () => {
+  // Tier 1: Parent Group (system primary). Tier 2: Group (custom under primary).
+  // Tier 3: Sub-Group (custom under custom).
   const groups = [
-    { name: 'Sundry Debtors', system: true, parent: '' },        // Tier 1 (primary)
-    { name: 'Current Assets', system: true, parent: '' },        // Tier 1 (primary)
-    { name: 'B2C Customers', system: false, parent: 'Sundry Debtors' },   // Tier 2 (group)
-    { name: 'Ref Farhan', system: false, parent: 'B2C Customers' },       // Tier 3 (sub-group)
+    { name: 'Sundry Debtors', system: true, parent: '' },        // Tier 1 (Parent Group — mandatory)
+    { name: 'Current Assets', system: true, parent: '' },        // Tier 1 (Parent Group — mandatory)
+    { name: 'B2C Customers', system: false, parent: 'Sundry Debtors' },   // Tier 2 (Group — mandatory, but a valid PARENT)
+    { name: 'Ref Farhan', system: false, parent: 'B2C Customers' },       // Tier 3 (Sub-Group)
   ];
 
-  test('offers Tier-1 primaries and Tier-2 groups as parents', () => {
+  test('offers ONLY Tier-2 Groups as parents — Parent Groups are excluded (no new Group can be created)', () => {
     const parents = validParentGroups(groups);
-    expect(parents).toContain('Sundry Debtors');   // create a group under a primary
-    expect(parents).toContain('Current Assets');
-    expect(parents).toContain('B2C Customers');     // create a sub-group under a group
+    expect(parents).toEqual(['B2C Customers']);     // only a Group is a valid parent → creates a Sub-Group
+    expect(parents).not.toContain('Sundry Debtors'); // Parent Group is mandatory, not a create-under target
+    expect(parents).not.toContain('Current Assets');
   });
 
   test('hides Tier-3 sub-groups (nesting under one would make an illegal 4th tier)', () => {

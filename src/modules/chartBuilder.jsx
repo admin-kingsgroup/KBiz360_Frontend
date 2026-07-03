@@ -195,6 +195,9 @@ export function AccountsTreeView({ branch }) {
   const countChip = (n, auto = true) => (
     <span title={`${n} ${n === 1 ? 'entry' : 'entries'}`} style={{ marginLeft: auto ? 'auto' : 8, fontSize: 10, fontWeight: 700, color: n ? '#334155' : '#c3cbe0', background: n ? '#eef2f7' : 'transparent', border: `1px solid ${n ? '#d7deea' : 'transparent'}`, padding: '0px 7px', borderRadius: 10, minWidth: 20, textAlign: 'center' }}>{n}</span>
   );
+  // Parent Group + Group are the MANDATORY chart backbone — fixed in every branch,
+  // and can't be created / edited / deleted. A red * marks them.
+  const mandatoryStar = <span title="Mandatory — fixed in all branches; cannot be created, edited or deleted" style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>*</span>;
   const ledgerRow = (l, indent) => {
     const n = entriesFor(l), rm = removableOf(l, n);
     return (
@@ -218,7 +221,7 @@ export function AccountsTreeView({ branch }) {
         return (
           <div key={pg.name}>
             <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', background: '#eef3fb', borderTop: '1px solid #dbe5f3', fontWeight: 800, color: DARK }}>
-              <Caret k={pg.name} has={pgHas} /><span {...(pgHas ? clickable(() => tog(pg.name)) : {})} style={{ cursor: pgHas ? 'pointer' : 'default' }}>{pg.name}</span>{badge('Parent Group', BLUE)}
+              <Caret k={pg.name} has={pgHas} /><span {...(pgHas ? clickable(() => tog(pg.name)) : {})} style={{ cursor: pgHas ? 'pointer' : 'default' }}>{pg.name}</span>{mandatoryStar}{badge('Parent Group', BLUE)}
               <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10.5, color: DIM }}>
                 <span>{pg.children.length} group{pg.children.length === 1 ? '' : 's'}{pg.ledgers.length ? ` · ${countNote(pg.ledgers)}` : ''}</span>{countChip(rollupCount(pg), false)}
               </span>
@@ -228,7 +231,7 @@ export function AccountsTreeView({ branch }) {
               return (
                 <div key={grp.name}>
                   <div style={{ display: 'flex', alignItems: 'center', padding: '7px 12px 7px 26px', background: '#f6f9fd', fontWeight: 700, color: '#1a3a6e' }}>
-                    <Caret k={grp.name} has={grpHas} /><span {...(grpHas ? clickable(() => tog(grp.name)) : {})} style={{ cursor: grpHas ? 'pointer' : 'default' }}>{grp.name}</span>{badge('Group', '#1a3a6e')}
+                    <Caret k={grp.name} has={grpHas} /><span {...(grpHas ? clickable(() => tog(grp.name)) : {})} style={{ cursor: grpHas ? 'pointer' : 'default' }}>{grp.name}</span>{mandatoryStar}{badge('Group', '#1a3a6e')}
                     <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: DIM }}>
                       {grp.ledgers.length > 0 && <span>{countNote(grp.ledgers)}</span>}{countChip(rollupCount(grp), false)}
                     </span>
@@ -349,6 +352,7 @@ export function AccountsTreeView({ branch }) {
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Removable', RED)}<span style={{ marginLeft: 4 }}>= deactivated + 0 entries (safe to delete)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>*</span><span style={{ marginLeft: 4 }}>= mandatory Parent Group / Group (fixed in all branches; cannot be created, edited or deleted)</span></span>
       </div>
 
       {/* Controls: in-page Branch view + Ledger Scope filter */}

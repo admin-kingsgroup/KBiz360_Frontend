@@ -40,13 +40,18 @@ export const ledgerMatchesFilter = (r, group, subGroup) =>
 // another custom group). So we offer every group EXCEPT those Tier-3 nodes; the
 // user then only ever picks a parent the backend will accept. A→Z, numeric-aware.
 export const validParentGroups = (groups = []) => {
+  // Parent Group (level 0) + Group (level 1) are the MANDATORY chart backbone —
+  // fixed in every branch, never created/edited/deleted. So the ONLY valid parent
+  // for a NEW node is a GROUP (level 1): nesting under it creates a Sub-Group
+  // (level 2). Parent Groups (would create a Group) and Sub-Groups (a 4th tier) are
+  // excluded — a Group is one whose parent is a top-level Parent Group.
   const byName = new Map(groups.map((g) => [g.name, g]));
-  const isTierThree = (g) => {
-    if (g.system || !g.parent) return false;      // Tier-1 (system) & Tier-2 (custom under system) are valid parents
+  const isGroupTier = (g) => {
+    if (!g.parent) return false;                   // level 0 Parent Group
     const p = byName.get(g.parent);
-    return !!(p && !p.system);                     // parent is itself a custom group → g is a Tier-3 sub-group
+    return !!(p && !p.parent);                     // parent has no parent → g is a Group (level 1)
   };
-  return groups.filter((g) => !isTierThree(g)).map((g) => g.name)
+  return groups.filter(isGroupTier).map((g) => g.name)
     .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }));
 };
 
@@ -461,15 +466,16 @@ export const GroupsMaster = () => {
   // 3-tier rule into a guardrail — the user never sees a "chart is 3 tiers" error.
   const parentOptions = validParentGroups(groups);
   return (
-    <MasterCrud title="Groups" subtitle="Chart-of-Accounts groups & sub-groups (Primary Group ▸ Group ▸ Sub-Group)"
+    <MasterCrud title="Groups" subtitle="Chart-of-Accounts groups & sub-groups (Parent Group ▸ Group ▸ Sub-Group)"
       resource="subgroups"
-      note="Groups are SHARED across all branches (not branch-scoped) — create once and every branch's chart uses them. The chart is 3 tiers: the 28 fixed Primary Groups ▸ your Group ▸ your Sub-Group. Pick the parent under 'Nest under' — only valid parents are listed, so you can't accidentally nest too deep. Nature & Statement (BS/PL) are inherited from the parent. For the P&L Fixed/Variable split, create 'Fixed Expenses' and 'Variable Expenses' under Indirect Expenses and nest your expense groups under them — the P&L rolls up from the hierarchy. To see the full tree including the 28 fixed groups, open Chart of Accounts (Tree view)."
+      lockedRow={(r) => (r.level || 0) <= 1}
+      note="Groups are SHARED across all branches (not branch-scoped) — the same chart applies to every branch. Parent Groups and Groups are the MANDATORY backbone: they're fixed and shown 🔒 (cannot be created, edited or deleted). You create Sub-Groups only — pick a Group under 'Nest under a Group'; Nature & Statement (BS/PL) are inherited. For the P&L Fixed/Variable split, nest your expense sub-groups under the 'Fixed Expenses' / 'Variable Expenses' Groups. To see the full tree, open Chart of Accounts (Tree view)."
       fields={[
-        { key: 'name', label: 'Group / Sub-Group Name', type: 'text', required: true },
+        { key: 'name', label: 'Sub-Group Name', type: 'text', required: true },
         // Display-only columns: the fixed primary root + the immediate parent.
-        { key: 'rootGroup', label: 'Primary Group', type: 'text', input: false },
-        { key: 'nestedUnder', label: 'Sub-group of', type: 'text', input: false },
-        { key: 'parent', label: 'Nest under (Primary Group or Group)', type: 'select', options: parentOptions.length ? parentOptions : TALLY_GROUP_NAMES, required: true, table: false },
+        { key: 'rootGroup', label: 'Parent Group', type: 'text', input: false },
+        { key: 'nestedUnder', label: 'Group', type: 'text', input: false },
+        { key: 'parent', label: 'Nest under a Group', type: 'select', options: parentOptions, required: true, table: false },
         { key: 'nature', label: 'Nature', type: 'text', input: false },
         { key: 'statement', label: 'Statement', type: 'text', input: false },
         { key: 'active', label: 'Active', type: 'bool', default: true },
