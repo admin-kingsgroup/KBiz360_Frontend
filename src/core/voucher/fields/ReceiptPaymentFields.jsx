@@ -41,9 +41,9 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   // Live open items for the chosen party. When editing, exclude this voucher's own
   // settlement so what it cleared reappears and stays re-allocatable. In refund mode the
   // rows are the client's open receipts (leftover each); otherwise their open bills —
-  // over-settled ones included (includeOverpaid), so the party's Overpaid credit that
-  // the ledger bill-wise shows is visible here too while allocating.
-  const billsQ = useOpenBills(isParty ? state.party : '', branch, spec.obSide, ctx.editId, false, spec.mode, spec.mode !== 'advances');
+  // over-settled ones included (useOpenBills defaults includeOverpaid), so the party's
+  // Overpaid credit that the ledger bill-wise shows is visible here too while allocating.
+  const billsQ = useOpenBills(isParty ? state.party : '', branch, spec.obSide, ctx.editId, false, spec.mode);
 
   // Keep billVno→billId in sync as bills load, so toBody can carry billId.
   useEffect(() => {
