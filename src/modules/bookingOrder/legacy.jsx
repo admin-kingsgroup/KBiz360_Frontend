@@ -16,7 +16,6 @@ import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { localeOf } from '../../core/format';
-import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../core/api';
@@ -813,8 +812,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="SPG Date"><SmartDateInput max={todayISO()} value={date} onChange={setDate} style={inp} /></FL>
-          <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} min={editing ? undefined : todayISO()} style={inp} title="When the customer travels (no past dates) — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
+          <FL label="SPG Date"><SmartDateInput value={date} onChange={setDate} style={inp} /></FL>
+          <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} style={inp} title="When the customer travels — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
           <FL label="Client Type">
             <DropdownMenu
               ariaLabel="Client Type"
