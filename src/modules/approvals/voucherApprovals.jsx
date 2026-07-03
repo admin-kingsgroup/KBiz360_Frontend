@@ -1053,16 +1053,28 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   };
 
   // INB refund/reissue is a single voucher — approve/reject it on its own (reuses the
-  // shared voucher mutations, same as the SO/PO/GP queue would).
+  // shared voucher mutations, same as the SO/PO/GP queue would). Single approve (NOT
+  // approveMany) so the backend's real refusal ("Awaiting Check…", validation error)
+  // reaches the toast instead of being flattened to "failed to post".
+  const approveRefund = useApproveVoucher();
   const doApproveRefund = async (e) => {
     const { confirmed } = await confirmDialog({ title: `Approve refund ${e.vno}?`, message: 'Posts this INB refund to the books.', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusy(true);
-    approveMany.mutate({ ids: [e.id], approver: 'admin' }, {
-      onSuccess: (res) => { const f = (res && res.failed) || 0; toast(f ? `${e.vno} failed to post` : `Approved ${e.vno}`, f ? 'error' : 'success'); },
-      onError: (err) => toast((err && err.message) || 'Approve failed', 'error'),
-      onSettled: () => setBusy(false),
-    });
+    try { await approveRefund.mutateAsync({ id: e.id, approver: 'admin' }); toast(`Approved ${e.vno} — posted to the books`); }
+    catch (err) { toast(`${e.vno}: ${(err && err.message) || 'failed to post'}`, 'error'); }
+    finally { setBusy(false); }
+  };
+  // Levels 1 & 2 of the chain for an INB refund (no books impact) — server enforces
+  // stage order and who may act; the button only routes the click.
+  const doReviewRefund = async (e, action) => {
+    setBusy(true);
+    try {
+      await apiPost(`/api/vouchers/${e.id}/review`, { action });
+      toast(action === 'check' ? `Checked ${e.vno} (level 1) — awaiting Verify` : `Verified ${e.vno} (level 2) — awaiting final Approval`);
+      qc.invalidateQueries({ queryKey: ['vouchers'] });
+    } catch (err) { toast((err && err.message) || `${action} failed`, 'error'); }
+    finally { setBusy(false); }
   };
   const doRejectRefund = async (e) => {
     const { confirmed, reason } = await confirmDialog({ title: `Reject refund ${e.vno}?`, message: 'Marks it Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
@@ -1228,14 +1240,24 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                     <td style={{ padding: '7px 12px', ...num }}><RefundAmountCell entry={e} money={money} /></td>
                     {pendingTab
                       ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                          {isApprover ? <>
+                          <StageChip e={e} />
+                          {isApprover && <>
                             {/* Single voucher (RF/RI) — edit it in place via the shared voucher
-                                editor (saving reverts it to Pending), then Approve/Reject. */}
-                            <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this INB refund/reissue voucher, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
-                            <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApproveRefund(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
-                            <button disabled={busy} onClick={() => doRejectRefund(e)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
-                            {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: C.red }}>blocked</span>}
-                          </> : <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>}
+                                editor (saving reverts it to Pending), then re-enter the chain. */}
+                            <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this INB refund/reissue voucher, then approve" style={{ margin: '0 6px', padding: '5px 10px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
+                          </>}
+                          {(() => {
+                            // Stage-aware action (mirrors the Vouchers queue): Check (L1, anyone in
+                            // branch) → Verify (L2) → Approve & Post (L3). Server re-enforces all gates.
+                            const na = nextActionFor(e, chainCfg);
+                            if (na.action !== 'approve') {
+                              return <button disabled={busy || !na.allowed} title={na.hint} onClick={() => doReviewRefund(e, na.action)} style={{ marginLeft: isApprover ? 0 : 6, marginRight: 6, padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? C.blue : C.gold) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                            }
+                            const ok = e.postable && na.allowed;
+                            return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} onClick={() => doApproveRefund(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                          })()}
+                          {isApprover && <button disabled={busy} onClick={() => doRejectRefund(e)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
+                          {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: C.red }}>blocked</span>}
                         </td>
                       : <td style={{ padding: '7px 12px', color: C.dim }}>{e.status}</td>}
                   </tr>

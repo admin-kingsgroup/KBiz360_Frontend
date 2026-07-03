@@ -1,11 +1,13 @@
 // INB SPG Approvals tab — the two INB legs (sale + airline purchase) group into ONE
-// deal by INB Link No (sourceRef); Pending deals can be approved (posts BOTH legs via
-// approve-many) or rejected; an already-posted ('saved') deal shows under Approved.
+// deal by INB Link No (sourceRef); Pending deals walk the three-level chain (stage lives
+// on the sale leg) and final Approve posts BOTH legs via approve-many; an already-posted
+// ('saved') deal shows under Approved.
 // (jest.mock factories may only reference vars prefixed `mock`.)
 const mockApiGet = jest.fn();
 const mockEditedGet = jest.fn(() => Promise.resolve([])); // /api/vouchers/edited feed (Edited tab)
 const mockApiPost = jest.fn(() => Promise.resolve({}));
 const mockApproveMany = jest.fn();
+const mockApproveOne = jest.fn(() => Promise.resolve({}));
 const mockRejectAsync = jest.fn(() => Promise.resolve());
 const mockConfirm = jest.fn(() => Promise.resolve({ confirmed: true, reason: 'x' }));
 
@@ -18,7 +20,7 @@ jest.mock('../../core/api', () => ({
 }));
 jest.mock('../../core/useAccounting', () => ({
   useVoucherApprovals: jest.fn(() => ({ data: {} })),
-  useApproveVoucher: jest.fn(() => ({ mutate: jest.fn() })),
+  useApproveVoucher: jest.fn(() => ({ mutate: jest.fn(), mutateAsync: (...a) => mockApproveOne(...a) })),
   useRejectVoucher: jest.fn(() => ({ mutate: jest.fn(), mutateAsync: (...a) => mockRejectAsync(...a) })),
   useDeleteVoucher: jest.fn(() => ({ mutate: jest.fn() })),
   useRevokeVoucher: jest.fn(() => ({ mutate: jest.fn() })),
@@ -53,13 +55,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { InbApprovals } from '../approvals';
 
 // One INB deal = a SALE leg + a PURCHASE leg sharing the same sourceRef (INB Link No).
+// Legs are already Checked + Verified so the deal sits at the final Approve stage
+// (the chain's stage is derived from the sale leg's checkedBy/verifiedBy).
 const LINK = 'INB/BOM-AMD/26/0001';
 const mkLegs = (status, pushed = false) => [
   { id: 'sale1', vno: 'INB/BOM/26/0003', category: 'sale', type: 'INB', branch: 'BOM', party: 'Travkings Tours and Travels AMD',
     date: '2026-06-23', sourceRef: LINK, status, pushed, total: 30551, taxAmt: 21.81, costCenter: 'BOM-INB-FLT-INT',
+    checkedBy: 'acct', verifiedBy: 'sughra',
     lines: [{ ledger: 'IT-Base Fare [IB]', amt: 25845 }, { ledger: 'IT-SVF [IB]', amt: 121.19 }] },
   { id: 'pur1', vno: 'INB/BOM/26/0004', category: 'purchase', type: 'INB', branch: 'BOM', party: 'TRIP JACK',
     date: '2026-06-23', sourceRef: LINK, status, pushed, total: 29113, taxAmt: 0, costCenter: 'BOM-INB-FLT-INT',
+    checkedBy: 'acct', verifiedBy: 'sughra',
     lines: [{ ledger: 'IT-Base Fare [Pur]', amt: 25845 }] },
 ];
 
@@ -67,7 +73,11 @@ const wrap = (ui) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 };
-afterEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  // The chain reads the signed-in user from localStorage; Super Admin overrides L2/L3.
+  localStorage.setItem('kb360-user', JSON.stringify({ email: 'admin@travkings.com', role: 'Super Admin' }));
+});
+afterEach(() => { localStorage.removeItem('kb360-user'); jest.clearAllMocks(); });
 
 describe('INB SPG Approvals', () => {
   test('groups the two legs into ONE pending deal row under the INB Link No', async () => {
@@ -150,7 +160,8 @@ describe('INB SPG Approvals', () => {
     const { useVoucherApprovals } = require('../../core/useAccounting');
     useVoucherApprovals.mockReturnValue({ isLoading: false, data: { entries: [
       { id: 'rf1', vno: 'RF/BOM/26/0052', category: 'refund', inb: true, againstInvoice: 'INB/BOM/26/0069',
-        party: 'Travkings Tours and Travels AMD', total: 53558, status: 'pending', postable: true, errors: [], warnings: [] },
+        party: 'Travkings Tours and Travels AMD', total: 53558, status: 'pending', postable: true, errors: [], warnings: [],
+        checkedBy: 'acct', verifiedBy: 'sughra', reviewStage: 'approve' },
     ] } });
     mockApiGet.mockResolvedValue([]); // no INB sale/purchase deals — isolate the refunds section
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
@@ -161,9 +172,10 @@ describe('INB SPG Approvals', () => {
     // it verifies the SO/PO/GP queue is asked to EXCLUDE these (refundScope split)
     expect(useVoucherApprovals).toHaveBeenCalledWith('BOM', 'pending', { refundScope: 'inb' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
-    await waitFor(() => expect(mockApproveMany).toHaveBeenCalled());
-    expect(mockApproveMany.mock.calls[0][0].ids).toEqual(['rf1']);
+    // Checked + Verified → the final chain action posts the SINGLE voucher (real errors surface).
+    fireEvent.click(screen.getByRole('button', { name: 'Approve & Post' }));
+    await waitFor(() => expect(mockApproveOne).toHaveBeenCalled());
+    expect(mockApproveOne.mock.calls[0][0]).toMatchObject({ id: 'rf1' });
     useVoucherApprovals.mockReturnValue({ data: {} }); // restore default for any later test
   });
 });

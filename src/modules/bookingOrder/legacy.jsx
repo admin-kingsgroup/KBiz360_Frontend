@@ -43,7 +43,7 @@ import {
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
-import { invalidateBooks, useVoucherApprovals, useApproveMany, useRejectVoucher } from '../../core/useAccounting';
+import { invalidateBooks, useVoucherApprovals, useApproveMany, useApproveVoucher, useRejectVoucher } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
@@ -1823,8 +1823,10 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
   const cur = bc(branch).cur;
   const isApprover = isApproverRole(currentUser);
   const q = useVoucherApprovals(branch, status, { refundScope: 'sopogp' });
-  const approveMany = useApproveMany();
+  const approveOne = useApproveVoucher();
   const reject = useRejectVoucher();
+  const qc = useQueryClient();
+  const chainCfg = useApprovalChain(); // three-level chain assignees (Check → Verify → Approve)
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null); // fix a blocked refund voucher in place, then approve
   useModalEsc(() => setEditId(null), !!editId);
@@ -1836,17 +1838,28 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
       .filter((e) => !needle || [e.vno, e.party, e.againstInvoice, e.linkNo, String(Math.round(e.total || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle));
   }, [q.data, needle]);
 
-  // A refund/reissue is one voucher — approve/reject it on its own (shared voucher
-  // mutations, exactly like the INB Refunds section).
+  // A refund/reissue is one voucher — approve/reject it on its own (exactly like the
+  // INB Refunds section). Single-voucher approve (NOT approveMany) so the backend's
+  // real refusal ("Awaiting Check…", validation error) reaches the toast instead of
+  // being flattened to "failed to post".
   const doApprove = async (e) => {
     const { confirmed } = await confirmDialog({ title: `Approve refund ${e.vno}?`, message: 'Posts this refund / reissue to the books (reverses the linked sale).', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusy(true);
-    approveMany.mutate({ ids: [e.id], approver: 'admin' }, {
-      onSuccess: (res) => { const f = (res && res.failed) || 0; toast(f ? `${e.vno} failed to post` : `Approved ${e.vno}`, f ? 'error' : 'success'); },
-      onError: (err) => toast((err && err.message) || 'Approve failed', 'error'),
-      onSettled: () => setBusy(false),
-    });
+    try { await approveOne.mutateAsync({ id: e.id, approver: 'admin' }); toast(`Approved ${e.vno} — posted to the books`); }
+    catch (err) { toast(`${e.vno}: ${(err && err.message) || 'failed to post'}`, 'error'); }
+    finally { setBusy(false); }
+  };
+  // Levels 1 & 2 of the chain (no books impact) — the server enforces stage order
+  // and who may act; these buttons only route the click. Mirrors the Vouchers queue.
+  const doReview = async (e, action) => {
+    setBusy(true);
+    try {
+      await apiPost(`/api/vouchers/${e.id}/review`, { action });
+      toast(action === 'check' ? `Checked ${e.vno} (level 1) — awaiting Verify` : `Verified ${e.vno} (level 2) — awaiting final Approval`);
+      qc.invalidateQueries({ queryKey: ['vouchers'] });
+    } catch (err) { toast((err && err.message) || `${action} failed`, 'error'); }
+    finally { setBusy(false); }
   };
   const doReject = async (e) => {
     const { confirmed, reason } = await confirmDialog({ title: `Reject refund ${e.vno}?`, message: 'Marks it Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
@@ -1886,14 +1899,24 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><RefundAmountCell entry={e} cur={cur} fmt={fmt} /></td>
                   {pendingTab
                     ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                        {isApprover ? <>
+                        <StageChip e={e} />
+                        {isApprover && <>
                           {/* Edit in place (reuses the shared voucher editor); saving reverts it to
-                              Pending, then Approve. Lets an approver fix a blocked refund inline. */}
-                          <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this refund / reissue voucher, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: BLUE, border: `1px solid ${BLUE}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
-                          <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
-                          <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
-                          {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
-                        </> : <span style={{ fontSize: 11, color: '#9197a3' }}>Approver only</span>}
+                              Pending, then re-enter the chain. Lets an approver fix a blocked refund inline. */}
+                          <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this refund / reissue voucher, then approve" style={{ margin: '0 6px', padding: '5px 10px', background: '#fff', color: BLUE, border: `1px solid ${BLUE}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
+                        </>}
+                        {(() => {
+                          // Stage-aware action (mirrors the Vouchers queue): Check (L1, anyone in
+                          // branch) → Verify (L2) → Approve & Post (L3). Server re-enforces all gates.
+                          const na = nextActionFor(e, chainCfg);
+                          if (na.action !== 'approve') {
+                            return <button disabled={busy || !na.allowed} title={na.hint} onClick={() => doReview(e, na.action)} style={{ margin: isApprover ? 0 : '0 0 0 6px', marginRight: 6, padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? BLUE : GOLD) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                          }
+                          const ok = e.postable && na.allowed;
+                          return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                        })()}
+                        {isApprover && <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
+                        {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
                       </td>
                     : <td style={{ padding: '7px 12px', color: '#5b616e', textTransform: 'capitalize' }}>{e.status}</td>}
                 </tr>
