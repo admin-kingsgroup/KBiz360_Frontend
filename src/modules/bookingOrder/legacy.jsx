@@ -338,7 +338,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Editing an INB deal preloads its counterparty branch; a fresh INB voucher starts empty.
   const [toBranch, setToBranch] = useState(editing && interBranch && editBooking.isInterBranch ? (editBooking.toBranch || '') : '');
   const inbBranches = INB_ALL.filter((b) => b !== brCode);
-  const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch);
+  // BOM bills IGST on its service fee even to an African branch, so a BOM sale is never
+  // a zero-rated export — only other branches' cross-border legs are (seller-side only).
+  const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch) && brCode !== 'BOM';
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
@@ -803,7 +805,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {interBranch && (
         <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
           🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Fee</b> column. Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
-          {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : 'IGST · inter-state (18% on Service Fee)'}</b>.</>}
+          {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : `IGST · ${inbCrossBorder(brCode, toBranch) ? 'inter-branch' : 'inter-state'} (18% on Service Fee)`}</b>.</>}
           {' '}Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
         </div>
       )}

@@ -11,14 +11,17 @@ import { toast } from '../core/ux/toast';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
-// Tax jurisdiction per branch (mirror of the backend). Same country (India) =
-// IGST taxable; different country = cross-border export (zero-rated).
+// Tax jurisdiction per branch (mirror of the backend). Same country (India) = IGST
+// taxable; different country = cross-border export (zero-rated) — EXCEPT BOM, which
+// bills IGST on its service fee even to an African branch (seller-side only).
 const COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
 const inbTreatment = (from, to) => {
   const cf = COUNTRY[from] || 'IN'; const ct = COUNTRY[to] || 'IN';
-  return cf !== ct
-    ? { crossBorder: true, label: `Export · zero-rated (${cf}→${ct})` }
-    : { crossBorder: false, label: 'IGST · inter-state (18% on Service Fee)' };
+  const crossBorder = cf !== ct;
+  const zeroRated = crossBorder && from !== 'BOM'; // BOM bills IGST even cross-border
+  return zeroRated
+    ? { crossBorder, zeroRated: true, label: `Export · zero-rated (${cf}→${ct})` }
+    : { crossBorder, zeroRated: false, label: crossBorder ? `IGST · inter-branch (${cf}→${ct}, 18% on Service Fee)` : 'IGST · inter-state (18% on Service Fee)' };
 };
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (x) => { const n = Number(x); return Number.isFinite(n) ? n : 0; };
@@ -44,12 +47,12 @@ export function InterBranchVoucher({ branch }) {
   const isVat = fromCfg.taxType === 'VAT';
   const taxRate = isVat ? (Number(fromCfg.vatRate) || 16) : 18;
   const taxName = isVat ? 'VAT' : 'IGST';
-  const treatmentLabel = treatment.crossBorder
+  const treatmentLabel = treatment.zeroRated
     ? treatment.label
-    : `${taxName} · ${isVat ? 'domestic' : 'inter-state'} (${taxRate}% on Service Fee)`;
+    : `${taxName} · ${treatment.crossBorder ? 'inter-branch' : (isVat ? 'domestic' : 'inter-state')} (${taxRate}% on Service Fee)`;
   const fares = r2(num(form.base) + num(form.k3) + num(form.taxes));
   const svc = r2(num(form.serviceFee));
-  const igst = treatment.crossBorder ? 0 : r2(svc * taxRate / 100); // export → zero-rated
+  const igst = treatment.zeroRated ? 0 : r2(svc * taxRate / 100); // export → zero-rated; BOM cross-border → IGST
   const total = r2(fares + svc + igst);
 
   const create = useCreateInb();
@@ -116,7 +119,7 @@ export function InterBranchVoucher({ branch }) {
         <div style={{ display: 'flex', gap: 18, marginTop: 12, fontSize: 12.5, color: C.dark, flexWrap: 'wrap' }}>
           <span>Fares: <b>{cur}{fares.toLocaleString(loc)}</b></span>
           <span>Service Fee: <b>{cur}{svc.toLocaleString(loc)}</b></span>
-          {treatment.crossBorder
+          {treatment.zeroRated
             ? <span style={{ color: C.blue }}>Tax: <b>Export · zero-rated</b></span>
             : <span>{taxName} ({taxRate}% on fee): <b>{cur}{igst.toLocaleString(loc)}</b></span>}
           <span style={{ marginLeft: 'auto', fontWeight: 800 }}>Total: {cur}{total.toLocaleString(loc)}</span>
@@ -129,11 +132,11 @@ export function InterBranchVoucher({ branch }) {
           Dr&nbsp; Travkings Tours &amp; Travels {form.toBranch || '<branch>'} &nbsp; {cur}{total.toLocaleString(loc)}<br />
           &nbsp;&nbsp;&nbsp;Cr&nbsp; Inter-Branch Sales (fares) &nbsp; {cur}{fares.toLocaleString(loc)}<br />
           &nbsp;&nbsp;&nbsp;Cr&nbsp; Service Fee Income &nbsp; {cur}{svc.toLocaleString(loc)}<br />
-          {treatment.crossBorder
+          {treatment.zeroRated
             ? <span style={{ color: C.blue }}>&nbsp;&nbsp;&nbsp;(export — zero-rated, no output tax)</span>
             : <>&nbsp;&nbsp;&nbsp;Cr&nbsp; Output {taxName} &nbsp; {cur}{igst.toLocaleString(loc)}</>}
         </div>
-        <div style={{ fontSize: 11, color: form.toBranch ? (treatment.crossBorder ? C.blue : C.green) : C.dim, marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: form.toBranch ? (treatment.zeroRated ? C.blue : C.green) : C.dim, marginTop: 6 }}>
           {form.toBranch ? `Tax treatment: ${treatmentLabel}` : 'Select a destination branch to see the tax treatment'}
         </div>
       </div>
