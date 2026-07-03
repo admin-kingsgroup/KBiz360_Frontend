@@ -33,6 +33,22 @@ const badge = (txt, color) => <span style={{ fontSize: 9, fontWeight: 700, paddi
 // Scope of a single ledger: Common (org-wide 'ALL') vs a specific branch.
 const isCommon = (l) => !l.branch || l.branch === 'ALL';
 const scopeBadge = (l) => (isCommon(l) ? badge('Common', GREY) : badge(l.branch, BLUE));
+// Deactivated ledgers are hidden by default; the "Include inactive" toggle reveals
+// them, dimmed and flagged, so the chart can show the full picture on demand.
+const AMBER = '#b45309';
+const isInactive = (l) => l.active === false;
+// A tree root is a top-level primary group ONLY: a system group with no parent.
+// The 13 seeded system SUB-groups carry a parent and must render nested under it,
+// never also as a second top-level "Parent Group".
+export const isRootGroup = (g) => !!(g && g.system && !g.parent);
+// Split the fetched ledgers into what the tree should show + how many deactivated
+// ones are being hidden. Pure so it can be unit-tested without rendering.
+export function partitionLedgers(fetched, includeInactive) {
+  const list = fetched || [];
+  const inactiveHidden = includeInactive ? 0 : list.filter(isInactive).length;
+  const sourceLedgers = includeInactive ? list : list.filter((l) => !isInactive(l));
+  return { sourceLedgers, inactiveHidden };
+}
 // "8 common · 4 BOM" style mini-summary for a node's ledger set.
 const countNote = (leds) => {
   const c = leds.filter(isCommon).length, b = leds.length - c;
@@ -47,18 +63,23 @@ export function AccountsTreeView({ branch }) {
   const groupsQ = useMasterList('groups');           // groups/sub-groups are SHARED across branches
   // Ledgers are branch-scoped. A specific branch view fetches that branch + the
   // org-wide 'ALL' ledgers; "All branches" fetches every branch's ledgers.
-  const ledgersQ = useMasterList('ledgers', branchView === 'ALL' ? {} : { branch: branchView });
+  // Always fetch inactive ledgers too (includeInactive) so the toggle flips
+  // instantly client-side and we can always report how many are hidden.
+  const ledgersQ = useMasterList('ledgers', { ...(branchView === 'ALL' ? {} : { branch: branchView }), includeInactive: 'true' });
   const [tab, setTab] = useState('tree');           // 'tree' | 'side'
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState({ pg: '', g: '', sg: '' });
+  const [includeInactive, setIncludeInactive] = useState(false); // hide deactivated ledgers by default
 
   const groups = groupsQ.data || [];
 
   // ── Resolve which ledgers to display, per the Branch view + Scope filter ──
   // Group raw ledgers by name so we can detect a branch copy that OVERRIDES a
   // Common ('ALL') one of the same name (Tally shows only the effective ledger).
+  // Deactivated ledgers stay out unless the toggle is on; count the hidden ones.
+  const { sourceLedgers, inactiveHidden } = partitionLedgers(ledgersQ.data, includeInactive);
   const byName = new Map();
-  (ledgersQ.data || []).forEach((l) => { const k = (l.name || '').toLowerCase(); (byName.get(k) || byName.set(k, []).get(k)).push(l); });
+  sourceLedgers.forEach((l) => { const k = (l.name || '').toLowerCase(); (byName.get(k) || byName.set(k, []).get(k)).push(l); });
   let display = [];
   for (const copies of byName.values()) {
     const common = copies.find(isCommon);
@@ -84,7 +105,12 @@ export function AccountsTreeView({ branch }) {
   groups.forEach((g) => { if (g.parent && nodes[g.parent]) nodes[g.parent].children.push(nodes[g.name]); });
   display.forEach((l) => { const t = (l.subGroup && nodes[l.subGroup]) ? l.subGroup : l.group; if (nodes[t]) nodes[t].ledgers.push(l); });
   Object.values(nodes).forEach((n) => { n.children.sort((a, b) => (a.name || '').localeCompare(b.name || '')); n.ledgers.sort((a, b) => (a.name || '').localeCompare(b.name || '')); });
-  const roots = groups.filter((g) => g.system).map((g) => nodes[g.name]).sort((a, b) => (TALLY_ORDER.indexOf(a.name) - TALLY_ORDER.indexOf(b.name)));
+  // Roots are ONLY the 16 top-level primary groups (system, no parent). The 13
+  // seeded system SUB-groups (Reserves & Surplus, Bank Accounts, Duties & Taxes, …)
+  // carry a parent — they must appear nested under it as a "Group", never also as a
+  // top-level "Parent Group" (that double-rendered them, most visibly Reserves &
+  // Surplus, which — absent from TALLY_ORDER — sorted to the very top).
+  const roots = groups.filter(isRootGroup).map((g) => nodes[g.name]).sort((a, b) => (TALLY_ORDER.indexOf(a.name) - TALLY_ORDER.indexOf(b.name)));
   const allKeys = groups.map((g) => g.name);
 
   // Header summary counts.
@@ -117,8 +143,8 @@ export function AccountsTreeView({ branch }) {
 
   const Caret = ({ k, has }) => <span {...(has ? clickable(() => tog(k)) : {})} style={{ width: 14, display: 'inline-block', color: GOLD, cursor: has ? 'pointer' : 'default' }}>{has ? (open[k] ? '▾' : '▸') : ''}</span>;
   const ledgerRow = (l, indent) => (
-    <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #dfe2e7', color: DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : undefined }}>
-      <span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}
+    <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #dfe2e7', color: isInactive(l) ? '#9aa2c0' : DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : undefined }}>
+      <span style={{ color: isInactive(l) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}{isInactive(l) && badge('Inactive', AMBER)}
       {l._overrides && <span style={{ fontSize: 9, color: GOLD, marginLeft: 6, fontStyle: 'italic' }}>overrides Common</span>}
     </div>
   );
@@ -177,7 +203,7 @@ export function AccountsTreeView({ branch }) {
       <div style={{ overflow: 'auto' }} onKeyDown={onPick ? listKeyNav() : undefined}>
         {items.map((it) => (
           <div key={kind === 'ledger' ? 'L' + it.id : (it.name || it.id)} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : 'transparent', borderBottom: '1px solid #dfe2e7', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>{kind === 'ledger' ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}</> : it.name}</span>
+            <span style={kind === 'ledger' && isInactive(it) ? { color: '#9aa2c0' } : undefined}>{kind === 'ledger' ? <><span style={{ color: isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{isInactive(it) && badge('Inactive', AMBER)}</> : it.name}</span>
             {onPick && kind !== 'ledger' && <span style={{ color: '#c3cbe0' }}>›</span>}
           </div>
         ))}
@@ -235,6 +261,11 @@ export function AccountsTreeView({ branch }) {
             {scopePill('all', 'All')}{scopePill('common', 'Common only')}{scopePill('branch', 'Branch-specific only')}
           </span>
         </span>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM, cursor: 'pointer' }}>
+          <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} className="max-tablet:min-h-[44px]" />
+          Include inactive
+          {inactiveHidden > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: AMBER, background: AMBER + '18', padding: '1px 6px', borderRadius: 4 }}>{inactiveHidden} hidden</span>}
+        </label>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: DIM }}>
           <b style={{ color: DARK }}>{roots.length}</b> parent groups · <b style={{ color: DARK }}>{subGroupCount}</b> sub-groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)
         </span>
