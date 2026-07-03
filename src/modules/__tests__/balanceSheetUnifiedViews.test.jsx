@@ -10,7 +10,7 @@ jest.mock('../reportsFinancial', () => ({
   ReportBSLive: (props) => <div data-testid="bs-body" data-view={props.forceView} data-hide={String(!!props.hideSwitcher)} />,
   ReportPnLLive: () => <div data-testid="pnl-body" />,
 }));
-jest.mock('../pnlTally', () => ({ PnLTallyLive: () => <div /> }));
+jest.mock('../reportsFinancial/pnlTally', () => ({ PnLTallyLive: () => <div /> }));
 // Isolate from the live data/api stack (Vite `import.meta.env` chain).
 jest.mock('../../core/styles', () => ({ bc: () => ({ cur: '₹' }) }));
 jest.mock('../../core/format', () => ({ localeOf: () => 'en-IN' }));
@@ -21,7 +21,7 @@ jest.mock('../../core/useAccounting', () => ({ useModulePL: () => ({ data: null,
 jest.mock('../../core/data', () => ({ CONSOLIDATED_LABEL: 'All Branches' }));
 
 // eslint-disable-next-line import/first
-import { BalanceSheetUnified } from '../financialStatements';
+import { BalanceSheetUnified } from '../reportsFinancial/financialStatements';
 
 describe('BalanceSheetUnified — three views only', () => {
   test('shows exactly Fiori, Classic, Vertical and none of the retired views', () => {

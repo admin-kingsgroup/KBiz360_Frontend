@@ -19,6 +19,7 @@ import { localeOf } from '../../core/format';
 import { PeriodBar, periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../core/api';
+import { useApprovalChain, nextActionFor, StageChip } from '../../core/approvalChain';
 import { useOpenInb, useBookInb, useCreateInb, useUpdateInb } from '../../core/useInterBranchVoucher';
 import { useVNo } from '../../core/useNextNo';
 
@@ -1371,7 +1372,7 @@ function PostingTable({ side, accent, title }) {
   return <JvBlock title={title} sub={`${side.vno || ''}${side.type ? ' · ' + side.type : ''}`} postings={side.postings} color={accent} />;
 }
 
-function JournalView({ id, cur }) {
+function JournalView({ id, cur, date }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['booking-journal', id],
     queryFn: () => apiGet('/api/booking-orders/' + id + '/journal'),
@@ -1394,6 +1395,7 @@ function JournalView({ id, cur }) {
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 11.5, color: '#5b616e' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'monospace', fontWeight: 700, color: BLUE }}><Link2 size={13} /> {data.linkNo}</span>
+        {date && <span>Voucher Date: <b style={{ color: DARK }}>{date}</b></span>}
         <span>Gross Profit: <b style={{ color: DR }}>{cur} {fmt(data.gp?.total)}</b> ({data.gp?.pct ?? 0}%)</span>
         <span style={{ fontStyle: 'italic', color: '#9A9A9A' }}>journal entries that {data.status === 'approved' || data.status === 'posted' ? 'were posted' : 'will post on approval'}</span>
       </div>
@@ -1459,14 +1461,15 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onInvoice, busyId, sel, onToggleSel }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onInvoice, busyId, sel, onToggleSel }) {
+  const chainCfg = useApprovalChain(); // three-level chain assignees (drives the stage-aware button)
   const cols = mode === 'approved'
-    ? ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
+    ? ['', 'Booking No', 'Voucher Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
-      ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Date', 'Reason']
+      ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Voucher Date', 'Reason']
       : mode === 'deleted'
         ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Deleted', 'By']
-        : ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Actions'];
+        : ['', 'Booking No', 'Voucher Date', 'Link No', 'Tally Ref', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Actions'];
   // The four money columns drive both header right-alignment and the group-summary
   // colSpans; derive their start from the header so adding lead columns can't misalign them.
   const numStart = cols.indexOf('Sale');
@@ -1528,11 +1531,22 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                   {mode !== 'pending' && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>}
                   <td style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
                     {mode === 'pending' ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <StageChip e={b} />
                         <button disabled={busyId === b.id} onClick={() => onEdit(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>
-                        <button disabled={busyId === b.id || !!b.validation?.hasErrors} onClick={() => onApprove(b)} title={b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : ''} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: b.validation?.hasErrors ? '#cfd6e4' : DR, cursor: b.validation?.hasErrors ? 'not-allowed' : 'pointer' }}>
-                          {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
-                        </button>
+                        {(() => {
+                          // Stage-aware chain action: Check (L1) → Verify (L2) → Approve & Post (L3).
+                          const na = nextActionFor(b, chainCfg);
+                          if (na.action !== 'approve') {
+                            return <button disabled={busyId === b.id || !na.allowed} onClick={() => onReview && onReview(b, na.action)} title={na.hint} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: !na.allowed ? '#cfd6e4' : (na.action === 'check' ? BLUE : GOLD), cursor: na.allowed ? 'pointer' : 'not-allowed' }}>
+                              {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {na.label}
+                            </button>;
+                          }
+                          const ok = !b.validation?.hasErrors && na.allowed;
+                          return <button disabled={busyId === b.id || !ok} onClick={() => onApprove(b)} title={!na.allowed ? na.hint : (b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : 'Level 3 — posts to the books')} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: ok ? DR : '#cfd6e4', cursor: ok ? 'pointer' : 'not-allowed' }}>
+                            {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
+                          </button>;
+                        })()}
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><XCircle size={12} /> Reject</button>
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} title="Delete — remove from Pending, view-only (number not reusable)" style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: '#dc2626' }}><Trash2 size={12} /> Delete</button>}
                       </div>
@@ -1560,7 +1574,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                         {!b.noSupplier && <button onClick={() => onInvoice(b, 'purchase')} style={{ ...btnGh, padding: '4px 10px', fontSize: 10.5 }}>📄 Purchase Invoice</button>}
                       </div>
                     )}
-                    <JournalView id={b.id} cur={cur} />
+                    <JournalView id={b.id} cur={cur} date={b.date} />
                   </td></tr>
                 )}
               </React.Fragment>
@@ -1640,12 +1654,14 @@ export function PendingBookings({ branch, setRoute }) {
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
     try {
       const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] });
-      setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`);
+      setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : ''}.`);
       setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] });
       invalidateBooks(qc); // each posting spawns Sale+Purchase journals → refresh every books cache
     } catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); }
     finally { setBusyId(null); }
   };
+  const onReview = makeBookingReview(qc, setBusyId, setMsg);
+  const onReviewSelected = makeBookingReviewSelected(qc, setBusyId, setMsg, sel, setSel);
 
   return (
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
@@ -1663,14 +1679,38 @@ export function PendingBookings({ branch, setRoute }) {
         {rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('check')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>Check selected ({sel.size})</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('verify')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: GOLD, borderColor: '#e3cd97' }}>Verify selected ({sel.size})</button>}
             {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {busyId === 'bulk' ? 'Approving…' : `Approve selected (${sel.size})`}</button>}
           </span>
         )}
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
     </div>
   );
 }
+
+// Shared Check/Verify handlers for the booking queues — levels 1 & 2 of the
+// three-level chain (no books impact; the server enforces stage + eligibility).
+const makeBookingReview = (qc, setBusyId, setMsg) => async (b, action) => {
+  setBusyId(b.id);
+  try {
+    await apiPost(`/api/booking-orders/${b.id}/review`, { action });
+    setMsg(`✓ ${action === 'check' ? 'Checked (L1)' : 'Verified (L2)'} ${b.bookingNo} — ${action === 'check' ? 'awaiting Verify' : 'awaiting final Approval'}.`);
+    qc.invalidateQueries({ queryKey: ['booking-orders'] });
+  } catch (e) { setMsg('⚠ ' + (e.message || `${action} failed`)); }
+  finally { setBusyId(null); }
+};
+const makeBookingReviewSelected = (qc, setBusyId, setMsg, sel, setSel) => async (action) => {
+  if (!sel.size) return;
+  setBusyId('bulk');
+  try {
+    const res = await apiPost('/api/booking-orders/review-many', { ids: [...sel], action });
+    setMsg(`✓ ${action === 'check' ? 'Checked' : 'Verified'} ${res.done} of ${res.total}${res.failed ? ` · ${res.failed} failed${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : ''}.`);
+    setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] });
+  } catch (e) { setMsg('⚠ ' + (e.message || `${action} failed`)); }
+  finally { setBusyId(null); }
+};
 
 const isAdminRole = (u) => ['Super Admin', 'Director'].includes(u?.role);
 // Revoking un-posts a posted booking — approver-level roles only (the server enforces
@@ -1829,7 +1869,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
         : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead><tr style={{ background: '#f3f4f8' }}>
-              {['Vch No', 'Reverses (Sale)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
+              {['Vch No', 'Voucher Date', 'Reverses (Sale)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
                 <th key={i} style={{ ...th, textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
               ))}
             </tr></thead>
@@ -1840,6 +1880,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                     {e.vno}
                     <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>{e.category === 'reissue' ? 'RI' : 'RF'}</span>
                   </td>
+                  <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', fontSize: 11, color: '#5b616e' }}>{e.date || '—'}</td>
                   <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5b616e' }}>{e.againstInvoice || e.linkNo || '—'}</td>
                   <td style={{ padding: '7px 12px' }}>{e.party || '—'}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><RefundAmountCell entry={e} cur={cur} fmt={fmt} /></td>
@@ -1976,9 +2017,11 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
     const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
-    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
+    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); } finally { setBusyId(null); }
   };
+  const onReview = makeBookingReview(qc, setBusyId, setMsg);
+  const onReviewSelected = makeBookingReviewSelected(qc, setBusyId, setMsg, sel, setSel);
 
   const tab = (k, label) => (
     <button key={k} onClick={() => setStatus(k)} className="max-tablet:min-h-[44px]" style={{ padding: '8px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `3px solid ${status === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? DARK : '#5b616e' }}>{label} <span style={{ fontSize: 11, color: '#9197a3' }}>({counts[k]})</span></button>
@@ -2014,6 +2057,8 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
         {status === 'pending' && rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('check')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>Check selected ({sel.size})</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('verify')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: GOLD, borderColor: '#e3cd97' }}>Verify selected ({sel.size})</button>}
             {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {busyId === 'bulk' ? 'Approving…' : `Approve selected (${sel.size})`}</button>}
           </span>
         )}
@@ -2021,7 +2066,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       {status === 'edited'
         ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
         : <>
-            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
             <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
           </>}
     </div>

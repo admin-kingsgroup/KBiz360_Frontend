@@ -6,7 +6,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { rollupEntries } from '../modules/chartBuilder.jsx';
+import { rollupEntries } from '../modules/masters/chartBuilder.jsx';
 
 // usage maps are keyed by LOWER-cased ledger name (as the API returns them).
 const usage = { cash: 5, 'hdfc bank': 12, 'sgst input [bom]': 343 };

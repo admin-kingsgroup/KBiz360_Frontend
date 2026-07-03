@@ -14,7 +14,7 @@ import { apiGet, getAuthToken } from '../../core/api';
 import { exportToExcel } from '../../core/exportExcel';
 import { CUR_FY, CUR_MONTH, CUR_QUARTER, todayISO, isoDate, fmtDate, fyMonthKeys, monthLabel, rangeNote } from '../../core/dates';
 import { VoucherEditor } from '../accountingLive';
-import { OutstandingOnAccount } from '../outstanding';
+import { OutstandingOnAccount } from './outstanding';
 import { useMobile } from '../../core/hooks';
 import { moduleDrillRows, moduleExpandKeys, moduleDetailKey, moduleHasDetail, moduleSideRows } from '../../core/pnlDetail';
 import { openPrintPreview } from '../../core/PrintPreview';
@@ -2193,9 +2193,13 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
   // into Settle, then Back, used to skip Ageing entirely).
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get('tab') || initialTab || 'ageing'; // 'ageing' | 'settlement' | 'settle' | 'net'
-  const setTab = (next) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', next); return p; });
-  const [advFocus, setAdvFocus] = useState(''); // party whose advances to focus
-  const adjustAdvance = (party) => { setAdvFocus(party); setTab('settle'); };
+  // The Adjust-focused party ALSO lives in the URL (`?party=`), not React state: a
+  // refresh / stale-bundle reload on ?tab=settle must reopen the SAME single-party
+  // view, never fall back to the whole book mixed. Tab buttons clear it, so opening
+  // the Settle tab directly is the unfiltered whole-book view.
+  const advFocus = searchParams.get('party') || '';
+  const setTab = (next) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', next); p.delete('party'); return p; });
+  const adjustAdvance = (party) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', 'settle'); p.set('party', party); return p; });
 
   const TABS = [['ageing', 'Ageing'], ['settlement', 'Ageing & Settlement'], ['settle', 'Open Bills & On-Account ▸ Settle'], ['net', 'Net (Debtors − Creditors)']];
   const tabBtn = (active) => ({
@@ -2214,7 +2218,11 @@ function ArApScreen({ branch, side, setRoute, initialTab }) {
           ? <SettlementAgeingReport branch={branch} side={side} />
           : tab === 'net'
             ? <NetAgeingView branch={branch} setRoute={setRoute} />
-            : <OutstandingOnAccount branch={branch} side={isRec ? 'customer' : 'supplier'}
+            // No `side` scoping: all four buckets (RF/ACM receipts AND payments) stay
+            // reachable. "Adjust ▸" focuses the clicked party via initialParty so the
+            // window shows ONLY that customer's vouchers ("show all parties" clears it);
+            // opening the tab directly shows the whole book.
+            : <OutstandingOnAccount key={advFocus || 'all'} branch={branch}
                 initialTab={advFocus ? (isRec ? 'recAdv' : 'payAdv') : undefined} initialParty={advFocus || undefined} />}
     </>
   );

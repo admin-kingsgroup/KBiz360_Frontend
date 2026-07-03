@@ -16,7 +16,7 @@ jest.mock('../../core/ux/toast', () => ({ toast: jest.fn() }));
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PageAccessControl } from '../pageAccess';
+import { PageAccessControl } from '../settings/pageAccess';
 
 const wrap = (ui) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

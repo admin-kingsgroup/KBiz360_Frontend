@@ -23,7 +23,7 @@ jest.mock('../core/useAccounting', () => ({
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { OutstandingOnAccount } from '../modules/outstanding';
+import { OutstandingOnAccount } from '../modules/reportsFinancial/outstanding';
 
 const has = (re) => screen.queryAllByText(re).length > 0;
 

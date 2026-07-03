@@ -7,7 +7,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { autoChildName, sideLedgerList, DIRECT_LEDGERS } from '../modules/chartBuilder.jsx';
+import { autoChildName, sideLedgerList, DIRECT_LEDGERS } from '../modules/masters/chartBuilder.jsx';
 
 const node = (name, ledgers = [], children = []) => ({ name, ledgers, children });
 

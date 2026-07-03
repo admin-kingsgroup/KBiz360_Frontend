@@ -7,7 +7,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { isRootGroup } from '../modules/chartBuilder.jsx';
+import { isRootGroup } from '../modules/masters/chartBuilder.jsx';
 
 describe('Accounts Tree View — tree roots are top-level primaries only', () => {
   test('a system group with no parent IS a root (Parent Group)', () => {
