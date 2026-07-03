@@ -12,7 +12,7 @@
 // structure never changes, only which ledgers are shown / how they're tagged.
 import React, { useState, useEffect, useRef } from 'react';
 import { useMasterList } from '../../core/useMasters';
-import { branchCode, useLedgerUsage, useBranchParity } from '../../core/useAccounting';
+import { branchCode, useLedgerUsage, useBranchParity, useBranchParitySummary } from '../../core/useAccounting';
 import { FocusBanner } from '../../core/ux/FocusBanner';
 import { useNavFocusStore } from '../../core/ux/navFocus';
 import { clickable } from '../../core/ux/clickable';
@@ -410,7 +410,7 @@ export function AccountsTreeView({ branch }) {
       {/* Controls: in-page Branch view + Ledger Scope filter. Hidden on the
           Travkings Group View — it is org-wide (all branches as columns) and
           carries its own scope/search controls. */}
-      {tab !== 'parity' && (
+      {tab !== 'parity' && tab !== 'paritytable' && (
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 10 }}>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
           Branch view
@@ -437,7 +437,7 @@ export function AccountsTreeView({ branch }) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #cdd1d8', marginBottom: 12 }}>
-        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('parity', 'Travkings Group View')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
+        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('parity', 'Travkings Group View')}{tabBtn('paritytable', 'Travkings Group Table View')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
         {tab === 'tree' && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, padding: '4px 0' }}>
             <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊞ Expand all</button>
@@ -446,12 +446,12 @@ export function AccountsTreeView({ branch }) {
         )}
       </div>
 
-      {tab !== 'parity' && (groupsQ.isLoading || ledgersQ.isLoading) && (
+      {tab !== 'parity' && tab !== 'paritytable' && (groupsQ.isLoading || ledgersQ.isLoading) && (
         <div style={{ padding: 14 }}>
           {Array.from({ length: 7 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}
         </div>
       )}
-      {tab === 'tree' ? treeView() : tab === 'side' ? sideView() : tab === 'parity' ? <TravkingsGroupView /> : inactiveView()}
+      {tab === 'tree' ? treeView() : tab === 'side' ? sideView() : tab === 'parity' ? <TravkingsGroupView /> : tab === 'paritytable' ? <TravkingsGroupTableView /> : inactiveView()}
     </div>
   );
 }
@@ -625,6 +625,101 @@ function TravkingsGroupView() {
             {!rows.length && <tr><td colSpan={branches.length + 3} style={{ padding: 30, textAlign: 'center', color: '#9aa2c0' }}>Nothing matches.</td></tr>}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Travkings Group Table View — count summary ──────────────────────────────
+// Compact count table: groups (global, Fixed */Wired ~*, NF=0 monitor) and
+// ledgers per branch (Fixed */Wired ~*/Non-fixed/Deactivated/Total, incl. inactive).
+const SIGN_CLR = { fixed: P_GREEN, wired: P_AMBER, nf: '#3f5a86', deact: P_RED };
+
+function TravkingsGroupTableView() {
+  const q = useBranchParitySummary();
+  const d = q.data || {};
+  const branches = d.branches || [];
+  const grp = d.groups || {};
+  const rows = d.ledgers || [];
+  const tot = d.ledgerTotals || { fixed: 0, wired: 0, nf: 0, deactivated: 0, total: 0 };
+
+  if (q.isLoading) return <div style={{ padding: 14 }}>{Array.from({ length: 6 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}</div>;
+  if (q.isError) return <div style={{ padding: 16, fontSize: 12, color: RED }}>Couldn’t load the summary. Try again.</div>;
+
+  const num = (n) => (n || 0).toLocaleString('en-IN');
+  const chip = (txt, clr) => <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 12, color: clr, background: clr + '18', padding: '1px 6px', borderRadius: 5 }}>{txt}</span>;
+  const th = (extra) => ({ fontSize: 11, color: DIM, fontWeight: 700, padding: '8px 10px', borderBottom: '1.5px solid #cdd1d8', whiteSpace: 'nowrap', textAlign: 'right', ...extra });
+  const td = (clr) => ({ padding: '9px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', borderBottom: '1px solid #eef1f5', color: clr || DARK });
+  const sep = { borderLeft: '2px solid #e6f0ec' };
+  const gcell = (v) => <td style={{ ...td('#7d8a83'), ...(v === 0 ? { color: '#b3bcb6' } : {}) }}>{v}</td>;
+
+  // Group tiers repeat per branch row (global structure); render once as greyed cells.
+  const gCols = (
+    <>
+      <td style={{ ...td('#7d8a83'), ...sep }}>{grp.parent?.fixed ?? '—'}</td>{gcell(grp.parent?.wired ?? 0)}{gcell(grp.parent?.nf ?? 0)}
+      <td style={{ ...td('#7d8a83'), ...sep }}>{grp.group?.fixed ?? '—'}</td>{gcell(grp.group?.wired ?? 0)}{gcell(grp.group?.nf ?? 0)}
+      <td style={{ ...td('#7d8a83'), ...sep }}>{grp.sub?.fixed ?? '—'}</td>{gcell(grp.sub?.wired ?? 0)}{gcell(grp.sub?.nf ?? 0)}
+    </>
+  );
+
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', fontSize: 11.5, color: DIM, marginBottom: 10 }}>
+        <span>{chip('*', SIGN_CLR.fixed)} Fixed</span>
+        <span>{chip('~*', SIGN_CLR.wired)} Wired (module)</span>
+        <span>{chip('NF', SIGN_CLR.nf)} Non-fixed (ledgers only)</span>
+        <span>{chip('Deact', SIGN_CLR.deact)} Deactivated</span>
+        <span style={{ color: '#9aa2c0' }}>· totals include inactive masters</span>
+      </div>
+
+      <div style={{ overflowX: 'auto', border: '1px solid #cdd1d8', borderRadius: 10 }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 1000 }}>
+          <thead>
+            <tr>
+              <th style={{ ...th({ textAlign: 'left' }) }}></th>
+              <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Parent Group</th>
+              <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Group</th>
+              <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Sub-Group</th>
+              <th colSpan={5} style={{ ...th({ textAlign: 'center' }), ...sep }}>Ledgers (total)</th>
+            </tr>
+            <tr>
+              <th style={{ ...th({ textAlign: 'left' }) }}>Branch</th>
+              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*</th><th style={th()}>NF</th>
+              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*</th><th style={th()}>NF</th>
+              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*</th><th style={th()}>NF</th>
+              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*</th><th style={th()}>NF</th><th style={th()}>Deact</th><th style={th()}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.branch}>
+                <td style={{ padding: '9px 10px', fontWeight: 650, color: DARK, borderBottom: '1px solid #eef1f5' }}>{r.branch}</td>
+                {gCols}
+                <td style={{ ...td(SIGN_CLR.fixed), ...sep }}>{num(r.fixed)}</td>
+                <td style={td(SIGN_CLR.wired)}>{num(r.wired)}</td>
+                <td style={td(SIGN_CLR.nf)}>{num(r.nf)}</td>
+                <td style={td(SIGN_CLR.deact)}>{num(r.deactivated)}</td>
+                <td style={{ ...td(), fontWeight: 700 }}>{num(r.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: '#f6faf8' }}>
+              <td style={{ padding: '11px 10px', fontWeight: 700, color: DARK, borderTop: '2px solid #cdd1d8' }}>All</td>
+              <td style={{ ...td('#b3bcb6'), ...sep, borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.parent?.fixed ?? '—'}</td><td style={{ ...td('#b3bcb6'), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.parent?.wired ?? 0}</td><td style={{ ...td('#b3bcb6'), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.parent?.nf ?? 0}</td>
+              <td style={{ ...td('#b3bcb6'), ...sep, borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.group?.fixed ?? '—'}</td><td style={{ ...td('#b3bcb6'), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.group?.wired ?? 0}</td><td style={{ ...td('#b3bcb6'), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.group?.nf ?? 0}</td>
+              <td style={{ ...td('#b3bcb6'), ...sep, borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.sub?.fixed ?? '—'}</td><td style={{ ...td('#b3bcb6'), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.sub?.wired ?? 0}</td><td style={{ ...td('#b3bcb6'), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{grp.sub?.nf ?? 0}</td>
+              <td style={{ ...td(SIGN_CLR.fixed), ...sep, borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{num(tot.fixed)}</td>
+              <td style={{ ...td(SIGN_CLR.wired), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{num(tot.wired)}</td>
+              <td style={{ ...td(SIGN_CLR.nf), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{num(tot.nf)}</td>
+              <td style={{ ...td(SIGN_CLR.deact), borderTop: '2px solid #cdd1d8', fontWeight: 700 }}>{num(tot.deactivated)}</td>
+              <td style={{ ...td(), borderTop: '2px solid #cdd1d8', fontWeight: 800 }}>{num(tot.total)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div style={{ marginTop: 12, fontSize: 11.5, color: DIM, background: '#f7f9fc', border: '1px solid #cdd1d8', borderLeft: `3px solid ${P_GREEN}`, borderRadius: 8, padding: '10px 13px' }}>
+        <b style={{ color: DARK }}>Groups are global &amp; fully locked</b> — Parent/Group/Sub-Group are identical for every branch (greyed), split only Fixed <b>*</b> vs Wired <b>~*</b>. <b>NF stays 0</b> — a monitor that surfaces any future non-fixed group. Only <b>ledgers</b> vary and carry a real Non-fixed (branch-specific) bucket; totals include deactivated masters.
       </div>
     </div>
   );

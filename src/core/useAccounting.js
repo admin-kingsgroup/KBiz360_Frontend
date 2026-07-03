@@ -82,6 +82,18 @@ export function useBranchParity() {
   });
 }
 
+// Travkings Group Table View — count summary. Returns { branches, groups:{parent,
+// group,sub each {fixed,wired,nf,total}}, ledgers:[{branch,fixed,wired,nf,
+// deactivated,total}], ledgerTotals }. Org-wide; totals include deactivated.
+export function useBranchParitySummary() {
+  return useQuery({
+    queryKey: ['accounting', 'branch-parity-summary'],
+    queryFn: () => apiGet('/api/accounting/branch-parity-summary'),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}
+
 export function useProfitAndLoss(branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({
