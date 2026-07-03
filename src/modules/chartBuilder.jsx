@@ -37,6 +37,10 @@ const scopeBadge = (l) => (isCommon(l) ? badge('Common', GREY) : badge(l.branch,
 // them, dimmed and flagged, so the chart can show the full picture on demand.
 const AMBER = '#b45309';
 const RED = '#dc2626', RED_TINT = '#fef2f2';
+// Side-by-Side sentinel: the "Direct Ledgers" bucket a node exposes when it holds
+// ledgers directly AND has child groups — a distinct, selectable item so those
+// ledgers don't show implicitly and confuse the Ledger column.
+export const DIRECT_LEDGERS = '::direct-ledgers::'; // never a real (trimmed) group name
 const isInactive = (l) => l.active === false;
 // A ledger is "removable" (safe to delete) when it's deactivated AND holds no
 // postings — the backend blocks deleting a ledger that has entries, so an inactive
@@ -90,6 +94,17 @@ export function autoChildName(node) {
   if (!node || (node.ledgers && node.ledgers.length)) return '';
   const kids = node.children || [];
   return ((kids.find((c) => (c.children && c.children.length) || (c.ledgers && c.ledgers.length)) || kids[0]) || {}).name || '';
+}
+// Which ledgers the Side-by-Side Ledger column shows for the selected path. A
+// DIRECT_LEDGERS pick at a level shows THAT node's OWN ledgers; otherwise the
+// deepest real node's ledgers. Pure. (gName/sgName carry the DIRECT_LEDGERS sentinel
+// when the "Direct Ledgers" bucket is selected; gNode/sgNode are then null.)
+export function sideLedgerList({ pgNode, gNode, sgNode, gName, sgName }) {
+  if (sgName === DIRECT_LEDGERS) return (gNode && gNode.ledgers) || [];
+  if (sgNode) return sgNode.ledgers;
+  if (gName === DIRECT_LEDGERS) return (pgNode && pgNode.ledgers) || [];
+  if (gNode) return gNode.ledgers;
+  return (pgNode && pgNode.ledgers) || [];
 }
 // "8 common · 4 BOM" style mini-summary for a node's ledger set.
 const countNote = (leds) => {
@@ -286,15 +301,16 @@ export function AccountsTreeView({ branch }) {
   // ── Side-by-Side (miller columns) ──
   const col = (title, items, selVal, onPick, kind) => (
     <div style={{ flex: 1, minWidth: 180, border: '1px solid #cdd1d8', borderRadius: 8, background: '#fff', display: 'flex', flexDirection: 'column', maxHeight: '64vh' }}>
-      <div style={{ padding: '8px 10px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #dfe2e7', background: '#f7f8fb' }}>{title} <span style={{ color: '#9aa2c0' }}>({items.length})</span></div>
+      <div style={{ padding: '8px 10px', fontSize: 10, fontWeight: 800, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1px solid #dfe2e7', background: '#f7f8fb' }}>{title} <span style={{ color: '#9aa2c0' }}>({items.filter((i) => !i.__direct).length})</span></div>
       <div style={{ overflow: 'auto' }} onKeyDown={onPick ? listKeyNav() : undefined}>
         {items.map((it) => {
+          const direct = !!it.__direct;                       // the "Direct Ledgers" bucket (a leaf, not a group)
           const n = kind === 'ledger' ? entriesFor(it) : 0;
           const rm = kind === 'ledger' && removableOf(it, n);
           return (
-          <div key={kind === 'ledger' ? 'L' + it.id : (it.name || it.id)} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : rm ? RED_TINT : 'transparent', borderBottom: '1px solid #dfe2e7', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={kind === 'ledger' ? (rm ? { color: RED } : isInactive(it) ? { color: '#9aa2c0' } : undefined) : undefined}>{kind === 'ledger' ? <><span style={{ color: rm ? RED : isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{rm ? badge('Removable', RED) : isInactive(it) && badge('Inactive', AMBER)}</> : it.name}</span>
-            {kind === 'ledger' ? countChip(n) : (onPick && <span style={{ color: '#c3cbe0' }}>›</span>)}
+          <div key={kind === 'ledger' ? 'L' + it.id : (it.name || it.id)} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : rm ? RED_TINT : (direct ? '#fbfcfe' : 'transparent'), borderBottom: '1px solid #dfe2e7', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontStyle: direct ? 'italic' : undefined }}>
+            <span style={kind === 'ledger' ? (rm ? { color: RED } : isInactive(it) ? { color: '#9aa2c0' } : undefined) : (direct ? { color: DIM } : undefined)}>{kind === 'ledger' ? <><span style={{ color: rm ? RED : isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{rm ? badge('Removable', RED) : isInactive(it) && badge('Inactive', AMBER)}</> : direct ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>Direct Ledgers</> : it.name}</span>
+            {kind === 'ledger' ? countChip(n) : direct ? countChip(it.__count) : (onPick && <span style={{ color: '#c3cbe0' }}>›</span>)}
           </div>
           );
         })}
@@ -304,19 +320,29 @@ export function AccountsTreeView({ branch }) {
   );
   // Effective selection — defaults to the first populated node so the Group /
   // Sub-Group / Ledger columns show immediately (a click still overrides). A node
-  // with direct ledgers is NOT auto-drilled (autoChildName), so its own ledgers show.
+  // that holds ledgers directly AND has child groups exposes a distinct "Direct
+  // Ledgers" bucket (DIRECT_LEDGERS), selected by default so its own ledgers show
+  // clearly instead of being hidden behind an auto-selected child group.
+  const directItem = (node) => ({ name: DIRECT_LEDGERS, __direct: true, __count: node.ledgers.length });
   const pgName = sel.pg || (roots.find((r) => r.children.length || r.ledgers.length) || roots[0] || {}).name || '';
   const pgNode = pgName ? nodes[pgName] : null;
-  const gName = sel.g || autoChildName(pgNode);
-  const gNode = gName ? nodes[gName] : null;
-  const sgName = sel.sg || autoChildName(gNode);
-  const sgNode = sgName ? nodes[sgName] : null;
+  const pgSplit = !!(pgNode && pgNode.ledgers.length && pgNode.children.length); // direct ledgers + groups
+  const gName = sel.g || (pgSplit ? DIRECT_LEDGERS : autoChildName(pgNode));
+  const gNode = (gName && gName !== DIRECT_LEDGERS) ? nodes[gName] : null;
+  const gSplit = !!(gNode && gNode.ledgers.length && gNode.children.length);
+  const sgName = sel.sg || (gSplit ? DIRECT_LEDGERS : autoChildName(gNode));
+  const sgNode = (sgName && sgName !== DIRECT_LEDGERS) ? nodes[sgName] : null;
+  // Ledger column reflects the DEEPEST selected item (a "Direct Ledgers" pick shows
+  // that node's own ledgers).
+  const ledgerList = sideLedgerList({ pgNode, gNode, sgNode, gName, sgName });
+  const groupItems = pgNode ? [...(pgSplit ? [directItem(pgNode)] : []), ...pgNode.children] : [];
+  const subItems = gNode ? [...(gSplit ? [directItem(gNode)] : []), ...gNode.children] : [];
   const sideView = () => (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
       {col(`Parent Group (${roots.length})`, roots, pgName, (it) => setSel({ pg: it.name, g: '', sg: '' }))}
-      {col('Group', pgNode ? pgNode.children : [], gName, (it) => setSel((s) => ({ ...s, g: it.name, sg: '' })))}
-      {col('Sub-Group', gNode ? gNode.children : [], sgName, (it) => setSel((s) => ({ ...s, sg: it.name })))}
-      {col('Ledger', sgNode ? sgNode.ledgers : gNode ? gNode.ledgers : pgNode ? pgNode.ledgers : [], '', null, 'ledger')}
+      {col('Group', groupItems, gName, (it) => setSel((s) => ({ ...s, g: it.name, sg: '' })))}
+      {col('Sub-Group', subItems, sgName, (it) => setSel((s) => ({ ...s, sg: it.name })))}
+      {col('Ledger', ledgerList, '', null, 'ledger')}
     </div>
   );
 

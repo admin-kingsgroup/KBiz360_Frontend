@@ -7,7 +7,7 @@
 jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 
-import { autoChildName } from '../modules/chartBuilder.jsx';
+import { autoChildName, sideLedgerList, DIRECT_LEDGERS } from '../modules/chartBuilder.jsx';
 
 const node = (name, ledgers = [], children = []) => ({ name, ledgers, children });
 
@@ -35,5 +35,37 @@ describe('autoChildName — Side-by-Side auto-drill', () => {
     expect(autoChildName(node('Empty'))).toBe('');
     expect(autoChildName(null)).toBe('');
     expect(autoChildName(undefined)).toBe('');
+  });
+});
+
+describe('sideLedgerList — the "Direct Ledgers" bucket shows a node\'s own ledgers', () => {
+  const AD = { name: 'AD Capital' }, ND = { name: 'ND Capital' };
+  const SC = [{ name: 'Sup A' }, { name: 'Sup B' }];
+  const pgNode = { name: 'Capital Account', ledgers: [AD, ND], children: [] };
+  const gNode = { name: 'Sundry Creditors', ledgers: SC, children: [] };
+  const sgNode = { name: 'Supplier Air Lines', ledgers: [{ name: 'IndiGo' }], children: [] };
+
+  test('DIRECT at the Group level → the Parent Group\'s own ledgers', () => {
+    // Capital Account selected → "Direct Ledgers" bucket → AD/ND Capital (gNode is null)
+    expect(sideLedgerList({ pgNode, gNode: null, sgNode: null, gName: DIRECT_LEDGERS, sgName: '' })).toEqual([AD, ND]);
+  });
+
+  test('DIRECT at the Sub-Group level → the Group\'s own ledgers', () => {
+    // Sundry Creditors selected → "Direct Ledgers" bucket → its 2 direct ledgers
+    expect(sideLedgerList({ pgNode, gNode, sgNode: null, gName: 'Sundry Creditors', sgName: DIRECT_LEDGERS })).toEqual(SC);
+  });
+
+  test('a real Sub-Group selected → that sub-group\'s ledgers', () => {
+    expect(sideLedgerList({ pgNode, gNode, sgNode, gName: 'Sundry Creditors', sgName: 'Supplier Air Lines' })).toEqual(sgNode.ledgers);
+  });
+
+  test('falls back to the deepest real node (group, then parent)', () => {
+    expect(sideLedgerList({ pgNode, gNode, sgNode: null, gName: 'Sundry Creditors', sgName: '' })).toEqual(SC);
+    expect(sideLedgerList({ pgNode, gNode: null, sgNode: null, gName: '', sgName: '' })).toEqual([AD, ND]);
+  });
+
+  test('null-safe', () => {
+    expect(sideLedgerList({ pgNode: null, gNode: null, sgNode: null, gName: '', sgName: '' })).toEqual([]);
+    expect(sideLedgerList({ pgNode: null, gNode: null, sgNode: null, gName: DIRECT_LEDGERS, sgName: '' })).toEqual([]);
   });
 });
