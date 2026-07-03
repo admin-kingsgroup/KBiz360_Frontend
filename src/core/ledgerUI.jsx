@@ -336,7 +336,7 @@ export function LedgerAccountView({
         {q.isLoading && <div className="loading">Loading ledger…</div>}
         {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} onPickInvoice={onPickInvoice} maxHeight={maxHeight} party={name} branch={branch} side={side} />}
         {!q.isLoading && view === 'bill' && (
-          <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} branch={branch} cur={cur} maxHeight={maxHeight} />
+          <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} branch={branch} cur={cur} maxHeight={maxHeight} ledgerRows={d?.rows} />
         )}
         {view === 'cc' && <BreakdownBody title="Cost-Centre Split (Domestic / International)" rows={splitRows} loading={splitQ.isLoading} cur={cur} maxHeight={maxHeight} hint="Module cost-centre split of this ledger (Tally sub-ledger level). Drill the full statement from the Ledger tab." />}
         {view === 'comp' && <BreakdownBody title="Fare / Charge Components" rows={compRows} loading={compQ.isLoading} cur={cur} maxHeight={maxHeight} hint="Component breakup (Base Fare, K3, Taxes, Service Charge…) summed from each voucher's fare detail." />}
@@ -378,7 +378,7 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
   // The exploded breakup row beneath a posting (themed like the bill-wise drill).
   const explodeRow = (r, key) => {
     if (/sale|purchase/i.test(r.category || '')) {
-      return <BillBreakup key={`${key}-x`} party={party} branch={r.branch || branch} billVno={r.vno} side={side || 'customer'} cur={cur} colSpan={7} />;
+      return <BillBreakup key={`${key}-x`} party={party} branch={r.branch || branch} billVno={r.vno} side={side || 'customer'} cur={cur} colSpan={7} ledgerRows={d.rows} />;
     }
     const alloc = r.alloc || [];
     const sum = alloc.reduce((t, a) => t + (a.amt || 0), 0);
@@ -536,10 +536,33 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
 /* Tally bill-wise breakup — ONE bill's settlement history (the Shift+Enter drill).
    Themed sub-rows: Date · Type · Ref/Instrument · Amount Dr/Cr (+ narration), with a
    running pending. Lazy — fetched only when a row is exploded. Reused by both views. */
-function BillBreakup({ party, branch, billVno, side, cur, colSpan }) {
+function BillBreakup({ party, branch, billVno, side, cur, colSpan, ledgerRows }) {
   const q = useBillSettlements(party, branch, billVno, side);
-  const d = q.data;
-  const set = (d && d.settlements) || [];
+  const raw = q.data;
+  const rawSet = (raw && raw.settlements) || [];
+  // Cross-check each settlement against the party's OWN ledger postings for that
+  // voucher. A refund/reissue settlement amount can be stale on the backend (a
+  // net-settlement total that dropped the cancellation fee recovered from the
+  // customer — see the ledger-vs-bill-wise mismatch report), while the ledger
+  // statement's Dr/Cr for the same voucher is the true posted amount. Only trust
+  // that substitution when the voucher settled exactly this one bill (alloc.length
+  // <= 1) — otherwise we can't know the correct per-bill split, so leave it as-is.
+  const byRef = new Map();
+  (ledgerRows || []).forEach((r) => {
+    const trueAmt = r.dr > 0 ? r.dr : r.cr;
+    if (!trueAmt) return;
+    const entry = { trueAmt, single: !r.alloc || r.alloc.length <= 1 };
+    if (r.vno) byRef.set(r.vno, entry);
+    if (r.tallyRef) byRef.set(r.tallyRef, entry);
+  });
+  const set = rawSet.map((s) => {
+    const hit = byRef.get(s.ref);
+    return (hit && hit.single && Math.abs(hit.trueAmt - (s.amount || 0)) > 0.01) ? { ...s, amount: hit.trueAmt } : s;
+  });
+  const patched = set.some((s, j) => s !== rawSet[j]);
+  const settled = patched ? Math.round(set.reduce((t, s) => t + (s.amount || 0), 0) * 100) / 100 : raw?.settled;
+  const pending = patched && raw?.bill ? Math.round(((raw.bill.total || 0) - settled) * 100) / 100 : raw?.pending;
+  const d = raw ? { ...raw, settled, pending } : raw;
   return (
     <tr className="exp"><td colSpan={colSpan}>
       <div className="breakup">
@@ -576,7 +599,7 @@ function BillBreakup({ party, branch, billVno, side, cur, colSpan }) {
 }
 
 /* ── Bill-wise + ageing body ─────────────────────────────────────────────── */
-function BillwiseBody({ side, bills, loading, hasBranch, group, name, branch, cur = '₹', maxHeight }) {
+function BillwiseBody({ side, bills, loading, hasBranch, group, name, branch, cur = '₹', maxHeight, ledgerRows }) {
   if (!side) {
     return (
       <>
@@ -593,12 +616,12 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, branch, cu
     );
   }
   if (loading) return <div className="loading">Loading bills…</div>;
-  return <BillwiseTable side={side} bills={bills} name={name} branch={branch} cur={cur} maxHeight={maxHeight} />;
+  return <BillwiseTable side={side} bills={bills} name={name} branch={branch} cur={cur} maxHeight={maxHeight} ledgerRows={ledgerRows} />;
 }
 
 // Bill-wise table with keyboard cursor (↑/↓) + Shift+Enter / click drill into each
 // bill's settlement history. Hooks live here (after BillwiseBody's guards).
-function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
+function BillwiseTable({ side, bills: rawBills, name, branch, cur, maxHeight, ledgerRows }) {
   const [cursor, setCursor] = useState(-1);
   const [open, setOpen] = useState(() => new Set());
   const wrapRef = useRef(null);
@@ -607,6 +630,36 @@ function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
     const row = wrapRef.current.querySelector(`tr[data-billrow="${cursor}"]`);
     if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
   }, [cursor]);
+
+  // Reconcile the open-bills aggregate against the party's own ledger postings — the
+  // same stale-allocation class of bug as the settlement drill (BillBreakup): a
+  // refund/reissue that settled a bill can carry a backend allocation amount below
+  // what it actually posted (dropped cancellation-fee recovery). When a voucher
+  // settled ONLY this one bill, its ledger Dr/Cr minus the stale allocation amount
+  // is the correction to apply to that bill's settled/pending — so the row, the
+  // ageing chart and the summary tiles all agree with the drill-down underneath it.
+  const bills = useMemo(() => {
+    if (!ledgerRows || !ledgerRows.length) return rawBills;
+    const delta = new Map();
+    ledgerRows.forEach((r) => {
+      const alloc = r.alloc || [];
+      if (alloc.length !== 1) return; // multi-bill split — can't safely correct
+      const a = alloc[0];
+      const trueAmt = r.dr > 0 ? r.dr : r.cr;
+      if (!trueAmt || !a || !a.ref) return;
+      const diff = trueAmt - (a.amt || 0);
+      if (Math.abs(diff) <= 0.01) return;
+      delta.set(a.ref, (delta.get(a.ref) || 0) + diff);
+    });
+    if (!delta.size) return rawBills;
+    return rawBills.map((b) => {
+      const dl = delta.get(b.ref);
+      if (!dl) return b;
+      const settled = Math.round((b.settled + dl) * 100) / 100;
+      const pend = Math.round((b.amt - settled) * 100) / 100;
+      return { ...b, settled, pend };
+    });
+  }, [rawBills, ledgerRows]);
 
   // Summary tiles double as filters — click "Unsettled" to work only the bills that
   // still need settling (pend > 0), "Settled" for the knocked-off ones, "Overdue" for
@@ -703,7 +756,7 @@ function BillwiseTable({ side, bills, name, branch, cur, maxHeight }) {
                     <td className={b.age > 0 && b.pend > 0 ? 'over' : ''}>{b.pend > 0 && b.age > 0 ? b.age + ' d' : '—'}</td>
                     <td className="l"><span className={'bw-status ' + scls}>{status}</span></td>
                   </tr>
-                  {isOpen && <BillBreakup party={name} branch={branch} billVno={b.ref} side={side} cur={cur} colSpan={7} />}
+                  {isOpen && <BillBreakup party={name} branch={branch} billVno={b.ref} side={side} cur={cur} colSpan={7} ledgerRows={ledgerRows} />}
                 </React.Fragment>
               );
             })}
