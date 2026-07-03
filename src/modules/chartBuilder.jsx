@@ -81,6 +81,16 @@ export function groupTierCounts(groups = []) {
   }
   return { parents, groups: grps, subGroups: subs };
 }
+// Auto-drill target for a Side-by-Side column: the first child worth expanding — BUT
+// only when the node has NO ledgers of its own. A node that holds ledgers directly
+// (e.g. Capital Account → AD/ND Capital) must show THEM in the Ledger column, not get
+// auto-drilled into a child group that hides them. Returns '' → show this node's own
+// ledgers. Pure. (A click on a child still overrides via the sel state.)
+export function autoChildName(node) {
+  if (!node || (node.ledgers && node.ledgers.length)) return '';
+  const kids = node.children || [];
+  return ((kids.find((c) => (c.children && c.children.length) || (c.ledgers && c.ledgers.length)) || kids[0]) || {}).name || '';
+}
 // "8 common · 4 BOM" style mini-summary for a node's ledger set.
 const countNote = (leds) => {
   const c = leds.filter(isCommon).length, b = leds.length - c;
@@ -293,12 +303,13 @@ export function AccountsTreeView({ branch }) {
     </div>
   );
   // Effective selection — defaults to the first populated node so the Group /
-  // Sub-Group / Ledger columns show immediately (a click still overrides).
+  // Sub-Group / Ledger columns show immediately (a click still overrides). A node
+  // with direct ledgers is NOT auto-drilled (autoChildName), so its own ledgers show.
   const pgName = sel.pg || (roots.find((r) => r.children.length || r.ledgers.length) || roots[0] || {}).name || '';
   const pgNode = pgName ? nodes[pgName] : null;
-  const gName = sel.g || ((pgNode && (pgNode.children.find((c) => c.children.length || c.ledgers.length) || pgNode.children[0])) || {}).name || '';
+  const gName = sel.g || autoChildName(pgNode);
   const gNode = gName ? nodes[gName] : null;
-  const sgName = sel.sg || ((gNode && gNode.children[0]) || {}).name || '';
+  const sgName = sel.sg || autoChildName(gNode);
   const sgNode = sgName ? nodes[sgName] : null;
   const sideView = () => (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
