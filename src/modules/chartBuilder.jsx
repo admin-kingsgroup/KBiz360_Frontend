@@ -70,6 +70,17 @@ export function rollupEntries(node, usage = {}) {
 // Default Ledger-scope for a Branch view: a specific branch shows only its OWN
 // ledgers (Common org-wide ledgers hidden); the consolidated view shows all. Pure.
 export const defaultScopeFor = (branchView) => (branchView && branchView !== 'ALL' ? 'branch' : 'all');
+// Count groups by TIER for the header summary — level 0 = Parent Group, level 1 =
+// Group, level 2+ = Sub-Group. (Counting by `system` folds the custom Groups in with
+// Sub-Groups and drops the 13 system Groups, so it never matched the tree.) Pure.
+export function groupTierCounts(groups = []) {
+  let parents = 0, grps = 0, subs = 0;
+  for (const g of (groups || [])) {
+    const lv = g.level || 0;
+    if (lv === 0) parents++; else if (lv === 1) grps++; else subs++;
+  }
+  return { parents, groups: grps, subGroups: subs };
+}
 // "8 common · 4 BOM" style mini-summary for a node's ledger set.
 const countNote = (leds) => {
   const c = leds.filter(isCommon).length, b = leds.length - c;
@@ -161,8 +172,8 @@ export function AccountsTreeView({ branch }) {
     .filter((l) => (scope === 'all' ? true : scope === 'common' ? isCommon(l) : !isCommon(l)))
     .sort((a, b) => (entriesFor(b) - entriesFor(a)) || (a.name || '').localeCompare(b.name || ''));
 
-  // Header summary counts.
-  const subGroupCount = groups.filter((g) => !g.system).length;
+  // Header summary counts — by TIER (Parent Group ▸ Group ▸ Sub-Group).
+  const tierCounts = groupTierCounts(groups);
   const commonCount = display.filter(isCommon).length;
   const branchCount = display.length - commonCount;
 
@@ -361,7 +372,7 @@ export function AccountsTreeView({ branch }) {
           Branch view
           <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={{ padding: '6px 9px', borderRadius: 6, border: '1px solid #cdd1d8', fontSize: 12, minWidth: 150 }}>
             <option value="ALL">{CONSOLIDATED_LABEL}</option>
-            {BRANCH_CODES.map((b) => <option key={b} value={b}>{b} + Common</option>)}
+            {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
         </label>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
@@ -376,7 +387,7 @@ export function AccountsTreeView({ branch }) {
           {inactiveHidden > 0 && <span style={{ fontSize: 10, fontWeight: 700, color: AMBER, background: AMBER + '18', padding: '1px 6px', borderRadius: 4 }}>{inactiveHidden} hidden</span>}
         </label>
         <span style={{ marginLeft: 'auto', fontSize: 11, color: DIM }}>
-          <b style={{ color: DARK }}>{roots.length}</b> parent groups · <b style={{ color: DARK }}>{subGroupCount}</b> sub-groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)
+          <b style={{ color: DARK }}>{tierCounts.parents}</b> Parent Groups · <b style={{ color: DARK }}>{tierCounts.groups}</b> Groups · <b style={{ color: DARK }}>{tierCounts.subGroups}</b> Sub-Groups <span style={{ color: '#9aa2c0' }}>(org-wide)</span> · <b style={{ color: DARK }}>{display.length}</b> ledgers{scope === 'all' && <> (<b style={{ color: GREY }}>{commonCount}</b> common + <b style={{ color: BLUE }}>{branchCount}</b> branch)</>}
         </span>
       </div>
 
