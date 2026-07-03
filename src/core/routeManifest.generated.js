@@ -24,6 +24,7 @@ export const APP_ROUTES = [
   "/accounts/net-ageing",
   "/accounts/payables-ageing-settlement",
   "/accounts/payment-run",
+  "/accounts/payment-verification",
   "/accounts/receivables-ageing-settlement",
   "/accounts/statistics",
   "/accounts/supplier-reco",

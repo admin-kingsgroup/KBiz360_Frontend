@@ -281,6 +281,8 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
 // (which carries its own Ageing / Settle / Net tabs).
 export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   {label:"Dashboard Accountant", href:"/accounts/dashboard"},
+  // CRM payments submitted by salespeople land here for finance to verify/reject.
+  {label:"Payment Verification (CRM)", href:"/accounts/payment-verification"},
   {label:"Receivables — Ageing & Settlement", href:"/accounts/receivables-ageing-settlement"},
   {label:"Payables — Ageing & Settlement", href:"/accounts/payables-ageing-settlement"},
 

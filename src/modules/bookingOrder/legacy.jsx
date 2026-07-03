@@ -16,7 +16,6 @@ import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { localeOf } from '../../core/format';
-import { todayISO } from '../../core/dates';
 import { PeriodBar, periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../core/api';
@@ -339,7 +338,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Editing an INB deal preloads its counterparty branch; a fresh INB voucher starts empty.
   const [toBranch, setToBranch] = useState(editing && interBranch && editBooking.isInterBranch ? (editBooking.toBranch || '') : '');
   const inbBranches = INB_ALL.filter((b) => b !== brCode);
-  const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch);
+  // BOM bills IGST on its service fee even to an African branch, so a BOM sale is never
+  // a zero-rated export — only other branches' cross-border legs are (seller-side only).
+  const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch) && brCode !== 'BOM';
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
@@ -492,7 +493,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         if (!confirmed) return;
         setError(''); setSaving(true);
         updateInb.mutate({ linkNo: editBooking.linkNo, ...inbBody, editReason: reason }, {
-          onSuccess: () => { setResult({ bookingNo: editBooking.linkNo, _approved: false, _inb: true, _edited: true }); toast(`Inter-branch deal ${editBooking.linkNo} saved — pending approval`); qc.invalidateQueries({ queryKey: ['inb'] }); invalidateBooks(qc); },
+          // Changing the destination branch renumbers the deal (INB/BOM-AMD → INB/BOM-DAR),
+          // so show the number the server actually minted, not the pre-edit one.
+          onSuccess: (data) => { const newLink = data?.linkNo || editBooking.linkNo; setResult({ bookingNo: newLink, _approved: false, _inb: true, _edited: true }); toast(`Inter-branch deal ${newLink} saved — pending approval`); qc.invalidateQueries({ queryKey: ['inb'] }); invalidateBooks(qc); },
           onError: (e) => { setError(e.message || 'Failed to save'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); },
           onSettled: () => setSaving(false),
         });
@@ -802,7 +805,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {interBranch && (
         <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
           🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Fee</b> column. Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
-          {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : 'IGST · inter-state (18% on Service Fee)'}</b>.</>}
+          {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : `IGST · ${inbCrossBorder(brCode, toBranch) ? 'inter-branch' : 'inter-state'} (18% on Service Fee)`}</b>.</>}
           {' '}Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
         </div>
       )}
@@ -810,8 +813,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="SPG Date"><SmartDateInput max={todayISO()} value={date} onChange={setDate} style={inp} /></FL>
-          <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} min={editing ? undefined : todayISO()} style={inp} title="When the customer travels (no past dates) — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
+          <FL label="SPG Date"><SmartDateInput value={date} onChange={setDate} style={inp} /></FL>
+          <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} style={inp} title="When the customer travels — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
           <FL label="Client Type">
             <DropdownMenu
               ariaLabel="Client Type"

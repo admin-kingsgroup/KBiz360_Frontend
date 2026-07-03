@@ -205,7 +205,10 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
                     const [ac,abg]=ageTone(b.ageDays);
                     return (
                       <tr key={b.billVno} style={{borderBottom:"1px solid #dfe2e7"}}>
-                        <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#1a1c22"}}>{b.billVno}</td>
+                        <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#1a1c22"}}>
+                          {b.billVno}
+                          {b.refundsBill&&<div style={{fontFamily:"inherit",fontSize:9,fontWeight:700,color:"#C0651A",marginTop:2}} title={`This credit refunds the over-settled bill ${b.refundsBill}`}>↩ {b.kind==="reissue"?"reissue of":"refund of"} {b.refundsBill}</div>}
+                        </td>
                         <td style={{padding:"8px 12px",fontSize:10.5,color:"#5b616e"}}>{b.date}</td>
                         <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,fontWeight:700,padding:"2px 7px",borderRadius:999,background:abg,color:ac}}>{b.ageDays}d</span></td>
                         <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,b.outstanding)}</td>

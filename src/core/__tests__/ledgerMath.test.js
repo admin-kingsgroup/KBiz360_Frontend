@@ -2,10 +2,30 @@
 // ledger UI, the consolidated branch segmentation, and bill-wise ageing.
 import {
   billwiseSide, isBillwiseLedger, mapLedger, mapBills,
-  groupByBranch, branchSeg, ageingOf, fmt, fmtB, dmy, vtLabel,
+  groupByBranch, branchSeg, ageingOf, fmt, fmtB, dmy, vtLabel, billwiseStatus,
 } from '../ledgerMath';
 
 const r2 = (n) => Math.round((n || 0) * 100) / 100;
+
+describe('billwiseStatus — over-settled bills read Overpaid, not Settled', () => {
+  test.concurrent('over-settled (settled > billed) → Overpaid + the excess amount', async () => {
+    // SF01069: billed 55,460, settled 1,10,290.67 (paid then refunded) → overpaid 54,830.67.
+    const s = billwiseStatus({ amt: 55460, settled: 110290.67, pend: 0, age: 0 });
+    expect(s).toMatchObject({ label: 'Overpaid', cls: 'overpaid', overpaid: true });
+    expect(s.overAmt).toBeCloseTo(54830.67, 2);
+  });
+  test.concurrent('exactly settled → Settled (not Overpaid)', async () => {
+    expect(billwiseStatus({ amt: 55460, settled: 55460, pend: 0, age: 0 })).toMatchObject({ label: 'Settled', cls: 'paid', overpaid: false });
+  });
+  test.concurrent('open + overdue → Nd overdue; partial → Part-paid; fresh → Current', async () => {
+    expect(billwiseStatus({ amt: 1000, settled: 0, pend: 1000, age: 45 })).toMatchObject({ label: '45d overdue', cls: 'over' });
+    expect(billwiseStatus({ amt: 1000, settled: 400, pend: 600, age: 0 })).toMatchObject({ label: 'Part-paid', cls: 'part' });
+    expect(billwiseStatus({ amt: 1000, settled: 0, pend: 1000, age: 0 })).toMatchObject({ label: 'Current', cls: 'curr' });
+  });
+  test.concurrent('a sub-paisa over-settlement is NOT flagged overpaid (tolerance)', async () => {
+    expect(billwiseStatus({ amt: 1000, settled: 1000.005, pend: 0, age: 0 }).overpaid).toBe(false);
+  });
+});
 
 describe('billwiseSide / isBillwiseLedger', () => {
   test.concurrent('debtor group → customer', async () => {
