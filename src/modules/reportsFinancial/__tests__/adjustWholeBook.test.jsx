@@ -1,8 +1,8 @@
-// "Adjust ▸" on the Receivables ageing must open the WHOLE-BOOK Outstanding &
-// On-Account view — all four buckets (on-account receipts incl. RF/ACM AND
-// payments), no `side` scoping and no single-party filter — landing on the
-// On-Account Receipts tab. Locks in the restore of the pre-split behaviour
-// (the retired /finance/outstanding dashboard) for the Adjust shortcut.
+// "Adjust ▸" on the Receivables ageing must open the Outstanding & On-Account
+// view UNSCOPED by side — all four buckets (on-account receipts incl. RF/ACM
+// AND payments) stay reachable — but FOCUSED on the clicked party, so the
+// window shows only that customer's vouchers ("show all parties" clears it).
+// Lands on the On-Account Receipts tab.
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})), apiPost: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../../../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }), { virtual: true });
 jest.mock('../../accountingLive', () => ({ VoucherEditor: () => null }));
@@ -43,7 +43,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ReceivablesLive } from '../legacy';
 
 describe('Adjust ▸ → whole-book Outstanding & On-Account', () => {
-  test('clicking Adjust opens the Settle tab UNSCOPED (no side / no party filter), on the receipts tab', () => {
+  test('clicking Adjust opens the Settle tab side-unscoped but focused on the clicked party', () => {
     render(<ReceivablesLive branch="BOM" setRoute={() => {}} />, { wrapper: MemoryRouter });
 
     fireEvent.click(screen.getByText('Adjust ▸'));
@@ -51,7 +51,7 @@ describe('Adjust ▸ → whole-book Outstanding & On-Account', () => {
     expect(screen.getByText('OUTSTANDING-PROBE')).toBeInTheDocument();
     const p = outstandingProps[outstandingProps.length - 1];
     expect(p.side).toBeUndefined();          // all four buckets — receipts AND payments
-    expect(p.initialParty).toBeUndefined();  // ALL parties' on-account items, unfiltered
+    expect(p.initialParty).toBe('Travkings Tours and Travels DAR'); // ONLY the clicked party's vouchers
     expect(p.initialTab).toBe('recAdv');     // lands on On-Account Receipts
   });
 });
