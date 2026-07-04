@@ -3336,9 +3336,19 @@ export function BspSummary({branch}){
             </p>
           </div>
         </div>
-        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-          {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
-        </select>
+        <StatusMenu
+          ariaLabel="Period"
+          menuRole="listbox"
+          width={160}
+          items={PERIODS.map(p=>({key:p.v,label:p.l,selected:p.v===period,onSelect:()=>setPeriod(p.v)}))}
+          renderTrigger={({ref,toggle,triggerProps})=>(
+            <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+              style={{...inp,display:"flex",alignItems:"center",gap:6,width:"auto",minHeight:32,fontSize:11,cursor:"pointer"}}>
+              {PERIODS.find(p=>p.v===period)?.l}
+              <ChevronDown size={12} style={{color:"#5b616e"}}/>
+            </button>
+          )}
+        />
       </div>
 
       {/* KPI row */}
