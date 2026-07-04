@@ -926,10 +926,10 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       const margin = Math.round((saleNet - purNet) * 100) / 100;
       return {
         key: (sale && sale.vno) || (purchase && purchase.vno), linkNo: inbLink || (sale && sale.vno) || (purchase && purchase.vno),
-        sale, purchase, status: st, rawStatus: raw, pushed, from: lead.branch, to: toOf((sale || lead).party), date: lead.date,
+        sale, purchase, extras: [], status: st, rawStatus: raw, pushed, from: lead.branch, to: toOf((sale || lead).party), date: lead.date,
         module: inbModuleOf(sale || purchase), saleVno: (sale && sale.vno) || '', purchaseVno: (purchase && purchase.vno) || '',
         approvedAt: (sale && (sale.approvedAt || sale.updatedAt)) || '',
-        saleTotal, purTotal: purchase ? Number(purchase.total) || 0 : 0,
+        saleTotal, saleNet, purTotal: purchase ? Number(purchase.total) || 0 : 0,
         margin, gpPct: saleNet > 0 ? Math.round((margin / saleNet) * 1000) / 10 : 0,
       };
     };
@@ -941,6 +941,23 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       if (pur) used.add(pur.vno);
       out.push(mk(sale, pur));
     }
+    // N-PO: attach the remaining purchase legs to their deal by INB link (bookingId /
+    // engine sourceRef) — extra supplier costs under the same Link No. Their nets fold
+    // into the deal's purchase total + margin so the row shows the true folder figures.
+    const linkOfP = (p) => (p.bookingId && /^INB\//.test(p.bookingId) && p.bookingId) || (p.sourceRef && /^INB\//.test(p.sourceRef) && p.sourceRef) || null;
+    for (const p of purchases) {
+      if (used.has(p.vno)) continue;
+      const lk = linkOfP(p);
+      const d = lk && out.find((x) => x.linkNo === lk);
+      if (!d) continue;
+      used.add(p.vno);
+      d.extras.push(p);
+      const extraNet = (Number(p.total) || 0) - (Number(p.taxAmt) || 0);
+      d.purTotal = Math.round((d.purTotal + (Number(p.total) || 0)) * 100) / 100;
+      d.margin = Math.round((d.margin - extraNet) * 100) / 100;
+      d.gpPct = d.saleNet > 0 ? Math.round((d.margin / d.saleNet) * 1000) / 10 : 0;
+    }
+    out.forEach((d) => { if (d.extras.length) d.purchaseVno = `${d.purchaseVno} (+${d.extras.length} leg${d.extras.length > 1 ? 's' : ''})`; });
     for (const p of purchases) if (!used.has(p.vno)) out.push(mk(null, p)); // orphan purchase (no matching sale)
     return out.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.linkNo).localeCompare(String(b.linkNo)));
   }, [rows]);
@@ -971,7 +988,8 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const allKeys = shown.map((d) => d.key);
   const toggleAll = () => setSel((s) => (s.size === allKeys.length ? new Set() : new Set(allKeys)));
   // Only PENDING legs can be approved/rejected; an already-approved leg is skipped.
-  const idsOf = (d) => [d.sale, d.purchase].filter(Boolean).filter((l) => l.status === 'pending').map((l) => l.id || l._id);
+  // Includes any N-PO extra purchase legs so a deal always acts as ONE unit.
+  const idsOf = (d) => [d.sale, d.purchase, ...(d.extras || [])].filter(Boolean).filter((l) => l.status === 'pending').map((l) => l.id || l._id);
   const toggle = (lk) => setSel((s) => { const n = new Set(s); if (n.has(lk)) n.delete(lk); else n.add(lk); return n; });
 
   const doApprove = async (list) => {
