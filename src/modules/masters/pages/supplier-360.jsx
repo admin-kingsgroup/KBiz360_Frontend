@@ -15,7 +15,8 @@ import { useAdmMemos } from '../../../core/useAdmMemos';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { Select, PageSection } from '../../../shell/primitives';
+import { PageSection } from '../../../shell/primitives';
+import { Combobox } from '../../../core/ux/Combobox';
 
 export function Supplier360({ branch }) {
   const cur = bc(branch).cur;
@@ -86,9 +87,15 @@ export function Supplier360({ branch }) {
         <div className="flex w-full flex-wrap items-center gap-3">
           <div className="flex flex-1 items-center gap-2">
             <div className="flex-1"><ReportSearch value={search} onChange={setSearch} placeholder="Voucher / module / destination…" width="100%" /></div>
-            <Select value={selSupplier} onChange={(e) => setSupplier(e.target.value)} disabled={!ALL_SUPPLIERS.length} className="flex-1">
-              {ALL_SUPPLIERS.length ? ALL_SUPPLIERS.map((s) => <option key={s}>{s}</option>) : <option value="">No supplier data yet</option>}
-            </Select>
+            <Combobox
+              ariaLabel="Supplier"
+              value={selSupplier}
+              options={ALL_SUPPLIERS.map((s) => ({ value: s, label: s }))}
+              onChange={setSupplier}
+              disabled={!ALL_SUPPLIERS.length}
+              placeholder={ALL_SUPPLIERS.length ? 'Search suppliers…' : 'No supplier data yet'}
+              className="flex-1"
+            />
           </div>
           <ReportDateBar value={range} onChange={setRange} branch={branch} />
         </div>
