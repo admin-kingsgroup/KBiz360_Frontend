@@ -167,7 +167,7 @@ function FeaturedAction({ node, route, go }) {
    Layout: title-less leaves become a featured action row; the remaining titled
    groups flow into a BALANCED CSS-column masonry (each group is break-inside-avoid)
    so uneven group heights pack tightly instead of leaving ragged grid-row gaps. */
-function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus }) {
+function MegaPanel({ item, route, go, align, anchor, autoFocus }) {
   const panelRef = useRef(null);
   // When opened via keyboard, move focus to the first link in the panel.
   useEffect(() => {
@@ -217,7 +217,7 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus
     // NOTE: this is a navigation panel of links, not an ARIA menu — its children
     // are <button> links (Leaf/FeaturedAction), so we use a labelled group rather
     // than role="menu" (which would require role="menuitem" children).
-    <div role="group" aria-label={`${item.label} menu`} data-mega-menu style={style} onMouseEnter={onEnter} onMouseLeave={onLeave} onKeyDown={onPanelKeyDown}>
+    <div role="group" aria-label={`${item.label} menu`} data-mega-menu style={style} onKeyDown={onPanelKeyDown}>
       <div
         ref={panelRef}
         className="animate-kb-pop rounded-2xl border border-surface-border bg-surface/95 p-4 shadow-pop backdrop-blur-xl"
@@ -259,8 +259,8 @@ function MegaPanel({ item, route, go, align, anchor, onEnter, onLeave, autoFocus
 }
 
 /* Horizontal desktop nav with hover/click mega-menus. The open panel is portaled to
-   <body> (see MegaPanel), so a short close-delay bridges the gap between the nav and
-   the now-detached panel — hovering onto the panel must not dismiss it. */
+   <body> (see MegaPanel) and only closes on an outside click, Escape, a link
+   selection, or a resize — moving the cursor off the nav/panel does not close it. */
 // Shorter labels for the horizontal nav pills only (the mega-panel keeps its full title).
 // Keeps the 8-pill bar from overflowing on laptops — "Taxation — GST" is the long one.
 const NAV_SHORT_LABEL = { 'Taxation — GST': 'Taxation', 'Taxation — VAT': 'Taxation' };
@@ -270,11 +270,8 @@ function DesktopNav({ menu, route, go }) {
   const [anchor, setAnchor] = useState(null);
   const [kbNav, setKbNav] = useState(false); // opened via keyboard → focus into panel
   const ref = useRef(null);
-  const timer = useRef(null);
-  const cancelClose = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
-  const scheduleClose = () => { cancelClose(); timer.current = setTimeout(() => { setOpen(null); setKbNav(false); }, 140); };
-  const openAt = (i, el) => { cancelClose(); setOpen(i); if (el) setAnchor(el.getBoundingClientRect()); };
-  const closeNow = () => { cancelClose(); setOpen(null); setKbNav(false); };
+  const openAt = (i, el) => { setOpen(i); if (el) setAnchor(el.getBoundingClientRect()); };
+  const closeNow = () => { setOpen(null); setKbNav(false); };
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') closeNow(); };
@@ -299,7 +296,7 @@ function DesktopNav({ menu, route, go }) {
   const openAlign = open != null && open >= menu.length - 2 ? 'right' : 'left'; // keep right-most panels on-screen
 
   return (
-    <nav ref={ref} aria-label="Primary" className="hidden min-w-0 items-center gap-0.5 desktop:flex" onMouseLeave={scheduleClose}>
+    <nav ref={ref} aria-label="Primary" className="hidden min-w-0 items-center gap-0.5 desktop:flex">
       {menu.map((item, i) => {
         const hasChildren = !!item.children;
         const active = hasChildren ? containsRoute(item, route) : route === item.href;
@@ -333,7 +330,7 @@ function DesktopNav({ menu, route, go }) {
       })}
       {openItem && openItem.children && (
         <MegaPanel item={openItem} route={route} go={goClose} align={openAlign} anchor={anchor}
-          onEnter={cancelClose} onLeave={scheduleClose} autoFocus={kbNav} />
+          autoFocus={kbNav} />
       )}
     </nav>
   );
