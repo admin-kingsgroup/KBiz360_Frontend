@@ -112,13 +112,15 @@ export function ArApSettlementView({ side, totals = {}, rows = [], formatMoney =
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
         {model.metrics.map((m) => {
           const on = active === m.key;
+          const bar = toneColor[m.tone] || C.brand;
           return (
             <button key={m.key} type="button" onClick={() => setActive(m.key)} aria-pressed={on}
-              style={{ flex: '1 1 140px', minWidth: 132, textAlign: 'left', cursor: 'pointer',
-                border: `1px solid ${on ? C.brand : C.line}`, borderRadius: 10, padding: '9px 12px',
-                background: on ? C.brandSoft : '#fff', boxShadow: on ? `inset 0 0 0 1px ${C.brand}` : 'none' }}>
-              <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: on ? C.brand : C.muted }}>{m.label}</div>
-              <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4, color: toneColor[m.tone] }}>{fm(m.value)}</div>
+              style={{ position: 'relative', overflow: 'hidden', flex: '1 1 140px', minWidth: 132, textAlign: 'left', cursor: 'pointer',
+                border: `1px solid ${on ? C.brand : C.line}`, borderRadius: 8, padding: '14px 12px 10px',
+                background: '#fff', boxShadow: on ? `0 0 0 1px ${C.brand}, 0 1px 2px rgba(16,18,22,0.04)` : '0 1px 2px rgba(16,18,22,0.04)' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: bar }} />
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: on ? C.brand : C.muted }}>{m.label}</div>
+              <div style={{ fontSize: 19, fontWeight: 700, marginTop: 6, color: toneColor[m.tone] }}>{fm(m.value)}</div>
             </button>
           );
         })}
