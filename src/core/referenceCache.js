@@ -105,7 +105,6 @@ function profileToCfg(p) {
     voucherPrefix: p.voucherPrefix || p.code,
     secondaryCur: p.secondaryCurSym || '',
     secondaryCurCode: p.secondaryCurrency || '',
-    isHO: !!p.isHO,
   };
 }
 export function setBranchCfg(profiles) {
@@ -139,7 +138,6 @@ function deriveCfgFromBranch(code) {
     voucherPrefix: code,
     secondaryCur: '',
     secondaryCurCode: (b.currencies && b.currencies[1]) || '',
-    isHO: !!b.isHO,
   };
 }
 

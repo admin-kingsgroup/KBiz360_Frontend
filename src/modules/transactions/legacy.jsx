@@ -35,6 +35,7 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
+import { billDuesSummary } from '../../core/voucher/ui';
 import { clickable } from '../../core/ux/clickable';
 import { Menu as StatusMenu } from '../../core/ux/Menu';
 import { listKeyNav } from '../../core/ux/listKeys';
@@ -139,25 +140,32 @@ export function VPlaceOfSupply({mode,onChange}){
 // for posting. `amount` is the gross settlement value (clears the bill's gross
 // outstanding); `onAcc` is the remainder deliberately parked as an advance.
 export function allocSummary(alloc,amount,parkOnAcc,mode){
+  // NET of entries: negative entries are adjust-credits (drawing down a bill's
+  // Overpaid excess) that free extra settling capacity for the positive rows —
+  // so the net (not gross) is what caps at the voucher amount.
   const allocated=_r2(Object.values(alloc||{}).reduce((s,v)=>s+(+v||0),0));
   if(mode==="onaccount") return {allocated:0,un:0,onAcc:_r2(amount),valid:amount>0,count:0};
   const un=_r2(amount-allocated);
   const onAcc=(un>0.001&&parkOnAcc)?un:0;
-  const count=Object.values(alloc||{}).filter(v=>(+v||0)>0).length;
-  const valid=amount>0&&allocated>0&&allocated<=amount+0.001&&(un<=0.001||parkOnAcc);
+  const count=Object.values(alloc||{}).filter(v=>Math.abs(+v||0)>0.001).length;
+  const valid=amount>0&&count>0&&allocated<=amount+0.001&&(un<=0.001||parkOnAcc);
   return {allocated,un,onAcc,valid,count};
 }
 
 // Bill-wise allocation panel (Receipt / Payment) — open bills with ageing, an
 // allocate box + "Full" per bill, an Against-Bills / On-Account mode toggle and a
 // summary foot. Controlled by the parent voucher form. Mirrors the HTML panel.
-export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode,onMode,parkOnAcc,onParkOnAcc,cur,heading,itemLabel,emptyHint,isRefund}){
+export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode,onMode,parkOnAcc,onParkOnAcc,cur,heading,itemLabel,emptyHint,isRefund,vDate}){
   const bills=q?.data?.bills||[];
   const advances=q?.data?.advances||0;
-  const {allocated,un,onAcc}=allocSummary(alloc,amount,parkOnAcc,mode);
+  const {allocated,un,onAcc,count}=allocSummary(alloc,amount,parkOnAcc,mode);
   const settleWord=side==="supplier"?"payment":"receipt";
-  const showOnAccToggle=mode==="bills"&&un>0.001&&allocated>0&&allocated<=amount+0.001;
+  const showOnAccToggle=mode==="bills"&&un>0.001&&count>0&&allocated<=amount+0.001;
   const ageTone=(d)=>d<=7?["#16a34a","#e8f6ed"]:d<=30?["#d97706","#fbeedb"]:["#dc2626","#fbe9e9"];
+  // Adjust-credit in play: the (negative) entries on Overpaid rows, shown positive.
+  // It adds settling capacity, so the dues strip nets it into "after this" live.
+  const creditUsed=_r2(-Object.values(alloc||{}).reduce((s,v)=>s+Math.min(+v||0,0),0));
+  const dues=billDuesSummary(bills,vDate,(+amount||0)+creditUsed);
 
   return (
     <div style={{border:"1px solid #cdd1d8",borderRadius:10,overflow:"hidden",marginBottom:12}}>
@@ -177,6 +185,24 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
           </div>
         </div>
       </div>
+
+      {/* Party dues strip — overdue as on the voucher date, what stays overdue after
+          this settlement, the total open balance, and any Overpaid credit (excess on
+          over-settled bills, owed back to the party — shown, never silently netted).
+          Hidden in refund/advances mode (the rows there are receipts, not bills). */}
+      {!isRefund&&party&&bills.length>0&&(
+        <div style={{display:"flex",gap:22,flexWrap:"wrap",padding:"8px 14px",background:"#fffdf5",borderBottom:"1px solid #cdd1d8"}}>
+          {[["Overdue as on "+(vDate||"today"),vf2(cur,dues.overdueAsOn),"#dc2626"],
+            [`Overdue after this ${settleWord}`,vf2(cur,dues.overdueAfter),dues.overdueAfter>0.005?"#dc2626":"#16a34a"],
+            ["Total open bills",vf2(cur,dues.totalOpen),"#1a1c22"],
+            ...(dues.overpaidCredit>0.005?[["Overpaid credit (owed back)","−"+vf2(cur,dues.overpaidCredit),"#C0651A"]]:[])].map(([l,v,c],i)=>(
+            <div key={i}>
+              <p style={{margin:0,fontSize:8.5,fontWeight:700,letterSpacing:"0.5px",color:"#5b616e",textTransform:"uppercase"}}>{l}</p>
+              <p style={{margin:"2px 0 0",fontSize:13.5,fontWeight:800,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {mode==="onaccount"?(
         <div style={{padding:"20px 16px",textAlign:"center"}}>
@@ -211,18 +237,35 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
                         </td>
                         <td style={{padding:"8px 12px",fontSize:10.5,color:"#5b616e"}}>{b.date}</td>
                         <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,fontWeight:700,padding:"2px 7px",borderRadius:999,background:abg,color:ac}}>{b.ageDays}d</span></td>
-                        <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{vf2(cur,b.outstanding)}</td>
+                        <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>
+                          {b.status==="overpaid"
+                            ? <span title={`Settled ${vf2(cur,b.allocated)} against ${vf2(cur,b.total)} billed — ${vf2(cur,b.overpaidAmt)} is the party's credit`} style={{color:"#C0651A"}}>−{vf2(cur,b.overpaidAmt)}</span>
+                            : vf2(cur,b.outstanding)}
+                        </td>
                         <td style={{padding:"8px 12px",textAlign:"center"}}>
-                          {b.overpaid
+                          {b.overpaid||b.status==="overpaid"
                             ? <span title="This bill was settled for more than billed — the excess is payable back to the party" style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,textTransform:"uppercase",background:"#fff1e0",color:"#C0651A"}}>Overpaid</span>
                             : <span style={{fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:999,textTransform:"uppercase",
                                 background:b.status==="partial"?"#fbeedb":"#fbe9e9",color:b.status==="partial"?"#d97706":"#dc2626"}}>{isRefund?(b.status==="partial"?"Part-refunded":"To refund"):b.status}</span>}
                         </td>
                         <td style={{padding:"6px 12px",textAlign:"right",whiteSpace:"nowrap"}}>
-                          <input type="number" min="0" max={b.outstanding} value={alloc[b.billVno]||""} placeholder="0"
-                            onChange={e=>onSetAlloc(b.billVno,e.target.value,b.outstanding)}
-                            style={{...inp,width:104,display:"inline-block",textAlign:"right",fontWeight:600,minHeight:28}}/>
-                          <button onClick={()=>onFull(b.billVno,b.outstanding)} style={{border:"none",background:"transparent",color:"#c2a04a",fontSize:10,fontWeight:700,cursor:"pointer",textDecoration:"underline",marginLeft:6,fontFamily:"inherit"}}>Full</button>
+                          {b.status==="overpaid"
+                            /* Adjust-credit: the value entered is how much of this bill's
+                               Overpaid excess to USE (shown positive, stored negative) —
+                               it frees that much extra to allocate on the other rows. */
+                            ? <>
+                                <input type="number" min="0" max={b.overpaidAmt} value={alloc[b.billVno]?Math.abs(alloc[b.billVno]):""} placeholder="0"
+                                  title="Use this bill's Overpaid excess to settle other bills"
+                                  onChange={e=>onSetAlloc(b.billVno,-(+e.target.value||0),-b.overpaidAmt)}
+                                  style={{...inp,width:104,display:"inline-block",textAlign:"right",fontWeight:600,minHeight:28,color:"#C0651A"}}/>
+                                <button onClick={()=>onFull(b.billVno,-b.overpaidAmt)} style={{border:"none",background:"transparent",color:"#C0651A",fontSize:10,fontWeight:700,cursor:"pointer",textDecoration:"underline",marginLeft:6,fontFamily:"inherit"}}>Full</button>
+                              </>
+                            : <>
+                                <input type="number" min="0" max={b.outstanding} value={alloc[b.billVno]||""} placeholder="0"
+                                  onChange={e=>onSetAlloc(b.billVno,e.target.value,b.outstanding)}
+                                  style={{...inp,width:104,display:"inline-block",textAlign:"right",fontWeight:600,minHeight:28}}/>
+                                <button onClick={()=>onFull(b.billVno,b.outstanding)} style={{border:"none",background:"transparent",color:"#c2a04a",fontSize:10,fontWeight:700,cursor:"pointer",textDecoration:"underline",marginLeft:6,fontFamily:"inherit"}}>Full</button>
+                              </>}
                         </td>
                       </tr>
                     );
@@ -235,7 +278,7 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
           {/* summary foot */}
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap",padding:"10px 14px",background:"#f4f5f7",borderTop:"1.5px solid #1a1c22"}}>
             <div style={{display:"flex",gap:22,flexWrap:"wrap"}}>
-              {[["Voucher Amount",vf2(cur,amount),"#1a1c22"],["Allocated",vf2(cur,allocated),"#c2a04a"],["Unallocated",vf2(cur,_r2(un-onAcc)),(_r2(un-onAcc)>0.001?"#dc2626":"#16a34a")],...(onAcc>0?[["On Account",vf2(cur,onAcc),"#d97706"]]:[])].map(([l,v,c],i)=>(
+              {[["Voucher Amount",vf2(cur,amount),"#1a1c22"],...(creditUsed>0.005?[["Credit adjusted",vf2(cur,creditUsed),"#C0651A"]]:[]),["Allocated",vf2(cur,allocated),"#c2a04a"],["Unallocated",vf2(cur,_r2(un-onAcc)),(_r2(un-onAcc)>0.001?"#dc2626":"#16a34a")],...(onAcc>0?[["On Account",vf2(cur,onAcc),"#d97706"]]:[])].map(([l,v,c],i)=>(
                 <div key={i}><p style={{margin:0,fontSize:8.5,fontWeight:700,letterSpacing:"0.5px",color:"#5b616e",textTransform:"uppercase"}}>{l}</p><p style={{margin:"2px 0 0",fontSize:13.5,fontWeight:800,color:c,fontVariantNumeric:"tabular-nums"}}>{v}</p></div>
               ))}
             </div>

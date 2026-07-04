@@ -255,6 +255,9 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     if (f.type === 'bool') return v ? <span style={{ color: GREEN, fontWeight: 700 }}>✓</span> : <span style={{ color: '#c2c8d6' }}>—</span>;
     if (f.type === 'tags') return Array.isArray(v) ? v.join(', ') || '—' : (v || '—');
     if (f.type === 'number') return v ? Number(v).toLocaleString('en-IN') : '—';
+    // A wired/system ledger (locked) carries the `~*` marker on its name — ~ = engine-
+    // wired, * = non-editable/non-deletable (changed only in the database).
+    if (f.key === 'name' && r.locked) return (<>{v || '—'} <span title="Wired ledger — locked; editable only directly in the database" style={{ color: '#dc2626', fontWeight: 800, fontSize: 11 }}>~*</span></>);
     return v || '—';
   };
 
@@ -567,7 +570,8 @@ export const LedgersMaster = ({ branch }) => {
         params={branchView !== 'ALL' ? { branch: branchView, includeInactive: 'true' } : { includeInactive: 'true' }}
         toolbar={toolbar}
         rowFilter={ledgerRowFilter}
-        note="Set Group to the Primary Group / Primary Sub Group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. All ledgers are owned by the BOM branch."
+        lockedRow={(r) => r.locked}
+        note="Set Group to the Primary Group / Primary Sub Group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. All ledgers are owned by the BOM branch. Ledgers marked ~* are WIRED to the posting/tax/inter-branch engine — locked (🔒) in every branch: they cannot be created, edited, deleted or deactivated from the app and change only directly in the database."
         fields={[
           // Code is server-allocated (<BRANCH>-MN-NNNN) — read-only, never typed
           // (matches the Chart-of-Accounts ledger editor). Was editable + required,

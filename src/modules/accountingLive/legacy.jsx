@@ -16,6 +16,7 @@ import { openLedgerModal } from '../../core/LedgerModalHost';
 import { usePrefs } from '../../core/prefs';
 import { pushModal } from '../../core/ux/modalStore';
 import { clickable } from '../../core/ux/clickable';
+import { useNavFocus, useNavFocusStore } from '../../core/ux/navFocus';
 import { usePager, Pager } from '../../core/ux/pager';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
 import { contraLedgerName, lineNarration } from '../../core/cashBookRows';
@@ -791,6 +792,13 @@ export function LedgerAcLive({ branch }) {
     window.addEventListener('kb:open-ledger', onOpen);
     return () => window.removeEventListener('kb:open-ledger', onOpen);
   }, [setPref]);
+  // Deep-link via nav-focus (e.g. Travkings Group Table View drill → tap a balance):
+  // setNavFocus('/ledger', { name }) then navigate here → open that ledger once, then clear.
+  const navLedger = useNavFocus('/ledger');
+  useEffect(() => {
+    const n = navLedger && navLedger.name;
+    if (n) { setPick(n); setShown(n); setPref('lastLedger', n); useNavFocusStore.getState().clear(); }
+  }, [navLedger, setPref]);
   const [voucher, setVoucher] = useState(null); // clicked Voucher No → editable voucher modal
   const closeVoucher = () => setVoucher(null);
   useEffect(() => (voucher ? pushModal(closeVoucher) : undefined), [voucher]); // Esc closes the voucher modal

@@ -3,6 +3,7 @@
    the server-side branch scoping (auth.middleware enforceBranchScope) 403s every
    branch-scoped read. pickBranchForUser is the single picker both paths use. */
 import { pickBranchForUser, isFullScope } from '../branchScope';
+import { BRANCHES } from '../data';
 
 beforeEach(() => { try { localStorage.removeItem('kb360-branch'); } catch { /* ignore */ } });
 
@@ -44,6 +45,18 @@ describe('pickBranchForUser', () => {
     const b = pickBranchForUser(null);
     expect(b).toBeTruthy();
     expect(typeof b === 'object' ? b.code : b).toBeTruthy();
+  });
+});
+
+describe('six equal peers — no Head Office (isHO removed)', () => {
+  test('no branch in the reference set carries an isHO flag', () => {
+    BRANCHES.forEach((b) => expect(b).not.toHaveProperty('isHO'));
+  });
+
+  // With no Head-Office branch to skip, a full-scope user with nothing saved simply
+  // defaults to the first branch — proving default selection no longer keys off isHO.
+  test('full-scope user with no saved branch defaults to the first branch', () => {
+    expect(pickBranchForUser(null)).toMatchObject({ code: BRANCHES[0].code });
   });
 });
 

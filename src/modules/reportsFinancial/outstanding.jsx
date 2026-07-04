@@ -76,6 +76,23 @@ function SettleModal({ adv, side, branch, cur, onClose }) {
               </thead>
               <tbody>
                 {open.map((b) => {
+                  // An OVER-settled bill rides in as the party's credit (ledger shows it
+                  // Overpaid) — visible for context, but nothing can be allocated to it.
+                  if (b.status === 'overpaid') {
+                    return (
+                      <tr key={b.billVno} className="text-xs">
+                        <td className="border-b border-surface-alt px-2.5 py-1.5 font-semibold text-[#185FA5]">{b.billVno}</td>
+                        <td className="border-b border-surface-alt px-2.5 py-1.5">{b.date}</td>
+                        <td className="border-b border-surface-alt px-2.5 py-1.5 text-right font-bold tabular-nums text-[#C0651A]"
+                          title={`Settled ${money(cur, b.allocated)} against ${money(cur, b.total)} billed — the excess is the party's credit`}>
+                          −{money(cur, b.overpaidAmt)}
+                        </td>
+                        <td colSpan={2} className="border-b border-surface-alt px-2.5 py-1.5">
+                          <span className="rounded-full bg-[#fff1e0] px-2 py-0.5 text-[9px] font-extrabold uppercase text-[#C0651A]">Overpaid</span>
+                        </td>
+                      </tr>
+                    );
+                  }
                   const max = r2(Math.min(b.outstanding, (Number(amts[b.billVno]) || 0) + Math.max(0, remaining)));
                   return (
                     <tr key={b.billVno} className="text-xs">

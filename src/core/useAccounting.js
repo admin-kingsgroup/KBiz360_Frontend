@@ -69,6 +69,45 @@ export function useLedgerUsage(branch) {
   });
 }
 
+// Travkings Group View — branch-parity of the whole chart of accounts. Org-wide
+// (not branch-scoped): returns { branches, parentGroups, groups, subGroups, ledgers }
+// with a per-branch 4-way state (used/dormant/local/absent) + posting counts and
+// */~* provenance flags. Powers the "Travkings Group View" tab in the Accounts Tree.
+export function useBranchParity() {
+  return useQuery({
+    queryKey: ['accounting', 'branch-parity'],
+    queryFn: () => apiGet('/api/accounting/branch-parity'),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}
+
+// Travkings Group Table View — count summary. Returns { branches, groups:{parent,
+// group,sub each {fixed,wired,nf,total}}, ledgers:[{branch,fixed,wired,nf,
+// deactivated,total}], ledgerTotals }. Org-wide; totals include deactivated.
+export function useBranchParitySummary() {
+  return useQuery({
+    queryKey: ['accounting', 'branch-parity-summary'],
+    queryFn: () => apiGet('/api/accounting/branch-parity-summary'),
+    enabled: enabled(),
+    staleTime: 60_000,
+  });
+}
+
+// Drill-down for the Travkings Group Table View — the ledgers/groups behind a
+// tapped count cell. `scope` = { tier, branch, cat } (branch only for tier 'ledger').
+// Lazily enabled: fires only when a scope is set. Ledger items carry count +
+// branch-scoped closingBalance + code (for the Master ?edit= jump).
+export function useBranchParityDrill(scope) {
+  const on = !!(scope && scope.tier);
+  return useQuery({
+    queryKey: ['accounting', 'branch-parity-drill', scope?.tier || '', scope?.branch || '', scope?.cat || ''],
+    queryFn: () => apiGet('/api/accounting/branch-parity-drill', { tier: scope.tier, branch: scope.branch, cat: scope.cat }),
+    enabled: on && enabled(),
+    staleTime: 60_000,
+  });
+}
+
 export function useProfitAndLoss(branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({
@@ -515,11 +554,17 @@ export function useRegisterSummary(branch, { category, from, to } = {}) {
 // `mode` (optional) — 'advances' returns the party's open RECEIPTS (leftover per
 // receipt), shaped as bills, so a Payment voucher can refund a Sundry Debtor's
 // on-account money by settling against specific receipts. Default → open bills.
-export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false, mode) {
+// `includeOverpaid` (default TRUE) — ALSO receive over-settled bills (status
+// 'overpaid', outstanding 0, `overpaidAmt` = the party's credit). Every UI that
+// lists a party's bills must show that credit — its invisibility is exactly how an
+// Overpaid bill (ledger) went missing from the Receipt edit modal. Rows stay
+// non-allocatable (outstanding 0), so allocation math is unaffected; pass false
+// ONLY for a consumer that must strictly mirror the raw settle math.
+export function useOpenBills(party, branch, side = 'customer', excludeId, includeSettled = false, mode, includeOverpaid = true) {
   const code = branchCode(branch);
   return useQuery({
-    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open', mode || 'bills'],
-    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, mode, includeSettled: includeSettled ? '1' : undefined }),
+    queryKey: ['vouchers', 'open-bills', code || 'all', side, party || '', excludeId || '', includeSettled ? 'all' : 'open', mode || 'bills', includeOverpaid ? 'op' : ''],
+    queryFn: () => apiGet('/api/vouchers/open-bills', { party, branch: code, side, excludeId, mode, includeSettled: includeSettled ? '1' : undefined, includeOverpaid: includeOverpaid ? '1' : undefined }),
     enabled: enabled() && !!party && !!code,
     staleTime: 15_000,
   });

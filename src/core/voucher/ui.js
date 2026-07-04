@@ -55,13 +55,34 @@ export const escHtml = (s) =>
 // registry (toBody/validate) can compute it without importing transactions.jsx.
 // `amount` is the gross settlement value; `onAcc` is the parked advance remainder.
 export function allocSummary(alloc, amount, parkOnAcc, mode) {
+  // `allocated` is the NET of the entries: negative entries are adjust-credits
+  // (drawing down a bill's Overpaid excess), which free extra settling capacity
+  // for the positive rows — so net (not gross) is what caps at the voucher amount.
   const allocated = r2(Object.values(alloc || {}).reduce((s, v) => s + (+v || 0), 0));
   if (mode === 'onaccount') return { allocated: 0, un: 0, onAcc: r2(amount), valid: amount > 0, count: 0 };
   const un = r2(amount - allocated);
   const onAcc = (un > 0.001 && parkOnAcc) ? un : 0;
-  const count = Object.values(alloc || {}).filter((v) => (+v || 0) > 0).length;
-  const valid = amount > 0 && allocated > 0 && allocated <= amount + 0.001 && (un <= 0.001 || parkOnAcc);
+  const count = Object.values(alloc || {}).filter((v) => Math.abs(+v || 0) > 0.001).length;
+  const valid = amount > 0 && count > 0 && allocated <= amount + 0.001 && (un <= 0.001 || parkOnAcc);
   return { allocated, un, onAcc, valid, count };
+}
+
+// Party dues context for the bill-wise panel — the figures an accountant checks
+// before settling: how much is OVERDUE as on the voucher date (bills whose due
+// date — bill date + credit days — falls on/before it), how much of that stays
+// overdue after this settlement, the party's total open balance, and any OVERPAID
+// credit (over-settled bills' excess — a standing credit owed back to the party,
+// shown but never silently netted into the dues). Pure, so the panel and tests
+// share one source of truth.
+export function billDuesSummary(bills, vDate, amount) {
+  const ref = (() => { const d = vDate ? new Date(vDate) : new Date(); return Number.isNaN(+d) ? new Date() : d; })();
+  const isDue = (b) => { const d = new Date(b.date); if (Number.isNaN(+d)) return true; d.setDate(d.getDate() + (+b.creditDays || 0)); return d <= ref; };
+  const sum = (arr) => r2(arr.reduce((s, b) => s + (+b.outstanding || 0), 0));
+  const overdueAsOn = sum((bills || []).filter(isDue));
+  const totalOpen = sum(bills || []);
+  const overdueAfter = r2(Math.max(0, overdueAsOn - (+amount || 0)));
+  const overpaidCredit = r2((bills || []).reduce((s, b) => s + (+b.overpaidAmt || 0), 0));
+  return { overdueAsOn, overdueAfter, totalOpen, overpaidCredit };
 }
 
 // Whether the counter-account on a Receipt / Payment settles bill-wise, and against

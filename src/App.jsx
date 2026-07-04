@@ -119,11 +119,9 @@ export default function KB360App(){
      We only honour a saved branch the current user may actually see — "ALL" is
      limited to full-scope roles, and a specific branch must be in the user's
      allowed list (full-scope users see all). If the saved value is missing or no
-     longer permitted, we fall back to the user's first allowed *operating*
-     branch. We skip the Head-Office (isHO) branch as a default because HO holds
-     no transactional data (vouchers are posted at the operating branches), so
-     defaulting to it would blank every branch-scoped dashboard/report. HO stays
-     selectable in the switcher; it's just never the implicit default. ── */
+     longer permitted, we fall back to the user's first allowed branch. All six
+     branches are equal peers (no Head Office), so any allowed branch is a valid
+     default. ── */
   const [branch,setBranch]=useState(()=>pickBranchForUser(restoredUser));
   /* ── Route + history, bridged onto react-router-dom ──────────────────────
      The URL is now the single source of truth: deep links resolve, and the
@@ -630,7 +628,7 @@ export default function KB360App(){
     //   (overlapping read-only viewers) — were removed here.
     if(route==="/masters/groups")        return <GroupsMaster/>;                 // Groups door — Create/Alter/Display groups & sub-groups (3-tier)
     if(route==="/masters/ledgers")       return <LedgersMaster branch={branch}/>;// Ledgers door — live CRUD (cascading Group ▸ Sub-Group)
-    if(route==="/masters/accounts-tree" || route==="/masters/chart-builder") return <AccountsTreeView branch={branch}/>;  // Chart of Accounts (Display): Primary Group ▸ Group ▸ Sub-Group ▸ Ledger tree
+    if(route==="/masters/accounts-tree" || route==="/masters/chart-builder") return <AccountsTreeView branch={branch} setRoute={navigate} setBranch={setBranch}/>;  // Chart of Accounts (Display): Primary Group ▸ Group ▸ Sub-Group ▸ Ledger tree
     if(route==="/masters/voucher-types")   return <VoucherTypesMaster/>;
     if(route==="/masters/cost-categories") return <CostCategoriesMaster/>;
     if(route==="/masters/budgets")         return <BudgetsMaster/>;

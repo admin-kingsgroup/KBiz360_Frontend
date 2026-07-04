@@ -103,7 +103,7 @@ export function ExpenseBudget({branch,setRoute}){
                 fontWeight:brCode===b.code?700:400,
                 background:brCode===b.code?"#0d1326":"#fff",
                 color:brCode===b.code?"#d4a437":"#5a6691"}}>
-              {b.flag} {b.code}<span style={{marginLeft:5,padding:"1px 6px",background:b.isHO?"#d4a437":"#e1e3ec",color:b.isHO?"#0d1326":"#5a6691",borderRadius:3,fontSize:8.5,fontWeight:700,letterSpacing:"0.3px"}}>{b.isHO?"Main Branch":"Branch"}</span>
+              {b.flag} {b.code}<span style={{marginLeft:5,padding:"1px 6px",background:"#e1e3ec",color:"#5a6691",borderRadius:3,fontSize:8.5,fontWeight:700,letterSpacing:"0.3px"}}>Branch</span>
             </button>
           ))}
         </div>

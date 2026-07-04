@@ -19,6 +19,7 @@ import { localeOf } from '../../core/format';
 import { PeriodBar, periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../core/api';
+import { useApprovalChain, nextActionFor, StageChip } from '../../core/approvalChain';
 import { useOpenInb, useBookInb, useCreateInb, useUpdateInb } from '../../core/useInterBranchVoucher';
 import { useVNo } from '../../core/useNextNo';
 
@@ -42,7 +43,7 @@ import {
 } from '../../core/voucherSpecs.js';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
-import { invalidateBooks, useVoucherApprovals, useApproveMany, useRejectVoucher } from '../../core/useAccounting';
+import { invalidateBooks, useVoucherApprovals, useApproveMany, useApproveVoucher, useRejectVoucher } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
@@ -1371,7 +1372,7 @@ function PostingTable({ side, accent, title }) {
   return <JvBlock title={title} sub={`${side.vno || ''}${side.type ? ' · ' + side.type : ''}`} postings={side.postings} color={accent} />;
 }
 
-function JournalView({ id, cur }) {
+function JournalView({ id, cur, date }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['booking-journal', id],
     queryFn: () => apiGet('/api/booking-orders/' + id + '/journal'),
@@ -1394,6 +1395,7 @@ function JournalView({ id, cur }) {
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 11.5, color: '#5b616e' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'monospace', fontWeight: 700, color: BLUE }}><Link2 size={13} /> {data.linkNo}</span>
+        {date && <span>Voucher Date: <b style={{ color: DARK }}>{date}</b></span>}
         <span>Gross Profit: <b style={{ color: DR }}>{cur} {fmt(data.gp?.total)}</b> ({data.gp?.pct ?? 0}%)</span>
         <span style={{ fontStyle: 'italic', color: '#9A9A9A' }}>journal entries that {data.status === 'approved' || data.status === 'posted' ? 'were posted' : 'will post on approval'}</span>
       </div>
@@ -1459,14 +1461,15 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onInvoice, busyId, sel, onToggleSel }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onEditPax, onInvoice, busyId, sel, onToggleSel }) {
+  const chainCfg = useApprovalChain(); // three-level chain assignees (drives the stage-aware button)
   const cols = mode === 'approved'
-    ? ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
+    ? ['', 'Booking No', 'Voucher Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
-      ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Date', 'Reason']
+      ? ['', 'Booking No', 'Link No', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Voucher Date', 'Reason']
       : mode === 'deleted'
         ? ['', 'Booking No', 'Link No', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Deleted', 'By']
-        : ['', 'Booking No', 'Booking Date', 'Link No', 'Tally Ref', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Actions'];
+        : ['', 'Booking No', 'Voucher Date', 'Link No', 'Tally Ref', 'Module', 'Customer', 'Supplier', 'Sale', 'Purchase', 'GP', 'GP %', 'Actions'];
   // The four money columns drive both header right-alignment and the group-summary
   // colSpans; derive their start from the header so adding lead columns can't misalign them.
   const numStart = cols.indexOf('Sale');
@@ -1528,11 +1531,22 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                   {mode !== 'pending' && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>}
                   <td style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
                     {mode === 'pending' ? (
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <StageChip e={b} />
                         <button disabled={busyId === b.id} onClick={() => onEdit(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>
-                        <button disabled={busyId === b.id || !!b.validation?.hasErrors} onClick={() => onApprove(b)} title={b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : ''} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: b.validation?.hasErrors ? '#cfd6e4' : DR, cursor: b.validation?.hasErrors ? 'not-allowed' : 'pointer' }}>
-                          {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
-                        </button>
+                        {(() => {
+                          // Stage-aware chain action: Check (L1) → Verify (L2) → Approve & Post (L3).
+                          const na = nextActionFor(b, chainCfg);
+                          if (na.action !== 'approve') {
+                            return <button disabled={busyId === b.id || !na.allowed} onClick={() => onReview && onReview(b, na.action)} title={na.hint} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: !na.allowed ? '#cfd6e4' : (na.action === 'check' ? BLUE : GOLD), cursor: na.allowed ? 'pointer' : 'not-allowed' }}>
+                              {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {na.label}
+                            </button>;
+                          }
+                          const ok = !b.validation?.hasErrors && na.allowed;
+                          return <button disabled={busyId === b.id || !ok} onClick={() => onApprove(b)} title={!na.allowed ? na.hint : (b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : 'Level 3 — posts to the books')} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: ok ? DR : '#cfd6e4', cursor: ok ? 'pointer' : 'not-allowed' }}>
+                            {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
+                          </button>;
+                        })()}
                         <button disabled={busyId === b.id} onClick={() => onCancel(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><XCircle size={12} /> Reject</button>
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} title="Delete — remove from Pending, view-only (number not reusable)" style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: '#dc2626' }}><Trash2 size={12} /> Delete</button>}
                       </div>
@@ -1541,9 +1555,10 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                       // returns it to Pending (edit there, then re-approve under the SAME
                       // numbers). Revoke is approver-only; Delete is admin-only.
                       <div style={{ display: 'flex', gap: 6 }}>
+                        {onEditPax && sp && <button disabled={busyId === b.id} onClick={() => onEditPax(b)} title="Edit passenger details (names / ticket & document refs / sectors) in place — amounts unchanged, booking stays approved. No revoke needed." style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit Pax</button>}
                         {canRevoke && onRevoke && <button disabled={busyId === b.id} onClick={() => onRevoke(b)} title="Revoke — un-post the Sales/Purchase and return this booking to Pending so it can be edited & re-approved (numbers kept)" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: GOLD, borderColor: '#e3cd97' }}><RotateCcw size={12} /> Revoke</button>}
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={12} /> Delete</button>}
-                        {!(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
+                        {!(onEditPax && sp) && !(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
                       </div>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#9197a3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
@@ -1560,7 +1575,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                         {!b.noSupplier && <button onClick={() => onInvoice(b, 'purchase')} style={{ ...btnGh, padding: '4px 10px', fontSize: 10.5 }}>📄 Purchase Invoice</button>}
                       </div>
                     )}
-                    <JournalView id={b.id} cur={cur} />
+                    <JournalView id={b.id} cur={cur} date={b.date} />
                   </td></tr>
                 )}
               </React.Fragment>
@@ -1640,12 +1655,14 @@ export function PendingBookings({ branch, setRoute }) {
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
     try {
       const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] });
-      setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`);
+      setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : ''}.`);
       setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] });
       invalidateBooks(qc); // each posting spawns Sale+Purchase journals → refresh every books cache
     } catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); }
     finally { setBusyId(null); }
   };
+  const onReview = makeBookingReview(qc, setBusyId, setMsg);
+  const onReviewSelected = makeBookingReviewSelected(qc, setBusyId, setMsg, sel, setSel);
 
   return (
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
@@ -1663,14 +1680,38 @@ export function PendingBookings({ branch, setRoute }) {
         {rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('check')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>Check selected ({sel.size})</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('verify')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: GOLD, borderColor: '#e3cd97' }}>Verify selected ({sel.size})</button>}
             {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {busyId === 'bulk' ? 'Approving…' : `Approve selected (${sel.size})`}</button>}
           </span>
         )}
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
     </div>
   );
 }
+
+// Shared Check/Verify handlers for the booking queues — levels 1 & 2 of the
+// three-level chain (no books impact; the server enforces stage + eligibility).
+const makeBookingReview = (qc, setBusyId, setMsg) => async (b, action) => {
+  setBusyId(b.id);
+  try {
+    await apiPost(`/api/booking-orders/${b.id}/review`, { action });
+    setMsg(`✓ ${action === 'check' ? 'Checked (L1)' : 'Verified (L2)'} ${b.bookingNo} — ${action === 'check' ? 'awaiting Verify' : 'awaiting final Approval'}.`);
+    qc.invalidateQueries({ queryKey: ['booking-orders'] });
+  } catch (e) { setMsg('⚠ ' + (e.message || `${action} failed`)); }
+  finally { setBusyId(null); }
+};
+const makeBookingReviewSelected = (qc, setBusyId, setMsg, sel, setSel) => async (action) => {
+  if (!sel.size) return;
+  setBusyId('bulk');
+  try {
+    const res = await apiPost('/api/booking-orders/review-many', { ids: [...sel], action });
+    setMsg(`✓ ${action === 'check' ? 'Checked' : 'Verified'} ${res.done} of ${res.total}${res.failed ? ` · ${res.failed} failed${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : ''}.`);
+    setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] });
+  } catch (e) { setMsg('⚠ ' + (e.message || `${action} failed`)); }
+  finally { setBusyId(null); }
+};
 
 const isAdminRole = (u) => ['Super Admin', 'Director'].includes(u?.role);
 // Revoking un-posts a posted booking — approver-level roles only (the server enforces
@@ -1701,6 +1742,100 @@ function makeOnRevoke({ qc, setBusyId, setOpen, toastFn }) {
   };
 }
 
+// ── Edit passenger details on an APPROVED booking ────────────────────────────
+// Identity-only fix — names, document refs (Ticket/PNR, Hotel/Conf, Passport…)
+// and Flight sectors — saved in place via POST /:id/passengers. The server applies
+// ONLY these identity columns, so amounts/ledgers can't change: the booking stays
+// approved and its posted Sales/Purchase stay posted. No Revoke → Edit → re-Approve
+// cycle for a name typo.
+function EditPaxModal({ booking, onClose, onSaved }) {
+  const spec = VSPECS[booking.module];
+  const [rows, setRows] = useState(() => (Array.isArray(booking.rows) ? booking.rows : []).map((r) => JSON.parse(JSON.stringify(r || {}))));
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  useModalEsc(onClose, true);
+  if (!spec) return null;
+  const setId = (i, key, val) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
+  const setSector = (i, si, key, val) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: (r.sectors || []).map((s, sx) => (sx === si ? { ...s, [key]: val } : s)) } : r)));
+  const addSector = (i) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: [...(r.sectors || []), Object.fromEntries(spec.sectorCols.map((c) => [c.key, '']))] } : r)));
+  const delSector = (i, si) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: (r.sectors || []).filter((_, sx) => sx !== si) } : r)));
+  const save = async () => {
+    setSaving(true); setErr('');
+    try {
+      await apiPost('/api/booking-orders/' + booking.id + '/passengers', { rows, editReason: reason });
+      toast('Passenger details saved — booking stays approved & posted');
+      onSaved();
+    } catch (e) { setErr(e.message || 'Save failed'); setSaving(false); }
+  };
+  const smallInp = { ...inp, height: 30, fontSize: 12, padding: '4px 8px' };
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,19,38,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: 'min(860px, 96vw)', maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(13,19,38,.28)', padding: '18px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 15, color: DARK, display: 'flex', alignItems: 'center', gap: 7 }}><Pencil size={15} style={{ color: BLUE }} /> Edit passenger details · {booking.bookingNo}</h3>
+            <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#5b616e' }}>
+              {spec.icon} {spec.name} · Link <b style={{ fontFamily: 'monospace' }}>{booking.linkNo}</b> · saved in place — <b>amounts are untouched and the booking stays approved</b> (no revoke needed).
+            </p>
+          </div>
+          <button onClick={onClose} style={{ ...btnGh, padding: '4px 10px' }}>✕</button>
+        </div>
+        {err && <div style={{ margin: '10px 0', padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>{err}</div>}
+        {!rows.length && <div style={{ padding: 18, fontSize: 12, color: '#9197a3' }}>This booking has no passenger grid to edit (legacy import). Use Revoke → Edit for changes.</div>}
+        {rows.map((l, i) => (
+          <div key={i} style={{ border: '1px solid #e3e6ee', borderRadius: 8, padding: '10px 12px', marginTop: 10, background: '#fbfaf7' }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#9197a3', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Passenger {i + 1}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${spec.idCols.length}, minmax(140px, 1fr))`, gap: 8 }}>
+              {spec.idCols.map((c) => (
+                <label key={c.key} style={{ fontSize: 10.5, color: '#5b616e', fontWeight: 600 }}>{c.label}
+                  <input value={l[c.key] ?? ''} onChange={(e) => setId(i, c.key, e.target.value)} style={{ ...smallInp, marginTop: 3, width: '100%' }} />
+                </label>
+              ))}
+            </div>
+            {spec.sectors && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#9197a3', textTransform: 'uppercase', letterSpacing: '.5px' }}>Sectors / Tickets</span>
+                  <button onClick={() => addSector(i)} style={{ ...btnGh, padding: '2px 8px', fontSize: 10 }}><Plus size={11} /> Sector</button>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 640 }}>
+                    <thead><tr>{spec.sectorCols.map((c) => <th key={c.key} style={{ padding: '3px 6px', fontSize: 9.5, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', textAlign: 'left' }}>{c.label}</th>)}<th /></tr></thead>
+                    <tbody>
+                      {(l.sectors || []).map((s, si) => (
+                        <tr key={si}>
+                          {spec.sectorCols.map((c) => (
+                            <td key={c.key} style={{ padding: 2 }}>
+                              {c.type === 'date'
+                                ? <SmartDateInput value={s[c.key] ?? ''} onChange={(v) => setSector(i, si, c.key, v)} style={{ ...smallInp, width: '100%' }} />
+                                : <input value={s[c.key] ?? ''} onChange={(e) => setSector(i, si, c.key, e.target.value)} style={{ ...smallInp, width: '100%' }} />}
+                            </td>
+                          ))}
+                          <td style={{ padding: 2 }}><button onClick={() => delSector(i, si)} title="Remove sector" style={{ ...btnGh, padding: '4px 7px', color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={11} /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {rows.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+            <label style={{ flex: 1, minWidth: 260, fontSize: 10.5, color: '#5b616e', fontWeight: 600 }}>Reason (audit trail — optional)
+              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Name spelling corrected per passport" style={{ ...smallInp, marginTop: 3, width: '100%' }} />
+            </label>
+            <button onClick={onClose} disabled={saving} style={btnGh}>Cancel</button>
+            <button onClick={save} disabled={saving} style={btnG}>{saving ? <RefreshCw size={13} className="spin" /> : <Save size={13} />} Save passenger details</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const brCode = brCodeOf(branch) || 'ALL';
   const cur = bc(branch).cur;
@@ -1709,6 +1844,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const [open, setOpen] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [groupBy, setGroupBy] = useState('none');
+  const [paxEdit, setPaxEdit] = useState(null); // booking whose passenger details are being edited in place
   const canDelete = isAdminRole(currentUser);
   const canRevoke = isApproverRole(currentUser);
   const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: toast });
@@ -1738,7 +1874,9 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
         <button onClick={() => setRoute && setRoute('/bookings/pending')} style={btnGh}><Clock size={14} /> View pending</button>
       </div>
       <div style={{ marginBottom: 12 }}><GroupByBar value={groupBy} onChange={setGroupBy} extra={[['recent', 'Recently Approved']]} /></div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} busyId={busyId} />
+      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="approved" groupBy={groupBy} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onEditPax={setPaxEdit} busyId={busyId} />
+      {paxEdit && <EditPaxModal booking={paxEdit} onClose={() => setPaxEdit(null)}
+        onSaved={() => { setPaxEdit(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); /* voucher meta.detail changed → refresh voucher views */ }} />}
     </div>
   );
 }
@@ -1783,8 +1921,10 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
   const cur = bc(branch).cur;
   const isApprover = isApproverRole(currentUser);
   const q = useVoucherApprovals(branch, status, { refundScope: 'sopogp' });
-  const approveMany = useApproveMany();
+  const approveOne = useApproveVoucher();
   const reject = useRejectVoucher();
+  const qc = useQueryClient();
+  const chainCfg = useApprovalChain(); // three-level chain assignees (Check → Verify → Approve)
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState(null); // fix a blocked refund voucher in place, then approve
   useModalEsc(() => setEditId(null), !!editId);
@@ -1796,17 +1936,28 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
       .filter((e) => !needle || [e.vno, e.party, e.againstInvoice, e.linkNo, String(Math.round(e.total || 0))].filter(Boolean).join(' ').toLowerCase().includes(needle));
   }, [q.data, needle]);
 
-  // A refund/reissue is one voucher — approve/reject it on its own (shared voucher
-  // mutations, exactly like the INB Refunds section).
+  // A refund/reissue is one voucher — approve/reject it on its own (exactly like the
+  // INB Refunds section). Single-voucher approve (NOT approveMany) so the backend's
+  // real refusal ("Awaiting Check…", validation error) reaches the toast instead of
+  // being flattened to "failed to post".
   const doApprove = async (e) => {
     const { confirmed } = await confirmDialog({ title: `Approve refund ${e.vno}?`, message: 'Posts this refund / reissue to the books (reverses the linked sale).', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusy(true);
-    approveMany.mutate({ ids: [e.id], approver: 'admin' }, {
-      onSuccess: (res) => { const f = (res && res.failed) || 0; toast(f ? `${e.vno} failed to post` : `Approved ${e.vno}`, f ? 'error' : 'success'); },
-      onError: (err) => toast((err && err.message) || 'Approve failed', 'error'),
-      onSettled: () => setBusy(false),
-    });
+    try { await approveOne.mutateAsync({ id: e.id, approver: 'admin' }); toast(`Approved ${e.vno} — posted to the books`); }
+    catch (err) { toast(`${e.vno}: ${(err && err.message) || 'failed to post'}`, 'error'); }
+    finally { setBusy(false); }
+  };
+  // Levels 1 & 2 of the chain (no books impact) — the server enforces stage order
+  // and who may act; these buttons only route the click. Mirrors the Vouchers queue.
+  const doReview = async (e, action) => {
+    setBusy(true);
+    try {
+      await apiPost(`/api/vouchers/${e.id}/review`, { action });
+      toast(action === 'check' ? `Checked ${e.vno} (level 1) — awaiting Verify` : `Verified ${e.vno} (level 2) — awaiting final Approval`);
+      qc.invalidateQueries({ queryKey: ['vouchers'] });
+    } catch (err) { toast((err && err.message) || `${action} failed`, 'error'); }
+    finally { setBusy(false); }
   };
   const doReject = async (e) => {
     const { confirmed, reason } = await confirmDialog({ title: `Reject refund ${e.vno}?`, message: 'Marks it Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
@@ -1829,7 +1980,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
         : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead><tr style={{ background: '#f3f4f8' }}>
-              {['Vch No', 'Reverses (Sale)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
+              {['Vch No', 'Voucher Date', 'Reverses (Sale)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
                 <th key={i} style={{ ...th, textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
               ))}
             </tr></thead>
@@ -1840,19 +1991,30 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                     {e.vno}
                     <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>{e.category === 'reissue' ? 'RI' : 'RF'}</span>
                   </td>
+                  <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', fontSize: 11, color: '#5b616e' }}>{e.date || '—'}</td>
                   <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5b616e' }}>{e.againstInvoice || e.linkNo || '—'}</td>
                   <td style={{ padding: '7px 12px' }}>{e.party || '—'}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><RefundAmountCell entry={e} cur={cur} fmt={fmt} /></td>
                   {pendingTab
                     ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                        {isApprover ? <>
+                        <StageChip e={e} />
+                        {isApprover && <>
                           {/* Edit in place (reuses the shared voucher editor); saving reverts it to
-                              Pending, then Approve. Lets an approver fix a blocked refund inline. */}
-                          <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this refund / reissue voucher, then approve" style={{ marginRight: 6, padding: '5px 10px', background: '#fff', color: BLUE, border: `1px solid ${BLUE}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
-                          <button disabled={busy || !e.postable} title={e.postable ? '' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving')} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: e.postable ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: e.postable ? 'pointer' : 'not-allowed' }}>Approve</button>
-                          <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>
-                          {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
-                        </> : <span style={{ fontSize: 11, color: '#9197a3' }}>Approver only</span>}
+                              Pending, then re-enter the chain. Lets an approver fix a blocked refund inline. */}
+                          <button disabled={busy} onClick={() => setEditId(e.id)} title="Edit this refund / reissue voucher, then approve" style={{ margin: '0 6px', padding: '5px 10px', background: '#fff', color: BLUE, border: `1px solid ${BLUE}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>✎ Edit</button>
+                        </>}
+                        {(() => {
+                          // Stage-aware action (mirrors the Vouchers queue): Check (L1, anyone in
+                          // branch) → Verify (L2) → Approve & Post (L3). Server re-enforces all gates.
+                          const na = nextActionFor(e, chainCfg);
+                          if (na.action !== 'approve') {
+                            return <button disabled={busy || !na.allowed} title={na.hint} onClick={() => doReview(e, na.action)} style={{ margin: isApprover ? 0 : '0 0 0 6px', marginRight: 6, padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? BLUE : GOLD) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                          }
+                          const ok = e.postable && na.allowed;
+                          return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                        })()}
+                        {isApprover && <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
+                        {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
                       </td>
                     : <td style={{ padding: '7px 12px', color: '#5b616e', textTransform: 'capitalize' }}>{e.status}</td>}
                 </tr>
@@ -1976,9 +2138,11 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
     const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
-    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
+    try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Bulk approve failed')); } finally { setBusyId(null); }
   };
+  const onReview = makeBookingReview(qc, setBusyId, setMsg);
+  const onReviewSelected = makeBookingReviewSelected(qc, setBusyId, setMsg, sel, setSel);
 
   const tab = (k, label) => (
     <button key={k} onClick={() => setStatus(k)} className="max-tablet:min-h-[44px]" style={{ padding: '8px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `3px solid ${status === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? DARK : '#5b616e' }}>{label} <span style={{ fontSize: 11, color: '#9197a3' }}>({counts[k]})</span></button>
@@ -2014,6 +2178,8 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
         {status === 'pending' && rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('check')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>Check selected ({sel.size})</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('verify')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: GOLD, borderColor: '#e3cd97' }}>Verify selected ({sel.size})</button>}
             {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {busyId === 'bulk' ? 'Approving…' : `Approve selected (${sel.size})`}</button>}
           </span>
         )}
@@ -2021,7 +2187,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       {status === 'edited'
         ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
         : <>
-            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
             <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
           </>}
     </div>
