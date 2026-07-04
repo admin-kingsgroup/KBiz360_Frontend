@@ -94,6 +94,20 @@ export function useBranchParitySummary() {
   });
 }
 
+// Drill-down for the Travkings Group Table View — the ledgers/groups behind a
+// tapped count cell. `scope` = { tier, branch, cat } (branch only for tier 'ledger').
+// Lazily enabled: fires only when a scope is set. Ledger items carry count +
+// branch-scoped closingBalance + code (for the Master ?edit= jump).
+export function useBranchParityDrill(scope) {
+  const on = !!(scope && scope.tier);
+  return useQuery({
+    queryKey: ['accounting', 'branch-parity-drill', scope?.tier || '', scope?.branch || '', scope?.cat || ''],
+    queryFn: () => apiGet('/api/accounting/branch-parity-drill', { tier: scope.tier, branch: scope.branch, cat: scope.cat }),
+    enabled: on && enabled(),
+    staleTime: 60_000,
+  });
+}
+
 export function useProfitAndLoss(branch, { from, to } = {}) {
   const code = branchCode(branch);
   return useQuery({

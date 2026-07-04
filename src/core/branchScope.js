@@ -15,8 +15,8 @@ export function isFullScope(user) {
 
 // Pick a branch the given user may actually use. Honour the last-saved branch
 // ('kb360-branch') when it's still in scope (full-scope users may use any branch,
-// incl. "ALL"), else fall back to the user's first allowed *operating* (non-HO)
-// branch. HO holds no transactional data, so it's never the implicit default.
+// incl. "ALL"), else fall back to the user's first allowed branch. All six
+// branches are equal peers, so the first allowed one is a fine default.
 //
 // Why this is shared between login and refresh: a fresh login used to keep
 // whatever branch happened to be in memory — often "ALL" or a previous user's
@@ -36,9 +36,8 @@ export function pickBranchForUser(user) {
     }
   } catch { /* ignore */ }
   if (Array.isArray(codes) && codes.length) {
-    const b = BRANCHES.find((x) => codes.includes(x.code) && !x.isHO)
-          ||  BRANCHES.find((x) => codes.includes(x.code));
+    const b = BRANCHES.find((x) => codes.includes(x.code));
     if (b) return b;
   }
-  return BRANCHES.find((x) => !x.isHO) || BRANCHES[0];
+  return BRANCHES[0];
 }
