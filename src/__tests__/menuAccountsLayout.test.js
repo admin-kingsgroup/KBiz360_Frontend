@@ -16,6 +16,7 @@ describe('Accounts pill — reorganized layout', () => {
     const labels = MENU_ACCOUNTS.children.map((c) => c.label);
     expect(labels).toEqual([
       'Dashboard Accountant',
+      'Payment Verification (CRM)',
       'Receivables — Ageing & Settlement',
       'Payables — Ageing & Settlement',
       'Daily Entry',
