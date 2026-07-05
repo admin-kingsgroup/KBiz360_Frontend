@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // api/inbox pulls in core/api (Vite import.meta) → mock it for this container test.
@@ -34,5 +34,30 @@ describe('InboxBadgeLive', () => {
     const { container } = renderWith(<InboxBadgeLive currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
     await waitFor(() => expect(getInbox).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
+  });
+
+  test('clicking the badge opens the dropdown listing the pending items', async () => {
+    getInbox.mockResolvedValue({ count: 2, items: [
+      { _id: '1', type: 'credit_limit', branch: 'BOM', maker: { name: 'Sughra' } },
+      { _id: '2', type: 'config', branch: 'AMD', maker: { name: 'Faiz' } },
+    ] });
+    renderWith(<InboxBadgeLive currentUser={{ role: 'Director' }} setRoute={() => {}} />);
+    const btn = await screen.findByRole('button', { name: /2 pending approvals/i });
+    expect(btn).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(screen.getByText('Credit limit')).toBeInTheDocument();   // item rendered via InboxPanel
+    expect(screen.getByText(/Sughra/)).toBeInTheDocument();
+  });
+
+  test('"View all" navigates to the Approvals Inbox and closes the dropdown', async () => {
+    const setRoute = jest.fn();
+    getInbox.mockResolvedValue({ count: 1, items: [{ _id: '1', type: 'flag', branch: null, maker: { name: 'Faiz' } }] });
+    renderWith(<InboxBadgeLive currentUser={{ role: 'Super Admin' }} setRoute={setRoute} />);
+    fireEvent.click(await screen.findByRole('button', { name: /1 pending approvals/i }));
+    fireEvent.click(screen.getByRole('button', { name: /view all in approvals inbox/i }));
+    expect(setRoute).toHaveBeenCalledWith('/tk/approvals');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();   // dropdown closed
   });
 });
