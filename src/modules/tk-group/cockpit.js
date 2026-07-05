@@ -33,6 +33,8 @@ export function controlCockpitMenu() {
       { label: 'Suppliers', href: '/masters/suppliers' },
     ] },
     { label: 'HR Control', icon: Users, children: [
+      { label: 'HR Requests', href: '/tk/hr-control' },
+      { divider: true, label: 'HR screens' },
       { label: 'Employees', href: '/hr/employees' },
       { label: 'Payroll', href: '/hr/payroll' },
       { label: 'Attrition', href: '/hr/attrition' },
@@ -42,12 +44,10 @@ export function controlCockpitMenu() {
       { label: 'Branch Scorecard', href: '/tk/scorecard' },
       { label: 'Performance vs Target', href: '/tk/performance' },
       { label: 'Investment & Capital', href: '/tk/investment' },
+      { label: 'Profitability', href: '/tk/profitability' },
+      { label: 'Receivables & Payables', href: '/tk/receivables-payables' },
       { label: 'Exceptions & Risk', href: '/tk/exceptions' },
       { label: 'Compliance & Close', href: '/tk/compliance' },
-      { divider: true, label: 'More dashboards' },
-      { label: 'Branch Performance', href: '/dashboards/branch' },
-      { label: 'Profitability (P&L)', href: '/dashboards/profitability' },
-      { label: 'Receivables & Payables', href: '/dashboards/arap' },
     ] },
     { label: 'Monitoring', icon: Activity, children: [
       { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
@@ -58,10 +58,12 @@ export function controlCockpitMenu() {
   ];
 }
 
-// Routes reachable inside TK Group Central: the /tk control pages plus the oversight
-// dashboards and master/HR governance screens surfaced in the cockpit. Anything else
-// (branch data-entry, branch books/registers) is out of the control mode.
-const COCKPIT_PREFIXES = ['/tk/', '/dashboards/', '/masters/', '/hr/'];
+// Routes reachable inside TK Group Central: the /tk control pages, the oversight
+// dashboards and master/HR governance screens surfaced in the cockpit, PLUS the cross-
+// cutting pages the app bar / user menu offer everywhere (personal profile & prefs
+// under /settings, and Support). Only branch-OPERATIONAL pages (data-entry, branch
+// books/registers, tax) are out of the control mode and bounce back to Control Tower.
+const COCKPIT_PREFIXES = ['/tk/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/'];
 export function isCockpitRoute(route) {
   return !!route && (route === '/dashboard' || COCKPIT_PREFIXES.some((p) => route.startsWith(p)));
 }

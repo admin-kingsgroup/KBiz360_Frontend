@@ -17,6 +17,7 @@ const LABELS = {
   investment: 'Investment request',
   // governance surfaces
   target_budget: 'Target / Budget',
+  hr: 'HR request',
 };
 
 /** Human label for a change-request type. */

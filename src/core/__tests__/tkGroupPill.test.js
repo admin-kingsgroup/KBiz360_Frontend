@@ -18,8 +18,8 @@ const labels = (roots) => (roots || []).map((r) => r && r.label);
 const CENTRAL = { role: 'Super Admin' };
 const CONTROL_ROUTES = [
   '/tk/control-tower', '/tk/approvals', '/tk/decisions', '/tk/onboarding', '/tk/controls', '/tk/period-locks',
-  '/tk/targets', '/tk/master-control', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/exceptions',
-  '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/go-live', '/tk/my-role',
+  '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability',
+  '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/go-live', '/tk/my-role',
 ];
 
 describe('TK Group Central — control cockpit mode', () => {
@@ -50,7 +50,7 @@ describe('TK Group Central — control cockpit mode', () => {
 
   test('every TK Group page stays controllable in Page Visibility Control', () => {
     const keys = new Set(allPageKeys());
-    for (const leaf of ['/tk/my-role', '/tk/go-live', '/tk/approvals', '/tk/onboarding', '/tk/controls', '/tk/period-locks', '/tk/targets', '/tk/master-control', '/tk/control-tower', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit']) {
+    for (const leaf of ['/tk/my-role', '/tk/go-live', '/tk/approvals', '/tk/onboarding', '/tk/controls', '/tk/period-locks', '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/control-tower', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability', '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit']) {
       expect(keys.has(leaf)).toBe(true);
     }
   });

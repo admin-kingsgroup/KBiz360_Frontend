@@ -437,7 +437,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #cdd1d8', marginBottom: 12 }}>
-        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('parity', 'Travkings Group View')}{tabBtn('paritytable', 'Travkings Group Table View')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
+        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('parity', 'TK Group Central View')}{tabBtn('paritytable', 'TK Group Central Table')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
         {tab === 'tree' && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, padding: '4px 0' }}>
             <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊞ Expand all</button>

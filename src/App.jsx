@@ -67,7 +67,7 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
@@ -461,6 +461,9 @@ export default function KB360App(){
     if(route==="/tk/compliance")         return <TkCompliancePage/>;
     if(route==="/tk/performance")        return <TkPerformancePage/>;
     if(route==="/tk/investment")         return <TkInvestmentPage/>;
+    if(route==="/tk/profitability")      return <TkProfitabilityPage/>;
+    if(route==="/tk/receivables-payables") return <TkArapPage/>;
+    if(route==="/tk/hr-control")         return <TkHRControlPage/>;
     if(route==="/hr/portal")               return <HRPortal setRoute={navigate}/>;
     if(route==="/hr/leave-apply")          return <LeaveApply/>;
     if(route==="/hr/reimbursement")        return <ReimbursementClaim/>;

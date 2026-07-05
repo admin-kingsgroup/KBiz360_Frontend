@@ -16,6 +16,9 @@ import { ExceptionsRisk } from './ExceptionsRisk';
 import { ComplianceClose } from './ComplianceClose';
 import { PerformanceTargets } from './PerformanceTargets';
 import { InvestmentDashboard } from './InvestmentDashboard';
+import { Profitability } from './Profitability';
+import { ReceivablesPayables } from './ReceivablesPayables';
+import { HRControl } from './HRControl';
 import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
 
@@ -167,6 +170,30 @@ export function TkInvestmentPage() {
   return (
     <Page title="Investment & Capital" subtitle="Each branch's capital invested, investments, loans, capital employed and profit — branchwise, in native currency, never consolidated into a group total.">
       <InvestmentDashboard />
+    </Page>
+  );
+}
+
+export function TkProfitabilityPage() {
+  return (
+    <Page title="Profitability" subtitle="Each branch's P&L — Revenue, Cost, Gross Profit, GP%, Expenses, Net Profit and NP% — branchwise, in native currency, never consolidated.">
+      <Profitability />
+    </Page>
+  );
+}
+
+export function TkArapPage() {
+  return (
+    <Page title="Receivables & Payables" subtitle="Each branch's outstanding — receivables (with 90d+ overdue), payables and the net — branchwise, in native currency, never consolidated.">
+      <ReceivablesPayables />
+    </Page>
+  );
+}
+
+export function TkHRControlPage() {
+  return (
+    <Page title="HR Requests" subtitle="Raise an HR governance item centrally — new hire, salary revision, payroll release. Filed as a Farhan + Owner change-request; nothing is actioned in HR until approved.">
+      <HRControl />
     </Page>
   );
 }
