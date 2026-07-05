@@ -10,25 +10,25 @@ const hrefsOf = (nodes, out = []) => {
   return out;
 };
 
-describe('getVisibleMenu — group-aware nav', () => {
-  test('group view (ALL) strips per-branch data-entry items', () => {
+describe('getVisibleMenu — TK Group Central vs branch', () => {
+  test('TK Group Central (ALL + central) shows the control cockpit, not the branch ERP', () => {
     const hrefs = hrefsOf(getVisibleMenu('ALL', { role: 'Super Admin' }));
-    // data-entry screens make no sense in the consolidated view → removed
-    expect(hrefs).not.toContain('/receipts');
-    expect(hrefs).not.toContain('/payments');
-    expect(hrefs).not.toContain('/bookings/new');
-    // non-entry pages (reports, approvals) still there
-    expect(hrefs).toContain('/transactions/approvals');
+    expect(hrefs).toContain('/tk/control-tower');           // the cockpit is the nav
+    expect(hrefs).not.toContain('/receipts');               // book-less: no data-entry
+    expect(hrefs).not.toContain('/transactions/approvals'); // no branch ERP
+    expect(hrefs).not.toContain('/reports/pnl');
   });
 
-  test('a real branch keeps data-entry (identical behaviour to getMenu)', () => {
+  test('a real branch shows the branch ERP with data-entry, not the cockpit', () => {
     const hrefs = hrefsOf(getVisibleMenu({ code: 'BOM' }, { role: 'Super Admin' }));
     expect(hrefs).toContain('/receipts');
     expect(hrefs).toContain('/bookings/new');
+    expect(hrefs).not.toContain('/tk/control-tower');       // control is group-level only
   });
 
-  test('object-form ALL branch is treated as group mode too', () => {
+  test('object-form ALL is TK Group Central too (cockpit)', () => {
     const hrefs = hrefsOf(getVisibleMenu({ code: 'ALL' }, { role: 'Super Admin' }));
+    expect(hrefs).toContain('/tk/control-tower');
     expect(hrefs).not.toContain('/receipts');
   });
 });

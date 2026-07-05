@@ -8,7 +8,6 @@ import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
 import { isPageAccessAdmin, isOwnerDashboardUser } from './pageCatalog';
-import { FULL_SCOPE_ROLES } from './branchScope';
 /* (Removed dead imports of Recruitment from './helpers' and Dashboard from
    '../modules/dashboard' — only their string labels/hrefs are used in the menu
    tree, never the component values. Dropping them also keeps the menu out of
@@ -472,12 +471,18 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"Go-Live", href:"/tk/go-live"},
   {divider:true, label:"Governance"},
   {label:"Approvals Inbox", href:"/tk/approvals"},
+  {label:"Onboarding", href:"/tk/onboarding"},
   {label:"Control Flags", href:"/tk/controls"},
   {label:"Period Locks", href:"/tk/period-locks"},
   {label:"Targets & Budgets", href:"/tk/targets"},
   {label:"Master Control", href:"/tk/master-control"},
   {divider:true, label:"Monitoring"},
   {label:"Control Tower", href:"/tk/control-tower"},
+  {label:"Branch Scorecard", href:"/tk/scorecard"},
+  {label:"Performance vs Target", href:"/tk/performance"},
+  {label:"Investment & Capital", href:"/tk/investment"},
+  {label:"Exceptions & Risk", href:"/tk/exceptions"},
+  {label:"Compliance & Close", href:"/tk/compliance"},
   {label:"Branch Cockpit", href:"/tk/branch-cockpit"},
   {label:"Audit Trail", href:"/tk/audit"},
 ]};
@@ -678,10 +683,11 @@ export function fullMenuRoots(branch, currentUser){
   // roles (Owner / Director / Finance Manager / Sr. Accounts Executive). Oversight-only
   // roles (GM/BM) and branch execs don't get it. Its pages stay in Page Visibility
   // Control regardless (MENU_TK_GROUP is an export the catalogue auto-discovers).
-  const central = FULL_SCOPE_ROLES.includes(role) ? [MENU_TK_GROUP] : [];
-  // Decisions (Farhan's stream) sits next to Approvals for everyone; TK Group (central
-  // control) only for the governance roles.
-  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, ...central, MENU_ADMIN, MENU_SUPPORT];
+  // NOTE: the TK Group control layer is NOT a pill in the branch ERP. It's a MODE —
+  // selecting "TK Group Central" in the branch selector enters the control cockpit
+  // (see modules/tk-group/menu.js → getVisibleMenu). Here we only keep Decisions as a
+  // branch pill so branches can RAISE credit/funds/onboarding/investment requests.
+  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN, MENU_SUPPORT];
 }
 
 // The menu roots a user's ROLE exposes, BEFORE their personal hidden/granted lists.

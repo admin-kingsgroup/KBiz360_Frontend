@@ -67,9 +67,11 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
+import { isCockpitRoute } from './modules/tk-group/cockpit';
+import { FULL_SCOPE_ROLES } from './core/branchScope';
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/reportsFinancial/financialStatements'));
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsFinancial/reportsNotes'));
 const { Statistics } = lazyModule(() => import('./modules/reports/statistics'));
@@ -154,6 +156,15 @@ export default function KB360App(){
   const goBack = useCallback(()=>rrNavigate(-1), [rrNavigate]);
   const goForward = useCallback(()=>rrNavigate(1), [rrNavigate]);
   const navValue={ route, navigate, goBack, goForward, canBack:histIdx>0, canForward:histIdx<maxIdxRef.current };
+
+  // TK Group Central mode: a central role selecting the consolidated entity ENTERS the
+  // control cockpit. Land them on the Control Tower and keep them on control routes —
+  // the branch ERP isn't shown in this mode (see modules/tk-group/menu.js).
+  useEffect(()=>{
+    const central = FULL_SCOPE_ROLES.includes(currentUser?.role || '');
+    const groupMode = branch === 'ALL' || (branch && branch.code === 'ALL');
+    if (central && groupMode && route && !isCockpitRoute(route)) navigate('/tk/control-tower');
+  }, [branch, currentUser, route, navigate]);
 
   /* Persist the current route so a refresh / re-open returns you here.
      Never persist the bare root "/": it is the live host's entry URL, not a real
@@ -444,6 +455,12 @@ export default function KB360App(){
     if(route==="/tk/targets")            return <TkTargetsPage/>;
     if(route==="/tk/master-control")     return <TkMasterControlPage/>;
     if(route==="/tk/go-live")            return <TkGoLivePage setRoute={navigate}/>;
+    if(route==="/tk/onboarding")         return <TkOnboardingPage/>;
+    if(route==="/tk/scorecard")          return <TkScorecardPage/>;
+    if(route==="/tk/exceptions")         return <TkExceptionsPage/>;
+    if(route==="/tk/compliance")         return <TkCompliancePage/>;
+    if(route==="/tk/performance")        return <TkPerformancePage/>;
+    if(route==="/tk/investment")         return <TkInvestmentPage/>;
     if(route==="/hr/portal")               return <HRPortal setRoute={navigate}/>;
     if(route==="/hr/leave-apply")          return <LeaveApply/>;
     if(route==="/hr/reimbursement")        return <ReimbursementClaim/>;

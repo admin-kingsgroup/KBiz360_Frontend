@@ -10,6 +10,7 @@ import { clickable } from '../../core/ux/clickable';
 import { usePager, Pager } from '../../core/ux/pager';
 import { bc } from '../../core/styles';
 import { apiGet } from '../../core/api';
+import { CONSOLIDATED_LABEL } from '../../core/data';
 import { periodRange, useInception } from '../../core/period';
 import { CUR_FY } from '../../core/dates';
 import {
@@ -54,7 +55,7 @@ const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', g
 // `{...card}` surface in this workspace adopts the premium look without structural change.
 const card = { background: '#fff', border: '1px solid #cdd1d8', borderRadius: 12, boxShadow: '0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString((cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US');
-const brLabel = (b) => (b === 'ALL' || !b ? 'All Branches' : (b.name || b.code || b));
+const brLabel = (b) => (b === 'ALL' || !b ? CONSOLIDATED_LABEL : (b.name || b.code || b));
 
 // Year-month of a voucher date — handles ISO (YYYY-MM-DD) and DD/MM/YYYY (migrated).
 export function ymOf(d) {

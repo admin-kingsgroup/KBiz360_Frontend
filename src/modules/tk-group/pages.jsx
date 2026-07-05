@@ -10,25 +10,28 @@ import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
 import { MasterControl } from './MasterControl';
 import { GoLive } from './GoLive';
+import { Onboarding } from './Onboarding';
+import { BranchScorecard } from './BranchScorecard';
+import { ExceptionsRisk } from './ExceptionsRisk';
+import { ComplianceClose } from './ComplianceClose';
+import { PerformanceTargets } from './PerformanceTargets';
+import { InvestmentDashboard } from './InvestmentDashboard';
+import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
 
 const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
 
 // ─── TK GROUP · FE · page wrappers (shell routes) ────────────────────────────
-// Thin page shells so App.jsx can route to the three TK Group governance
-// surfaces. Each just frames an already-tested container with a title. The pages
-// are DORMANT-SAFE: with core.policy_guard OFF the /api/tk/* endpoints return
-// empty / read-only, so every page renders a benign empty state until go-live.
+// Thin page shells so App.jsx can route to each TK Group Central surface. They use
+// the app's native PageLayout (standard header, spacing, width, design tokens) so
+// they look like the rest of the app. DORMANT-SAFE: with core.policy_guard OFF the
+// /api/tk/* endpoints return empty / read-only, so pages render a benign empty state.
 
 function Page({ title, subtitle, children }) {
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '18px 20px' }}>
-      <div style={{ marginBottom: 14 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: '#1f2a44' }}>{title}</h1>
-        {subtitle ? <p style={{ fontSize: 12.5, color: '#5a6691', margin: '4px 0 0' }}>{subtitle}</p> : null}
-      </div>
+    <PageLayout title={title} subtitle={subtitle} maxWidth="max-w-[1280px]">
       {children}
-    </div>
+    </PageLayout>
   );
 }
 
@@ -116,6 +119,54 @@ export function TkGoLivePage({ setRoute }) {
   return (
     <Page title="Go-Live" subtitle="Turn the TK Group control layer on. Each step shows its live status; the switch itself is proposed on Control Flags and dual-approved — fully reversible.">
       <GoLive setRoute={setRoute} />
+    </Page>
+  );
+}
+
+export function TkOnboardingPage() {
+  return (
+    <Page title="Onboarding" subtitle="Onboard a new client or supplier with their credit terms — centrally. Filed as a Farhan + Owner counterparty decision; the party master is set up after approval (nothing auto-creates it).">
+      <Onboarding />
+    </Page>
+  );
+}
+
+export function TkScorecardPage() {
+  return (
+    <Page title="Branch Scorecard" subtitle="Every branch side by side in its own currency — Sales, Gross Profit, GP%, Net Profit and bookings. Branchwise oversight; amounts are never consolidated into a group total.">
+      <BranchScorecard />
+    </Page>
+  );
+}
+
+export function TkExceptionsPage() {
+  return (
+    <Page title="Exceptions & Risk" subtitle="Governance red-flags per branch — net loss, thin margin, no bookings. Each branch judged on its own figures (branchwise), worst first.">
+      <ExceptionsRisk />
+    </Page>
+  );
+}
+
+export function TkCompliancePage() {
+  return (
+    <Page title="Compliance & Close" subtitle="Per-branch close & compliance posture — period-lock status and pending governance/decisions still to clear. Branchwise; never consolidated.">
+      <ComplianceClose />
+    </Page>
+  );
+}
+
+export function TkPerformancePage() {
+  return (
+    <Page title="Performance vs Target" subtitle="Each branch's actual against its own target for the chosen metric — branchwise, in native currency, never consolidated. Targets are the ones approved under Controls ▸ Targets & Budgets.">
+      <PerformanceTargets />
+    </Page>
+  );
+}
+
+export function TkInvestmentPage() {
+  return (
+    <Page title="Investment & Capital" subtitle="Each branch's capital invested, investments, loans, capital employed and profit — branchwise, in native currency, never consolidated into a group total.">
+      <InvestmentDashboard />
     </Page>
   );
 }

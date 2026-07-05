@@ -527,7 +527,7 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
         </table>
       </div>
       <div className="hint">{doSegment
-        ? <>Consolidated <b>TK HO Group</b> view — postings are <b>segmented by branch</b> with per-branch subtotals; branch books are never blended. Select a branch top-right for that branch only.</>
+        ? <><b>{CONSOLIDATED_LABEL}</b> view — postings are <b>segmented by branch</b> with per-branch subtotals; branch books are never blended. Select a branch top-right for that branch only.</>
         : <>Tally-style ledger. <b>To/By</b> shows the contra account. On a bill or receipt, <b>▸ Shift+Enter</b> (or click the arrow) drills its settlement history. Toggle <b>Narration</b> / <b>Detailed</b> for more, or switch to <b>Bill-wise</b>.</>}</div>
     </>
   );
@@ -807,7 +807,7 @@ function branchLabelOf(branch) { return (!branch || branch === 'ALL') ? CONSOLID
 function showPeriodBranchHint(branch) {
   const isAll = (!branch || branch === 'ALL');
   return (
-    <span className="brchip" title="Branch is set by the top-right selector. Consolidated (TK HO Group) shows all branches.">
+    <span className="brchip" title={`Branch is set by the top-right selector. ${CONSOLIDATED_LABEL} shows all branches.`}>
       <span className="bk">{isAll ? 'Group' : 'Branch'}</span>
       <span className="bv">{isAll ? CONSOLIDATED_LABEL : branchLabelOf(branch)}</span>
     </span>
