@@ -469,6 +469,7 @@ export const MENU_HO_CONTROL = {label:"HO Control", icon:Settings, children:[
 // empty / read-only state until core.policy_guard is switched on at go-live.
 export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"My Role", href:"/tk/my-role"},
+  {label:"Go-Live", href:"/tk/go-live"},
   {divider:true, label:"Governance"},
   {label:"Approvals Inbox", href:"/tk/approvals"},
   {label:"Control Flags", href:"/tk/controls"},

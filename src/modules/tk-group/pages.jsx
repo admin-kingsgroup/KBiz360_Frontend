@@ -9,6 +9,7 @@ import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
 import { MasterControl } from './MasterControl';
+import { GoLive } from './GoLive';
 import { BRANCHES } from '../../core/referenceCache';
 
 const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
@@ -107,6 +108,14 @@ export function TkMasterControlPage() {
   return (
     <Page title="Master Control" subtitle="Raise a master / chart-of-accounts change (add / rename / deactivate a head). Filed as a Farhan + Owner change-request; applying it to the master stays a deliberate post-approval step.">
       <MasterControl />
+    </Page>
+  );
+}
+
+export function TkGoLivePage({ setRoute }) {
+  return (
+    <Page title="Go-Live" subtitle="Turn the TK Group control layer on. Each step shows its live status; the switch itself is proposed on Control Flags and dual-approved — fully reversible.">
+      <GoLive setRoute={setRoute} />
     </Page>
   );
 }

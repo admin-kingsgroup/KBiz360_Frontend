@@ -308,6 +308,7 @@ export const APP_ROUTES = [
   "/tk/control-tower",
   "/tk/controls",
   "/tk/decisions",
+  "/tk/go-live",
   "/tk/master-control",
   "/tk/my-role",
   "/tk/period-locks",
