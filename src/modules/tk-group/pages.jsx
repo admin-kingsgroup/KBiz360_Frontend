@@ -7,6 +7,8 @@ import { DecisionsBoard } from './DecisionsBoard';
 import { ControlTower } from './ControlTower';
 import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
+import { TargetsBudgets } from './TargetsBudgets';
+import { MasterControl } from './MasterControl';
 import { BRANCHES } from '../../core/referenceCache';
 
 const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
@@ -89,6 +91,22 @@ export function TkAuditTrailPage() {
   return (
     <Page title="Audit Trail" subtitle="The append-only control-events log — every config change, approval, rejection and lock. Filter by branch or action.">
       <AuditTrail />
+    </Page>
+  );
+}
+
+export function TkTargetsPage() {
+  return (
+    <Page title="Targets & Budgets" subtitle="Propose a branch target or budget for a period. It's filed as a Farhan + Owner change-request; nothing applies until approved.">
+      <TargetsBudgets branches={BRANCH_CODES} />
+    </Page>
+  );
+}
+
+export function TkMasterControlPage() {
+  return (
+    <Page title="Master Control" subtitle="Raise a master / chart-of-accounts change (add / rename / deactivate a head). Filed as a Farhan + Owner change-request; applying it to the master stays a deliberate post-approval step.">
+      <MasterControl />
     </Page>
   );
 }

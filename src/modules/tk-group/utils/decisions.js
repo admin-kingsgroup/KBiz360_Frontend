@@ -10,7 +10,11 @@ export const DECISION_TYPES = [
   { key: 'credit_limit', label: 'Credit limit', amount: true, partyLabel: 'Customer', amountLabel: 'Proposed limit' },
   { key: 'funds_release', label: 'Funds release', amount: true, partyLabel: 'Payee / purpose', amountLabel: 'Amount' },
   { key: 'counterparty', label: 'Counterparty onboarding', amount: false, partyLabel: 'New party name', amountLabel: '' },
+  { key: 'investment', label: 'Investment request', amount: true, partyLabel: 'Investment / asset', amountLabel: 'Amount' },
 ];
+
+// Decisions that always need both Farhan AND the Owner, regardless of amount.
+const ALWAYS_DUAL = new Set(['counterparty', 'investment']);
 
 export function decisionTypeDef(key) {
   return DECISION_TYPES.find((d) => d.key === key) || null;
@@ -19,7 +23,7 @@ export function decisionTypeDef(key) {
 /** Who will need to sign, for the proposer's guidance. Counterparty is always dual;
  *  credit/funds escalate to the Owner above the threshold. */
 export function approverHint(type, amount) {
-  if (type === 'counterparty') return 'Farhan + Owner';
+  if (ALWAYS_DUAL.has(type)) return 'Farhan + Owner';
   return (Number(amount) || 0) > DECISION_THRESHOLD ? 'Farhan + Owner' : 'Farhan';
 }
 

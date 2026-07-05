@@ -14,6 +14,9 @@ const LABELS = {
   credit_limit: 'Credit limit',
   funds_release: 'Funds release',
   counterparty: 'Counterparty onboarding',
+  investment: 'Investment request',
+  // governance surfaces
+  target_budget: 'Target / Budget',
 };
 
 /** Human label for a change-request type. */

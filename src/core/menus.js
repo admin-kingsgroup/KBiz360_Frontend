@@ -473,6 +473,8 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"Approvals Inbox", href:"/tk/approvals"},
   {label:"Control Flags", href:"/tk/controls"},
   {label:"Period Locks", href:"/tk/period-locks"},
+  {label:"Targets & Budgets", href:"/tk/targets"},
+  {label:"Master Control", href:"/tk/master-control"},
   {divider:true, label:"Monitoring"},
   {label:"Control Tower", href:"/tk/control-tower"},
   {label:"Branch Cockpit", href:"/tk/branch-cockpit"},

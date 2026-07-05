@@ -67,7 +67,7 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/reportsFinancial/financialStatements'));
@@ -441,6 +441,8 @@ export default function KB360App(){
     if(route==="/tk/control-tower")      return <TkControlTowerPage/>;
     if(route==="/tk/branch-cockpit")     return <TkBranchCockpitPage/>;
     if(route==="/tk/audit")              return <TkAuditTrailPage/>;
+    if(route==="/tk/targets")            return <TkTargetsPage/>;
+    if(route==="/tk/master-control")     return <TkMasterControlPage/>;
     if(route==="/hr/portal")               return <HRPortal setRoute={navigate}/>;
     if(route==="/hr/leave-apply")          return <LeaveApply/>;
     if(route==="/hr/reimbursement")        return <ReimbursementClaim/>;
