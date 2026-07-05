@@ -2,6 +2,14 @@ import React from 'react';
 import { MyRole } from './MyRole';
 import { ApprovalsInbox } from './ApprovalsInbox';
 import { FlagAdmin } from './FlagAdmin';
+import { PeriodLockAdmin } from './PeriodLockAdmin';
+import { DecisionsBoard } from './DecisionsBoard';
+import { ControlTower } from './ControlTower';
+import { BranchCockpit } from './BranchCockpit';
+import { AuditTrail } from './AuditTrail';
+import { BRANCHES } from '../../core/referenceCache';
+
+const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
 
 // ─── TK GROUP · FE · page wrappers (shell routes) ────────────────────────────
 // Thin page shells so App.jsx can route to the three TK Group governance
@@ -41,6 +49,46 @@ export function TkControlsPage() {
   return (
     <Page title="Control Flags" subtitle="TK Group control switches. Toggling a flag submits a Farhan + Owner change-request — never a raw flip — so even go-live is dual-approved and audited.">
       <FlagAdmin />
+    </Page>
+  );
+}
+
+export function TkPeriodLockPage() {
+  return (
+    <Page title="Period Locks" subtitle="Lock an accounting period so nothing can be posted or edited into it. Proposing a lock (or unlock) is a Farhan + Owner change-request; 'ALL' locks every branch.">
+      <PeriodLockAdmin branches={BRANCH_CODES} />
+    </Page>
+  );
+}
+
+export function TkDecisionsPage() {
+  return (
+    <Page title="Decisions" subtitle="Raise a credit-limit, funds-release or counterparty-onboarding decision. Farhan disposes smaller ones; large decisions and all onboarding escalate to the Owner. Nothing posts automatically — approval is the governance record.">
+      <DecisionsBoard />
+    </Page>
+  );
+}
+
+export function TkControlTowerPage() {
+  return (
+    <Page title="Control Tower" subtitle="Is the control layer healthy? Pending approvals, how long they've waited, locked periods, which controls are live, and the latest control events.">
+      <ControlTower />
+    </Page>
+  );
+}
+
+export function TkBranchCockpitPage() {
+  return (
+    <Page title="Branch Cockpit" subtitle="Per-branch control posture — pending decisions, pending governance and locked periods. Rows needing attention are highlighted.">
+      <BranchCockpit />
+    </Page>
+  );
+}
+
+export function TkAuditTrailPage() {
+  return (
+    <Page title="Audit Trail" subtitle="The append-only control-events log — every config change, approval, rejection and lock. Filter by branch or action.">
+      <AuditTrail />
     </Page>
   );
 }

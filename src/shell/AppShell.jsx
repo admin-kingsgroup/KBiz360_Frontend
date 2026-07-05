@@ -23,7 +23,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Menu, X, ChevronDown, Eye } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
-import { getMenu } from '../core/menus';
+import { getVisibleMenu } from '../modules/tk-group/menu';
+import { InboxBadgeLive } from '../modules/tk-group/InboxBadgeLive';
+import { useHideStatements } from '../modules/tk-group/useHideStatements';
 import { useAlerts } from '../core/useAccounting';
 import { openPrintPreview } from '../core/PrintPreview';
 import { useFyStore, FY_OPTIONS } from '../store/fy';
@@ -402,7 +404,15 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
   const openAlerts = useMemo(() => alertsQ.data?.alerts || [], [alertsQ.data]);
   const unread = openAlerts.length;
   const critical = useMemo(() => openAlerts.filter((a) => a.severity === 'error'), [openAlerts]);
-  const menu = useMemo(() => getMenu(branch, currentUser), [branch, currentUser]);
+  // TK Group control model: a restricted (Branch Accountant) view with the
+  // hide-statements control ON has P&L / Balance Sheet stripped from nav + search.
+  // Dormant until the flag is switched on (resolves false → user unchanged).
+  const hideStatements = useHideStatements(currentUser);
+  const scopedUser = useMemo(
+    () => (hideStatements ? { ...currentUser, hideStatements: true } : currentUser),
+    [currentUser, hideStatements],
+  );
+  const menu = useMemo(() => getVisibleMenu(branch, scopedUser), [branch, scopedUser]);
   const go = (href) => { if (href) setRoute(href); setMobileOpen(false); };
 
   // Close the mobile slide-over once we cross into desktop.
@@ -436,10 +446,13 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
 
         {/* Right cluster — tighten the gap on laptops so the items fit */}
         <div className="flex shrink-0 items-center gap-1 2xl:gap-1.5">
-          <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={currentUser} setRoute={setRoute} /></div>
+          <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={scopedUser} setRoute={setRoute} /></div>
 
           <FxRateChip branch={branch} />
           <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
+
+          {/* TK Group pending-approvals badge — central roles only, hidden at 0 (dormant-safe) */}
+          <InboxBadgeLive currentUser={currentUser} setRoute={setRoute} />
 
           <UserMenu currentUser={currentUser} setCurrentUser={setCurrentUser} setRoute={setRoute} onOpenNotifications={() => setShowNotif(true)} />
 
@@ -465,7 +478,7 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
               <button type="button" onClick={() => setMobileOpen(false)} aria-label="Close menu" className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-all duration-fast ease-premium hover:bg-ink/[0.06] hover:text-ink"><X size={18} /></button>
             </div>
             <div className="space-y-2 border-b border-surface-border p-3">
-              <ModuleSearch branch={branch} currentUser={currentUser} setRoute={(r) => go(r)} bar />
+              <ModuleSearch branch={branch} currentUser={scopedUser} setRoute={(r) => go(r)} bar />
               <div className="flex items-center gap-2">
                 <div className="min-w-0 flex-1"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
                 <FySelector />

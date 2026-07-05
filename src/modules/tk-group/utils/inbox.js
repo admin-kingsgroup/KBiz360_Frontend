@@ -10,6 +10,10 @@ const LABELS = {
   credit_policy: 'Credit policy',
   credit: 'Credit',
   voucher: 'Voucher',
+  // Farhan's decision stream
+  credit_limit: 'Credit limit',
+  funds_release: 'Funds release',
+  counterparty: 'Counterparty onboarding',
 };
 
 /** Human label for a change-request type. */

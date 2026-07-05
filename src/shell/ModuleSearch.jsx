@@ -16,7 +16,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, CornerDownLeft, ArrowRight, X } from 'lucide-react';
-import { getMenu } from '../core/menus';
+import { getVisibleMenu } from '../modules/tk-group/menu';
 import { useMobile } from '../core/hooks';
 
 const BLUE = '#2563eb', TEXT = '#5b616e', DIM = '#9197a3', DARK = '#14161a';
@@ -82,7 +82,7 @@ export function ModuleSearch({ branch, currentUser, setRoute, bar = false }) {
 
   /* Build (and cache) the searchable page index from the permission-filtered menu. */
   const index = useMemo(
-    () => flattenMenu(getMenu(branch, currentUser)),
+    () => flattenMenu(getVisibleMenu(branch, currentUser)),
     [branch, currentUser?.role, currentUser?.id]
   );
 

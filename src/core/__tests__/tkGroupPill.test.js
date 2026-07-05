@@ -24,13 +24,16 @@ describe('TK Group pill — central-control gating', () => {
 
   test('its pages stay controllable in Page Visibility Control regardless of the gate', () => {
     const keys = new Set(allPageKeys());
-    for (const leaf of ['/tk/my-role', '/tk/approvals', '/tk/controls']) {
+    for (const leaf of ['/tk/my-role', '/tk/approvals', '/tk/controls', '/tk/period-locks', '/tk/control-tower', '/tk/branch-cockpit', '/tk/audit']) {
       expect(keys.has(leaf)).toBe(true);
     }
   });
 
-  test('the pill exposes exactly the three governance routes', () => {
+  test('the pill exposes exactly the governance + monitoring routes', () => {
     const hrefs = MENU_TK_GROUP.children.filter((c) => c.href).map((c) => c.href);
-    expect(hrefs.sort()).toEqual(['/tk/approvals', '/tk/controls', '/tk/my-role']);
+    expect(hrefs.sort()).toEqual([
+      '/tk/approvals', '/tk/audit', '/tk/branch-cockpit', '/tk/control-tower',
+      '/tk/controls', '/tk/my-role', '/tk/period-locks',
+    ]);
   });
 });

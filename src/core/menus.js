@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, LifeBuoy, Lock, Settings, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, LifeBuoy, Lock, Scale, Settings, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
@@ -472,10 +472,21 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {divider:true, label:"Governance"},
   {label:"Approvals Inbox", href:"/tk/approvals"},
   {label:"Control Flags", href:"/tk/controls"},
+  {label:"Period Locks", href:"/tk/period-locks"},
+  {divider:true, label:"Monitoring"},
+  {label:"Control Tower", href:"/tk/control-tower"},
+  {label:"Branch Cockpit", href:"/tk/branch-cockpit"},
+  {label:"Audit Trail", href:"/tk/audit"},
 ]};
 
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
 export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/transactions/approvals"};
+
+// Farhan's DECISION stream — a branch raises a credit-limit / funds-release /
+// counterparty-onboarding decision; Farhan disposes smaller ones, large ones escalate
+// to the Owner. A leaf pill surfaced to EVERY role (branches raise; central roles act
+// via the TK Group ▸ Approvals Inbox), like Approvals/Support.
+export const MENU_DECISIONS = {label:"Decisions", icon:Scale, href:"/tk/decisions"};
 
 // In-app issue tracker — every user can raise bugs / errors / change requests and
 // help triage the board while the software is under active development. A leaf pill
@@ -665,8 +676,9 @@ export function fullMenuRoots(branch, currentUser){
   // roles (GM/BM) and branch execs don't get it. Its pages stay in Page Visibility
   // Control regardless (MENU_TK_GROUP is an export the catalogue auto-discovers).
   const central = FULL_SCOPE_ROLES.includes(role) ? [MENU_TK_GROUP] : [];
-  // Up to 11 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · [TK Group] · Admin · Support
-  return [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, ...central, MENU_ADMIN, MENU_SUPPORT];
+  // Decisions (Farhan's stream) sits next to Approvals for everyone; TK Group (central
+  // control) only for the governance roles.
+  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, ...central, MENU_ADMIN, MENU_SUPPORT];
 }
 
 // The menu roots a user's ROLE exposes, BEFORE their personal hidden/granted lists.
@@ -674,8 +686,9 @@ export function fullMenuRoots(branch, currentUser){
 export function roleMenuRoots(branch, currentUser){
   if (hasFullMenu(currentUser)) return fullMenuRoots(branch, currentUser);
   // Branch Accountant → their self-contained Accounts workspace PLUS Approvals,
-  // Taxation and Support. Branch scope is still enforced by the top-right switcher.
-  return [MENU_ACCOUNTS, MENU_APPROVALS, taxSectionFor(branch), MENU_SUPPORT];
+  // Decisions (they raise credit/funds/onboarding requests), Taxation and Support.
+  // Branch scope is still enforced by the top-right switcher.
+  return [MENU_ACCOUNTS, MENU_APPROVALS, MENU_DECISIONS, taxSectionFor(branch), MENU_SUPPORT];
 }
 
 // Keep ONLY the leaves whose href is in `keep`; drop everything else (containers with

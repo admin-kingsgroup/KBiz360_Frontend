@@ -67,7 +67,9 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkControlsPage } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage } = lazyModule(() => import('./modules/tk-group'));
+import { useHideStatements } from './modules/tk-group/useHideStatements';
+import { isStatementHref } from './modules/tk-group/utils/statements';
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/reportsFinancial/financialStatements'));
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsFinancial/reportsNotes'));
 const { Statistics } = lazyModule(() => import('./modules/reports/statistics'));
@@ -144,6 +146,9 @@ export default function KB360App(){
   const maxIdxRef = useRef(histIdx);
   if (histIdx > maxIdxRef.current) maxIdxRef.current = histIdx;
   const [currentUser,setCurrentUser]=useState(restoredUser);  // null → LoginScreen shows on app load
+  // TK Group control: when the hide-statements control is ON for a Branch Accountant,
+  // P&L / Balance Sheet are blocked even by direct URL (dormant until the flag is on).
+  const hideStatements = useHideStatements(currentUser);
   const mob=useMobile();
   const navigate = useCallback((r)=>{ if(r && r!==window.location.pathname) rrNavigate(r); }, [rrNavigate]);
   const goBack = useCallback(()=>rrNavigate(-1), [rrNavigate]);
@@ -282,6 +287,10 @@ export default function KB360App(){
        URL — it's removed from their nav too (see getMenu). The landing dashboard
        and the visibility-control page itself are never blocked here (the latter
        gates non-admins inside its own component). ── */
+    // TK Group hide-statements: a restricted view with the control ON can't reach the
+    // financial statements even by direct URL — send them back to their dashboard.
+    if(hideStatements && isStatementHref(route)) return <Navigate to="/accounts/dashboard" replace/>;
+
     const hiddenPages = Array.isArray(currentUser?.hidden) ? currentUser.hidden : [];
     // Top-level pills are structural — never blocked by the deny-list (they can't be
     // hidden from the catalogue either), so a single-page pill like Approvals always works.
@@ -427,6 +436,11 @@ export default function KB360App(){
     if(route==="/tk/my-role")            return <TkMyRolePage/>;
     if(route==="/tk/approvals")          return <TkApprovalsPage/>;
     if(route==="/tk/controls")           return <TkControlsPage/>;
+    if(route==="/tk/period-locks")       return <TkPeriodLockPage/>;
+    if(route==="/tk/decisions")          return <TkDecisionsPage/>;
+    if(route==="/tk/control-tower")      return <TkControlTowerPage/>;
+    if(route==="/tk/branch-cockpit")     return <TkBranchCockpitPage/>;
+    if(route==="/tk/audit")              return <TkAuditTrailPage/>;
     if(route==="/hr/portal")               return <HRPortal setRoute={navigate}/>;
     if(route==="/hr/leave-apply")          return <LeaveApply/>;
     if(route==="/hr/reimbursement")        return <ReimbursementClaim/>;
