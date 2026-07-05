@@ -67,6 +67,7 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
+const { TkMyRolePage, TkApprovalsPage, TkControlsPage } = lazyModule(() => import('./modules/tk-group'));
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/reportsFinancial/financialStatements'));
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsFinancial/reportsNotes'));
 const { Statistics } = lazyModule(() => import('./modules/reports/statistics'));
@@ -422,6 +423,10 @@ export default function KB360App(){
     if(route==="/ho/filing-register")    return <StatutoryFilingRegister/>;
     if(route==="/ho/period-lock")        return <PeriodLockControl/>;
     if(route==="/ho/audit-queue")        return <CentralAuditQueue/>;
+    /* TK Group — central control (real /api/tk/* pages; dormant until core.policy_guard on) */
+    if(route==="/tk/my-role")            return <TkMyRolePage/>;
+    if(route==="/tk/approvals")          return <TkApprovalsPage/>;
+    if(route==="/tk/controls")           return <TkControlsPage/>;
     if(route==="/hr/portal")               return <HRPortal setRoute={navigate}/>;
     if(route==="/hr/leave-apply")          return <LeaveApply/>;
     if(route==="/hr/reimbursement")        return <ReimbursementClaim/>;

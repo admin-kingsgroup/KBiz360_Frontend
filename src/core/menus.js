@@ -8,6 +8,7 @@ import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
 import { isPageAccessAdmin, isOwnerDashboardUser } from './pageCatalog';
+import { FULL_SCOPE_ROLES } from './branchScope';
 /* (Removed dead imports of Recruitment from './helpers' and Dashboard from
    '../modules/dashboard' — only their string labels/hrefs are used in the menu
    tree, never the component values. Dropping them also keeps the menu out of
@@ -461,6 +462,18 @@ export const MENU_HO_CONTROL = {label:"HO Control", icon:Settings, children:[
 ]};
 
 
+// ─── TK GROUP · central-control pill ─────────────────────────────────────────
+// The REAL governance surfaces backed by /api/tk/*: your role briefing, the
+// change-request approvals inbox, and the control-flag switchboard. Distinct from
+// the (static-prototype) HO Control pill. Dormant-safe — every page shows an
+// empty / read-only state until core.policy_guard is switched on at go-live.
+export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
+  {label:"My Role", href:"/tk/my-role"},
+  {divider:true, label:"Governance"},
+  {label:"Approvals Inbox", href:"/tk/approvals"},
+  {label:"Control Flags", href:"/tk/controls"},
+]};
+
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
 export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/transactions/approvals"};
 
@@ -647,8 +660,13 @@ export function fullMenuRoots(branch, currentUser){
   // "AD Dashboards" group is Super-Admin-only; the owner also gets the Owner Dashboard link.
   const dashboardsMenu = dashboardsFor(currentUser);
   const top = isDir ? [dashboardsMenu, MENU_FINANCE, MENU_APPROVALS] : MENU_COMMON_TOP;
-  // 10 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · Admin · Support
-  return [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN, MENU_SUPPORT];
+  // TK Group is the central-control pill — shown ONLY to the all-branch governance
+  // roles (Owner / Director / Finance Manager / Sr. Accounts Executive). Oversight-only
+  // roles (GM/BM) and branch execs don't get it. Its pages stay in Page Visibility
+  // Control regardless (MENU_TK_GROUP is an export the catalogue auto-discovers).
+  const central = FULL_SCOPE_ROLES.includes(role) ? [MENU_TK_GROUP] : [];
+  // Up to 11 pills: Dashboard(s) · Finance · Approvals · Accounts · Reports · Taxation · Masters · HR · [TK Group] · Admin · Support
+  return [...top, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, ...central, MENU_ADMIN, MENU_SUPPORT];
 }
 
 // The menu roots a user's ROLE exposes, BEFORE their personal hidden/granted lists.
