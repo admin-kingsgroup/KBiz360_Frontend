@@ -2,12 +2,19 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAudit } from './api/monitor';
 import { actorName } from './utils/monitor';
+import { Button, FormField, Input } from '../../shell/primitives';
+import { DataTable } from '../../shell/DataTable';
 
 // ─── TK GROUP · FE · Audit Trail Explorer (container) ────────────────────────
 // The append-only control_events log, filterable by branch / action / date — the
 // "prove what happened" view. Read-only.
-const cell = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #eee', textAlign: 'left', verticalAlign: 'top' };
-const inp = { padding: '5px 8px', fontSize: 12, border: '1px solid #cdd1d8', borderRadius: 5 };
+const AUDIT_COLS = [
+  { key: 'ts', header: 'When', className: 'whitespace-nowrap', render: (e) => (e.ts ? String(e.ts).slice(0, 19).replace('T', ' ') : '—') },
+  { key: 'action', header: 'Action' },
+  { key: 'actor', header: 'By', render: (e) => actorName(e.actor) },
+  { key: 'branch', header: 'Branch', render: (e) => e.branch || '—' },
+  { key: 'reason', header: 'Reason', className: 'text-ink-muted', render: (e) => e.reason || '—' },
+];
 
 export function AuditTrail() {
   const [branch, setBranch] = useState('');
@@ -19,29 +26,30 @@ export function AuditTrail() {
   const apply = (e) => { e.preventDefault(); setApplied({ ...(branch ? { branch } : {}), ...(action ? { action } : {}) }); };
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <form onSubmit={apply} aria-label="Filter audit trail" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <input aria-label="Branch" placeholder="Branch (e.g. BOM)" value={branch} onChange={(e) => setBranch(e.target.value)} style={{ ...inp, width: 130 }} />
-        <input aria-label="Action" placeholder="Action (e.g. approval.approve)" value={action} onChange={(e) => setAction(e.target.value)} style={{ ...inp, width: 200 }} />
-        <button type="submit" style={{ background: '#0d1326', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, padding: '6px 12px', cursor: 'pointer' }}>Filter</button>
+    <div className="grid gap-3">
+      <form onSubmit={apply} aria-label="Filter audit trail" className="flex flex-wrap items-end gap-2">
+        <FormField label="Branch" htmlFor="au-branch" className="w-[150px]">
+          <Input id="au-branch" aria-label="Branch" placeholder="Branch (e.g. BOM)" value={branch} onChange={(e) => setBranch(e.target.value)} />
+        </FormField>
+        <FormField label="Action" htmlFor="au-action" className="w-[220px]">
+          <Input id="au-action" aria-label="Action" placeholder="Action (e.g. approval.approve)" value={action} onChange={(e) => setAction(e.target.value)} />
+        </FormField>
+        <Button type="submit" variant="primary" size="sm">Filter</Button>
       </form>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }} data-testid="tk-audit">
-        <thead>
-          <tr>{['When', 'Action', 'By', 'Branch', 'Reason'].map((h) => <th key={h} style={{ ...cell, color: '#5a6691', fontWeight: 700 }}>{h}</th>)}</tr>
-        </thead>
-        <tbody>
-          {rows.length ? rows.map((e, i) => (
-            <tr key={e._id || i}>
-              <td style={{ ...cell, whiteSpace: 'nowrap' }}>{e.ts ? String(e.ts).slice(0, 19).replace('T', ' ') : '—'}</td>
-              <td style={cell}>{e.action}</td>
-              <td style={cell}>{actorName(e.actor)}</td>
-              <td style={cell}>{e.branch || '—'}</td>
-              <td style={{ ...cell, color: '#777' }}>{e.reason || '—'}</td>
-            </tr>
-          )) : <tr><td style={{ ...cell, color: '#777' }} colSpan={5}>No control events match.</td></tr>}
-        </tbody>
-      </table>
+      <div data-testid="tk-audit">
+        <DataTable
+          columns={AUDIT_COLS}
+          rows={rows}
+          getRowKey={(e, i) => e._id || i}
+          loading={q.isLoading}
+          isError={q.isError}
+          emptyMessage="No control events match."
+          searchable={false}
+          showDensityToggle={false}
+          zebra
+        />
+      </div>
     </div>
   );
 }

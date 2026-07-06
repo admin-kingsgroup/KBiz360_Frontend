@@ -33,7 +33,7 @@ export function PeriodLockAdmin({ branches = DEFAULT_BRANCHES }) {
 
   return (
     <div className="tk-period-locks">
-      {msg ? <div role="status" style={{ padding: '6px 12px', fontSize: 12, color: '#6E5518', background: '#FBF6E9', marginBottom: 10 }}>{msg}</div> : null}
+      {msg ? <div role="status" className="mb-2.5 rounded-md bg-warning-soft px-3 py-1.5 text-xs text-warning">{msg}</div> : null}
       <PeriodLockPanel rows={lockRows(state)} branches={branches} onPropose={onPropose} />
     </div>
   );

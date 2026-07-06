@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getLimits, proposeLimits } from './api/limits';
-import { Button, FormField, Input, LoadingState } from '../../shell/primitives';
+import { Button, Input, LoadingState } from '../../shell/primitives';
 
 // ─── TK GROUP CENTRAL · Thresholds & Limits (Owner-editable) ─────────────────
 // The control-model numbers in one editable place — decision escalation ceilings,

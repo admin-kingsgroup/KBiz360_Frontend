@@ -2,15 +2,21 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { proposeGovernance, getPendingByType } from './api/governance';
 import { HR_KINDS, hrKindLabel, isHrValid } from './utils/hr';
 import { waitingRoles } from './utils/changeRequests';
+import { PageSection, Button, FormField, Input, Select, Textarea } from '../../shell/primitives';
+import { DataTable } from '../../shell/DataTable';
 
 // ─── TK GROUP CENTRAL · HR Control (container) ───────────────────────────────
 // Raise an HR governance item (new hire / salary revision / payroll release) centrally.
 // Filed as a Farhan + Owner change-request; nothing is actioned in HR until approved
 // (the approval is the governance record). Mirrors Master Control.
-const cell = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #eee', textAlign: 'left' };
-const inp = { padding: '6px 8px', fontSize: 12, border: '1px solid #cdd1d8', borderRadius: 5 };
-const lbl = { fontSize: 11, fontWeight: 700, color: '#5a6691', display: 'block', marginBottom: 3 };
 const DEFAULT_BRANCHES = ['', 'BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+
+const COLS = [
+  { key: 'kind', header: 'Item', render: (cr) => hrKindLabel(((cr.payload && cr.payload.after) || {}).kind) },
+  { key: 'subject', header: 'Employee / role', render: (cr) => ((cr.payload && cr.payload.after) || {}).subject || '—' },
+  { key: 'branch', header: 'Branch', render: (cr) => ((cr.payload && cr.payload.after) || {}).branch || cr.branch || '—' },
+  { key: 'waiting', header: 'Waiting', render: (cr) => waitingRoles(cr).join(' → ') || 'ready' },
+];
 
 export function HRControl({ branches = DEFAULT_BRANCHES }) {
   const [pending, setPending] = useState([]);
@@ -37,53 +43,44 @@ export function HRControl({ branches = DEFAULT_BRANCHES }) {
   }, [valid, kind, subject, branch, detail, load]);
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
-      <section>
-        {msg ? <div role="status" style={{ padding: '6px 12px', fontSize: 12, color: '#1F6E4C', background: '#E6F2EC', marginBottom: 10, borderRadius: 5 }}>{msg}</div> : null}
-        <form onSubmit={submit} aria-label="Raise an HR request" style={{ display: 'grid', gap: 10, maxWidth: 480 }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1 }}><label style={lbl}>HR item</label>
-              <select aria-label="HR item" value={kind} onChange={(e) => setKind(e.target.value)} style={{ ...inp, width: '100%' }}>
+    <div className="grid gap-4">
+      <PageSection title="Raise an HR request">
+        {msg ? <div role="status" className="mb-2.5 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
+        <form onSubmit={submit} aria-label="Raise an HR request" className="grid max-w-[480px] gap-2.5">
+          <div className="flex gap-2.5">
+            <FormField label="HR item" className="flex-1">
+              <Select aria-label="HR item" value={kind} onChange={(e) => setKind(e.target.value)}>
                 {HR_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
-              </select>
-            </div>
-            <div style={{ width: 130 }}><label style={lbl}>Branch (optional)</label>
-              <select aria-label="Branch" value={branch} onChange={(e) => setBranch(e.target.value)} style={{ ...inp, width: '100%' }}>
+              </Select>
+            </FormField>
+            <FormField label="Branch (optional)" className="w-[130px]">
+              <Select aria-label="Branch" value={branch} onChange={(e) => setBranch(e.target.value)}>
                 {branches.map((b) => <option key={b || 'none'} value={b}>{b || '—'}</option>)}
-              </select>
-            </div>
+              </Select>
+            </FormField>
           </div>
-          <div><label style={lbl}>Employee / role</label>
-            <input aria-label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Ravi Kumar — Accountant" style={{ ...inp, width: '100%' }} />
-          </div>
-          <div><label style={lbl}>Detail (optional)</label>
-            <textarea aria-label="Detail" rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} placeholder="e.g. CTC, effective date, payroll month" style={{ ...inp, width: '100%', resize: 'vertical', fontFamily: 'inherit' }} />
-          </div>
-          <button type="submit" disabled={!valid} style={{ justifySelf: 'start', background: valid ? '#1F6E4C' : '#9bb3a7', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, padding: '7px 14px', cursor: valid ? 'pointer' : 'not-allowed' }}>
+          <FormField label="Employee / role">
+            <Input aria-label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Ravi Kumar — Accountant" />
+          </FormField>
+          <FormField label="Detail (optional)">
+            <Textarea aria-label="Detail" rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} placeholder="e.g. CTC, effective date, payroll month" />
+          </FormField>
+          <Button type="submit" variant="primary" size="sm" disabled={!valid} className="justify-self-start">
             Submit HR request
-          </button>
+          </Button>
         </form>
-      </section>
+      </PageSection>
 
-      <section>
-        <h2 style={{ fontSize: 13, fontWeight: 800, color: '#1f2a44', margin: '0 0 6px' }}>Pending HR requests</h2>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Item', 'Employee / role', 'Branch', 'Waiting'].map((h) => <th key={h} style={{ ...cell, color: '#5a6691', fontWeight: 700 }}>{h}</th>)}</tr></thead>
-          <tbody>
-            {pending.length ? pending.map((cr) => {
-              const a = (cr.payload && cr.payload.after) || {};
-              return (
-                <tr key={cr._id}>
-                  <td style={cell}>{hrKindLabel(a.kind)}</td>
-                  <td style={cell}>{a.subject || '—'}</td>
-                  <td style={cell}>{a.branch || cr.branch || '—'}</td>
-                  <td style={cell}>{waitingRoles(cr).join(' → ') || 'ready'}</td>
-                </tr>
-              );
-            }) : <tr><td style={{ ...cell, color: '#777' }} colSpan={4}>No pending HR requests.</td></tr>}
-          </tbody>
-        </table>
-      </section>
+      <DataTable
+        title="Pending HR requests"
+        columns={COLS}
+        rows={pending}
+        getRowKey={(cr, i) => cr._id || `${i}`}
+        emptyMessage="No pending HR requests."
+        searchable={false}
+        showDensityToggle={false}
+        zebra
+      />
     </div>
   );
 }

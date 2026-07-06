@@ -6,14 +6,14 @@ import { typeLabel } from './utils/inbox';
 // passed in; the container fetches via api/inbox.getInbox()).
 export function InboxPanel({ items = [] }) {
   if (!items.length) {
-    return <div className="tk-inbox-empty" style={{ padding: '14px', color: '#777', fontSize: 12.5 }}>Nothing waiting on you.</div>;
+    return <div className="tk-inbox-empty p-3.5 text-xs text-ink-muted">Nothing waiting on you.</div>;
   }
   return (
-    <ul className="tk-inbox-list" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+    <ul className="tk-inbox-list m-0 list-none p-0">
       {items.map((it) => (
-        <li key={it._id || `${it.type}-${it.branch}`} style={{ padding: '9px 12px', borderBottom: '1px solid #eee', fontSize: 12.5 }}>
+        <li key={it._id || `${it.type}-${it.branch}`} className="border-b border-surface-divider px-3 py-2 text-xs">
           <span><b>{typeLabel(it.type)}</b>{it.branch ? ` · ${it.branch}` : ''}</span>
-          <div style={{ color: '#777', fontSize: 11, marginTop: 2 }}>
+          <div className="mt-0.5 text-[11px] text-ink-muted">
             {(it.maker && (it.maker.name || it.maker.userId)) || 'submitted'}
           </div>
         </li>

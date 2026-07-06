@@ -59,16 +59,17 @@ export function InboxBadgeLive({ currentUser, setRoute }) {
       {open ? (
         <div
           role="menu"
-          style={{ position: 'absolute', right: 0, top: '100%', marginTop: 6, width: 288, maxHeight: 360, overflowY: 'auto', background: '#fff', border: '1px solid #e3e6ec', borderRadius: 8, boxShadow: '0 8px 28px -12px rgba(16,18,22,0.28)', zIndex: 50 }}
+          className="absolute right-0 top-full z-50 mt-1.5 overflow-y-auto rounded-brand border border-surface-border bg-surface shadow-pop"
+          style={{ width: 288, maxHeight: 360 }}
         >
-          <div style={{ padding: '9px 12px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#1f2a44' }}>
+          <div className="border-b border-surface-divider px-3 py-2 text-xs font-bold text-navy">
             Waiting on you ({count})
           </div>
           <InboxPanel items={items} />
           <button
             type="button"
             onClick={viewAll}
-            style={{ width: '100%', padding: '9px 12px', border: 'none', borderTop: '1px solid #eee', background: '#f7f8fa', color: '#2563eb', fontSize: 12, fontWeight: 600, cursor: 'pointer', textAlign: 'center' }}
+            className="w-full border-t border-surface-divider bg-surface-alt px-3 py-2 text-center text-xs font-semibold text-info transition-colors duration-fast hover:bg-ink/[0.04]"
           >
             View all in Approvals Inbox →
           </button>

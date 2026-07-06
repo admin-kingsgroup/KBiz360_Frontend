@@ -9,14 +9,9 @@ export function InboxBadge({ count = 0 }) {
   if (!text) return null;
   return (
     <span
-      className="tk-inbox-badge"
+      className="tk-inbox-badge inline-block min-w-[16px] rounded-full bg-danger px-1.5 text-center text-[10px] font-bold leading-[14px] text-white"
       role="status"
       aria-label={`${count} pending approvals`}
-      style={{
-        display: 'inline-block', background: '#A32F2F', color: '#fff', borderRadius: 20,
-        fontSize: 10, fontWeight: 700, lineHeight: '14px', padding: '1px 6px',
-        minWidth: 16, textAlign: 'center',
-      }}
     >
       {text}
     </span>

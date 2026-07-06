@@ -3,15 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { getFlagState } from './api/flags';
 import { getPendingByType } from './api/governance';
 import { goLiveSteps, masterIsOn } from './utils/goLive';
+import { Button, Card } from '../../shell/primitives';
 
 // ─── TK GROUP · FE · Go-Live checklist (container) ───────────────────────────
 // A guided view of exactly where go-live stands: is the control catalogue ready, has
 // the master switch been proposed, approved, and engaged. Read-only status; the actual
 // flip happens on Control Flags → Approvals (dual-approved, reversible).
-const stepBox = (done) => ({
-  display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px',
-  border: '1px solid #e3e6ec', borderRadius: 8, background: done ? '#F3FAF6' : '#fff',
-});
 
 export function GoLive({ setRoute }) {
   const fq = useQuery({ queryKey: ['tk', 'flags'], queryFn: getFlagState, staleTime: 15_000 });
@@ -22,31 +19,33 @@ export function GoLive({ setRoute }) {
   const steps = goLiveSteps(flagState, pendingFlagCount);
 
   return (
-    <div style={{ display: 'grid', gap: 16, maxWidth: 640 }}>
-      <div style={{ padding: '12px 16px', borderRadius: 8, background: on ? '#E6F2EC' : '#FBF6E9', border: `1px solid ${on ? '#bfe0cd' : '#efe2bd'}` }}>
-        <div style={{ fontSize: 15, fontWeight: 800, color: on ? '#1F6E4C' : '#6E5518' }} data-testid="tk-golive-status">
+    <div className="grid max-w-[640px] gap-4">
+      <div className={`rounded-brand border px-4 py-3 ${on ? 'border-success/30 bg-success-soft' : 'border-warning/30 bg-warning-soft'}`}>
+        <div className={`text-sm font-extrabold ${on ? 'text-success' : 'text-warning'}`} data-testid="tk-golive-status">
           {on ? 'LIVE — the control guard is engaged' : 'DORMANT — controls are built but not enforcing'}
         </div>
-        <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>
+        <div className="mt-0.5 text-xs text-ink-muted">
           {on
             ? 'Enforcement is active. Toggle the master control off (dual-approved) to roll back.'
             : 'Nothing is enforced yet. Follow the steps below to go live — it stays fully reversible.'}
         </div>
       </div>
 
-      <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+      <ol className="m-0 grid list-none gap-2 p-0">
         {steps.map((s, i) => (
-          <li key={s.key} style={stepBox(s.done)}>
-            <span aria-hidden style={{ fontSize: 15, lineHeight: '20px' }}>{s.done ? '✅' : `${i + 1}.`}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1f2a44' }}>{s.label}</div>
-              <div style={{ fontSize: 11.5, color: '#666', marginTop: 1 }}>{s.hint}</div>
-            </div>
-            {s.href && !s.done ? (
-              <button type="button" onClick={() => setRoute && setRoute(s.href)} style={{ alignSelf: 'center', background: '#0d1326', color: '#fff', border: 'none', borderRadius: 5, fontSize: 11, fontWeight: 600, padding: '5px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                Open
-              </button>
-            ) : null}
+          <li key={s.key}>
+            <Card className={`flex items-start gap-2.5 ${s.done ? 'bg-success-soft' : ''}`}>
+              <span aria-hidden className="text-sm leading-5">{s.done ? '✅' : `${i + 1}.`}</span>
+              <div className="flex-1">
+                <div className="text-xs font-bold text-navy">{s.label}</div>
+                <div className="mt-px text-[11.5px] text-ink-muted">{s.hint}</div>
+              </div>
+              {s.href && !s.done ? (
+                <Button type="button" variant="primary" size="xs" className="self-center" onClick={() => setRoute && setRoute(s.href)}>
+                  Open
+                </Button>
+              ) : null}
+            </Card>
           </li>
         ))}
       </ol>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge, Button, EmptyState } from '../../shell/primitives';
+import { Button, EmptyState } from '../../shell/primitives';
 
 // ─── TK GROUP · FE · control flags panel (presentational) ────────────────────
 // Lists each control flag with its ON/OFF state. Foundation flags are always on
@@ -14,20 +14,19 @@ export function FlagPanel({ rows = [], onToggle }) {
         <li key={r.key} className="flex items-center gap-2.5 border-b border-surface-border px-3 py-2 text-xs">
           <span className="flex-1 font-mono text-[11.5px] text-ink">{r.key}</span>
           {r.foundation ? <span className="text-[10px] text-warning">foundation</span> : null}
-          {r.foundation ? (
-            <Badge tone={r.enabled ? 'success' : 'neutral'} size="sm">{r.enabled ? 'ON' : 'OFF'}</Badge>
-          ) : (
-            <Button
-              variant={r.enabled ? 'success' : 'secondary'}
-              size="xs"
-              role="switch"
-              aria-checked={r.enabled}
-              aria-label={r.key}
-              onClick={() => onToggle && onToggle(r.key, !r.enabled)}
-            >
-              {r.enabled ? 'ON' : 'OFF'}
-            </Button>
-          )}
+          {/* Every flag is a labelable switch. Foundation flags are always ON and
+              disabled — they can't be toggled off (the panel proposes, never flips). */}
+          <Button
+            variant={r.enabled ? 'success' : 'secondary'}
+            size="xs"
+            role="switch"
+            aria-checked={r.enabled}
+            aria-label={r.key}
+            disabled={r.foundation}
+            onClick={r.foundation ? undefined : () => onToggle && onToggle(r.key, !r.enabled)}
+          >
+            {r.enabled ? 'ON' : 'OFF'}
+          </Button>
         </li>
       ))}
     </ul>
