@@ -54,4 +54,15 @@ describe('Control Panel · Power Console', () => {
     expect(await screen.findByText(/submitted for the Owner/)).toBeInTheDocument();
     expect(proposeFlags).toHaveBeenCalledTimes(1);
   });
+
+  test('AE-approve on the Approval screen proposes it (elevate Sughra to approve)', async () => {
+    const { proposeFlags } = require('../api/flags');
+    proposeFlags.mockClear();
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Approval & Verification'));
+    const sw = (await screen.findAllByRole('switch'))[0]; // AE-approve is the only switch here
+    fireEvent.click(sw);
+    expect(await screen.findByText(/submitted for the Owner/)).toBeInTheDocument();
+    expect(proposeFlags).toHaveBeenCalledTimes(1);
+  });
 });

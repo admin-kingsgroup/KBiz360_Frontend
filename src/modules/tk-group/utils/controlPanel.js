@@ -28,9 +28,12 @@ function masterOn(flags) {
 export function approvalChainView(cfg = {}) {
   const verify = asEmailList(cfg.verifyEmails, DEFAULT_VERIFY);
   const approve = asEmailList(cfg.approveEmails, DEFAULT_APPROVE);
-  // The AE-can-approve toggle = a verifier (Sughra) is ALSO in the approver set, so
-  // she can give final approval on a branch-accountant voucher, not just verify.
-  const aeCanApprove = verify.some((e) => approve.includes(e));
+  // AE-can-approve is on when either the control flag is engaged OR a verifier (Sughra)
+  // is already in the approver set — so she can give final approval, not just verify.
+  const flagsMap = (cfg.flags && cfg.flags.flags) || {};
+  const aeFlag = flagsMap['approval.ae_can_approve'];
+  const aeFlagOn = !!aeFlag && (aeFlag.foundation === true || aeFlag.enabled === true);
+  const aeCanApprove = aeFlagOn || verify.some((e) => approve.includes(e));
   const mOn = masterOn(cfg.flags);
 
   // Per-person control state. When NO control applies to a person (all toggles off —

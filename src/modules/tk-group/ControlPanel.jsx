@@ -120,8 +120,8 @@ export function ControlPanel({ setRoute }) {
             <div className="mt-3 grid gap-2.5">
               <Row nm="Require Verify (Sughra)" ds="A voucher must be verified before approval." st="verify not required" />
               <Row nm="Require Approve (Faiz)" ds="Final approval posts the journal." st="posts directly" />
-              <Row nm="Let Sughra also Approve (AE-approve)" ds="Elevates the AE from verify-only to also give final approval."
-                st="Sughra verifies only" right={v.aeCanApprove ? <Badge tone="success" size="sm">On</Badge> : <Off />} />
+              <Row nm="Let Sughra also Approve (AE-approve)" ds="Elevates the AE from verify-only to also give final approval on a branch-accountant voucher."
+                st="Sughra verifies only" flag="approval.ae_can_approve" on={v.aeCanApprove} onPropose={onPropose} />
               <Row nm="Owner co-sign on sensitive types" ds="Refund · reissue · write-off · adjustment JV also need Afshin." st="sensitive" />
             </div>
             <H3>Who is under control</H3>
