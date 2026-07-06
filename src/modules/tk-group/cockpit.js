@@ -1,4 +1,4 @@
-import { LayoutDashboard, CheckSquare, Scale, UserPlus, Lock, Database, Users, BarChart2, Activity, Rocket, User } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Activity, Rocket } from 'lucide-react';
 import { FULL_SCOPE_ROLES } from '../../core/branchScope';
 
 // ─── TK GROUP CENTRAL · the control cockpit ──────────────────────────────────
@@ -15,19 +15,28 @@ export function isCentralRole(currentUser) {
 
 export function controlCockpitMenu() {
   return [
+    // Overview — the cockpit landing.
     { label: 'Control Tower', icon: LayoutDashboard, href: '/tk/control-tower' },
-    { label: 'Control Panel', icon: Lock, href: '/tk/control-panel' },
-    { label: 'Approvals', icon: CheckSquare, href: '/tk/approvals' },
-    { label: 'Voucher Approvals', icon: CheckSquare, href: '/tk/voucher-approvals' },
-    { label: 'Decisions', icon: Scale, href: '/tk/decisions' },
-    { label: 'Onboarding', icon: UserPlus, href: '/tk/onboarding' },
-    { label: 'Controls', icon: Lock, children: [
+
+    // Approvals & Governance — the daily clearing work.
+    { label: 'Approvals & Governance', icon: CheckSquare, children: [
+      { label: 'Approvals', href: '/tk/approvals' },
+      { label: 'Voucher Approvals', href: '/tk/voucher-approvals' },
+      { label: 'Decisions', href: '/tk/decisions' },
+      { label: 'Onboarding', href: '/tk/onboarding' },
+    ] },
+
+    // Control & Configuration — the Power Console + the rules it governs.
+    { label: 'Control & Configuration', icon: Lock, children: [
+      { label: 'Control Panel', href: '/tk/control-panel' },
       { label: 'Control Flags', href: '/tk/controls' },
       { label: 'Thresholds & Limits', href: '/tk/limits' },
       { label: 'Period Locks', href: '/tk/period-locks' },
       { label: 'Targets & Budgets', href: '/tk/targets' },
       { label: 'Master Control (request)', href: '/tk/master-control' },
     ] },
+
+    // Masters & Ledger — the chart of accounts + party masters (central-approved).
     { label: 'Masters & Ledger', icon: Database, children: [
       { label: 'Chart of Accounts', href: '/masters/accounts-tree' },
       { label: 'Ledger Masters', href: '/masters/ledgers' },
@@ -35,14 +44,8 @@ export function controlCockpitMenu() {
       { label: 'Customers', href: '/masters/customers' },
       { label: 'Suppliers', href: '/masters/suppliers' },
     ] },
-    { label: 'HR Control', icon: Users, children: [
-      { label: 'HR Requests', href: '/tk/hr-control' },
-      { divider: true, label: 'HR screens' },
-      { label: 'Employees', href: '/hr/employees' },
-      { label: 'Payroll', href: '/hr/payroll' },
-      { label: 'Attrition', href: '/hr/attrition' },
-      { label: 'Recruitment', href: '/hr/recruitment' },
-    ] },
+
+    // Performance & Oversight — branchwise analytics (never blended).
     { label: 'Performance & Oversight', icon: BarChart2, children: [
       { label: 'Branch Scorecard', href: '/tk/scorecard' },
       { label: 'Performance vs Target', href: '/tk/performance' },
@@ -54,14 +57,30 @@ export function controlCockpitMenu() {
       { label: 'Compliance & Close', href: '/tk/compliance' },
       { label: 'Central Tax Desk', href: '/tk/tax-desk' },
     ] },
+
+    // HR Control — governance + the HR screens.
+    { label: 'HR Control', icon: Users, children: [
+      { label: 'HR Requests', href: '/tk/hr-control' },
+      { divider: true, label: 'HR screens' },
+      { label: 'Employees', href: '/hr/employees' },
+      { label: 'Payroll', href: '/hr/payroll' },
+      { label: 'Attrition', href: '/hr/attrition' },
+      { label: 'Recruitment', href: '/hr/recruitment' },
+    ] },
+
+    // Monitoring — live drill-downs.
     { label: 'Monitoring', icon: Activity, children: [
       { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
       { label: 'Audit Trail', href: '/tk/audit' },
     ] },
-    { label: 'Configuration Readiness', icon: Rocket, href: '/tk/readiness' },
-    { label: 'Go-Live', icon: Rocket, href: '/tk/go-live' },
-    { label: 'My Role', icon: User, href: '/tk/my-role' },
-    { label: 'Roles & Responsibilities', icon: Users, href: '/tk/roles' },
+
+    // Setup & Roles — readiness, the go-live switch, and who does what.
+    { label: 'Setup & Roles', icon: Rocket, children: [
+      { label: 'Configuration Readiness', href: '/tk/readiness' },
+      { label: 'Go-Live', href: '/tk/go-live' },
+      { label: 'My Role', href: '/tk/my-role' },
+      { label: 'Roles & Responsibilities', href: '/tk/roles' },
+    ] },
   ];
 }
 
