@@ -536,6 +536,11 @@ export const MENU_IMPORT_EXPORT = {label:"Import / Export Data", icon:Database, 
 // Back-office sections grouped under one "Admin" header pill (cleaner top bar).
 // HR now has its own top-level pill (MENU_HR) — no longer nested under Admin.
 export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT_EXPORT]};
+// The BRANCH surface keeps only OPERATIONAL admin — fixed-asset entry + data import.
+// Org administration (Users & Roles, Permissions, Access, Config, Integrations, HO
+// Control) is central: it lives in TK Group Central ▸ Administration, off the branch
+// nav. Personal profile/preferences stay reachable via the avatar UserMenu.
+export const MENU_ADMIN_BRANCH = {label:"Admin", icon:Lock, children:[MENU_ASSETS, MENU_IMPORT_EXPORT]};
 
 // Director/Super-Admin only: the plain "Dashboard" pill becomes a "Dashboards"
 // dropdown with the whole-company suite. Other roles keep the single Dashboard link.
@@ -697,7 +702,7 @@ export function fullMenuRoots(branch, currentUser){
   // selecting "TK Group Central" in the branch selector enters the control cockpit
   // (see modules/tk-group/menu.js → getVisibleMenu). Here we only keep Decisions as a
   // branch pill so branches can RAISE credit/funds/onboarding/investment requests.
-  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN, MENU_SUPPORT];
+  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT];
 }
 
 // The menu roots a user's ROLE exposes, BEFORE their personal hidden/granted lists.

@@ -1,4 +1,4 @@
-import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Activity, Rocket, FilePlus, FileText } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Activity, Rocket, FilePlus, FileText, ShieldCheck } from 'lucide-react';
 import { FULL_SCOPE_ROLES } from '../../core/branchScope';
 import { dashboardsFor } from '../../core/menus';
 
@@ -50,6 +50,45 @@ function branchWorkspace(focus) {
   ];
 }
 
+// Administration — the org-wide admin panel, central by nature (one user list, one set
+// of roles/permissions/config for the whole group). It lives HERE, not on the branch
+// surface. The sensitive Users & Access column shows ONLY for the Owner / Super Admin;
+// a Director/FM in the cockpit sees org-config + integrations but not user creation.
+function administration(currentUser) {
+  const isOwner = (currentUser && currentUser.role) === 'Super Admin';
+  const usersAccess = isOwner ? [{ label: 'Users & Access', children: [
+    { label: 'Users & Roles', href: '/settings/users' },
+    { label: 'App Access', href: '/settings/users' },
+    { label: 'Bulk User Operations', href: '/settings/bulk-users' },
+    { label: 'Page Visibility Control', href: '/settings/page-access' },
+    { label: 'Permissions Matrix', href: '/settings/permissions-matrix' },
+    { label: 'Field-Level Access', href: '/settings/field-access' },
+    { label: 'Approval Matrix Builder', href: '/settings/approval-matrix-builder' },
+    { label: 'Authority Configuration', href: '/settings/authority-config' },
+  ] }] : [];
+  return { label: 'Administration', icon: ShieldCheck, children: [
+    ...usersAccess,
+    { label: 'Organisation & Config', children: [
+      { label: 'Branches', href: '/settings/branches' },
+      { label: 'Numbering Series', href: '/masters/numbering' },
+      { label: 'Custom Fields', href: '/settings/custom-fields' },
+      { label: 'Vacation Delegations', href: '/settings/delegations' },
+      { label: 'Approval Workflow', href: '/settings/approval-workflow' },
+      { label: 'Master Change Queue', href: '/settings/master-change-queue' },
+    ] },
+    { label: 'Templates & Integrations', children: [
+      { label: 'Document Templates', href: '/settings/doc-templates' },
+      { label: 'Email / SMS Templates', href: '/settings/email-templates' },
+      { label: 'Branding', href: '/settings/branding' },
+      { label: 'Banking API', href: '/settings/banking-api' },
+      { label: 'GSP / IRP E-Invoice', href: '/settings/gsp-irp' },
+      { label: 'API & Integrations', href: '/settings/integrations' },
+      { divider: true, label: 'Audit' },
+      { label: 'Audit Log', href: '/settings/audit' },
+    ] },
+  ] };
+}
+
 export function controlCockpitMenu(focus, currentUser) {
   return [
     // Overview — the cockpit landing.
@@ -82,6 +121,10 @@ export function controlCockpitMenu(focus, currentUser) {
       { label: 'Targets & Budgets', href: '/tk/targets' },
       { label: 'Master Control (request)', href: '/tk/master-control' },
     ] },
+
+    // Administration — the org-wide admin panel (users / roles / access / config /
+    // integrations). Central by nature; the branch surface no longer carries it.
+    administration(currentUser),
 
     // Masters & Ledger — the chart of accounts + party masters (central-approved).
     { label: 'Masters & Ledger', icon: Database, children: [

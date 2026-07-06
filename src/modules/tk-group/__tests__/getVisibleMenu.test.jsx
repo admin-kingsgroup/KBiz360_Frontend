@@ -60,4 +60,21 @@ describe('getVisibleMenu — TK Group Central vs branch', () => {
     expect(hrefs).toContain('/tk/approvals');                    // Admin Approval (everything else)
     expect(hrefs.some((h) => h.startsWith('/dashboard'))).toBe(true); // Dashboards group present
   });
+
+  test('Administration lives in the cockpit (Owner) and is stripped from the branch nav', () => {
+    const owner = hrefsOf(getVisibleMenu('ALL', { role: 'Super Admin' }));
+    expect(owner).toContain('/settings/users');            // Administration ▸ Users & Roles
+    expect(owner).toContain('/settings/permissions-matrix'); // ▸ Permissions
+    expect(owner).toContain('/settings/branches');         // ▸ Org config
+    const branch = hrefsOf(getVisibleMenu({ code: 'BOM' }, { role: 'Super Admin' }));
+    expect(branch).not.toContain('/settings/users');       // org-admin OFF the branch surface
+    expect(branch).not.toContain('/settings/permissions-matrix');
+  });
+
+  test('a non-Owner central role sees Administration but NOT user creation (Owner-gated)', () => {
+    const fm = hrefsOf(getVisibleMenu('ALL', { role: 'Senior Finance Manager' }));
+    expect(fm).toContain('/settings/branches');            // org-config visible to central roles
+    expect(fm).not.toContain('/settings/users');           // user creation is Owner-only
+    expect(fm).not.toContain('/settings/permissions-matrix');
+  });
 });
