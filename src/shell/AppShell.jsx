@@ -451,9 +451,10 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           the top-most bar) so selecting a branch re-aims the whole cockpit before
           the header/nav even render. The mode stays on the entity pill. ─────── */}
       {inCockpit && (
-        <div className="noprint flex shrink-0 items-center gap-3 border-b border-surface-border bg-surface/70 px-4 py-2 tablet:px-5">
-          <span className="hidden text-[11px] font-semibold text-ink-subtle tablet:inline">TK Group Central&nbsp;▸</span>
-          <FocusSwitcher />
+        <div className="noprint flex shrink-0 flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-navy/40 bg-navy px-4 py-2.5 text-white tablet:px-5">
+          <span className="hidden rounded bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-gold tablet:inline">Control</span>
+          <span className="hidden text-[11px] font-semibold text-white/85 tablet:inline">TK Group Central&nbsp;▸</span>
+          <FocusSwitcher dark />
         </div>
       )}
       {/* ── Sticky, blurred app-bar ──────────────────────────────────── */}
