@@ -51,6 +51,6 @@ describe('FlagAdmin container', () => {
     render(<FlagAdmin />);
     fireEvent.click(await screen.findByLabelText('branch.hide_statements'));
     await waitFor(() => expect(proposeFlags).toHaveBeenCalled());
-    expect(await screen.findByRole('status')).toHaveTextContent(/submitted for Farhan \+ Owner approval/);
+    expect(await screen.findByRole('status')).toHaveTextContent(/submitted for Owner approval/);
   });
 });

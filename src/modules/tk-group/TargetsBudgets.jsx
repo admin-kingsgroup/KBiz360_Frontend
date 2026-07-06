@@ -30,7 +30,7 @@ export function TargetsBudgets({ branches = DEFAULT_BRANCHES }) {
     setMsg('');
     try {
       await proposeGovernance('target_budget', branch, { branch, period, metric, amount: Number(amount), note: note.trim() });
-      setMsg(`${metricLabel(metric)} target for ${branch} ${period} submitted for Farhan + Owner approval.`);
+      setMsg(`${metricLabel(metric)} target for ${branch} ${period} submitted for Owner approval.`);
       await load();
     } catch (e2) { setMsg((e2 && e2.message) || 'Failed to submit.'); }
   }, [valid, branch, period, metric, amount, note, load]);

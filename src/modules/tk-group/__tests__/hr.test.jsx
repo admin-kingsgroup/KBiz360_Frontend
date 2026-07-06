@@ -26,6 +26,6 @@ describe('HRControl container', () => {
     fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Ravi Kumar' } });
     fireEvent.click(screen.getByRole('button', { name: /submit hr request/i }));
     await waitFor(() => expect(proposeGovernance).toHaveBeenCalledWith('hr', null, expect.objectContaining({ kind: 'new_hire', subject: 'Ravi Kumar' })));
-    expect(await screen.findByRole('status')).toHaveTextContent(/Farhan \+ Owner approval/);
+    expect(await screen.findByRole('status')).toHaveTextContent(/Owner approval/);
   });
 });

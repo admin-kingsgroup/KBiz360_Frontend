@@ -28,7 +28,7 @@ export function MasterControl() {
     setMsg('');
     try {
       await proposeGovernance('master', null, { kind, target: target.trim(), detail: detail.trim() });
-      setMsg(`Master change "${masterKindLabel(kind)}: ${target.trim()}" submitted for Farhan + Owner approval.`);
+      setMsg(`Master change "${masterKindLabel(kind)}: ${target.trim()}" submitted for Owner approval.`);
       await load();
     } catch (e2) { setMsg((e2 && e2.message) || 'Failed to submit.'); }
   }, [valid, kind, target, detail, load]);

@@ -27,8 +27,8 @@ export function goLiveSteps(flagState, pendingFlagCount = 0) {
       hint: on ? 'Already engaged.' : (proposed ? 'A flag change is in the approval queue.' : 'Toggle "Master control" on Control Flags to file the request.'),
     },
     {
-      key: 'approve', label: 'Farhan + Owner approved', done: on, href: '/tk/approvals',
-      hint: on ? 'Approved and applied.' : (proposed ? `${pendingFlagCount} flag change awaiting approval.` : 'Both approve it in the Approvals Inbox.'),
+      key: 'approve', label: 'Owner approved', done: on, href: '/tk/approvals',
+      hint: on ? 'Approved and applied.' : (proposed ? `${pendingFlagCount} flag change awaiting the Owner.` : 'The Owner approves it in the Approvals Inbox.'),
     },
     {
       key: 'live', label: 'Guard engaged — go-live complete', done: on,

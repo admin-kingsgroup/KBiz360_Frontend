@@ -35,7 +35,7 @@ describe('TargetsBudgets container', () => {
     fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '1000000' } });
     fireEvent.click(screen.getByRole('button', { name: /submit target/i }));
     await waitFor(() => expect(proposeGovernance).toHaveBeenCalledWith('target_budget', 'ALL', expect.objectContaining({ period: '2026-07', amount: 1000000 })));
-    expect(await screen.findByRole('status')).toHaveTextContent(/Farhan \+ Owner approval/);
+    expect(await screen.findByRole('status')).toHaveTextContent(/Owner approval/);
   });
 });
 
@@ -46,6 +46,6 @@ describe('MasterControl container', () => {
     fireEvent.change(screen.getByLabelText('Head or target'), { target: { value: 'ICICI 1234' } });
     fireEvent.click(screen.getByRole('button', { name: /submit master change/i }));
     await waitFor(() => expect(proposeGovernance).toHaveBeenCalledWith('master', null, expect.objectContaining({ kind: 'add_head', target: 'ICICI 1234' })));
-    expect(await screen.findByRole('status')).toHaveTextContent(/Farhan \+ Owner approval/);
+    expect(await screen.findByRole('status')).toHaveTextContent(/Owner approval/);
   });
 });

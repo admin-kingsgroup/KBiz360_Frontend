@@ -56,7 +56,7 @@ export function TkApprovalsPage() {
 
 export function TkControlsPage() {
   return (
-    <Page title="Control Flags" subtitle="TK Group control switches. Toggling a flag submits a Farhan + Owner change-request — never a raw flip — so even go-live is dual-approved and audited.">
+    <Page title="Control Flags" subtitle="TK Group control switches — the Owner's to manage. Toggling a flag submits an Owner change-request (never a raw flip), so even go-live is Owner-approved and audited.">
       <FlagAdmin />
     </Page>
   );
@@ -64,7 +64,7 @@ export function TkControlsPage() {
 
 export function TkPeriodLockPage() {
   return (
-    <Page title="Period Locks" subtitle="Lock an accounting period so nothing can be posted or edited into it. Proposing a lock (or unlock) is a Farhan + Owner change-request; 'ALL' locks every branch.">
+    <Page title="Period Locks" subtitle="Lock an accounting period so nothing can be posted or edited into it. Proposing a lock (or unlock) is an Owner change-request; 'ALL' locks every branch.">
       <PeriodLockAdmin branches={BRANCH_CODES} />
     </Page>
   );
@@ -104,7 +104,7 @@ export function TkAuditTrailPage() {
 
 export function TkTargetsPage() {
   return (
-    <Page title="Targets & Budgets" subtitle="Propose a branch target or budget for a period. It's filed as a Farhan + Owner change-request; nothing applies until approved.">
+    <Page title="Targets & Budgets" subtitle="Propose a branch target or budget for a period. It's filed as an Owner change-request; nothing applies until approved.">
       <TargetsBudgets branches={BRANCH_CODES} />
     </Page>
   );
@@ -112,7 +112,7 @@ export function TkTargetsPage() {
 
 export function TkMasterControlPage() {
   return (
-    <Page title="Master Control" subtitle="Raise a master / chart-of-accounts change (add / rename / deactivate a head). Filed as a Farhan + Owner change-request; applying it to the master stays a deliberate post-approval step.">
+    <Page title="Master Control" subtitle="Raise a master / chart-of-accounts change (add / rename / deactivate a head). Filed as an Owner change-request; applying it to the master stays a deliberate post-approval step.">
       <MasterControl />
     </Page>
   );
@@ -192,7 +192,7 @@ export function TkArapPage() {
 
 export function TkHRControlPage() {
   return (
-    <Page title="HR Requests" subtitle="Raise an HR governance item centrally — new hire, salary revision, payroll release. Filed as a Farhan + Owner change-request; nothing is actioned in HR until approved.">
+    <Page title="HR Requests" subtitle="Raise an HR governance item centrally — new hire, salary revision, payroll release. Filed as an Owner change-request; nothing is actioned in HR until approved.">
       <HRControl />
     </Page>
   );

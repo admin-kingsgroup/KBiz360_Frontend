@@ -45,6 +45,6 @@ describe('PeriodLockAdmin container', () => {
     fireEvent.change(screen.getByLabelText('Period (YYYY-MM)'), { target: { value: '2026-07' } });
     fireEvent.click(screen.getByRole('button', { name: /propose lock/i }));
     await waitFor(() => expect(proposePeriodLock).toHaveBeenCalledWith(expect.objectContaining({ period: '2026-07' })));
-    expect(await screen.findByRole('status')).toHaveTextContent(/submitted for Farhan \+ Owner approval/);
+    expect(await screen.findByRole('status')).toHaveTextContent(/submitted for Owner approval/);
   });
 });

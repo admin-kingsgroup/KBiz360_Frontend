@@ -30,7 +30,7 @@ export function HRControl({ branches = DEFAULT_BRANCHES }) {
     setMsg('');
     try {
       await proposeGovernance('hr', branch || null, { kind, subject: subject.trim(), branch: branch || null, detail: detail.trim() });
-      setMsg(`HR request "${hrKindLabel(kind)}: ${subject.trim()}" submitted for Farhan + Owner approval.`);
+      setMsg(`HR request "${hrKindLabel(kind)}: ${subject.trim()}" submitted for Owner approval.`);
       setSubject(''); setDetail('');
       await load();
     } catch (e2) { setMsg((e2 && e2.message) || 'Failed to submit.'); }

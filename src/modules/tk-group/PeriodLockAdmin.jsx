@@ -25,7 +25,7 @@ export function PeriodLockAdmin({ branches = DEFAULT_BRANCHES }) {
     setMsg('');
     try {
       await proposePeriodLock(form);
-      setMsg(`Period lock for ${form.branch} ${form.period} submitted for Farhan + Owner approval.`);
+      setMsg(`Period lock for ${form.branch} ${form.period} submitted for Owner approval.`);
     } catch (e) {
       setMsg((e && e.message) || 'Failed to submit the period lock.');
     }

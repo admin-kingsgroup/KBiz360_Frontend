@@ -23,7 +23,7 @@ export function FlagAdmin() {
     const next = withToggled(state, key);
     try {
       await proposeFlags(next);
-      setMsg(`Change to "${key}" submitted for Farhan + Owner approval.`);
+      setMsg(`Change to "${key}" submitted for Owner approval.`);
     } catch (e) {
       setMsg((e && e.message) || 'Failed to submit change.');
     }
