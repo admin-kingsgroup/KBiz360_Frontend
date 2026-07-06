@@ -911,10 +911,15 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       // Edited is a cross-cut (own data source), not a status bucket.
       const pushed = !!((sale && sale.pushed) || (purchase && purchase.pushed));
       const raw = lead.status || 'pending';
-      const st = (raw === 'approved' || raw === 'saved') ? (pushed ? 'pushed' : 'approved')
+      let st = (raw === 'approved' || raw === 'saved') ? (pushed ? 'pushed' : 'approved')
         : raw === 'rejected' ? 'deleted'
         : raw === 'unpushed' ? 'pending'
         : raw;
+      // Half-approved guard: a deal whose OTHER leg is still pending/unposted (e.g. the
+      // sale posted but the purchase refused on a missing tax head) must surface under
+      // PENDING — fix the refusal and re-approve the deal as one unit — never under
+      // Approved looking done while one leg hasn't reached the books.
+      if (st === 'approved' && [sale, purchase].some((l) => l && ((l.status || 'pending') === 'pending' || l.status === 'unpushed'))) st = 'pending';
       const saleNet = sale ? (Number(sale.total) || 0) - (Number(sale.taxAmt) || 0) : 0;
       const purNet = purchase ? (Number(purchase.total) || 0) - (Number(purchase.taxAmt) || 0) : 0;
       // The real INB Link No lives in bookingId (the shared deal id — e.g. INB/BOM-NBO/26/0007);
@@ -993,13 +998,17 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const toggle = (lk) => setSel((s) => { const n = new Set(s); if (n.has(lk)) n.delete(lk); else n.add(lk); return n; });
 
   const doApprove = async (list) => {
-    const ids = list.flatMap(idsOf);
+    // One group per deal → the backend approves each deal ATOMICALLY: if one leg
+    // refuses (e.g. missing tax head), its sibling rolls back and the WHOLE deal
+    // stays Pending — never a half-posted deal sitting in the Approved tab.
+    const groups = list.map(idsOf).filter((g) => g.length);
+    const ids = groups.flat();
     if (!ids.length) return;
     const { confirmed } = await confirmDialog({ title: `Approve ${list.length} INB deal(s)?`, message: 'Posts each deal’s INB Sale + airline Purchase to OUR (seller) books now. It stays revocable/editable until you Push it to the buyer branch.', confirmLabel: 'Approve' });
     if (!confirmed) return;
     setBusy(true);
-    approveMany.mutate({ ids, approver: 'admin' }, {
-      onSuccess: (res) => { setSel(new Set()); const a = (res && res.approved) != null ? res.approved : ids.length, f = (res && res.failed) || 0; toast(f ? `Approved ${a}, ${f} failed${res?.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : `${list.length} INB deal(s) approved — posted to our books`, f ? 'error' : 'success'); },
+    approveMany.mutate({ ids, groups, approver: 'admin' }, {
+      onSuccess: (res) => { setSel(new Set()); const a = (res && res.approved) != null ? res.approved : groups.length, f = (res && res.failed) || 0; toast(f ? `Approved ${a} deal(s), ${f} deal(s) failed — nothing from a failed deal was posted${res?.errors?.[0] ? `. ${res.errors[0]}` : ''}` : `${list.length} INB deal(s) approved — posted to our books`, f ? 'error' : 'success'); },
       onError: (e) => toast((e && e.message) || 'Approve failed', 'error'),
       onSettled: () => setBusy(false),
     });

@@ -285,7 +285,9 @@ export const fetchRevokeCheck = (id) => apiGet(`/api/vouchers/${id}/revoke-check
 export function useApproveMany() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ ids, approver }) => apiPost('/api/vouchers/approve-many', { ids, approver }),
+    // `groups` (optional): sub-arrays of ids the backend approves ATOMICALLY — an INB
+    // deal's sale + purchase legs post together or roll back together (never half).
+    mutationFn: ({ ids, approver, groups }) => apiPost('/api/vouchers/approve-many', { ids, approver, ...(groups ? { groups } : {}) }),
     onSuccess: () => invalidateBooks(qc),
   });
 }

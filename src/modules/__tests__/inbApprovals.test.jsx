@@ -92,13 +92,33 @@ describe('INB SPG Approvals', () => {
     expect(screen.getByText('INB/BOM/26/0004')).toBeInTheDocument();
   });
 
-  test('Approve posts BOTH legs via approve-many (sale + purchase ids)', async () => {
+  test('Approve posts BOTH legs via approve-many (sale + purchase ids), grouped per deal for atomicity', async () => {
     mockApiGet.mockResolvedValue(mkLegs('pending'));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(mockApproveMany).toHaveBeenCalled());
     const arg = mockApproveMany.mock.calls[0][0];
     expect(arg.ids.sort()).toEqual(['pur1', 'sale1']);
+    // The deal's legs travel as ONE group → the backend posts them all-or-nothing
+    // (a refused purchase leg rolls the sale leg back; the deal stays Pending).
+    expect(arg.groups).toEqual([['sale1', 'pur1']]);
+  });
+
+  // Regression: a HALF-approved deal (sale posted, purchase still pending — e.g. an old
+  // non-atomic bulk approve died on "Tax ledger(s) not in Chart of Accounts") must
+  // surface under PENDING so it can be fixed and re-approved — NOT under Approved.
+  test('a half-approved deal (sale approved, purchase pending) stays in the Pending tab', async () => {
+    const legs = mkLegs('pending');
+    legs.find((l) => l.category === 'sale').status = 'approved';
+    mockApiGet.mockResolvedValue(legs);
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    // It renders on the (default) Pending tab, still actionable…
+    expect(await screen.findByText(LINK, { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Approve' })).toHaveLength(1);
+    // …and re-approving sends ONLY the still-pending purchase leg (its own group).
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(mockApproveMany).toHaveBeenCalled());
+    expect(mockApproveMany.mock.calls[0][0].groups).toEqual([['pur1']]);
   });
 
   test('historical folded legs pair via againstPurchase even when sourceRef differs', async () => {
