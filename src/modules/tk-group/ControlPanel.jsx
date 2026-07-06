@@ -31,20 +31,22 @@ const Off = () => <Badge tone="neutral" size="sm">Off</Badge>;
 const H3 = ({ children }) => <h3 className="mb-2 mt-5 font-serif text-[15px] font-semibold text-ink">{children}</h3>;
 // Interactive switch — flipping it PROPOSES the change (Owner-approved), it does not
 // flip live. Off = grey, On = teal (crit = red for money controls).
-function Toggle({ on, crit, onClick }) {
+function Toggle({ on, crit, onClick, label }) {
   return (
-    <button type="button" role="switch" aria-checked={!!on} onClick={onClick}
+    <button type="button" role="switch" aria-checked={!!on} aria-label={label} onClick={onClick}
       className="relative h-[24px] w-[42px] shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
       style={{ background: on ? (crit ? '#9A2A2A' : '#1E655C') : '#CDD3DE' }}>
       <span className="absolute top-[2.5px] h-[19px] w-[19px] rounded-full bg-white shadow transition-all" style={{ left: on ? 20 : 2.5 }} />
     </button>
   );
 }
-function Row({ nm, ds, st, flag, on, crit, onPropose, right }) {
-  const control = right !== undefined
-    ? right
-    : (flag ? <Toggle on={on} crit={crit} onClick={() => onPropose && onPropose(flag)} /> : <Off />);
-  const state = flag ? (on ? 'On' : 'Off') : 'Off';
+function Row({ nm, ds, st, flag, on, crit, onPropose, right, applied, guarded }) {
+  const control = right !== undefined ? right
+    : flag ? <Toggle on={on} crit={crit} label={nm} onClick={() => onPropose && onPropose(flag)} />
+    : applied ? <Badge tone="success" size="sm">Active</Badge>
+    : guarded ? <Badge tone="info" size="sm">Via master guard</Badge>
+    : <Off />;
+  const state = flag ? (on ? 'On' : 'Off') : applied ? 'Active now' : guarded ? 'Engages with the master guard' : 'Off';
   return (
     <div className="flex items-start gap-3 rounded-brand border border-surface-border bg-surface p-3.5">
       <div className="min-w-0 flex-1">
@@ -119,7 +121,8 @@ export function ControlPanel({ setRoute }) {
             </div>
             <div className="mt-3 grid gap-2.5">
               <Row nm="Require Verify (Sughra)" ds="A voucher must be verified before approval." st="verify not required" />
-              <Row nm="Require Approve (Faiz)" ds="Final approval posts the journal." st="posts directly" />
+              <Row nm="Require approval before posting" ds="New vouchers start Pending — final approval (Faiz) posts the journal." st="posts directly"
+                flag="branch.pending_by_default" on={isOn('branch.pending_by_default')} onPropose={onPropose} />
               <Row nm="Let Sughra also Approve (AE-approve)" ds="Elevates the AE from verify-only to also give final approval on a branch-accountant voucher."
                 st="Sughra verifies only" flag="approval.ae_can_approve" on={v.aeCanApprove} onPropose={onPropose} />
               <Row nm="Owner co-sign on sensitive types" ds="Refund · reissue · write-off · adjustment JV also need Afshin." st="sensitive" />
@@ -220,7 +223,7 @@ export function ControlPanel({ setRoute }) {
             </div>
           </>
         );
-      case 'rights': return <><p className="psub">What the branch may and may not touch. Keep off during migration; lock as you hand structure to the centre.</p><ControlList items={CONTROL_LISTS.rights} isOn={isOn} onPropose={onPropose} /></>;
+      case 'rights': return <><p className="psub">Two flags you set independently here (Relocate, Hide-statements). The rest engage automatically with the master guard — <b>Via master guard</b> means a branch write already stages for Owner approval once the guard is on, so you don't wire them separately.</p><ControlList items={CONTROL_LISTS.rights} isOn={isOn} onPropose={onPropose} /></>;
       case 'sod': return <><p className="psub">Conflict rules — the same person can never both create and clear their own work. All off (advisory) until engaged.</p><ControlList items={CONTROL_LISTS.sod} /></>;
       case 'security': return <><p className="psub">Who can log in, from where, and how strongly — session-level protection, independent of the approval chain.</p><ControlList items={CONTROL_LISTS.security} /></>;
       case 'entry': return <><p className="psub">Guards at the point of entry and on statutory work — block bad data before it posts, and lock filed periods.</p><ControlList items={CONTROL_LISTS.entry} /></>;

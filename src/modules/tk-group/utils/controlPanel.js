@@ -104,13 +104,13 @@ export const POWER_SCREEN_KEYS = POWER_SCREENS.flatMap((g) => g.items.map((i) =>
 // the component renders them generically and they are testable.
 export const CONTROL_LISTS = {
   rights: [
-    { nm: 'Master-creation lock', ds: "Branches can't create ledgers / parties — central only.", st: 'open during migration' },
-    { nm: 'Field locks (PAN · bank · credit-limit)', ds: 'Sensitive party fields become central-request only.' },
-    { nm: 'Period lock', ds: "Branches can't post into a closed / filed period." },
-    { nm: 'Numbering lock (auto only)', ds: 'No manual voucher-number resets.' },
-    { nm: 'Branch profitability visibility', ds: 'ON = branches see own P&L / GP / MIS. OFF = hidden.', st: 'hidden by default' },
-    { nm: 'Relocate central screens off branch', ds: 'Masters · approvals · money-out move to TK Group only.', st: 'branch menu unchanged', flag: 'branch.central_relocated' },
-    { nm: 'Wired-ledger lock', ds: 'Module / tax / inter-branch heads locked for everyone.' },
+    { nm: 'Relocate central screens off branch', ds: 'Masters · approvals · money-out move to TK Group only.', flag: 'branch.central_relocated' },
+    { nm: 'Hide branch statements (P&L / Balance Sheet)', ds: 'ON = P&L / GP / MIS hidden from Branch Accountants; central always sees.', flag: 'branch.hide_statements' },
+    { nm: 'Master-creation lock', ds: "Branch ledger / party writes route to Owner approval (masterGuard).", guarded: true },
+    { nm: 'Field locks (PAN · bank · credit-limit)', ds: 'Party-field changes from a branch stage for Owner approval.', guarded: true },
+    { nm: 'Period lock', ds: 'No posting into a closed / filed period. Set specific periods on Period Locks.', guarded: true },
+    { nm: 'Numbering lock (auto only)', ds: 'Voucher numbers are always system-generated — no manual resets.', applied: true },
+    { nm: 'Wired-ledger lock', ds: 'Module / tax / inter-branch heads locked for everyone.', applied: true },
   ],
   sod: [
     { nm: 'A maker cannot approve their own voucher', ds: 'The person who entered it is barred from its approval.' },

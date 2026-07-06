@@ -49,8 +49,7 @@ describe('Control Panel · Power Console', () => {
     const { proposeFlags } = require('../api/flags');
     proposeFlags.mockClear();
     renderWith(<ControlPanel setRoute={() => {}} />);
-    const sw = (await screen.findAllByRole('switch'))[0]; // the master toggle
-    fireEvent.click(sw);
+    fireEvent.click(await screen.findByRole('switch', { name: /Engage the TK Group guard/ }));
     expect(await screen.findByText(/submitted for the Owner/)).toBeInTheDocument();
     expect(proposeFlags).toHaveBeenCalledTimes(1);
   });
@@ -60,9 +59,23 @@ describe('Control Panel · Power Console', () => {
     proposeFlags.mockClear();
     renderWith(<ControlPanel setRoute={() => {}} />);
     fireEvent.click(screen.getByText('Approval & Verification'));
-    const sw = (await screen.findAllByRole('switch'))[0]; // AE-approve is the only switch here
-    fireEvent.click(sw);
+    fireEvent.click(await screen.findByRole('switch', { name: /Let Sughra also Approve/ }));
     expect(await screen.findByText(/submitted for the Owner/)).toBeInTheDocument();
     expect(proposeFlags).toHaveBeenCalledTimes(1);
+  });
+
+  test('Rights & Locks toggles (relocate / hide-statements) propose too', async () => {
+    const { proposeFlags } = require('../api/flags');
+    proposeFlags.mockClear();
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Rights & Locks'));
+    fireEvent.click(await screen.findByRole('switch', { name: /Relocate central screens/ }));
+    expect(await screen.findByText(/submitted for the Owner/)).toBeInTheDocument();
+    expect(proposeFlags).toHaveBeenCalledTimes(1);
+    // hide-statements is also a live switch on this screen
+    expect(screen.getByRole('switch', { name: /Hide branch statements/ })).toBeInTheDocument();
+    // guard-governed locks are shown honestly (not fake toggles)
+    expect(screen.getAllByText(/Via master guard/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(1); // numbering / wired already applied
   });
 });
