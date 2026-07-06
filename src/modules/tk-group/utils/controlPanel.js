@@ -134,10 +134,10 @@ export const CONTROL_LISTS = {
     { nm: 'Reconciliation before close', ds: "A period can't close until bank/client/supplier recon is signed off.", planned: true },
   ],
   notifications: [
-    { nm: 'Approval-request alerts', ds: 'Notify the next approver when a voucher reaches their level.', planned: true },
-    { nm: 'Stale-approval SLA + escalation', ds: 'Auto-remind, then escalate an item sitting too long.', planned: true },
+    { nm: 'Approval-request alerts', ds: 'Pending work already surfaces on the Alerts feed and the Inbox badge for the next approver.', applied: true },
+    { nm: 'Stale-approval SLA + escalation', ds: 'Change-requests are aged against the clearance SLA — on-time / at-risk / breached — on the governance queue.', applied: true },
     { nm: 'Exception & risk alerts', ds: 'GP≤0 · negative cash · over-limit — already surface on the Alerts feed.', applied: true },
-    { nm: 'Daily digest to Owner / Director', ds: 'One summary of pending, exceptions and close status.', planned: true },
+    { nm: 'Daily digest to Owner / Director', ds: 'One scheduled email summary of pending, exceptions and close status.', planned: true },
   ],
   reports: [
     { nm: 'Restrict export of sensitive data', ds: 'Only granted users may export ledgers / registers / P&L.', planned: true },
