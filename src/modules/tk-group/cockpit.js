@@ -47,10 +47,12 @@ export function controlCockpitMenu() {
       { label: 'Branch Scorecard', href: '/tk/scorecard' },
       { label: 'Performance vs Target', href: '/tk/performance' },
       { label: 'Investment & Capital', href: '/tk/investment' },
+      { label: 'Assets Central', href: '/tk/assets' },
       { label: 'Profitability', href: '/tk/profitability' },
       { label: 'Receivables & Payables', href: '/tk/receivables-payables' },
       { label: 'Exceptions & Risk', href: '/tk/exceptions' },
       { label: 'Compliance & Close', href: '/tk/compliance' },
+      { label: 'Central Tax Desk', href: '/tk/tax-desk' },
     ] },
     { label: 'Monitoring', icon: Activity, children: [
       { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },

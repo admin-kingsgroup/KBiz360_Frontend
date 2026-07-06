@@ -67,7 +67,7 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
@@ -485,6 +485,8 @@ export default function KB360App(){
     if(route==="/tk/compliance")         return <TkCompliancePage/>;
     if(route==="/tk/performance")        return <TkPerformancePage/>;
     if(route==="/tk/investment")         return <TkInvestmentPage/>;
+    if(route==="/tk/tax-desk")           return <TkTaxDeskPage/>;
+    if(route==="/tk/assets")             return <TkAssetsPage/>;
     if(route==="/tk/profitability")      return <TkProfitabilityPage/>;
     if(route==="/tk/receivables-payables") return <TkArapPage/>;
     if(route==="/tk/hr-control")         return <TkHRControlPage/>;

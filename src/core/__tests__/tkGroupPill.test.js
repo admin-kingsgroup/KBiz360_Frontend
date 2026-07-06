@@ -20,6 +20,7 @@ const CONTROL_ROUTES = [
   '/tk/control-tower', '/tk/approvals', '/tk/decisions', '/tk/onboarding', '/tk/controls', '/tk/limits', '/tk/period-locks',
   '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability',
   '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/go-live', '/tk/my-role', '/tk/roles',
+  '/tk/tax-desk', '/tk/assets',
 ];
 
 describe('TK Group Central — control cockpit mode', () => {
@@ -50,7 +51,7 @@ describe('TK Group Central — control cockpit mode', () => {
 
   test('every TK Group page stays controllable in Page Visibility Control', () => {
     const keys = new Set(allPageKeys());
-    for (const leaf of ['/tk/my-role', '/tk/go-live', '/tk/approvals', '/tk/onboarding', '/tk/controls', '/tk/limits', '/tk/period-locks', '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/control-tower', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability', '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/roles']) {
+    for (const leaf of ['/tk/my-role', '/tk/go-live', '/tk/approvals', '/tk/onboarding', '/tk/controls', '/tk/limits', '/tk/period-locks', '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/control-tower', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability', '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/roles', '/tk/tax-desk', '/tk/assets']) {
       expect(keys.has(leaf)).toBe(true);
     }
   });

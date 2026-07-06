@@ -23,6 +23,8 @@ import { RolesResponsibilities } from './RolesResponsibilities';
 import { ApprovalsOverview } from './ApprovalsOverview';
 import { ConfigReadiness } from './ConfigReadiness';
 import { ControlPanel } from './ControlPanel';
+import { TaxDesk } from './TaxDesk';
+import { AssetsCentral } from './AssetsCentral';
 import { LimitsAdmin } from './LimitsAdmin';
 import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
@@ -215,6 +217,22 @@ export function TkInvestmentPage() {
   return (
     <Page title="Investment & Capital" subtitle="Each branch's capital invested, investments, loans, capital employed and profit — branchwise, in native currency, never consolidated into a group total.">
       <InvestmentDashboard />
+    </Page>
+  );
+}
+
+export function TkTaxDeskPage() {
+  return (
+    <Page title="Central Tax Desk" subtitle="The org-wide statutory compliance calendar (a filing is entity / return level, never a branch sum) plus a branchwise filing-status matrix for the last fileable month.">
+      <TaxDesk />
+    </Page>
+  );
+}
+
+export function TkAssetsPage() {
+  return (
+    <Page title="Assets Central" subtitle="Each branch's fixed-asset register — asset count, gross cost, accumulated depreciation and net book value — branchwise, in native currency, never consolidated into a group total.">
+      <AssetsCentral />
     </Page>
   );
 }
