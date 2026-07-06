@@ -21,6 +21,7 @@ export function controlCockpitMenu() {
     { label: 'Onboarding', icon: UserPlus, href: '/tk/onboarding' },
     { label: 'Controls', icon: Lock, children: [
       { label: 'Control Flags', href: '/tk/controls' },
+      { label: 'Thresholds & Limits', href: '/tk/limits' },
       { label: 'Period Locks', href: '/tk/period-locks' },
       { label: 'Targets & Budgets', href: '/tk/targets' },
       { label: 'Master Control (request)', href: '/tk/master-control' },
@@ -55,6 +56,7 @@ export function controlCockpitMenu() {
     ] },
     { label: 'Go-Live', icon: Rocket, href: '/tk/go-live' },
     { label: 'My Role', icon: User, href: '/tk/my-role' },
+    { label: 'Roles & Responsibilities', icon: Users, href: '/tk/roles' },
   ];
 }
 

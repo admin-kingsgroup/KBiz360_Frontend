@@ -3,7 +3,7 @@ import React from 'react';
 // ─── TK GROUP · FE · control flags panel (presentational) ────────────────────
 // Lists each control flag with its ON/OFF state. Foundation flags are always on
 // and can't be switched. Toggling calls onToggle(key, next) — the container turns
-// that into a change-request (Farhan + Owner), it does not flip anything directly.
+// that into a change-request (Owner-only), it does not flip anything directly.
 const sw = (on) => ({
   background: on ? '#1F6E4C' : '#cbd2dc', color: '#fff', border: 'none', borderRadius: 20,
   fontSize: 10, fontWeight: 700, padding: '3px 10px', minWidth: 38,

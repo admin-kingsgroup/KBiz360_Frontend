@@ -59,7 +59,7 @@ describe('UserMenu (keyboard/menu)', () => {
     fireEvent.click(trigger);
     expect(screen.getByRole('menu')).toBeInTheDocument();
     const items = screen.getAllByRole('menuitem');
-    expect(items.length).toBe(5);
+    expect(items.length).toBe(6); // + Roles & Responsibilities
     expect(document.activeElement.textContent).toMatch(/My Profile/);
     fireEvent.click(screen.getByText('My Notifications'));
     expect(onOpenNotifications).toHaveBeenCalled();

@@ -9,7 +9,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { confirmDialog } from '../core/ux/confirm';
 import { toast } from '../core/ux/toast';
 import { createPortal } from 'react-dom';
-import { Bell, Lock, LogOut, Settings, User } from 'lucide-react';
+import { Bell, Lock, LogOut, Settings, User, Users } from 'lucide-react';
 import { rovingNextIndex } from '../core/ux/focus';
 import { ChangePasswordModal } from './ChangePasswordModal';
 
@@ -44,6 +44,7 @@ export function UserMenu({currentUser, setCurrentUser, setRoute, onOpenNotificat
   // Action list — order matters for roving focus.
   const actions = [
     { icon: User, label: 'My Profile', onSelect: () => { close(false); setRoute && setRoute('/settings/profile'); } },
+    { icon: Users, label: 'Roles & Responsibilities', onSelect: () => { close(false); setRoute && setRoute('/tk/roles'); } },
     { icon: Bell, label: 'My Notifications', onSelect: () => { close(false); onOpenNotifications ? onOpenNotifications() : (setRoute && setRoute('/dashboard')); } },
     { icon: Settings, label: 'Preferences', onSelect: () => { close(false); setRoute && setRoute('/settings/preferences'); } },
     { icon: Lock, label: 'Change Password', onSelect: () => { close(false); setPwdOpen(true); } },

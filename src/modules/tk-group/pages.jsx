@@ -19,6 +19,8 @@ import { InvestmentDashboard } from './InvestmentDashboard';
 import { Profitability } from './Profitability';
 import { ReceivablesPayables } from './ReceivablesPayables';
 import { HRControl } from './HRControl';
+import { RolesResponsibilities } from './RolesResponsibilities';
+import { LimitsAdmin } from './LimitsAdmin';
 import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
 
@@ -46,6 +48,14 @@ export function TkMyRolePage() {
   );
 }
 
+export function TkRolesPage() {
+  return (
+    <Page title="Roles & Responsibilities" subtitle="Everyone's role in the ERP — who reports to whom, what each can approve, and the guardrails. Read-only and auto-updates when the model changes; shareable with the whole team.">
+      <RolesResponsibilities />
+    </Page>
+  );
+}
+
 export function TkApprovalsPage() {
   return (
     <Page title="Approvals Inbox" subtitle="Governance change-requests awaiting your decision — config, control flags, period locks, masters and credit policy.">
@@ -58,6 +68,14 @@ export function TkControlsPage() {
   return (
     <Page title="Control Flags" subtitle="TK Group control switches — the Owner's to manage. Toggling a flag submits an Owner change-request (never a raw flip), so even go-live is Owner-approved and audited.">
       <FlagAdmin />
+    </Page>
+  );
+}
+
+export function TkLimitsPage() {
+  return (
+    <Page title="Thresholds & Limits" subtitle="The control-model numbers — decision escalation ceilings, voucher tiers, cash limits, investment thresholds. Owner-editable; changes are filed as an Owner change-request and apply only on approval.">
+      <LimitsAdmin />
     </Page>
   );
 }

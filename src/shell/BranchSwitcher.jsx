@@ -7,6 +7,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { BRANCHES, CONSOLIDATED_LABEL } from '../core/data';
+import { FULL_SCOPE_ROLES } from '../core/branchScope';
 import { rovingNextIndex } from '../core/ux/focus';
 
 export function BranchSwitcher({branch,setBranch,currentUser,light}){
@@ -29,10 +30,13 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
 
   // The branches this user may switch to, plus a Consolidated (ALL) row.
   const list=useMemo(()=>{
-    const FULL_SCOPE=["Super Admin","Director","Senior Finance Manager","Sr. Accounts Executive"];
     const userBranches = Array.isArray(currentUser?.branches) ? currentUser.branches : null;
-    const isFull = !currentUser || FULL_SCOPE.includes(currentUser.role);
-    const allowed = (isFull || !userBranches) ? BRANCHES : BRANCHES.filter(b=>userBranches.includes(b.code));
+    // Single-sourced with branchScope (the pill/cockpit gate) so the "who sees all
+    // branches" rule can never drift between the switcher and the scope guard.
+    const isFull = !currentUser || FULL_SCOPE_ROLES.includes(currentUser.role);
+    // Full-scope → every branch. Non-full → ONLY their assigned branches; no assignment
+    // = nothing (never fall back to all branches — that would leak every branch's data).
+    const allowed = isFull ? BRANCHES : (userBranches ? BRANCHES.filter(b=>userBranches.includes(b.code)) : []);
     const includeAll = isFull && allowed.length>1;
     return includeAll ? [...allowed,{code:"ALL",city:CONSOLIDATED_LABEL,country:"Consolidated",flag:"🌐",currency:"INR",tax:"MULTI"}] : allowed;
   },[currentUser]);

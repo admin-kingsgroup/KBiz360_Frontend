@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { perfTargetRow, fyStr } from '../utils/perfTarget';
-import { investmentRow } from '../utils/investment';
+import { investmentRow, fixFirstFlags } from '../utils/investment';
 
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn().mockResolvedValue({}) }));
 // eslint-disable-next-line import/first
@@ -34,6 +34,12 @@ describe('investment utils', () => {
     expect(investmentRow({ code: 'BOM', currency: 'INR' }, { capitalInvested: 5000, investments: 2000, loans: 1000, capitalEmployed: 8000, profit: 500 }))
       .toMatchObject({ capitalInvested: 5000, investments: 2000, loans: 1000, capitalEmployed: 8000, profit: 500 });
     expect(investmentRow({ code: 'X' }, null)).toMatchObject({ capitalInvested: 0, profit: 0 });
+  });
+  test('fixFirstFlags flags low ROI / high overdue / budget-over against configured limits', () => {
+    const L = { investmentMinRoi: 1.5, investmentMaxOverduePct: 15, investmentMaxBudgetOverPct: 10 };
+    expect(fixFirstFlags({ roi: 1.2, overduePct: 5, budgetOverPct: 2 }, L)).toEqual([expect.stringMatching(/ROI/)]);
+    expect(fixFirstFlags({ roi: 2, overduePct: 20, budgetOverPct: 12 }, L)).toHaveLength(2);
+    expect(fixFirstFlags({ roi: 2, overduePct: 5, budgetOverPct: 2 }, L)).toEqual([]); // clear
   });
 });
 

@@ -2,7 +2,7 @@
    login and refresh must resolve to a branch the user can actually access, or
    the server-side branch scoping (auth.middleware enforceBranchScope) 403s every
    branch-scoped read. pickBranchForUser is the single picker both paths use. */
-import { pickBranchForUser, isFullScope } from '../branchScope';
+import { pickBranchForUser, isFullScope, hasNoAssignedBranch } from '../branchScope';
 import { BRANCHES } from '../data';
 
 beforeEach(() => { try { localStorage.removeItem('kb360-branch'); } catch { /* ignore */ } });
@@ -45,6 +45,25 @@ describe('pickBranchForUser', () => {
     const b = pickBranchForUser(null);
     expect(b).toBeTruthy();
     expect(typeof b === 'object' ? b.code : b).toBeTruthy();
+  });
+
+  test('NON-full user with NO branch assigned → null (never falls back to all branches)', () => {
+    expect(pickBranchForUser({ role: 'Branch Manager' })).toBe(null);
+    expect(pickBranchForUser({ role: 'General Manager', branches: [] })).toBe(null);
+  });
+
+  test('a leftover saved branch cannot rescue an unassigned non-full user', () => {
+    localStorage.setItem('kb360-branch', 'BOM');
+    expect(pickBranchForUser({ role: 'Branch Manager' })).toBe(null);
+  });
+});
+
+describe('hasNoAssignedBranch (no assignment = no access)', () => {
+  test('true only for a NON-full user with no assigned branch', () => {
+    expect(hasNoAssignedBranch({ role: 'General Manager' })).toBe(true);
+    expect(hasNoAssignedBranch({ role: 'Branch Manager', branches: [] })).toBe(true);
+    expect(hasNoAssignedBranch({ role: 'Branch Accountant', branches: ['BOM'] })).toBe(false);
+    expect(hasNoAssignedBranch({ role: 'Super Admin' })).toBe(false); // full-scope
   });
 });
 

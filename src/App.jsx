@@ -67,11 +67,11 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
-import { FULL_SCOPE_ROLES } from './core/branchScope';
+import { FULL_SCOPE_ROLES, hasNoAssignedBranch } from './core/branchScope';
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/reportsFinancial/financialStatements'));
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsFinancial/reportsNotes'));
 const { Statistics } = lazyModule(() => import('./modules/reports/statistics'));
@@ -298,6 +298,27 @@ export default function KB360App(){
        URL — it's removed from their nav too (see getMenu). The landing dashboard
        and the visibility-control page itself are never blocked here (the latter
        gates non-admins inside its own component). ── */
+    // No branch assigned: a non-central user (GM / BM / Branch Accountant) with NO branch
+    // in their profile can see NOTHING — never all branches. Show a clear notice until an
+    // admin assigns a branch (the server also branch-scopes every call as the safety net).
+    if(hasNoAssignedBranch(currentUser)){
+      return (
+        <div style={{padding:30,maxWidth:560,margin:"40px auto",
+          background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🏢</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>No branch assigned</h2>
+          <p style={{margin:"0 0 8px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
+            Your account <b>{currentUser?.name || currentUser?.email}</b> ({currentUser?.role}) isn't
+            assigned to any branch yet, so there's nothing to show. You are branch-scoped —
+            you'll only ever see the branch(es) assigned to you, never all branches.
+          </p>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
+            Ask an administrator to assign your branch in <b>Settings ▸ Users</b>.
+          </p>
+        </div>
+      );
+    }
+
     // TK Group hide-statements: a restricted view with the control ON can't reach the
     // financial statements even by direct URL — send them back to their dashboard.
     if(hideStatements && isStatementHref(route)) return <Navigate to="/accounts/dashboard" replace/>;
@@ -464,6 +485,8 @@ export default function KB360App(){
     if(route==="/tk/profitability")      return <TkProfitabilityPage/>;
     if(route==="/tk/receivables-payables") return <TkArapPage/>;
     if(route==="/tk/hr-control")         return <TkHRControlPage/>;
+    if(route==="/tk/roles")              return <TkRolesPage/>;
+    if(route==="/tk/limits")             return <TkLimitsPage/>;
     if(route==="/hr/portal")               return <HRPortal setRoute={navigate}/>;
     if(route==="/hr/leave-apply")          return <LeaveApply/>;
     if(route==="/hr/reimbursement")        return <ReimbursementClaim/>;

@@ -4,9 +4,9 @@ import { flagRows, withToggled } from './utils/flags';
 import { FlagPanel } from './FlagPanel';
 
 // ─── TK GROUP · FE · control-flag admin (container) ──────────────────────────
-// Shows the current control flags. Toggling one SUBMITS a change-request (Farhan +
-// Owner) rather than flipping it — so even go-live (turning controls on) is a
-// dual-approved, audited action, not a raw switch.
+// Shows the current control flags. Toggling one SUBMITS a change-request (Owner-only)
+// rather than flipping it — so even go-live (turning controls on) is an Owner-approved,
+// audited action, not a raw switch.
 export function FlagAdmin() {
   const [state, setState] = useState({ flags: {} });
   const [msg, setMsg] = useState('');

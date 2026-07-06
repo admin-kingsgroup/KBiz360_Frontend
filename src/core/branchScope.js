@@ -13,6 +13,13 @@ export function isFullScope(user) {
   return !user || FULL_SCOPE_ROLES.includes(user?.role);
 }
 
+// A NON-full-scope user (GM / BM / Branch Accountant) with NO branch assigned has no
+// access to anything — they must NOT fall back to seeing all branches. An admin has to
+// assign them a branch first.
+export function hasNoAssignedBranch(user) {
+  return !isFullScope(user) && !(Array.isArray(user?.branches) && user.branches.length > 0);
+}
+
 // Pick a branch the given user may actually use. Honour the last-saved branch
 // ('kb360-branch') when it's still in scope (full-scope users may use any branch,
 // incl. "ALL"), else fall back to the user's first allowed branch. All six
@@ -32,12 +39,15 @@ export function pickBranchForUser(user) {
       if (full) return 'ALL';
     } else if (saved) {
       const b = BRANCHES.find((x) => x.code === saved);
-      if (b && (full || !Array.isArray(codes) || codes.includes(b.code))) return b;
+      // Non-full users may only restore a saved branch that is actually assigned to them.
+      if (b && (full || (Array.isArray(codes) && codes.includes(b.code)))) return b;
     }
   } catch { /* ignore */ }
   if (Array.isArray(codes) && codes.length) {
     const b = BRANCHES.find((x) => codes.includes(x.code));
     if (b) return b;
   }
-  return BRANCHES[0];
+  // Full-scope → first branch is a fine default. A NON-full user with no assigned branch
+  // gets NULL — no all-branch fallback, so they can't see anything until assigned.
+  return full ? BRANCHES[0] : null;
 }

@@ -8,3 +8,12 @@ export async function getMyRole() {
     return null;
   }
 }
+
+// The whole org's roles & responsibilities (shareable) + which role is "you".
+export async function getAllRoles() {
+  try {
+    return (await apiGet('/api/tk/my-role/all')) || { youAre: '', roles: [] };
+  } catch {
+    return { youAre: '', roles: [] };
+  }
+}
