@@ -11,6 +11,7 @@ import { getUnmatchedTickets, settlePurchaseEntry } from './business-logic';
 import { FX_RATES, PURCHASE_REGISTRY } from './data';
 import { branchCfg } from './referenceCache';
 import { useSalespeople } from './useReference';
+import { guardExport } from './exportGuard';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, getAuthToken } from './api';
 import { useMasterList } from './useMasters';
@@ -500,17 +501,21 @@ function exportRptTable(pageEl, title, kind) {
   const matrix = [...table.querySelectorAll('tr')].map(cellsOf).filter((r) => r.length);
   if (!matrix.length) { toast('Nothing to export on this report.'); return; }
   const slug = String(title || 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'report';
-  let blob, ext;
-  if (kind === 'xls') {
-    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const html = `<table border="1">${matrix.map((r, i) => `<tr>${r.map((c) => `<t${i === 0 ? 'h' : 'd'}>${esc(c)}</t${i === 0 ? 'h' : 'd'}>`).join('')}</tr>`).join('')}</table>`;
-    blob = new Blob([`﻿<html><head><meta charset="utf-8"></head><body>${html}</body></html>`], { type: 'application/vnd.ms-excel' }); ext = 'xls';
-  } else {
-    const q = (s) => (/[",\n\r]/.test(s) ? `"${String(s).replace(/"/g, '""')}"` : s);
-    blob = new Blob([`﻿${matrix.map((r) => r.map(q).join(',')).join('\r\n')}`], { type: 'text/csv;charset=utf-8' }); ext = 'csv';
-  }
-  const url = URL.createObjectURL(blob); const a = document.createElement('a');
-  a.href = url; a.download = `${slug}.${ext}`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  // Report/Export controls chokepoint — dormant unless the Owner engages the export
+  // policy, then a restricted export is blocked (and logged) instead of downloading.
+  guardExport({ report: title || slug, scope: 'branch', format: kind === 'xls' ? 'xls' : 'csv', rowCount: Math.max(0, matrix.length - 1) }, () => {
+    let blob, ext;
+    if (kind === 'xls') {
+      const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const html = `<table border="1">${matrix.map((r, i) => `<tr>${r.map((c) => `<t${i === 0 ? 'h' : 'd'}>${esc(c)}</t${i === 0 ? 'h' : 'd'}>`).join('')}</tr>`).join('')}</table>`;
+      blob = new Blob([`﻿<html><head><meta charset="utf-8"></head><body>${html}</body></html>`], { type: 'application/vnd.ms-excel' }); ext = 'xls';
+    } else {
+      const q = (s) => (/[",\n\r]/.test(s) ? `"${String(s).replace(/"/g, '""')}"` : s);
+      blob = new Blob([`﻿${matrix.map((r) => r.map(q).join(',')).join('\r\n')}`], { type: 'text/csv;charset=utf-8' }); ext = 'csv';
+    }
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = `${slug}.${ext}`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  });
 }
 
 export function RPT_Page({title,subtitle,toolbar,children}){

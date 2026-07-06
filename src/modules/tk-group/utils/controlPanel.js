@@ -140,9 +140,9 @@ export const CONTROL_LISTS = {
     { nm: 'Daily digest to Owner / Director', ds: 'One scheduled email summary of pending, exceptions and close status.', planned: true },
   ],
   reports: [
-    { nm: 'Restrict export of sensitive data', ds: 'Only granted users may export ledgers / registers / P&L.', planned: true },
-    { nm: 'Watermark & log every export', ds: 'Stamp who exported what, when — logged to the audit trail.', planned: true },
-    { nm: 'Block branch export of group reports', ds: 'Consolidated / cross-branch reports never leave via a branch.', planned: true },
+    { nm: 'Restrict export of sensitive data', ds: 'Only permitted roles may export ledgers / registers / P&L — a view-only user is blocked at the shared export helper.', flag: 'reports.restrict_export' },
+    { nm: 'Log every export', ds: 'Who exported what, when — every export (allowed or blocked) is recorded to the central export trail.', flag: 'reports.log_exports' },
+    { nm: 'Block branch export of group reports', ds: 'A branch-scoped user cannot export a consolidated (group) report.', flag: 'reports.block_branch_group_export' },
   ],
 };
 

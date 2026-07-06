@@ -5,6 +5,7 @@
 // open directly into columns — no binary .xlsx writer / runtime dependency.
 // Numbers stay numeric; text with commas/quotes/newlines is escaped per RFC 4180.
 // ───────────────────────────────────────────────────────────────────────────
+import { guardExport } from './exportGuard';
 
 function csvCell(v) {
   if (v == null) return '';
@@ -18,21 +19,30 @@ function csvCell(v) {
  * @param {string} filename            without extension (".csv" appended)
  * @param {{key:string,label?:string}[]} columns
  * @param {object[]} rows              keyed by column.key
+ * @param {{report?:string, scope?:'branch'|'group', branch?:string}} [meta]
+ *        Report/Export-controls hint. Dormant unless the Owner engages the export
+ *        policy — then a restricted / branch-group export is blocked (returns false).
+ * @returns {boolean|undefined} false if the export policy blocked it; else undefined.
  */
-export function exportToExcel(filename, columns, rows) {
-  const header = columns.map((c) => csvCell(c.label ?? c.key)).join(',');
-  const body = (rows || []).map((r) => columns.map((c) => csvCell(r[c.key])).join(',')).join('\r\n');
-  const csv = '﻿' + header + '\r\n' + body;
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const safe = String(filename || 'export').replace(/[^\w.-]+/g, '-').replace(/-+/g, '-');
-  a.download = safe.endsWith('.csv') ? safe : `${safe}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
+export function exportToExcel(filename, columns, rows, meta = {}) {
+  return guardExport(
+    { report: meta.report || filename, scope: meta.scope || 'branch', branch: meta.branch, format: 'csv', rowCount: (rows || []).length },
+    () => {
+      const header = columns.map((c) => csvCell(c.label ?? c.key)).join(',');
+      const body = (rows || []).map((r) => columns.map((c) => csvCell(r[c.key])).join(',')).join('\r\n');
+      const csv = '﻿' + header + '\r\n' + body;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safe = String(filename || 'export').replace(/[^\w.-]+/g, '-').replace(/-+/g, '-');
+      a.download = safe.endsWith('.csv') ? safe : `${safe}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    },
+  );
 }
 
 const num = (n) => { const v = Number(n); return Number.isFinite(v) ? v : 0; };

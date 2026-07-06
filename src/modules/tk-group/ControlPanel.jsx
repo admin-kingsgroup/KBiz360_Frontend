@@ -231,7 +231,7 @@ export function ControlPanel({ setRoute }) {
       case 'security': return <><p className="psub">Who can log in, from where, and how strongly — session-level protection, independent of the approval chain.</p><ControlList items={CONTROL_LISTS.security} /></>;
       case 'entry': return <><p className="psub">Guards at the point of entry and on statutory work — block bad data before it posts, and lock filed periods.</p><ControlList items={CONTROL_LISTS.entry} /></>;
       case 'notifications': return <><p className="psub">Who is told what, and when a stale item escalates — so nothing waits unseen.</p><ControlList items={CONTROL_LISTS.notifications} /></>;
-      case 'reports': return <><p className="psub">Who may export or print sensitive data, and the trail it leaves.</p><ControlList items={CONTROL_LISTS.reports} /></>;
+      case 'reports': return <><p className="psub">Who may export sensitive data, and the trail it leaves. These are live switches — the shared export helpers enforce them the moment you engage each flag; dormant until then.</p><ControlList items={CONTROL_LISTS.reports} isOn={isOn} onPropose={onPropose} /></>;
       case 'masters':
         return (
           <>

@@ -1,4 +1,5 @@
 import './core/formPersistence.js';   // ← draft autosave to localStorage (load first)
+import './core/exportGuardSetup.js';   // ← wire the (dormant) Report/Export controls
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { installNumberWheelGuard } from './core/ux/numberGuard';

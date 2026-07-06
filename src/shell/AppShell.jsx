@@ -444,6 +444,15 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-alt">
+      {/* ── TK Group Central — branch Focus, ABOVE the header (spans full width,
+          the top-most bar) so selecting a branch re-aims the whole cockpit before
+          the header/nav even render. The mode stays on the entity pill. ─────── */}
+      {inCockpit && (
+        <div className="noprint flex shrink-0 items-center gap-3 border-b border-surface-border bg-surface/70 px-4 py-2 tablet:px-5">
+          <span className="hidden text-[11px] font-semibold text-ink-subtle tablet:inline">TK Group Central&nbsp;▸</span>
+          <FocusSwitcher />
+        </div>
+      )}
       {/* ── Sticky, blurred app-bar ──────────────────────────────────── */}
       <header className="noprint sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-surface-border bg-surface/80 px-3 backdrop-blur-xl transition-shadow tablet:px-5 shadow-[0_1px_0_rgba(16,18,22,0.04),0_6px_20px_-16px_rgba(16,18,22,0.16)]">
         {/* Logo */}
@@ -516,13 +525,6 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           <div className="noprint flex shrink-0 items-center justify-center gap-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-[11.5px] font-semibold text-amber-800">
             <Eye size={13} />
             View only — you can browse and open records, but changes are disabled for this account.
-          </div>
-        )}
-        {/* TK Group Central — in-cockpit branch Focus (mode stays on the entity pill) */}
-        {inCockpit && (
-          <div className="noprint flex shrink-0 items-center gap-3 border-b border-surface-border bg-surface/70 px-4 py-2 tablet:px-5">
-            <span className="hidden text-[11px] font-semibold text-ink-subtle tablet:inline">TK Group Central&nbsp;▸</span>
-            <FocusSwitcher />
           </div>
         )}
         {subBar && (
