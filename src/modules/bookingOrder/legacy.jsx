@@ -1219,8 +1219,11 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         : await apiPost('/api/booking-orders', payload);
       setResult({ ...booking, _approved: false, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
+      // An INB-target refund/reissue lands as a pending RF/RI VOUCHER in the INB
+      // approvals window (not a booking) — refresh the voucher caches so it shows there.
+      if (booking.inbRefund) qc.invalidateQueries({ queryKey: ['vouchers'] });
       if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
-      toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
+      toast(`Voucher ${booking.bookingNo || ''} saved — pending approval${booking.inbRefund ? ' in the INB window (Refunds & Reissues)' : ''}`);
     } catch (e) { setError(e.message || 'Failed to save'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
