@@ -16,6 +16,7 @@ export function isCentralRole(currentUser) {
 export function controlCockpitMenu() {
   return [
     { label: 'Control Tower', icon: LayoutDashboard, href: '/tk/control-tower' },
+    { label: 'Control Panel', icon: Lock, href: '/tk/control-panel' },
     { label: 'Approvals', icon: CheckSquare, href: '/tk/approvals' },
     { label: 'Voucher Approvals', icon: CheckSquare, href: '/tk/voucher-approvals' },
     { label: 'Decisions', icon: Scale, href: '/tk/decisions' },

@@ -22,6 +22,7 @@ import { HRControl } from './HRControl';
 import { RolesResponsibilities } from './RolesResponsibilities';
 import { ApprovalsOverview } from './ApprovalsOverview';
 import { ConfigReadiness } from './ConfigReadiness';
+import { ControlPanel } from './ControlPanel';
 import { LimitsAdmin } from './LimitsAdmin';
 import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
@@ -70,6 +71,14 @@ export function TkConfigReadinessPage() {
   return (
     <Page title="Configuration Readiness" subtitle="How much of the control layer is engaged — a green % scoreboard Faiz and the Owner watch climb toward go-live. Read-only; complements the Go-Live activation steps.">
       <ConfigReadiness />
+    </Page>
+  );
+}
+
+export function TkControlPanelPage({ setRoute }) {
+  return (
+    <Page title="Control Panel" subtitle="The TK Group control centre — enforcement posture, the live approval chain (Check → Verify · Sughra → Approve · Faiz), whether the AE can also approve, and who is under control vs acting independently. Read-only; changes are Owner-approved on Control Flags / Limits.">
+      <ControlPanel setRoute={setRoute} />
     </Page>
   );
 }

@@ -306,6 +306,7 @@ export const APP_ROUTES = [
   "/tk/audit",
   "/tk/branch-cockpit",
   "/tk/compliance",
+  "/tk/control-panel",
   "/tk/control-tower",
   "/tk/controls",
   "/tk/decisions",

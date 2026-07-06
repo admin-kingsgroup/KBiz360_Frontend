@@ -11,6 +11,7 @@ import { usePager, Pager } from '../../core/ux/pager';
 import { bc } from '../../core/styles';
 import { apiGet } from '../../core/api';
 import { CONSOLIDATED_LABEL } from '../../core/data';
+import { branchTaskBoard } from '../dashboard/utils/branchTasks';
 import { periodRange, useInception } from '../../core/period';
 import { CUR_FY } from '../../core/dates';
 import {
@@ -1183,6 +1184,17 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
 
   const alerts = alertsRes?.alerts || [];
 
+  // Workflow to-dos awaiting THIS accountant — from live data already fetched above
+  // (rejected vouchers to fix, their own CRM entries awaiting Check level 1, pending
+  // SO/PO/GP, branch alerts). Complements the month-end close checklist below.
+  const taskBoard = branchTaskBoard({
+    rejected: pendVQ.data?.counts?.rejected?.n || 0,
+    awaitingMyCheck: pendVouchers.filter((v) => v.reviewStage === 'check').length,
+    pendingBookings: bookings.length,
+    criticalAlerts: alerts.filter((a) => a.severity === 'error').length,
+    warnAlerts: alerts.filter((a) => a.severity === 'warn').length,
+  });
+
   // ── Receivable vs Payable comparison metrics ──────────────────────────────
   // Both sides computed from the SAME live engines (ageing totals carry billed &
   // settled; outstanding carries open-bill & on-account totals) so the two columns
@@ -1766,6 +1778,25 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
 
           {/* Tier 3.9 — tax-readiness gaps in the customer / supplier masters */}
           <MasterHealth branch={branch} go={go} />
+
+          {/* Workflow to-dos — voucher tasks awaiting this accountant (complements the close checklist) */}
+          {!taskBoard.allClear && (
+            <>
+              <SecTitle>Your Workflow To-Dos ({taskBoard.openTotal})</SecTitle>
+              <div style={{ ...card, padding: 10, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {taskBoard.groups.map((g) => (
+                  <button key={g.key} onClick={() => go(g.route)}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
+                      border: '1px solid #dfe2e7',
+                      background: g.tone === 'red' ? '#fef2f2' : g.tone === 'amber' ? '#fffbeb' : '#eff6ff',
+                      color: g.tone === 'red' ? '#b91c1c' : g.tone === 'amber' ? '#b45309' : '#1d4ed8',
+                      fontSize: 11.5, fontWeight: 700 }}>
+                    <span aria-hidden>{g.icon}</span>{g.label}: {g.count}<span style={{ opacity: 0.6 }}>→</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* Month-End Close progress checklist embedded */}
           <SecTitle>Month-End Checklist / Close Verification</SecTitle>
