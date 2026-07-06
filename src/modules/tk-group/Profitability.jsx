@@ -4,13 +4,27 @@ import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { fyRange } from './utils/scorecard';
 import { profitabilityRow } from './utils/profitability';
+import { DataTable } from '../../shell/DataTable';
+import { money } from '../../core/format';
 
 // ─── TK GROUP CENTRAL · Profitability (branchwise) ───────────────────────────
 // Each branch's P&L — Revenue, Cost, Gross Profit, GP%, Expenses, Net Profit, NP% —
 // in its OWN currency. Never consolidated into a group total.
-const money = (cur, n) => `${cur || ''} ${Math.round(Number(n) || 0).toLocaleString()}`;
-const cell = { padding: '7px 10px', fontSize: 12, borderBottom: '1px solid #eee', textAlign: 'left', whiteSpace: 'nowrap' };
-const num = { ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
+//
+// Built from the shared design system (DataTable + design tokens) so it matches the
+// branch dashboards — no bespoke tables/inline hex.
+const gpTone = (pct) => (pct >= 15 ? 'text-success' : pct < 10 ? 'text-danger' : 'text-warning');
+
+const COLS = [
+  { key: 'code', header: 'Branch', align: 'left', render: (r) => <span className="font-bold">{r.flag ? `${r.flag} ` : ''}{r.code}</span> },
+  { key: 'rev', header: 'Revenue', align: 'right', num: true, render: (r) => money(r.rev, r.cur) },
+  { key: 'cost', header: 'Cost', align: 'right', num: true, render: (r) => money(r.cost, r.cur) },
+  { key: 'gp', header: 'Gross Profit', align: 'right', num: true, render: (r) => money(r.gp, r.cur) },
+  { key: 'gpPct', header: 'GP %', align: 'right', num: true, render: (r) => <span className={`${gpTone(r.gpPct)} tabular-nums`}>{r.gpPct}%</span> },
+  { key: 'exp', header: 'Expenses', align: 'right', num: true, render: (r) => money(r.exp, r.cur) },
+  { key: 'np', header: 'Net Profit', align: 'right', num: true, render: (r) => <span className={`${r.np < 0 ? 'text-danger' : 'text-ink'} font-bold tabular-nums`}>{money(r.np, r.cur)}</span> },
+  { key: 'npPct', header: 'NP %', align: 'right', num: true, render: (r) => <span className={`${r.npPct < 0 ? 'text-danger' : 'text-success'} tabular-nums`}>{r.npPct}%</span> },
+];
 
 export function Profitability() {
   const { from, to } = fyRange(new Date());
@@ -18,35 +32,21 @@ export function Profitability() {
   const rows = BRANCHES.map((b, i) => profitabilityRow(b, q[i] && q[i].data));
 
   return (
-    <div>
-      <p style={{ fontSize: 11.5, color: '#5a6691', margin: '0 0 10px' }}>FY {from} → {to} · <b>branchwise</b> — each branch in its own currency, never consolidated.</p>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }} data-testid="tk-profitability">
-          <thead>
-            <tr>
-              <th style={{ ...cell, color: '#5a6691', fontWeight: 700 }}>Branch</th>
-              {['Revenue', 'Cost', 'Gross Profit', 'GP %', 'Expenses', 'Net Profit', 'NP %'].map((h) => (
-                <th key={h} style={{ ...num, color: '#5a6691', fontWeight: 700 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.code}>
-                <td style={{ ...cell, fontWeight: 700 }}>{r.flag ? `${r.flag} ` : ''}{r.code}</td>
-                <td style={num}>{money(r.cur, r.rev)}</td>
-                <td style={num}>{money(r.cur, r.cost)}</td>
-                <td style={num}>{money(r.cur, r.gp)}</td>
-                <td style={{ ...num, color: r.gpPct >= 15 ? '#1F6E4C' : (r.gpPct < 10 ? '#A32F2F' : '#6E5518') }}>{r.gpPct}%</td>
-                <td style={num}>{money(r.cur, r.exp)}</td>
-                <td style={{ ...num, fontWeight: 700, color: r.np < 0 ? '#A32F2F' : '#1f2a44' }}>{money(r.cur, r.np)}</td>
-                <td style={{ ...num, color: r.npPct < 0 ? '#A32F2F' : '#1F6E4C' }}>{r.npPct}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <div className="grid gap-4">
+      <p className="text-xs text-ink-muted">FY {from} → {to} · <b>branchwise</b> — each branch in its own currency, never consolidated.</p>
+      <div data-testid="tk-profitability">
+        <DataTable
+          title="Profitability"
+          columns={COLS}
+          rows={rows}
+          getRowKey={(r) => r.code}
+          emptyMessage="No branch figures yet."
+          searchable={false}
+          showDensityToggle={false}
+          zebra
+        />
       </div>
-      <p style={{ fontSize: 11, color: '#8892a4', marginTop: 8 }}>Branchwise — never consolidated. Branches are equal peers, compared side by side.</p>
+      <p className="text-xs text-ink-subtle">Branchwise — never consolidated. Branches are equal peers, compared side by side.</p>
     </div>
   );
 }

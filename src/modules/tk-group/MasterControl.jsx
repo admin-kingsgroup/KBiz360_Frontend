@@ -2,14 +2,19 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { proposeGovernance, getPendingByType } from './api/governance';
 import { MASTER_KINDS, masterKindLabel, isMasterValid } from './utils/governance';
 import { waitingRoles } from './utils/changeRequests';
+import { PageSection, Button, FormField, Input, Select, Textarea } from '../../shell/primitives';
+import { DataTable } from '../../shell/DataTable';
 
 // ─── TK GROUP · FE · Master / CoA control (container) ────────────────────────
 // Raise a master / chart-of-accounts change (add / rename / deactivate a head, etc.).
 // It's filed as a Farhan + Owner change-request; applying it to the master stays a
 // deliberate step after approval (nothing auto-posts).
-const cell = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #eee', textAlign: 'left' };
-const inp = { padding: '6px 8px', fontSize: 12, border: '1px solid #cdd1d8', borderRadius: 5 };
-const lbl = { fontSize: 11, fontWeight: 700, color: '#5a6691', display: 'block', marginBottom: 3 };
+const COLS = [
+  { key: 'kind', header: 'Kind', render: (cr) => masterKindLabel(((cr.payload && cr.payload.after) || {}).kind) },
+  { key: 'target', header: 'Target', render: (cr) => ((cr.payload && cr.payload.after) || {}).target || '—' },
+  { key: 'detail', header: 'Detail', className: 'text-ink-muted', render: (cr) => ((cr.payload && cr.payload.after) || {}).detail || '—' },
+  { key: 'waiting', header: 'Waiting', render: (cr) => waitingRoles(cr).join(' → ') || 'ready' },
+];
 
 export function MasterControl() {
   const [pending, setPending] = useState([]);
@@ -34,46 +39,37 @@ export function MasterControl() {
   }, [valid, kind, target, detail, load]);
 
   return (
-    <div style={{ display: 'grid', gap: 18 }}>
-      <section>
-        {msg ? <div role="status" style={{ padding: '6px 12px', fontSize: 12, color: '#1F6E4C', background: '#E6F2EC', marginBottom: 10, borderRadius: 5 }}>{msg}</div> : null}
-        <form onSubmit={submit} aria-label="Raise a master change" style={{ display: 'grid', gap: 10, maxWidth: 460 }}>
-          <div><label style={lbl}>Change kind</label>
-            <select aria-label="Change kind" value={kind} onChange={(e) => setKind(e.target.value)} style={{ ...inp, width: '100%' }}>
+    <div className="grid gap-4">
+      <PageSection title="Raise a master change">
+        {msg ? <div role="status" className="mb-2.5 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
+        <form onSubmit={submit} aria-label="Raise a master change" className="grid max-w-[460px] gap-2.5">
+          <FormField label="Change kind">
+            <Select aria-label="Change kind" value={kind} onChange={(e) => setKind(e.target.value)}>
               {MASTER_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
-            </select>
-          </div>
-          <div><label style={lbl}>Head / target</label>
-            <input aria-label="Head or target" placeholder="e.g. ledger name or code" value={target} onChange={(e) => setTarget(e.target.value)} style={{ ...inp, width: '100%' }} />
-          </div>
-          <div><label style={lbl}>Detail (optional)</label>
-            <textarea aria-label="Detail" rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} style={{ ...inp, width: '100%', resize: 'vertical', fontFamily: 'inherit' }} />
-          </div>
-          <button type="submit" disabled={!valid} style={{ justifySelf: 'start', background: valid ? '#1F6E4C' : '#9bb3a7', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, padding: '7px 14px', cursor: valid ? 'pointer' : 'not-allowed' }}>
+            </Select>
+          </FormField>
+          <FormField label="Head / target">
+            <Input aria-label="Head or target" placeholder="e.g. ledger name or code" value={target} onChange={(e) => setTarget(e.target.value)} />
+          </FormField>
+          <FormField label="Detail (optional)">
+            <Textarea aria-label="Detail" rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} />
+          </FormField>
+          <Button type="submit" variant="primary" size="sm" disabled={!valid} className="justify-self-start">
             Submit master change
-          </button>
+          </Button>
         </form>
-      </section>
+      </PageSection>
 
-      <section>
-        <h2 style={{ fontSize: 13, fontWeight: 800, color: '#1f2a44', margin: '0 0 6px' }}>Pending master changes</h2>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Kind', 'Target', 'Detail', 'Waiting'].map((h) => <th key={h} style={{ ...cell, color: '#5a6691', fontWeight: 700 }}>{h}</th>)}</tr></thead>
-          <tbody>
-            {pending.length ? pending.map((cr) => {
-              const a = (cr.payload && cr.payload.after) || {};
-              return (
-                <tr key={cr._id}>
-                  <td style={cell}>{masterKindLabel(a.kind)}</td>
-                  <td style={cell}>{a.target || '—'}</td>
-                  <td style={{ ...cell, color: '#777' }}>{a.detail || '—'}</td>
-                  <td style={cell}>{waitingRoles(cr).join(' → ') || 'ready'}</td>
-                </tr>
-              );
-            }) : <tr><td style={{ ...cell, color: '#777' }} colSpan={4}>No pending master changes.</td></tr>}
-          </tbody>
-        </table>
-      </section>
+      <DataTable
+        title="Pending master changes"
+        columns={COLS}
+        rows={pending}
+        getRowKey={(cr, i) => cr._id || `${i}`}
+        emptyMessage="No pending master changes."
+        searchable={false}
+        showDensityToggle={false}
+        zebra
+      />
     </div>
   );
 }

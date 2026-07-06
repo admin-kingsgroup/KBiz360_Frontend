@@ -3,17 +3,21 @@ import { submitDecision, getMyDecisions } from './api/decisions';
 import { DecisionRequestForm } from './DecisionRequestForm';
 import { typeLabel } from './utils/inbox';
 import { statusLabel } from './utils/decisions';
+import { PageSection, Badge } from '../../shell/primitives';
+import { DataTable } from '../../shell/DataTable';
 
 // ─── TK GROUP · FE · decisions board (container) ─────────────────────────────
 // A branch raises a decision and tracks their own requests + status. Farhan (and the
 // Owner for large ones) act on them from the Approvals Inbox. Nothing auto-applies —
 // approval is the governance record; updating the master stays a manual step.
-const cell = { padding: '6px 10px', fontSize: 12, borderBottom: '1px solid #eee', textAlign: 'left' };
-const chip = (s) => ({
-  fontSize: 10.5, fontWeight: 700, padding: '1px 7px', borderRadius: 20,
-  background: s === 'rejected' ? '#F6E4E4' : (s === 'pending' ? '#FBF6E9' : '#E6F2EC'),
-  color: s === 'rejected' ? '#A32F2F' : (s === 'pending' ? '#6E5518' : '#1F6E4C'),
-});
+const statusTone = (s) => (s === 'rejected' ? 'danger' : s === 'pending' ? 'warning' : 'success');
+
+const COLS = [
+  { key: 'type', header: 'Type', render: (cr) => typeLabel(cr.type) },
+  { key: 'party', header: 'Party', render: (cr) => ((cr.payload && cr.payload.after) || {}).party || '—' },
+  { key: 'amount', header: 'Amount', num: true, render: (cr) => { const a = ((cr.payload && cr.payload.after) || {}).amount; return a ? Number(a).toLocaleString() : '—'; } },
+  { key: 'status', header: 'Status', render: (cr) => <Badge tone={statusTone(cr.status)} size="sm">{statusLabel(cr.status)}</Badge> },
+];
 
 export function DecisionsBoard() {
   const [items, setItems] = useState([]);
@@ -38,39 +42,22 @@ export function DecisionsBoard() {
   }, [load]);
 
   return (
-    <div className="tk-decisions" style={{ display: 'grid', gap: 18 }}>
+    <div className="tk-decisions grid gap-4">
       <section>
-        {msg ? <div role="status" style={{ padding: '6px 12px', fontSize: 12, color: '#1F6E4C', background: '#E6F2EC', marginBottom: 10, borderRadius: 5 }}>{msg}</div> : null}
+        {msg ? <div role="status" className="mb-2.5 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
         <DecisionRequestForm onSubmit={onSubmit} />
       </section>
 
-      <section>
-        <h2 style={{ fontSize: 13, fontWeight: 800, color: '#1f2a44', margin: '0 0 6px' }}>My decision requests</h2>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              {['Type', 'Party', 'Amount', 'Status'].map((h) => (
-                <th key={h} style={{ ...cell, color: '#5a6691', fontWeight: 700 }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.length ? items.map((cr) => {
-              const after = (cr.payload && cr.payload.after) || {};
-              return (
-                <tr key={cr._id}>
-                  <td style={cell}>{typeLabel(cr.type)}</td>
-                  <td style={cell}>{after.party || '—'}</td>
-                  <td style={{ ...cell, fontVariantNumeric: 'tabular-nums' }}>{after.amount ? Number(after.amount).toLocaleString() : '—'}</td>
-                  <td style={cell}><span style={chip(cr.status)}>{statusLabel(cr.status)}</span></td>
-                </tr>
-              );
-            }) : (
-              <tr><td style={{ ...cell, color: '#777' }} colSpan={4}>No decision requests yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+      <DataTable
+        title="My decision requests"
+        columns={COLS}
+        rows={items}
+        getRowKey={(cr, i) => cr._id || `${i}`}
+        emptyMessage="No decision requests yet."
+        searchable={false}
+        showDensityToggle={false}
+        zebra
+      />
     </div>
   );
 }

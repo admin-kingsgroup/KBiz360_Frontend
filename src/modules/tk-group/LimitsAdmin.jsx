@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getLimits, proposeLimits } from './api/limits';
+import { Button, FormField, Input, LoadingState } from '../../shell/primitives';
 
 // ─── TK GROUP CENTRAL · Thresholds & Limits (Owner-editable) ─────────────────
 // The control-model numbers in one editable place — decision escalation ceilings,
 // voucher tiers, cash limits, investment "fix-first" thresholds. Editing files an
 // Owner change-request (never a raw write); applied only on Owner approval.
-const inp = { padding: '5px 8px', fontSize: 12, border: '1px solid #cdd1d8', borderRadius: 5, width: 130, textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
-const row = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '6px 0', borderBottom: '1px solid #dfe2e7' };
 
 export function LimitsAdmin() {
   const [fields, setFields] = useState([]);
@@ -51,26 +50,27 @@ export function LimitsAdmin() {
   }, [fields, values]);
 
   return (
-    <form onSubmit={submit} aria-label="Edit thresholds and limits" style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
-      {msg ? <div role="status" style={{ padding: '6px 12px', fontSize: 12, color: '#6E5518', background: '#FBF6E9', borderRadius: 5 }}>{msg}</div> : null}
+    <form onSubmit={submit} aria-label="Edit thresholds and limits" className="grid max-w-[520px] gap-4">
+      {msg ? <div role="status" className="rounded-md bg-warning-soft px-3 py-1.5 text-xs text-warning">{msg}</div> : null}
       {groups.length ? groups.map(([group, gf]) => (
         <section key={group}>
-          <h2 style={{ fontSize: 12.5, fontWeight: 800, color: '#1f2a44', margin: '0 0 4px' }}>{group}</h2>
+          <h2 className="mb-1 text-xs font-extrabold text-navy">{group}</h2>
           {gf.map((f) => (
-            <div key={f.key} style={row}>
-              <label htmlFor={`lim-${f.key}`} style={{ fontSize: 12, color: '#555' }}>{f.label}</label>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <input id={`lim-${f.key}`} aria-label={f.label} type="number" step="any" min="0"
-                  value={values[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)} style={inp} />
-                <span style={{ fontSize: 11, color: '#8892a4', minWidth: 26 }}>{f.unit}</span>
+            <div key={f.key} className="flex items-center justify-between gap-3 border-b border-surface-border py-1.5">
+              <label htmlFor={`lim-${f.key}`} className="text-xs text-ink-muted">{f.label}</label>
+              <span className="inline-flex items-center gap-1.5">
+                <Input id={`lim-${f.key}`} aria-label={f.label} type="number" step="any" min="0"
+                  value={values[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)}
+                  className="w-[130px] text-right tabular-nums" />
+                <span className="min-w-[26px] text-[11px] text-ink-muted">{f.unit}</span>
               </span>
             </div>
           ))}
         </section>
-      )) : <div style={{ fontSize: 12, color: '#777' }}>Loading limits…</div>}
-      <button type="submit" style={{ justifySelf: 'start', background: '#1F6E4C', color: '#fff', border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, padding: '7px 14px', cursor: 'pointer' }}>
+      )) : <LoadingState label="Loading limits…" />}
+      <Button type="submit" variant="success" size="sm" className="justify-self-start">
         Submit changes for Owner approval
-      </button>
+      </Button>
     </form>
   );
 }

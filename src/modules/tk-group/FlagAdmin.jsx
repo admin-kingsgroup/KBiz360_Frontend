@@ -30,8 +30,8 @@ export function FlagAdmin() {
   }, [state]);
 
   return (
-    <div className="tk-flags">
-      {msg ? <div role="status" style={{ padding: '6px 12px', fontSize: 12, color: '#6E5518', background: '#FBF6E9' }}>{msg}</div> : null}
+    <div className="tk-flags grid gap-2">
+      {msg ? <div role="status" className="rounded-md bg-warning-soft px-3 py-1.5 text-xs text-warning">{msg}</div> : null}
       <FlagPanel rows={flagRows(state)} onToggle={onToggle} />
     </div>
   );

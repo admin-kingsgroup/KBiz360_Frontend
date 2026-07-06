@@ -40,7 +40,7 @@ export function ApprovalsInbox() {
 
   return (
     <div className="tk-approvals" aria-busy={busy}>
-      {error ? <div className="tk-error" role="alert" style={{ color: '#A32F2F', fontSize: 12, padding: '6px 12px' }}>{error}</div> : null}
+      {error ? <div className="tk-error mb-2 rounded-md bg-danger-soft px-3 py-1.5 text-xs text-danger" role="alert">{error}</div> : null}
       <ChangeRequestList items={items} onAct={onAct} />
     </div>
   );

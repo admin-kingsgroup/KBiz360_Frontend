@@ -4,15 +4,25 @@ import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { fyRange } from './utils/scorecard';
 import { perfTargetRow, PERF_METRICS, fyStr } from './utils/perfTarget';
+import { Select } from '../../shell/primitives';
+import { DataTable } from '../../shell/DataTable';
+import { money } from '../../core/format';
 
 // ─── TK GROUP CENTRAL · Performance vs Target (branchwise) ────────────────────
 // Each branch's target vs actual for the chosen metric, in its OWN currency — never
 // consolidated. Reuses /api/accounting/targets-vs-actual per branch.
-const money = (cur, n) => `${cur || ''} ${Math.round(Number(n) || 0).toLocaleString()}`;
-const cell = { padding: '7px 10px', fontSize: 12, borderBottom: '1px solid #eee', textAlign: 'left', whiteSpace: 'nowrap' };
-const num = { ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
-const inp = { padding: '5px 8px', fontSize: 12, border: '1px solid #cdd1d8', borderRadius: 5 };
-const achColor = (a) => (a >= 100 ? '#1F6E4C' : a >= 90 ? '#6E5518' : '#A32F2F');
+//
+// Built from the shared design system (Select + DataTable + design tokens) so it
+// matches the branch dashboards — no bespoke tables/inline hex.
+const achTone = (a) => (a >= 100 ? 'text-success' : a >= 90 ? 'text-warning' : 'text-danger');
+
+const COLS = [
+  { key: 'code', header: 'Branch', align: 'left', render: (r) => <span className="font-bold">{r.flag ? `${r.flag} ` : ''}{r.code}</span> },
+  { key: 'target', header: 'Target', align: 'right', num: true, render: (r) => money(r.target, r.cur) },
+  { key: 'actual', header: 'Actual', align: 'right', num: true, render: (r) => money(r.actual, r.cur) },
+  { key: 'achievement', header: 'Achievement', align: 'right', num: true, render: (r) => r.target ? <span className={`${achTone(r.achievement)} font-bold tabular-nums`}>{r.achievement}%</span> : '—' },
+  { key: 'variance', header: 'Variance', align: 'right', num: true, render: (r) => <span className={`${r.variance < 0 ? 'text-danger' : 'text-success'} tabular-nums`}>{money(r.variance, r.cur)}</span> },
+];
 
 export function PerformanceTargets() {
   const [metric, setMetric] = useState('sales');
@@ -23,40 +33,28 @@ export function PerformanceTargets() {
   const noTargets = rows.every((r) => r.target === 0);
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <label style={{ fontSize: 11.5, fontWeight: 700, color: '#5a6691' }}>Metric</label>
-        <select aria-label="Metric" value={metric} onChange={(e) => setMetric(e.target.value)} style={inp}>
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <label className="text-xs font-bold text-ink-muted">Metric</label>
+        <Select aria-label="Metric" value={metric} onChange={(e) => setMetric(e.target.value)} className="w-auto">
           {PERF_METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
-        </select>
-        <span style={{ fontSize: 11.5, color: '#8892a4' }}>FY {fy} · <b>branchwise</b></span>
+        </Select>
+        <span className="text-xs text-ink-muted">FY {fy} · <b>branchwise</b></span>
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 620 }} data-testid="tk-perf-target">
-          <thead>
-            <tr>
-              <th style={{ ...cell, color: '#5a6691', fontWeight: 700 }}>Branch</th>
-              <th style={{ ...num, color: '#5a6691', fontWeight: 700 }}>Target</th>
-              <th style={{ ...num, color: '#5a6691', fontWeight: 700 }}>Actual</th>
-              <th style={{ ...num, color: '#5a6691', fontWeight: 700 }}>Achievement</th>
-              <th style={{ ...num, color: '#5a6691', fontWeight: 700 }}>Variance</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.code}>
-                <td style={{ ...cell, fontWeight: 700 }}>{r.flag ? `${r.flag} ` : ''}{r.code}</td>
-                <td style={num}>{money(r.cur, r.target)}</td>
-                <td style={num}>{money(r.cur, r.actual)}</td>
-                <td style={{ ...num, fontWeight: 700, color: achColor(r.achievement) }}>{r.target ? `${r.achievement}%` : '—'}</td>
-                <td style={{ ...num, color: r.variance < 0 ? '#A32F2F' : '#1F6E4C' }}>{money(r.cur, r.variance)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div data-testid="tk-perf-target">
+        <DataTable
+          title="Performance vs Target"
+          columns={COLS}
+          rows={rows}
+          getRowKey={(r) => r.code}
+          emptyMessage="No branches to compare."
+          searchable={false}
+          showDensityToggle={false}
+          zebra
+        />
       </div>
-      {noTargets ? <p style={{ fontSize: 11.5, color: '#6E5518', marginTop: 8 }}>No targets set for this metric — set them in TK Group Central ▸ Controls ▸ Targets &amp; Budgets.</p> : null}
-      <p style={{ fontSize: 11, color: '#8892a4', marginTop: 8 }}>Branchwise — each branch vs its own target, never consolidated.</p>
+      {noTargets ? <p className="text-xs text-warning">No targets set for this metric — set them in TK Group Central ▸ Controls ▸ Targets &amp; Budgets.</p> : null}
+      <p className="text-xs text-ink-subtle">Branchwise — each branch vs its own target, never consolidated.</p>
     </div>
   );
 }
