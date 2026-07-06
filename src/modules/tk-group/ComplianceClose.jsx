@@ -1,6 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getBranchCockpit } from './api/monitor';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { isFocused } from './utils/cockpitFocus';
 import { Badge } from '../../shell/primitives';
 import { DataTable } from '../../shell/DataTable';
 
@@ -33,13 +35,15 @@ const COMPLIANCE_COLS = [
 ];
 
 export function ComplianceClose() {
+  const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'branches'], queryFn: getBranchCockpit, staleTime: 30_000, refetchInterval: 60_000 });
-  const rows = (q.data && q.data.items) || [];
+  const all = (q.data && q.data.items) || [];
+  const rows = isFocused(focus) ? all.filter((r) => r.branch === focus) : all;
 
   return (
     <div>
       <p className="mb-2.5 text-[11.5px] text-ink-muted">
-        <b>Branchwise</b> — each branch's close & compliance posture, on its own.
+        {isFocused(focus) ? <b>{focus} — focused</b> : <b>Branchwise</b>} — each branch's close & compliance posture, on its own.
       </p>
       <div data-testid="tk-compliance">
         <DataTable

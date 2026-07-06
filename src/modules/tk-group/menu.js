@@ -1,6 +1,7 @@
 import { getMenu } from '../../core/menus';
 import { gateMenuForGroup, isGroupMode } from './utils/groupMode';
 import { gateStatements } from './utils/statements';
+import { gateCentralRoutes } from './utils/gateCentralRoutes';
 import { controlCockpitMenu, isCentralRole } from './cockpit';
 
 // ─── TK GROUP · FE · the nav's single entry point ────────────────────────────
@@ -15,5 +16,8 @@ import { controlCockpitMenu, isCentralRole } from './cockpit';
 export function getVisibleMenu(branch, currentUser) {
   if (isGroupMode(branch) && isCentralRole(currentUser)) return controlCockpitMenu();
   const base = gateMenuForGroup(getMenu(branch, currentUser), branch);
-  return gateStatements(base, !!(currentUser && currentUser.hideStatements));
+  // Relocate central screens off the branch surface (dormant until the flag is on) —
+  // then apply the hide-statements control. Both fail-safe: false → unchanged.
+  const relocated = gateCentralRoutes(base, !!(currentUser && currentUser.relocateCentral));
+  return gateStatements(relocated, !!(currentUser && currentUser.hideStatements));
 }

@@ -26,11 +26,16 @@ import { KBIZ_LOGO } from '../core/brand';
 import { getVisibleMenu } from '../modules/tk-group/menu';
 import { InboxBadgeLive } from '../modules/tk-group/InboxBadgeLive';
 import { useHideStatements } from '../modules/tk-group/useHideStatements';
+import { useRelocateCentral } from '../modules/tk-group/useRelocateCentral';
 import { useAlerts } from '../core/useAccounting';
 import { openPrintPreview } from '../core/PrintPreview';
 import { useFyStore, FY_OPTIONS } from '../store/fy';
 import { ModuleSearch } from './ModuleSearch';
 import { BranchSwitcher } from './BranchSwitcher';
+import { FocusSwitcher } from './FocusSwitcher';
+import { isGroupMode } from '../modules/tk-group/utils/groupMode';
+import { isCentralRole } from '../modules/tk-group/cockpit';
+import { useCockpitFocusStore } from '../store/cockpitFocus';
 import { FxRateChip } from './FxRateChip';
 import { NotifPanel } from './NotifPanel';
 import { UserMenu } from './UserMenu';
@@ -408,11 +413,21 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
   // hide-statements control ON has P&L / Balance Sheet stripped from nav + search.
   // Dormant until the flag is switched on (resolves false → user unchanged).
   const hideStatements = useHideStatements(currentUser);
+  // Relocate the central toolkit off the branch surface (dormant until the flag is on).
+  const relocateCentral = useRelocateCentral(currentUser);
   const scopedUser = useMemo(
-    () => (hideStatements ? { ...currentUser, hideStatements: true } : currentUser),
-    [currentUser, hideStatements],
+    () => ((hideStatements || relocateCentral)
+      ? { ...currentUser, ...(hideStatements ? { hideStatements: true } : {}), ...(relocateCentral ? { relocateCentral: true } : {}) }
+      : currentUser),
+    [currentUser, hideStatements, relocateCentral],
   );
   const menu = useMemo(() => getVisibleMenu(branch, scopedUser), [branch, scopedUser]);
+  // TK Group Central cockpit: a central role on the consolidated entity gets the
+  // in-cockpit branch Focus bar. Reset Focus to branchwise whenever we're NOT in the
+  // cockpit so a stale focus can never scope the branch ERP.
+  const inCockpit = useMemo(() => isGroupMode(branch) && isCentralRole(currentUser), [branch, currentUser]);
+  const resetFocus = useCockpitFocusStore((s) => s.resetFocus);
+  useEffect(() => { if (!inCockpit) resetFocus(); }, [inCockpit, resetFocus]);
   const go = (href) => { if (href) setRoute(href); setMobileOpen(false); };
 
   // Close the mobile slide-over once we cross into desktop.
@@ -501,6 +516,13 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           <div className="noprint flex shrink-0 items-center justify-center gap-2 border-b border-amber-300 bg-amber-50 px-3 py-1.5 text-[11.5px] font-semibold text-amber-800">
             <Eye size={13} />
             View only — you can browse and open records, but changes are disabled for this account.
+          </div>
+        )}
+        {/* TK Group Central — in-cockpit branch Focus (mode stays on the entity pill) */}
+        {inCockpit && (
+          <div className="noprint flex shrink-0 items-center gap-3 border-b border-surface-border bg-surface/70 px-4 py-2 tablet:px-5">
+            <span className="hidden text-[11px] font-semibold text-ink-subtle tablet:inline">TK Group Central&nbsp;▸</span>
+            <FocusSwitcher />
           </div>
         )}
         {subBar && (

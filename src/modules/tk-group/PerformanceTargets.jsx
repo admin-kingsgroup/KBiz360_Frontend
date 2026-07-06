@@ -4,6 +4,8 @@ import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { fyRange } from './utils/scorecard';
 import { perfTargetRow, PERF_METRICS, fyStr } from './utils/perfTarget';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { Select } from '../../shell/primitives';
 import { DataTable } from '../../shell/DataTable';
 import { money } from '../../core/format';
@@ -28,8 +30,10 @@ export function PerformanceTargets() {
   const [metric, setMetric] = useState('sales');
   const { from, to } = fyRange(new Date());
   const fy = fyStr(new Date());
-  const q = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'pvt', metric, b.code, fy], queryFn: () => apiGet('/api/accounting/targets-vs-actual', { branch: b.code, metric, from, to, fy }), staleTime: 60_000 })) });
-  const rows = BRANCHES.map((b, i) => perfTargetRow(b, q[i] && q[i].data));
+  const focus = useCockpitFocus();
+  const view = focusedBranches(focus, BRANCHES);
+  const q = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'pvt', metric, b.code, fy], queryFn: () => apiGet('/api/accounting/targets-vs-actual', { branch: b.code, metric, from, to, fy }), staleTime: 60_000 })) });
+  const rows = view.map((b, i) => perfTargetRow(b, q[i] && q[i].data));
   const noTargets = rows.every((r) => r.target === 0);
 
   return (
@@ -39,7 +43,7 @@ export function PerformanceTargets() {
         <Select aria-label="Metric" value={metric} onChange={(e) => setMetric(e.target.value)} className="w-auto">
           {PERF_METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
         </Select>
-        <span className="text-xs text-ink-muted">FY {fy} · <b>branchwise</b></span>
+        <span className="text-xs text-ink-muted">FY {fy} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>}</span>
       </div>
       <div data-testid="tk-perf-target">
         <DataTable

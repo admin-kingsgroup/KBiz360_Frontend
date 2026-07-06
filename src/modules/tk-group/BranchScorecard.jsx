@@ -5,6 +5,8 @@ import { BRANCHES } from '../../core/referenceCache';
 import { scorecardRow, fyRange } from './utils/scorecard';
 import { DataTable } from '../../shell/DataTable';
 import { money } from '../../core/format';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { focusedBranches, isFocused } from './utils/cockpitFocus';
 
 // ─── TK GROUP CENTRAL · Branch Scorecard ─────────────────────────────────────
 // A branchwise performance view — every branch side by side in its OWN currency.
@@ -34,17 +36,19 @@ const COLS = [
 
 export function BranchScorecard() {
   const { from, to } = fyRange(new Date());
-  const pnl = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'sc', 'pnl', b.code, from, to], queryFn: () => apiGet('/api/accounting/profit-and-loss', { branch: b.code, from, to }), staleTime: 60_000 })) });
-  const inv = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'sc', 'inv', b.code, from, to], queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: b.code, from, to }), staleTime: 60_000 })) });
-  // Rows are ALWAYS the full branch set (numbers fill in as each branch's data
-  // arrives) — this is a fixed branchwise roster, so it renders immediately rather
-  // than hiding every branch behind a loading skeleton.
-  const rows = BRANCHES.map((b, i) => scorecardRow(b, pnl[i] && pnl[i].data, inv[i] && inv[i].data));
+  const focus = useCockpitFocus();
+  const view = focusedBranches(focus, BRANCHES);
+  const pnl = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'sc', 'pnl', b.code, from, to], queryFn: () => apiGet('/api/accounting/profit-and-loss', { branch: b.code, from, to }), staleTime: 60_000 })) });
+  const inv = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'sc', 'inv', b.code, from, to], queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: b.code, from, to }), staleTime: 60_000 })) });
+  // Rows are the (focused) branch roster — the full set branchwise, or the single
+  // focused branch — numbers fill in as each branch's data arrives, so it renders
+  // immediately rather than hiding behind a loading skeleton.
+  const rows = view.map((b, i) => scorecardRow(b, pnl[i] && pnl[i].data, inv[i] && inv[i].data));
 
   return (
     <div className="grid gap-4">
       <p className="text-xs text-ink-muted">
-        FY {from} → {to} · <b>branchwise</b> — each branch in its own currency, never consolidated.
+        FY {from} → {to} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>} — {isFocused(focus) ? 'this branch, in its own currency.' : 'each branch in its own currency, never consolidated.'}
       </p>
       <div data-testid="tk-scorecard">
         <DataTable

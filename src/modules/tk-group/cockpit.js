@@ -17,6 +17,7 @@ export function controlCockpitMenu() {
   return [
     { label: 'Control Tower', icon: LayoutDashboard, href: '/tk/control-tower' },
     { label: 'Approvals', icon: CheckSquare, href: '/tk/approvals' },
+    { label: 'Voucher Approvals', icon: CheckSquare, href: '/tk/voucher-approvals' },
     { label: 'Decisions', icon: Scale, href: '/tk/decisions' },
     { label: 'Onboarding', icon: UserPlus, href: '/tk/onboarding' },
     { label: 'Controls', icon: Lock, children: [
@@ -54,6 +55,7 @@ export function controlCockpitMenu() {
       { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
       { label: 'Audit Trail', href: '/tk/audit' },
     ] },
+    { label: 'Configuration Readiness', icon: Rocket, href: '/tk/readiness' },
     { label: 'Go-Live', icon: Rocket, href: '/tk/go-live' },
     { label: 'My Role', icon: User, href: '/tk/my-role' },
     { label: 'Roles & Responsibilities', icon: Users, href: '/tk/roles' },

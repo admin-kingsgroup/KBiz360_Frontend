@@ -4,6 +4,8 @@ import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { scorecardRow, fyRange } from './utils/scorecard';
 import { branchExceptions, riskScore } from './utils/exceptions';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { Badge } from '../../shell/primitives';
 import { DataTable } from '../../shell/DataTable';
 import { money } from '../../core/format';
@@ -31,10 +33,12 @@ const COLS = [
 
 export function ExceptionsRisk() {
   const { from, to } = fyRange(new Date());
-  const pnl = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'ex', 'pnl', b.code, from, to], queryFn: () => apiGet('/api/accounting/profit-and-loss', { branch: b.code, from, to }), staleTime: 60_000 })) });
-  const inv = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'ex', 'inv', b.code, from, to], queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: b.code, from, to }), staleTime: 60_000 })) });
+  const focus = useCockpitFocus();
+  const view = focusedBranches(focus, BRANCHES);
+  const pnl = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'ex', 'pnl', b.code, from, to], queryFn: () => apiGet('/api/accounting/profit-and-loss', { branch: b.code, from, to }), staleTime: 60_000 })) });
+  const inv = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'ex', 'inv', b.code, from, to], queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: b.code, from, to }), staleTime: 60_000 })) });
 
-  const rows = BRANCHES.map((b, i) => {
+  const rows = view.map((b, i) => {
     const sc = scorecardRow(b, pnl[i] && pnl[i].data, inv[i] && inv[i].data);
     const flags = branchExceptions(sc);
     return { ...sc, flags, score: riskScore(flags) };
@@ -44,7 +48,7 @@ export function ExceptionsRisk() {
   return (
     <div className="grid gap-4">
       <p className="text-xs text-ink-muted">
-        FY {from} → {to} · <b>branchwise</b> — each branch judged on its own figures, worst first.
+        FY {from} → {to} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>} — each branch judged on its own figures, worst first.
       </p>
       <div data-testid="tk-exceptions">
         <DataTable

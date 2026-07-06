@@ -20,6 +20,8 @@ import { Profitability } from './Profitability';
 import { ReceivablesPayables } from './ReceivablesPayables';
 import { HRControl } from './HRControl';
 import { RolesResponsibilities } from './RolesResponsibilities';
+import { ApprovalsOverview } from './ApprovalsOverview';
+import { ConfigReadiness } from './ConfigReadiness';
 import { LimitsAdmin } from './LimitsAdmin';
 import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
@@ -60,6 +62,22 @@ export function TkApprovalsPage() {
   return (
     <Page title="Approvals Inbox" subtitle="Governance change-requests awaiting your decision — config, control flags, period locks, masters and credit policy.">
       <ApprovalsInbox />
+    </Page>
+  );
+}
+
+export function TkConfigReadinessPage() {
+  return (
+    <Page title="Configuration Readiness" subtitle="How much of the control layer is engaged — a green % scoreboard Faiz and the Owner watch climb toward go-live. Read-only; complements the Go-Live activation steps.">
+      <ConfigReadiness />
+    </Page>
+  );
+}
+
+export function TkVoucherApprovalsPage() {
+  return (
+    <Page title="Voucher Approvals" subtitle="One central queue across all branches — how many vouchers are Pending per branch and the backlog in each branch's own currency. Branchwise; never blended. Approval authority is central (Model B). Use the Focus bar to drill into one branch.">
+      <ApprovalsOverview />
     </Page>
   );
 }

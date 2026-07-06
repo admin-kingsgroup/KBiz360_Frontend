@@ -5,6 +5,8 @@ import { BRANCHES } from '../../core/referenceCache';
 import { arapRow } from './utils/arap';
 import { DataTable } from '../../shell/DataTable';
 import { money } from '../../core/format';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { focusedBranches, isFocused } from './utils/cockpitFocus';
 
 // ─── TK GROUP CENTRAL · Receivables & Payables (branchwise) ──────────────────
 // Each branch's outstanding — receivables (with 90d+), payables and the net — in its
@@ -22,12 +24,14 @@ const COLS = [
 ];
 
 export function ReceivablesPayables() {
-  const q = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'arap', b.code], queryFn: () => apiGet('/api/accounting/ageing', { branch: b.code }), staleTime: 60_000 })) });
-  const rows = BRANCHES.map((b, i) => arapRow(b, q[i] && q[i].data));
+  const focus = useCockpitFocus();
+  const view = focusedBranches(focus, BRANCHES);
+  const q = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'arap', b.code], queryFn: () => apiGet('/api/accounting/ageing', { branch: b.code }), staleTime: 60_000 })) });
+  const rows = view.map((b, i) => arapRow(b, q[i] && q[i].data));
 
   return (
     <div className="grid gap-4">
-      <p className="text-xs text-ink-muted"><b>Branchwise</b> — each branch's outstanding in its own currency, never consolidated.</p>
+      <p className="text-xs text-ink-muted">{isFocused(focus) ? <b>{focus} — focused</b> : <b>Branchwise</b>} — each branch's outstanding in its own currency, never consolidated.</p>
       <div data-testid="tk-arap">
         <DataTable
           title="Receivables & Payables"

@@ -469,9 +469,11 @@ export const MENU_HO_CONTROL = {label:"HO Control", icon:Settings, children:[
 export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"My Role", href:"/tk/my-role"},
   {label:"Roles & Responsibilities", href:"/tk/roles"},
+  {label:"Configuration Readiness", href:"/tk/readiness"},
   {label:"Go-Live", href:"/tk/go-live"},
   {divider:true, label:"Governance"},
   {label:"Approvals Inbox", href:"/tk/approvals"},
+  {label:"Voucher Approvals", href:"/tk/voucher-approvals"},
   {label:"Onboarding", href:"/tk/onboarding"},
   {label:"Control Flags", href:"/tk/controls"},
   {label:"Thresholds & Limits", href:"/tk/limits"},

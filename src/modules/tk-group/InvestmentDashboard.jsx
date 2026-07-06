@@ -5,6 +5,8 @@ import { BRANCHES } from '../../core/referenceCache';
 import { getLimits } from './api/limits';
 import { fyRange } from './utils/scorecard';
 import { investmentRow, fixFirstFlags } from './utils/investment';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { PageSection, Input } from '../../shell/primitives';
 import { DataTable } from '../../shell/DataTable';
 import { money } from '../../core/format';
@@ -50,14 +52,16 @@ function FixFirstCheck() {
 
 export function InvestmentDashboard() {
   const { from, to } = fyRange(new Date());
-  const q = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'invest', b.code, from, to], queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: b.code, from, to }), staleTime: 60_000 })) });
-  const rows = BRANCHES.map((b, i) => investmentRow(b, q[i] && q[i].data));
+  const focus = useCockpitFocus();
+  const view = focusedBranches(focus, BRANCHES);
+  const q = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'invest', b.code, from, to], queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: b.code, from, to }), staleTime: 60_000 })) });
+  const rows = view.map((b, i) => investmentRow(b, q[i] && q[i].data));
 
   return (
     <div className="grid gap-4">
       <FixFirstCheck />
       <p className="text-xs text-ink-muted">
-        FY {from} → {to} · <b>branchwise</b> — each branch in its own currency, never consolidated.
+        FY {from} → {to} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>} — each branch in its own currency, never consolidated.
       </p>
       <div data-testid="tk-investment">
         <DataTable
