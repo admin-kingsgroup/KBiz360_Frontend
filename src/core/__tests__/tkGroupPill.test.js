@@ -20,7 +20,7 @@ const CONTROL_ROUTES = [
   '/tk/control-tower', '/tk/approvals', '/tk/decisions', '/tk/onboarding', '/tk/controls', '/tk/limits', '/tk/period-locks',
   '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability',
   '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/go-live', '/tk/my-role', '/tk/roles',
-  '/tk/tax-desk', '/tk/assets',
+  '/tk/tax-desk', '/tk/assets', '/tk/control-panel', '/tk/readiness', '/tk/voucher-approvals',
 ];
 
 describe('TK Group Central — control cockpit mode', () => {

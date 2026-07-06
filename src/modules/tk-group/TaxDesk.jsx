@@ -32,11 +32,14 @@ const FILING_COLS = [
   { key: 'pct', header: 'Filed %', align: 'right', num: true, render: (r) => <Badge tone={r.pct === 100 ? 'success' : r.pct > 0 ? 'warning' : 'danger'} size="sm">{r.pct}%</Badge> },
 ];
 
+// KPI card — the number is tinted by severity (tone); the label is the caption. No
+// redundant chip echoing the label.
+const KPI_TONE_TEXT = { danger: 'text-danger', warning: 'text-warning', info: 'text-info', success: 'text-success' };
 function Kpi({ label, value, tone }) {
   return (
     <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
       <div className="text-[11px] uppercase tracking-wide text-ink-muted">{label}</div>
-      <div className="mt-0.5 flex items-center gap-2"><span className="font-serif text-[22px] font-semibold text-ink tabular-nums">{value}</span><Badge tone={tone} size="sm">{label}</Badge></div>
+      <div className={`mt-0.5 font-serif text-[22px] font-semibold tabular-nums ${KPI_TONE_TEXT[tone] || 'text-ink'}`}>{value}</div>
     </div>
   );
 }
