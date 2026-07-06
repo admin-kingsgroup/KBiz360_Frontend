@@ -40,13 +40,14 @@ function Toggle({ on, crit, onClick, label }) {
     </button>
   );
 }
-function Row({ nm, ds, st, flag, on, crit, onPropose, right, applied, guarded }) {
+function Row({ nm, ds, st, flag, on, crit, onPropose, right, applied, guarded, planned }) {
   const control = right !== undefined ? right
     : flag ? <Toggle on={on} crit={crit} label={nm} onClick={() => onPropose && onPropose(flag)} />
     : applied ? <Badge tone="success" size="sm">Active</Badge>
     : guarded ? <Badge tone="info" size="sm">Via master guard</Badge>
+    : planned ? <Badge tone="neutral" size="sm">Planned</Badge>
     : <Off />;
-  const state = flag ? (on ? 'On' : 'Off') : applied ? 'Active now' : guarded ? 'Engages with the master guard' : 'Off';
+  const state = flag ? (on ? 'On' : 'Off') : applied ? 'Active now' : guarded ? 'Engages with the master guard' : planned ? 'Not built yet' : 'Off';
   return (
     <div className="flex items-start gap-3 rounded-brand border border-surface-border bg-surface p-3.5">
       <div className="min-w-0 flex-1">
@@ -183,6 +184,7 @@ export function ControlPanel({ setRoute }) {
                 </div>
               ))}
             </div>
+            <div className="infobar"><span>📐</span><span>Set these on <button className="underline" onClick={() => go('/tk/limits')}>Thresholds &amp; Limits</button> (Owner-approved). The guard already <b>enforces</b> them once set — escalate-to-FM · dual-control-to-Owner · cash caps · cash-on-hand · back-date are live checks in the policy guard.</span></div>
           </>
         );
       case 'roles':

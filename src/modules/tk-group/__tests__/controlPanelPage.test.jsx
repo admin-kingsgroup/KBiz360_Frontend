@@ -78,4 +78,13 @@ describe('Control Panel · Power Console', () => {
     expect(screen.getAllByText(/Via master guard/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(1); // numbering / wired already applied
   });
+
+  test('honest states: SoD enforced by the guard, Security still Planned', async () => {
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Segregation of Duties'));
+    expect(await screen.findByText(/enforced by the guard/)).toBeInTheDocument();     // maker≠approver
+    expect(screen.getAllByText('Via master guard').length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(screen.getByText('Access & Security'));
+    expect((await screen.findAllByText('Planned')).length).toBeGreaterThanOrEqual(3); // 2FA / IP / session… not built
+  });
 });
