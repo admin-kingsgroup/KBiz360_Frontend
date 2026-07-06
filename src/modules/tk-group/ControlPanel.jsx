@@ -223,6 +223,7 @@ export function ControlPanel({ setRoute }) {
                 </div>
               ))}
             </div>
+            <div className="infobar"><span>🛡️</span><span><b>ERP (Books) login access is now gated:</b> when the master guard is on, a non-Owner granting or revoking someone's Books access is queued for the Owner instead of taking effect. CRM &amp; App toggles stay a direct control. 2FA &amp; session rules remain Planned.</span></div>
           </>
         );
       case 'rights': return <><p className="psub">Two flags you set independently here (Relocate, Hide-statements). The rest engage automatically with the master guard — <b>Via master guard</b> means a branch write already stages for Owner approval once the guard is on, so you don't wire them separately.</p><ControlList items={CONTROL_LISTS.rights} isOn={isOn} onPropose={onPropose} /></>;
@@ -245,6 +246,7 @@ export function ControlPanel({ setRoute }) {
               <ChainCard k="④ Approve" r="Afshin" w="Owner · party goes active" />
             </div>
             <div className="infobar"><span>🔒</span><span>Branch accountants never create parties or ledgers — they only raise a request; a party appears in branch pickers only after Afshin approves.</span></div>
+            <div className="infobar"><span>🛡️</span><span><b>Wired &amp; dormant:</b> customer &amp; supplier onboarding already routes through the master guard — a branch create / edit / delete stages for the Owner the moment the guard is engaged; today it applies inline, unchanged. Ledger heads stay locked to Faiz → Owner.</span></div>
           </>
         );
       case 'delegation':
