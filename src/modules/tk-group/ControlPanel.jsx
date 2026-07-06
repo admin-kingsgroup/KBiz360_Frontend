@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getFlagState } from './api/flags';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getFlagState, proposeFlags } from './api/flags';
+import { withToggled } from './utils/flags';
 import { useConfigValue } from '../../core/useAccounting';
 import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
@@ -28,20 +29,35 @@ const USERS = [
 
 const Off = () => <Badge tone="neutral" size="sm">Off</Badge>;
 const H3 = ({ children }) => <h3 className="mb-2 mt-5 font-serif text-[15px] font-semibold text-ink">{children}</h3>;
-function Row({ nm, ds, st, right }) {
+// Interactive switch — flipping it PROPOSES the change (Owner-approved), it does not
+// flip live. Off = grey, On = teal (crit = red for money controls).
+function Toggle({ on, crit, onClick }) {
+  return (
+    <button type="button" role="switch" aria-checked={!!on} onClick={onClick}
+      className="relative h-[24px] w-[42px] shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+      style={{ background: on ? (crit ? '#9A2A2A' : '#1E655C') : '#CDD3DE' }}>
+      <span className="absolute top-[2.5px] h-[19px] w-[19px] rounded-full bg-white shadow transition-all" style={{ left: on ? 20 : 2.5 }} />
+    </button>
+  );
+}
+function Row({ nm, ds, st, flag, on, crit, onPropose, right }) {
+  const control = right !== undefined
+    ? right
+    : (flag ? <Toggle on={on} crit={crit} onClick={() => onPropose && onPropose(flag)} /> : <Off />);
+  const state = flag ? (on ? 'On' : 'Off') : 'Off';
   return (
     <div className="flex items-start gap-3 rounded-brand border border-surface-border bg-surface p-3.5">
       <div className="min-w-0 flex-1">
         <div className="text-[13.5px] font-semibold text-ink">{nm}</div>
         {ds && <div className="mt-0.5 text-[11.5px] text-ink-muted">{ds}</div>}
-        {st && <div className="mt-1.5 font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">Off · {st}</div>}
+        <div className="mt-1.5 font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">{state}{st ? ' · ' + st : ''}{flag ? ' · proposes to Owner' : ''}</div>
       </div>
-      {right || <Off />}
+      {control}
     </div>
   );
 }
-const ControlList = ({ items }) => (
-  <div className="grid gap-2.5 tablet:grid-cols-2">{items.map((c, i) => <Row key={i} {...c} />)}</div>
+const ControlList = ({ items, isOn = () => false, onPropose = () => {} }) => (
+  <div className="grid gap-2.5 tablet:grid-cols-2">{items.map((c, i) => <Row key={i} {...c} on={c.flag ? isOn(c.flag) : false} onPropose={onPropose} />)}</div>
 );
 function ChainCard({ k, r, w }) {
   return (
@@ -61,6 +77,21 @@ export function ControlPanel({ setRoute }) {
   const v = approvalChainView({ verifyEmails: verify, approveEmails: approve, flags: flagsQ.data });
   const r = readinessFromFlags(flagsQ.data);
   const go = (route) => setRoute && setRoute(route);
+  const qc = useQueryClient();
+  const [msg, setMsg] = useState('');
+  const flags = flagsQ.data?.flags || {};
+  const isOn = (key) => { const f = flags[key] || {}; return f.foundation === true || f.enabled === true; };
+  // Flipping a control PROPOSES the change through the Owner-approved change-request
+  // flow — it never flips live. Dormant-safe: even an approved flag stays guarded by
+  // core.policy_guard until that master is on.
+  const onPropose = async (key) => {
+    setMsg('');
+    try {
+      await proposeFlags(withToggled(flagsQ.data || { flags: {} }, key));
+      setMsg('Change to “' + key + '” submitted for the Owner’s approval — it applies only once approved.');
+      qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
+    } catch (e) { setMsg((e && e.message) || 'Could not submit the change.'); }
+  };
 
   const screenBody = () => {
     switch (screen) {
@@ -70,8 +101,7 @@ export function ControlPanel({ setRoute }) {
             <p className="psub">The one switch that makes every other setting live. While off, this console is advisory — nobody is blocked, nothing needs approval, your migration continues untouched.</p>
             <Row nm="Engage the TK Group guard (go-live switch)"
               ds="Flip this LAST, once the other screens are set. Then everyone comes under control at once — or ramp per voucher type first."
-              st="core.policy_guard"
-              right={v.masterOn ? <Badge tone="success" size="sm">Live</Badge> : <Off />} />
+              st="core.policy_guard" flag="core.policy_guard" on={v.masterOn} onPropose={onPropose} />
             <div className="infobar"><span>🛡️</span><span><b>Nothing is engaged.</b> This console decides who may do what; it takes no action itself. Changes are proposed on Control Flags and Owner-approved. Hand power over slowly — one control, one voucher type, one user at a time.</span></div>
           </>
         );
@@ -190,7 +220,7 @@ export function ControlPanel({ setRoute }) {
             </div>
           </>
         );
-      case 'rights': return <><p className="psub">What the branch may and may not touch. Keep off during migration; lock as you hand structure to the centre.</p><ControlList items={CONTROL_LISTS.rights} /></>;
+      case 'rights': return <><p className="psub">What the branch may and may not touch. Keep off during migration; lock as you hand structure to the centre.</p><ControlList items={CONTROL_LISTS.rights} isOn={isOn} onPropose={onPropose} /></>;
       case 'sod': return <><p className="psub">Conflict rules — the same person can never both create and clear their own work. All off (advisory) until engaged.</p><ControlList items={CONTROL_LISTS.sod} /></>;
       case 'security': return <><p className="psub">Who can log in, from where, and how strongly — session-level protection, independent of the approval chain.</p><ControlList items={CONTROL_LISTS.security} /></>;
       case 'entry': return <><p className="psub">Guards at the point of entry and on statutory work — block bad data before it posts, and lock filed periods.</p><ControlList items={CONTROL_LISTS.entry} /></>;
@@ -267,6 +297,7 @@ export function ControlPanel({ setRoute }) {
         <span className="text-[12px] text-amber-800">Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.</span>
       </div>
 
+      {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}
       <div className="grid gap-4 desktop:grid-cols-[230px_1fr]">
         {/* nav */}
         <nav className="rounded-brand border border-surface-border bg-surface p-2" aria-label="Power Console screens">

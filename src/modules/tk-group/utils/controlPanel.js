@@ -106,7 +106,7 @@ export const CONTROL_LISTS = {
     { nm: 'Period lock', ds: "Branches can't post into a closed / filed period." },
     { nm: 'Numbering lock (auto only)', ds: 'No manual voucher-number resets.' },
     { nm: 'Branch profitability visibility', ds: 'ON = branches see own P&L / GP / MIS. OFF = hidden.', st: 'hidden by default' },
-    { nm: 'Relocate central screens off branch', ds: 'Masters · approvals · money-out move to TK Group only.', st: 'branch menu unchanged' },
+    { nm: 'Relocate central screens off branch', ds: 'Masters · approvals · money-out move to TK Group only.', st: 'branch menu unchanged', flag: 'branch.central_relocated' },
     { nm: 'Wired-ledger lock', ds: 'Module / tax / inter-branch heads locked for everyone.' },
   ],
   sod: [

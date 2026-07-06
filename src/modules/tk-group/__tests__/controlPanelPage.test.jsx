@@ -3,7 +3,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // master guard OFF (dormant) so people read Independent.
-jest.mock('../api/flags', () => ({ getFlagState: jest.fn().mockResolvedValue({ flags: { 'core.policy_guard': { enabled: false, label: 'Master' } } }) }));
+jest.mock('../api/flags', () => ({
+  getFlagState: jest.fn().mockResolvedValue({ flags: { 'core.policy_guard': { enabled: false, label: 'Master' } } }),
+  proposeFlags: jest.fn().mockResolvedValue({ ok: true }),
+}));
 jest.mock('../../../core/useAccounting', () => ({ useConfigValue: () => ({ data: {} }) }));
 // eslint-disable-next-line import/first
 import { ControlPanel } from '../ControlPanel';
@@ -40,5 +43,15 @@ describe('Control Panel · Power Console', () => {
     fireEvent.click(screen.getByText('ERP Config & Security'));
     expect(await screen.findByText(/Controls engaged/)).toBeInTheDocument();
     expect(screen.getByText(/Secure & under verification/)).toBeInTheDocument();
+  });
+
+  test('flipping the Master Switch PROPOSES a change (Owner-approved), never a live flip', async () => {
+    const { proposeFlags } = require('../api/flags');
+    proposeFlags.mockClear();
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    const sw = (await screen.findAllByRole('switch'))[0]; // the master toggle
+    fireEvent.click(sw);
+    expect(await screen.findByText(/submitted for the Owner/)).toBeInTheDocument();
+    expect(proposeFlags).toHaveBeenCalledTimes(1);
   });
 });
