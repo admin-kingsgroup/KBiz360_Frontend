@@ -36,7 +36,9 @@ export function BranchScorecard() {
   const { from, to } = fyRange(new Date());
   const pnl = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'sc', 'pnl', b.code, from, to], queryFn: () => apiGet('/api/accounting/profit-and-loss', { branch: b.code, from, to }), staleTime: 60_000 })) });
   const inv = useQueries({ queries: BRANCHES.map((b) => ({ queryKey: ['tk', 'sc', 'inv', b.code, from, to], queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: b.code, from, to }), staleTime: 60_000 })) });
-  const loading = pnl.some((q) => q.isLoading) || inv.some((q) => q.isLoading);
+  // Rows are ALWAYS the full branch set (numbers fill in as each branch's data
+  // arrives) — this is a fixed branchwise roster, so it renders immediately rather
+  // than hiding every branch behind a loading skeleton.
   const rows = BRANCHES.map((b, i) => scorecardRow(b, pnl[i] && pnl[i].data, inv[i] && inv[i].data));
 
   return (
@@ -50,7 +52,6 @@ export function BranchScorecard() {
           columns={COLS}
           rows={rows}
           getRowKey={(r) => r.code}
-          loading={loading}
           emptyMessage="No branch figures yet."
           searchable={false}
           showDensityToggle={false}
