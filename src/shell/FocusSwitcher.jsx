@@ -41,8 +41,8 @@ export function FocusSwitcher() {
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[10px] font-bold uppercase tracking-wide text-ink-subtle">Focus</span>
+    <div className="flex flex-wrap items-center gap-2.5">
+      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-subtle whitespace-nowrap">Focus <span className="text-ink-subtle/70">· scopes everything below</span></span>
       <div role="group" aria-label="Branch focus" className="inline-flex flex-wrap overflow-hidden rounded-lg border border-surface-border bg-surface">
         {options.map((o, i) => {
           const on = focus === o.code;
@@ -55,17 +55,17 @@ export function FocusSwitcher() {
               className={[
                 'inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
                 i > 0 ? 'border-l border-surface-border' : '',
-                on ? 'bg-navy text-white' : 'text-ink-muted hover:bg-navy/5 hover:text-navy',
+                on ? 'bg-gold text-navy' : 'text-ink-muted hover:bg-gold/10 hover:text-navy',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50',
               ].join(' ')}
             >
               <span>{o.label}</span>
-              <span className={['font-mono text-[10px]', on ? 'text-gold' : 'text-ink-subtle'].join(' ')}>{o.cur}</span>
+              <span className={['font-mono text-[10px]', on ? 'text-navy/70' : 'text-ink-subtle'].join(' ')}>{o.cur}</span>
             </button>
           );
         })}
       </div>
-      <span className="text-[11px] text-ink-subtle">
+      <span className="text-[11px] text-ink-subtle whitespace-nowrap">
         {focus === FOCUS_ALL ? 'branchwise · never summed' : 'scoped to this branch · full authority'}
       </span>
     </div>

@@ -281,7 +281,8 @@ export function VHead({vNo,branch,salesperson=true}){
     <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8"}}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:11}}>
           <FL label="Voucher no.">
-            <input value={vNo} readOnly style={{...inp,background:"#f3f4f8",color:"#5a6691",fontFamily:"monospace",fontWeight:700}}/>
+            <input value={vNo} readOnly title="Provisional — the final, guaranteed-unique number is assigned atomically when you save (so simultaneous entries never clash)." style={{...inp,background:"#f3f4f8",color:"#5a6691",fontFamily:"monospace",fontWeight:700}}/>
+            {vNo && vNo!=="Auto" && <div style={{fontSize:9.5,color:"#8A8A84",marginTop:3,letterSpacing:"0.2px"}}>Provisional · final no. assigned on save</div>}
           </FL>
           <FL label="Date">
             <input type="date" defaultValue={todayISO()} style={inp}/>

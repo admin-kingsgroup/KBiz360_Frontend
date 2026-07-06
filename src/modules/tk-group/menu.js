@@ -13,8 +13,8 @@ import { controlCockpitMenu, isCentralRole } from './cockpit';
 //     restricted (Branch Accountant) view (P&L / Balance Sheet stripped when on).
 // getMenu() itself is left untouched (pure; still used by Page Visibility Control
 // and every menu test); the mode logic lives here, at the shell's call site.
-export function getVisibleMenu(branch, currentUser) {
-  if (isGroupMode(branch) && isCentralRole(currentUser)) return controlCockpitMenu();
+export function getVisibleMenu(branch, currentUser, focus) {
+  if (isGroupMode(branch) && isCentralRole(currentUser)) return controlCockpitMenu(focus, currentUser);
   const base = gateMenuForGroup(getMenu(branch, currentUser), branch);
   // Relocate central screens off the branch surface (dormant until the flag is on) —
   // then apply the hide-statements control. Both fail-safe: false → unchanged.

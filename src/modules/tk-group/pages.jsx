@@ -63,7 +63,7 @@ export function TkRolesPage() {
 
 export function TkApprovalsPage() {
   return (
-    <Page title="Approvals Inbox" subtitle="Governance change-requests awaiting your decision — config, control flags, period locks, masters and credit policy.">
+    <Page title="Admin Approval" subtitle="Everything that is NOT a data-entry voucher — config, control flags, thresholds & limits, period locks, masters, party onboarding, user access and credit policy. All these route here when their rule is engaged; vouchers go to Approvals — Vouchers.">
       <ApprovalsInbox />
     </Page>
   );

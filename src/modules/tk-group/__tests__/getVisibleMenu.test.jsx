@@ -31,4 +31,33 @@ describe('getVisibleMenu — TK Group Central vs branch', () => {
     expect(hrefs).toContain('/tk/control-tower');
     expect(hrefs).not.toContain('/receipts');
   });
+
+  test('Focus on a branch adds its Data Entry + Reports workspace (still the cockpit)', () => {
+    const hrefs = hrefsOf(getVisibleMenu('ALL', { role: 'Super Admin' }, 'BOM'));
+    expect(hrefs).toContain('/tk/control-tower');   // still the cockpit
+    expect(hrefs).toContain('/receipts');            // Data Entry now reachable (operates on BOM)
+    expect(hrefs).toContain('/bookings/new');        // SO/PO/GP
+    expect(hrefs).toContain('/bookings/inter-branch'); // INB
+    expect(hrefs).toContain('/reports/pnl');         // full Reports
+    expect(hrefs).toContain('/trial-balance');
+  });
+
+  test('Focus = ALL (branchwise) does NOT show the branch workspace (book-less)', () => {
+    const hrefs = hrefsOf(getVisibleMenu('ALL', { role: 'Super Admin' }, 'ALL'));
+    expect(hrefs).toContain('/tk/control-tower');
+    expect(hrefs).not.toContain('/receipts');
+    expect(hrefs).not.toContain('/reports/pnl');
+  });
+
+  test('a non-central role never gets the cockpit workspace even with a focus value', () => {
+    const hrefs = hrefsOf(getVisibleMenu('ALL', { role: 'Branch Accountant' }, 'BOM'));
+    expect(hrefs).not.toContain('/tk/control-tower');
+  });
+
+  test('cockpit has the two approvals + a role-segregated Dashboards section', () => {
+    const hrefs = hrefsOf(getVisibleMenu('ALL', { role: 'Super Admin' }));
+    expect(hrefs).toContain('/tk/voucher-approvals');            // Approvals — Vouchers (data entry)
+    expect(hrefs).toContain('/tk/approvals');                    // Admin Approval (everything else)
+    expect(hrefs.some((h) => h.startsWith('/dashboard'))).toBe(true); // Dashboards group present
+  });
 });

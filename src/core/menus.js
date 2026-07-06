@@ -596,7 +596,7 @@ function withOwnerDashboard(menu){
 // The Dashboards dropdown for a role: the "AD Dashboards" group is Super-Admin-only,
 // so strip any superAdminOnly-flagged group for every other full-menu role (Director).
 // The owner-only Owner Dashboard link is folded in first (owner ⇒ Super Admin ⇒ kept).
-function dashboardsFor(currentUser){
+export function dashboardsFor(currentUser){
   const isSuperAdmin = (currentUser?.role || 'Super Admin') === 'Super Admin';
   const menu = isOwnerDashboardUser(currentUser) ? withOwnerDashboard(MENU_DASHBOARDS) : MENU_DASHBOARDS;
   if (isSuperAdmin) return menu;

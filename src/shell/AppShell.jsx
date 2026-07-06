@@ -421,7 +421,10 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
       : currentUser),
     [currentUser, hideStatements, relocateCentral],
   );
-  const menu = useMemo(() => getVisibleMenu(branch, scopedUser), [branch, scopedUser]);
+  // The in-cockpit Focus drives the menu: spotlighting a branch adds its Data Entry +
+  // Reports workspace (which operate on the focused branch). ALL → cockpit only.
+  const cockpitFocus = useCockpitFocusStore((s) => s.focus);
+  const menu = useMemo(() => getVisibleMenu(branch, scopedUser, cockpitFocus), [branch, scopedUser, cockpitFocus]);
   // TK Group Central cockpit: a central role on the consolidated entity gets the
   // in-cockpit branch Focus bar. Reset Focus to branchwise whenever we're NOT in the
   // cockpit so a stale focus can never scope the branch ERP.

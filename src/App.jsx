@@ -72,6 +72,9 @@ import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
 import { FULL_SCOPE_ROLES, hasNoAssignedBranch } from './core/branchScope';
+import { BRANCHES } from './core/referenceCache';
+import { useCockpitFocus } from './store/cockpitFocus';
+import { FOCUS_ALL } from './modules/tk-group/utils/cockpitFocus';
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/reportsFinancial/financialStatements'));
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsFinancial/reportsNotes'));
 const { Statistics } = lazyModule(() => import('./modules/reports/statistics'));
@@ -157,14 +160,24 @@ export default function KB360App(){
   const goForward = useCallback(()=>rrNavigate(1), [rrNavigate]);
   const navValue={ route, navigate, goBack, goForward, canBack:histIdx>0, canForward:histIdx<maxIdxRef.current };
 
+  // TK Group Central · in-cockpit branch Focus. The top selector holds the MODE (ALL);
+  // this holds which branch a central user is spotlighting. When a branch is focused it
+  // becomes the OPERATING branch for everything Page() renders — Data Entry, Reports,
+  // registers — so a central user works IN that branch without leaving the cockpit
+  // ("Focus scopes everything below"). Mode detection stays on the outer `branch` = 'ALL'.
+  const focus = useCockpitFocus();
+  const isCentral = FULL_SCOPE_ROLES.includes(currentUser?.role || '');
+  const inGroupMode = branch === 'ALL' || (branch && branch.code === 'ALL');
+  const branchFocused = isCentral && inGroupMode && focus && focus !== FOCUS_ALL;
+  const opBranch = branchFocused ? (BRANCHES.find((b) => b.code === focus) || branch) : branch;
+
   // TK Group Central mode: a central role selecting the consolidated entity ENTERS the
-  // control cockpit. Land them on the Control Tower and keep them on control routes —
-  // the branch ERP isn't shown in this mode (see modules/tk-group/menu.js).
+  // control cockpit. With Focus = ALL keep them on control routes (book-less); with a
+  // branch focused they may work in that branch's ERP (opBranch drives it), so don't
+  // bounce those routes back to the Control Tower.
   useEffect(()=>{
-    const central = FULL_SCOPE_ROLES.includes(currentUser?.role || '');
-    const groupMode = branch === 'ALL' || (branch && branch.code === 'ALL');
-    if (central && groupMode && route && !isCockpitRoute(route)) navigate('/tk/control-tower');
-  }, [branch, currentUser, route, navigate]);
+    if (isCentral && inGroupMode && !branchFocused && route && !isCockpitRoute(route)) navigate('/tk/control-tower');
+  }, [branch, currentUser, route, navigate, focus, isCentral, inGroupMode, branchFocused]);
 
   /* Persist the current route so a refresh / re-open returns you here.
      Never persist the bare root "/": it is the live host's entry URL, not a real
@@ -293,6 +306,10 @@ export default function KB360App(){
   },[]);
 
   function Page(){
+    // eslint-disable-next-line no-shadow -- intentional: re-scope every route rendered
+    // below to the OPERATING branch (the spotlighted Focus branch in the cockpit, else
+    // the top-right branch). Mode/menu logic above keeps using the outer `branch`.
+    const branch = opBranch;
     /* ── Per-user page visibility (Settings → Page Visibility Control) ────────
        A route on the user's `hidden` deny-list isn't rendered, even via a direct
        URL — it's removed from their nav too (see getMenu). The landing dashboard
@@ -467,7 +484,10 @@ export default function KB360App(){
     /* TK Group — central control (real /api/tk/* pages; dormant until core.policy_guard on) */
     if(route==="/tk/my-role")            return <TkMyRolePage/>;
     if(route==="/tk/approvals")          return <TkApprovalsPage/>;
-    if(route==="/tk/voucher-approvals")  return <TkVoucherApprovalsPage/>;
+    // Approvals — Vouchers: the SAME screen as the branch (UnifiedApprovals: vouchers +
+    // SO/PO/GP + INB — all data entry). Operates on the focused branch (opBranch); with
+    // Focus = ALL it shows every branch's pending in one central queue.
+    if(route==="/tk/voucher-approvals")  return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
     if(route==="/tk/readiness")          return <TkConfigReadinessPage/>;
     if(route==="/tk/control-panel")      return <TkControlPanelPage setRoute={navigate}/>;
     if(route==="/tk/controls")           return <TkControlsPage/>;

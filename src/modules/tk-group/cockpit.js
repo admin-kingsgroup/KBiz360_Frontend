@@ -1,5 +1,6 @@
-import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Activity, Rocket } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Activity, Rocket, FilePlus, FileText } from 'lucide-react';
 import { FULL_SCOPE_ROLES } from '../../core/branchScope';
+import { dashboardsFor } from '../../core/menus';
 
 // ─── TK GROUP CENTRAL · the control cockpit ──────────────────────────────────
 // Selecting "TK Group Central" in the branch selector ENTERS the central control
@@ -13,15 +14,61 @@ export function isCentralRole(currentUser) {
   return FULL_SCOPE_ROLES.includes(currentUser && currentUser.role);
 }
 
-export function controlCockpitMenu() {
+// Branch Workspace — shown ONLY when a branch is spotlighted via Focus. These reuse the
+// EXACT branch routes; they operate on the focused branch (App re-scopes the operating
+// branch to the Focus). So a central user does Data Entry + sees full Reports for the
+// focused branch, in one place, without leaving TK Group. Focus = ALL → not shown (the
+// consolidated cockpit is book-less; there's nothing to enter against a group total).
+function branchWorkspace(focus) {
+  const focused = focus && focus !== 'ALL';
+  if (!focused) return [];
+  return [
+    { label: `Data Entry — ${focus}`, icon: FilePlus, children: [
+      { label: 'SO / PO / GP Voucher', href: '/bookings/new' },
+      { label: 'Inter-Branch (INB) Voucher', href: '/bookings/inter-branch' },
+      { label: 'Receipt Voucher', href: '/receipts' },
+      { label: 'Payment Voucher', href: '/payments' },
+      { label: 'Contra Entry', href: '/contra' },
+      { label: 'Journal Entry', href: '/journal' },
+      { label: 'Debit Note', href: '/debit-note' },
+    ] },
+    { label: `Reports — ${focus}`, icon: FileText, children: [
+      { label: 'Day Book', href: '/day-book' },
+      { label: 'Ledger Account', href: '/ledger' },
+      { label: 'Trial Balance', href: '/trial-balance' },
+      { label: 'Profit & Loss', href: '/reports/pnl' },
+      { label: 'Balance Sheet', href: '/reports/bs' },
+      { label: 'Receivables (Ageing + Settle)', href: '/reports/rec' },
+      { label: 'Payables (Ageing + Settle)', href: '/reports/pay' },
+      { divider: true, label: 'Registers' },
+      { label: 'Sales Register', href: '/reports/sreg' },
+      { label: 'Purchase Register', href: '/reports/preg' },
+      { label: 'Receipt Register', href: '/finance/receipt-register' },
+      { label: 'Payment Register', href: '/finance/payment-register' },
+      { label: 'Journal Register', href: '/finance/journal-register' },
+    ] },
+  ];
+}
+
+export function controlCockpitMenu(focus, currentUser) {
   return [
     // Overview — the cockpit landing.
     { label: 'Control Tower', icon: LayoutDashboard, href: '/tk/control-tower' },
 
-    // Approvals & Governance — the daily clearing work.
-    { label: 'Approvals & Governance', icon: CheckSquare, children: [
-      { label: 'Approvals', href: '/tk/approvals' },
-      { label: 'Voucher Approvals', href: '/tk/voucher-approvals' },
+    // Dashboards — all dashboards in one place, segregated by role. The AD Dashboards
+    // (and the owner-only AD Dashboard All) are folded in ONLY for the Owner / Super
+    // Admin; other central roles get the role-appropriate set (dashboardsFor decides).
+    { ...dashboardsFor(currentUser), icon: LayoutDashboard },
+
+    // Branch Workspace (Data Entry + Reports) — only when a branch is focused.
+    ...branchWorkspace(focus),
+
+    // Approvals — exactly two: data-entry Vouchers (same screen as the branch) and
+    // Admin Approval (every other rule approval). Plus the governance raise-points.
+    { label: 'Approvals', icon: CheckSquare, children: [
+      { label: 'Approvals — Vouchers', href: '/tk/voucher-approvals' },
+      { label: 'Admin Approval', href: '/tk/approvals' },
+      { divider: true, label: 'Raise / govern' },
       { label: 'Decisions', href: '/tk/decisions' },
       { label: 'Onboarding', href: '/tk/onboarding' },
     ] },
@@ -89,7 +136,9 @@ export function controlCockpitMenu() {
 // cutting pages the app bar / user menu offer everywhere (personal profile & prefs
 // under /settings, and Support). Only branch-OPERATIONAL pages (data-entry, branch
 // books/registers, tax) are out of the control mode and bounce back to Control Tower.
-const COCKPIT_PREFIXES = ['/tk/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/'];
+// '/dashboard/' covers the role-segregated dashboards surfaced in the cockpit (incl. the
+// owner-only /dashboard/owner); '/dashboards/' covers the AD Dashboards group.
+const COCKPIT_PREFIXES = ['/tk/', '/dashboard/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/'];
 export function isCockpitRoute(route) {
   return !!route && (route === '/dashboard' || COCKPIT_PREFIXES.some((p) => route.startsWith(p)));
 }
