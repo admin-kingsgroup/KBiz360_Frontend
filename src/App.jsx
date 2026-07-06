@@ -67,7 +67,7 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
@@ -484,10 +484,17 @@ export default function KB360App(){
     /* TK Group — central control (real /api/tk/* pages; dormant until core.policy_guard on) */
     if(route==="/tk/my-role")            return <TkMyRolePage/>;
     if(route==="/tk/approvals")          return <TkApprovalsPage/>;
-    // Approvals — Vouchers: the SAME screen as the branch (UnifiedApprovals: vouchers +
-    // SO/PO/GP + INB — all data entry). Operates on the focused branch (opBranch); with
-    // Focus = ALL it shows every branch's pending in one central queue.
-    if(route==="/tk/voucher-approvals")  return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
+    // Approvals — Vouchers: the SAME approval screen as the branch (UnifiedApprovals:
+    // vouchers + SO/PO/GP + INB — full JV detail + Approve/Reject), with the 5-stage
+    // pipeline funnel on top (where each pending entry is waiting: Branch → AE → FM →
+    // Director → Owner). Operates on the focused branch (opBranch); Focus = ALL pools
+    // every branch's pending into one central queue.
+    if(route==="/tk/voucher-approvals")  return (
+      <div className="grid gap-4">
+        <StagePipeline/>
+        <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>
+      </div>
+    );
     if(route==="/tk/readiness")          return <TkConfigReadinessPage/>;
     if(route==="/tk/control-panel")      return <TkControlPanelPage setRoute={navigate}/>;
     if(route==="/tk/controls")           return <TkControlsPage/>;

@@ -88,4 +88,46 @@ export function branchesWithPending(agg) {
   return rows.filter((b) => b.pending.n > 0).sort((a, b) => b.pending.n - a.pending.n);
 }
 
+// ─── 5-stage pipeline — where each pending entry is waiting NOW ────────────────
+// Maps the real chain stage (reviewStage) + the amount-tier escalation onto the five
+// people-stages: Branch → AE·Sughra → FM·Faiz → Director·Farhan → Owner·Afshin.
+//   check  → Branch (the entry is with the branch accountant)
+//   verify → AE · Sughra
+//   approve / direct → FM · Faiz, UNLESS the amount escalates it:
+//        amount > voucherDual      → Owner · Afshin (only he may sign)
+//        amount > voucherEscalate  → Director · Farhan (a senior must clear)
+export const PIPELINE_STAGES = [
+  { key: 'branch', role: 'Branch', name: 'Accountants', wait: 'entered' },
+  { key: 'ae', role: 'Verify · AE', name: 'Sughra', wait: 'to verify' },
+  { key: 'fm', role: 'Approve · FM', name: 'Faiz', wait: 'to post', gate: true },
+  { key: 'director', role: 'Director', name: 'Farhan', wait: 'escalated' },
+  { key: 'owner', role: 'Owner', name: 'Afshin Dhanani', wait: 'sole sign-off' },
+];
+
+const ageDaysOf = (e, nowMs) => {
+  const d = e && (e.date || e.createdAt || e.submittedAt);
+  const t = d ? Date.parse(d) : NaN;
+  return Number.isNaN(t) ? 0 : Math.max(0, Math.floor((nowMs - t) / 86_400_000));
+};
+
+/** Fold pending entries into the five people-stages. Returns rows in pipeline order,
+ *  each { key, role, name, wait, gate?, n, amount, oldest }. Pure & testable. */
+export function stagePipeline(entries = [], limits = {}, nowMs = Date.now()) {
+  const dual = Number(limits.voucherDual) > 0 ? Number(limits.voucherDual) : Infinity;
+  const escalate = Number(limits.voucherEscalate) > 0 ? Number(limits.voucherEscalate) : Infinity;
+  const acc = {};
+  for (const s of PIPELINE_STAGES) acc[s.key] = { ...s, n: 0, amount: 0, oldest: 0 };
+  for (const e of (Array.isArray(entries) ? entries : [])) {
+    const amt = Math.abs(Number(e.total != null ? e.total : e.amount) || 0);
+    const stage = e && e.reviewStage;
+    let key;
+    if (stage === 'check') key = 'branch';
+    else if (stage === 'verify') key = 'ae';
+    else key = amt > dual ? 'owner' : amt > escalate ? 'director' : 'fm'; // approve / direct
+    const b = acc[key];
+    b.n += 1; b.amount += amt; b.oldest = Math.max(b.oldest, ageDaysOf(e, nowMs));
+  }
+  return PIPELINE_STAGES.map((s) => acc[s.key]);
+}
+
 export { ZERO as _ZERO };
