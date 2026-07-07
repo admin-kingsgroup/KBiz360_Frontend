@@ -112,7 +112,7 @@ export function MastersTaxRates() {
               <button key={k} onClick={() => setTab(k)} className={`px-3.5 py-1.5 text-xs font-semibold transition ${tab === k ? 'bg-navy text-gold' : 'bg-surface text-ink-muted hover:bg-surface-alt'}`}>{l}</button>
             ))}
           </div>
-          {tab === 'gst' && <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search HSN/SAC, module…" className="w-auto min-w-[180px]" />}
+          {tab === 'gst' && <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search HSN/SAC, module…" className="flex-1 min-w-[180px]" />}
         </>
       }
     >

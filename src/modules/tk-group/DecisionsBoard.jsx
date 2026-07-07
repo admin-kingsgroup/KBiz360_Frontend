@@ -13,10 +13,10 @@ import { DataTable } from '../../shell/DataTable';
 const statusTone = (s) => (s === 'rejected' ? 'danger' : s === 'pending' ? 'warning' : 'success');
 
 const COLS = [
-  { key: 'type', header: 'Type', render: (cr) => typeLabel(cr.type) },
-  { key: 'party', header: 'Party', render: (cr) => ((cr.payload && cr.payload.after) || {}).party || '—' },
-  { key: 'amount', header: 'Amount', num: true, render: (cr) => { const a = ((cr.payload && cr.payload.after) || {}).amount; return a ? Number(a).toLocaleString() : '—'; } },
-  { key: 'status', header: 'Status', render: (cr) => <Badge tone={statusTone(cr.status)} size="sm">{statusLabel(cr.status)}</Badge> },
+  { key: 'type', header: 'Type', width: '25%', render: (cr) => typeLabel(cr.type) },
+  { key: 'party', header: 'Party', width: '25%', render: (cr) => ((cr.payload && cr.payload.after) || {}).party || '—' },
+  { key: 'amount', header: 'Amount', num: true, width: '25%', render: (cr) => { const a = ((cr.payload && cr.payload.after) || {}).amount; return a ? Number(a).toLocaleString() : '—'; } },
+  { key: 'status', header: 'Status', width: '25%', render: (cr) => <Badge tone={statusTone(cr.status)} size="sm">{statusLabel(cr.status)}</Badge> },
 ];
 
 export function DecisionsBoard() {
@@ -43,10 +43,8 @@ export function DecisionsBoard() {
 
   return (
     <div className="tk-decisions grid gap-4">
-      <section>
-        {msg ? <div role="status" className="mb-2.5 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
-        <DecisionRequestForm onSubmit={onSubmit} />
-      </section>
+      {msg ? <div role="status" className="rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
+      <DecisionRequestForm onSubmit={onSubmit} />
 
       <DataTable
         title="My decision requests"

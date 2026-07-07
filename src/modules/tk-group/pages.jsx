@@ -37,9 +37,9 @@ const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
 // they look like the rest of the app. DORMANT-SAFE: with core.policy_guard OFF the
 // /api/tk/* endpoints return empty / read-only, so pages render a benign empty state.
 
-function Page({ title, subtitle, children }) {
+function Page({ title, subtitle, children, maxWidth = 'max-w-[1280px]' }) {
   return (
-    <PageLayout title={title} subtitle={subtitle} maxWidth="max-w-[1280px]">
+    <PageLayout title={title} subtitle={subtitle} maxWidth={maxWidth}>
       {children}
     </PageLayout>
   );
@@ -119,7 +119,7 @@ export function TkPeriodLockPage() {
 
 export function TkDecisionsPage() {
   return (
-    <Page title="Decisions" subtitle="Raise a credit-limit, funds-release or counterparty-onboarding decision. Farhan disposes smaller ones; large decisions and all onboarding escalate to the Owner. Nothing posts automatically — approval is the governance record.">
+    <Page title="Decisions" subtitle="Raise a credit-limit, funds-release or counterparty-onboarding decision. Farhan disposes smaller ones; large decisions and all onboarding escalate to the Owner. Nothing posts automatically — approval is the governance record." maxWidth="max-w-none">
       <DecisionsBoard />
     </Page>
   );

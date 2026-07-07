@@ -8,12 +8,13 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, ChevronDown } from 'lucide-react';
 import { useNumberingSeries } from '../../../core/useReference';
 import { BRANCH_CODES } from '../../../core/data';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { Input, Select, StatusPill } from '../../../shell/primitives';
+import { Input, StatusPill } from '../../../shell/primitives';
+import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 
 const STD = [['BKG', 'Booking'], ['LK', 'Link No'], ['SF', 'Sales (SO)'], ['PF', 'Purchase (PO)'], ['RV', 'Receipt'], ['PMT', 'Payment'], ['JV', 'Journal'], ['CV', 'Contra'], ['SDN', 'Debit Note'], ['PXP', 'Purchase Expense'], ['RF', 'Refund'], ['RI', 'Reissue']];
 
@@ -57,11 +58,28 @@ export function NumberingSeriesMaster({ branch }) {
       subtitle="System-controlled · read-only — a series is created on first use; “Next No” is the next number that will be issued."
       filters={
         <>
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search type, prefix, format…" className="w-auto min-w-[200px] flex-1" />
-          <Select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="w-auto">
-            <option value="ALL">All branches</option>
-            {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
-          </Select>
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search type, prefix, format…" className="!w-auto min-w-[200px] flex-1" />
+          <DropdownMenu
+            ariaLabel="Branch"
+            menuRole="listbox"
+            width={220}
+            items={[
+              { key: 'ALL', label: 'All branches', selected: filterBranch === 'ALL', onSelect: () => setFilterBranch('ALL') },
+              ...BRANCH_CODES.map((b) => ({ key: b, label: b, selected: filterBranch === b, onSelect: () => setFilterBranch(b) })),
+            ]}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button
+                ref={ref}
+                {...triggerProps}
+                onClick={toggle}
+                type="button"
+                className="flex h-9 w-[220px] items-center justify-between gap-2 rounded-md border border-surface-border bg-surface px-3 text-left text-[13px] text-ink outline-none transition focus:border-gold focus:shadow-gold-glow max-tablet:min-h-[44px]"
+              >
+                <span className="truncate">{filterBranch === 'ALL' ? 'All branches' : filterBranch}</span>
+                <ChevronDown size={14} className="shrink-0 text-ink-muted" />
+              </button>
+            )}
+          />
           <StatusPill tone="info" icon={Lock}>System-controlled</StatusPill>
         </>
       }

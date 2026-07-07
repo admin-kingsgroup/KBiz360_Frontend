@@ -20,7 +20,7 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
   // under the ACCOUNTS header now — see MENU_ACCOUNTS ▸ "Accounts Master".
   {label:"Voucher Master", children:[
     {label:"Voucher Types", href:"/masters/voucher-types"},
-    {label:"Numbering Series (🔒 auto)", href:"/masters/numbering"},
+    {label:"Numbering Series (auto)", href:"/masters/numbering"},
   ]},
   {label:"Client Master", children:[
     {label:"Clients (Sundry Debtors)", href:"/masters/customers"},
