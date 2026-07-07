@@ -5,9 +5,27 @@
 
 
 
+// ── Active branch currency ───────────────────────────────────────────────────
+// The default currency the symbol-less / ₹-defaulting formatters (fmt, fmtINR, money's
+// default) print in. Set ONCE when the operating branch changes (App.jsx) so the whole
+// branch app follows the branch: ₹ + lakh/crore for India, $ + K/M/B + Western grouping
+// for the Africa USD branches (NBO/DAR/FBM). Default '₹' → byte-identical to before, so
+// nothing changes until a USD branch is selected. Callers that pass an explicit currency
+// (money(n, cur) / compactAmt(n,{currency})) are unaffected — the explicit value wins.
+let _activeCur = '₹';
+export function setActiveCurrency(sym) { _activeCur = (sym && String(sym).trim()) || '₹'; }
+export function activeCurrency() { return _activeCur; }
+const isUsdSym = (s) => { const t = String(s).trim().toUpperCase(); return t === '$' || t === 'US$' || t === 'USD'; };
+
 export function fmt(n){
   if(n==null||isNaN(n))return "0";
   const abs=Math.abs(n);
+  if(isUsdSym(_activeCur)){
+    if(abs>=1e9) return (n/1e9).toFixed(2)+" B";
+    if(abs>=1e6) return (n/1e6).toFixed(2)+" M";
+    if(abs>=1e3) return (n/1e3).toFixed(1)+" K";
+    return String(n);
+  }
   if(abs>=10000000)return (n/10000000).toFixed(2)+" Cr";
   if(abs>=100000) return (n/100000).toFixed(2)+" L";
   if(abs>=1000)   return Number(n).toLocaleString("en-IN");
@@ -51,14 +69,16 @@ export function compactAmt(n, { currency = '₹', dash = false } = {}) {
   return `${currency}${sign}${Math.round(a).toLocaleString(localeOf(currency))}`;
 }
 
-// Back-compat ₹ wrapper — delegates to the canonical formatter so the rules stay in one place.
-export const fmtINR = n => compactAmt(n, { currency: '₹' });
+// Branch-aware wrapper (kept the name for back-compat) — abbreviates in the ACTIVE branch
+// currency. India branches / consolidated default → ₹ + Cr/L (unchanged); a selected USD
+// branch → $ + K/M/B. Delegates to the canonical formatter so the rules stay in one place.
+export const fmtINR = n => compactAmt(n, { currency: _activeCur });
 
 // Canonical FULL amount (no Cr/L abbreviation), branch-currency aware. The single
 // source for screens that print exact figures (registers, vouchers, statements):
 // ₹ + Indian lakh/crore grouping for India branches, $/other + Western thousands
 // grouping for USD branches (NBO/DAR/FBM). Pass the branch currency symbol as `cur`.
-export const money = (n, cur = '₹') => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
+export const money = (n, cur = _activeCur) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 
 /* ════════════════════════════════════════════════════════════════════
    A. DIRECTOR DASHBOARD
