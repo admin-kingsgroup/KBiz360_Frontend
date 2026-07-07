@@ -66,12 +66,16 @@ export const isRemovable = (l, n) => isInactive(l) && (n || 0) === 0;
 // The 13 seeded system SUB-groups carry a parent and must render nested under it,
 // never also as a second top-level "Parent Group".
 export const isRootGroup = (g) => !!(g && g.system && !g.parent);
-// Split the fetched ledgers into what the tree should show + how many deactivated
-// ones are being hidden. Pure so it can be unit-tested without rendering.
+// Split the fetched ledgers into what the tree should show + how many are being
+// withheld. Presence-HIDDEN ledgers (TK Group Central Table branch toggle) are
+// treated like deactivated ones: dropped by default, revealed by the same
+// "Include inactive" toggle (with their own badge). Pure — unit-tested.
+export const isPresenceHidden = (l) => l.hidden === true;
 export function partitionLedgers(fetched, includeInactive) {
   const list = fetched || [];
-  const inactiveHidden = includeInactive ? 0 : list.filter(isInactive).length;
-  const sourceLedgers = includeInactive ? list : list.filter((l) => !isInactive(l));
+  const drop = (l) => isInactive(l) || isPresenceHidden(l);
+  const inactiveHidden = includeInactive ? 0 : list.filter(drop).length;
+  const sourceLedgers = includeInactive ? list : list.filter((l) => !drop(l));
   return { sourceLedgers, inactiveHidden };
 }
 // Sum the entry counts of every ledger in a group node's subtree, counting each
@@ -255,7 +259,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
     const n = entriesFor(l), rm = removableOf(l, n);
     return (
       <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #dfe2e7', color: rm ? RED : isInactive(l) ? '#9aa2c0' : DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : rm ? RED_TINT : undefined }}>
-        <span style={{ color: rm ? RED : isInactive(l) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}{ledgerLock(l)}{rm ? badge('Removable', RED) : isInactive(l) && badge('Inactive', AMBER)}
+        <span style={{ color: rm ? RED : isInactive(l) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}{ledgerLock(l)}{rm ? badge('Removable', RED) : isInactive(l) ? badge('Inactive', AMBER) : isPresenceHidden(l) && badge('Hidden', '#64748b')}
         {l._overrides && <span style={{ fontSize: 9, color: GOLD, marginLeft: 6, fontStyle: 'italic' }}>overrides Common</span>}
         {countChip(n)}
       </div>
