@@ -98,6 +98,8 @@ const CSS = `
 .cvd .banner .s{font-size:12.5px;color:#337b73;margin-top:2px}
 .cvd .banner.bad{background:linear-gradient(90deg,#fdecec,#fff5f5);border-color:#f6cccc}
 .cvd .banner.bad .ic{background:var(--red)}.cvd .banner.bad .t{color:#8f1d1d}.cvd .banner.bad .s{color:#a53a3a}
+.cvd .banner.muted{background:linear-gradient(90deg,#f3f5f9,#f9fafc);border-color:var(--line)}
+.cvd .banner.muted .ic{background:var(--dim)}.cvd .banner.muted .t{color:var(--ink2)}.cvd .banner.muted .s{color:var(--dim)}
 
 /* KPI strip */
 .cvd .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
@@ -154,8 +156,14 @@ const CSS = `
 .cvd .stmt-tools button{font-size:10.5px;font-weight:700;color:var(--dim);background:#f1f3f8;border:1px solid var(--line);border-radius:6px;padding:4px 9px;cursor:pointer}
 .cvd .stmt-tools button:hover{color:var(--primary-d);border-color:var(--primary)}
 .cvd .grphd,.cvd .row.led{display:flex;align-items:center;gap:8px;padding:7px 18px;border-bottom:1px solid var(--line2);font-size:13px}
-.cvd .grphd{background:#fafbfd;font-weight:800;color:var(--primary-d);text-transform:uppercase;font-size:10.5px;letter-spacing:.6px}
-.cvd .grphd .nm{flex:1;min-width:0;overflow-wrap:anywhere}.cvd .grphd .amt{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:800}
+.cvd .grphd{background:#fafbfd;font-weight:800;color:var(--primary-d);text-transform:uppercase;font-size:10.5px;letter-spacing:.6px;
+  cursor:pointer;width:100%;text-align:left;border-top:0;border-left:0;border-right:0;font-family:inherit}
+.cvd .grphd:hover{background:#f3f6fb}
+.cvd .grphd:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.cvd .grphd .chev{color:var(--primary);font-weight:800;font-size:11px;display:inline-block;transition:transform .15s;flex:none}
+.cvd .grphd.open .chev{transform:rotate(90deg)}
+.cvd .grphd .nm{flex:1;min-width:0;overflow-wrap:anywhere}.cvd .grphd .cnt{color:var(--dim);font-weight:700;font-size:10px;flex:none}
+.cvd .grphd .amt{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:800}
 .cvd .subhd{display:flex;align-items:center;gap:8px;padding:7px 18px;border-bottom:1px solid var(--line2);font-size:13px;
   cursor:pointer;font-weight:700;color:var(--ink);width:100%;text-align:left;background:none;border-top:0;border-left:0;border-right:0;font-family:inherit}
 .cvd .subhd:hover{background:#f3f6fb}
@@ -242,28 +250,24 @@ function LeafRow({ node, fmt }) {
     </div>
   );
 }
-function SubNode({ node, depth, fmt }) {
+// Every group — top-level or nested — is collapsible and seeds its open state from
+// TreeCtx, so Expand all / Collapse all (and the default collapsed state) reach every
+// level, not just deep sub-groups. Top-level groups keep the uppercase `grphd` look.
+function GroupNode({ node, depth, fmt }) {
   const [open, setOpen] = useState(React.useContext(TreeCtx));
+  const top = depth === 0;
   return (
     <div className="node">
-      <button type="button" className={`subhd ${open ? 'open' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button type="button" className={`${top ? 'grphd' : 'subhd'} ${open ? 'open' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span className="chev">›</span><span className="nm">{node.name}</span><span className="cnt">{leafCount(node)}</span><Amt v={node.amount} fmt={fmt} />
       </button>
-      {open && <div className="kids">{(node.items || []).map((c, i) => <TreeNode key={i} node={c} depth={depth + 1} fmt={fmt} />)}</div>}
+      {open && <div className={`kids ${top ? 'top' : ''}`}>{(node.items || []).map((c, i) => <TreeNode key={i} node={c} depth={depth + 1} fmt={fmt} />)}</div>}
     </div>
   );
 }
 function TreeNode({ node, depth, fmt }) {
   if (!node.isGroup) return <LeafRow node={node} fmt={fmt} />;
-  if (depth === 0) {
-    return (
-      <div className="node">
-        <div className="grphd"><span className="nm">{node.name}</span><Amt v={node.amount} fmt={fmt} /></div>
-        <div className="kids top">{(node.items || []).map((c, i) => <TreeNode key={i} node={c} depth={1} fmt={fmt} />)}</div>
-      </div>
-    );
-  }
-  return <SubNode node={node} depth={depth} fmt={fmt} />;
+  return <GroupNode node={node} depth={depth} fmt={fmt} />;
 }
 const TreeList = ({ nodes, fmt }) => (nodes || []).map((n, i) => <TreeNode key={i} node={n} depth={0} fmt={fmt} />);
 
@@ -345,7 +349,7 @@ export function CapitalVsInvestmentLive({ branch }) {
 
   // Scroll-spy: highlight the rail link for whatever section is in view.
   useEffect(() => {
-    if (!hasData) return undefined;
+    if (isLoading || error || !data) return undefined;
     const ids = NAV.map(([id]) => document.getElementById('cvd-' + id)).filter(Boolean);
     if (!ids.length || typeof IntersectionObserver === 'undefined') return undefined;
     const obs = new IntersectionObserver((entries) => {
@@ -353,7 +357,7 @@ export function CapitalVsInvestmentLive({ branch }) {
     }, { rootMargin: '-45% 0px -50% 0px' });
     ids.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
-  }, [hasData]);
+  }, [isLoading, error, data]);
 
   const jump = (id) => { const el = document.getElementById('cvd-' + id); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActive(id); };
 
@@ -407,17 +411,18 @@ export function CapitalVsInvestmentLive({ branch }) {
         <div className="content">
           {isLoading && <div className="state">Loading live capital analysis…</div>}
           {error && <div className="state" style={{ color: '#dc2626' }}>Couldn’t load: {String(error.message || error)}</div>}
-          {!isLoading && !error && data && !hasData && (
-            <div className="state">No capital or gross-profit postings for this period. Record vouchers to populate the capital-vs-investment analysis.</div>
-          )}
-
-          {!isLoading && !error && data && hasData && (<>
-            {/* verdict banner */}
-            <div className={`banner ${good ? '' : 'bad'}`}>
-              <div className="ic">{good ? '✓' : '!'}</div>
+          {/* The report always renders once data has loaded — a branch with no postings
+              shows every figure as zero (with a neutral banner) rather than a dead-end
+              empty state, so it stays consistent across all branches. */}
+          {!isLoading && !error && data && (<>
+            {/* verdict banner — neutral when there are no postings yet */}
+            <div className={`banner ${!hasData ? 'muted' : good ? '' : 'bad'}`}>
+              <div className="ic">{!hasData ? '○' : good ? '✓' : '!'}</div>
               <div>
-                <div className="t">{good ? 'In-Flow capital IS generating enough gross profit' : 'In-Flow capital is NOT generating enough gross profit'}</div>
-                <div className="s">{good
+                <div className="t">{!hasData ? 'No postings recorded for this period yet' : good ? 'In-Flow capital IS generating enough gross profit' : 'In-Flow capital is NOT generating enough gross profit'}</div>
+                <div className="s">{!hasData
+                  ? <>This branch has no capital, asset or trading entries in the selected period — every figure below shows as {cr(0)}. Record vouchers to populate the analysis.</>
+                  : good
                   ? <>{(t.gpYield || 0).toFixed(1)}% GP-yield on in-flow capital — <b>above</b> the {hurdle}% cost-of-capital hurdle. {(t.netProfit || 0) < 0
                     ? <>But operating costs of {cr(t.indirectExpense)} turn it into a <b>net loss of {cr(t.netProfit)}</b>.</>
                     : <>Working capital recycled {(t.flowTurnover || 0).toFixed(2)}× a year at a {(t.gpMargin || 0).toFixed(1)}% margin into {cr(t.grossRevenue)} of turnover.</>}</>

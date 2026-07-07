@@ -61,21 +61,43 @@ test('India branch (BOM) renders ₹ figures', () => {
   expect(screen.queryByText(/\$5/)).toBeNull();
 });
 
-test('USD branch (NBO) renders $ figures — a top-group ledger shows without a click', () => {
+test('USD branch (NBO) renders $ figures — group header + expanded ledger in branch currency', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'NBO' }} />);
   expect(screen.getAllByText(/\$/).length).toBeGreaterThan(0);
-  // Owner Capital is a leaf directly under the always-expanded Capital Account group.
+  // Groups are collapsed by default; the always-visible top-group header carries the $ amount.
+  expect(screen.getAllByText('Capital Account')[0].closest('.grphd')).toHaveTextContent('$');
+  // Expand the group and its ledger shows in branch currency too.
+  fireEvent.click(screen.getAllByText('Capital Account')[0]);
   expect(screen.getAllByText('Owner Capital')[0].closest('.led')).toHaveTextContent('$');
-  // Ticket Sales likewise (top group Sales Accounts stays open) — in branch currency.
-  expect(screen.getAllByText('Ticket Sales')[0].closest('.led')).toHaveTextContent('$');
 });
 
-test('ledgers collapse under a sub-group and expand on click', () => {
+test('top-level groups are collapsed by default and collapse/expand on header click', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
-  // Bank HDFC sits under the "Bank Accounts" sub-group → hidden until it's expanded.
+  // Office Equipment is a leaf under the top-level "Fixed Assets" group → hidden by default.
+  expect(screen.queryByText('Office Equipment')).toBeNull();
+  fireEvent.click(screen.getByText('Fixed Assets'));       // expand the top group
+  expect(screen.getByText('Office Equipment')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('Fixed Assets'));       // collapse it again
+  expect(screen.queryByText('Office Equipment')).toBeNull();
+});
+
+test('nested ledgers stay hidden until each level (top group ▸ sub-group) is expanded', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  // Bank HDFC is two levels deep: Current Assets ▸ Bank Accounts ▸ Bank HDFC.
   expect(screen.queryByText('Bank HDFC')).toBeNull();
-  fireEvent.click(screen.getByText('Bank Accounts'));
+  expect(screen.queryByText('Bank Accounts')).toBeNull();  // sub-group hidden while top group is collapsed
+  screen.getAllByText('Current Assets').forEach((el) => fireEvent.click(el)); // expand top group
+  fireEvent.click(screen.getByText('Bank Accounts'));       // expand sub-group
   expect(screen.getByText('Bank HDFC')).toBeInTheDocument();
+});
+
+test('Expand all / Collapse all fold and unfold every level', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  expect(screen.queryByText('Office Equipment')).toBeNull();          // collapsed by default
+  screen.getAllByText(/Expand all/).forEach((b) => fireEvent.click(b));
+  expect(screen.getAllByText('Office Equipment').length).toBeGreaterThan(0);
+  screen.getAllByText(/Collapse all/).forEach((b) => fireEvent.click(b));
+  expect(screen.queryByText('Office Equipment')).toBeNull();
 });
 
 test('Section 1 shows Capital Invested and Capital Employed as distinct totals + Less line', () => {
