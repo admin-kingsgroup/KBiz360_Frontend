@@ -98,6 +98,8 @@ const CSS = `
 .cvd .banner .s{font-size:12.5px;color:#337b73;margin-top:2px}
 .cvd .banner.bad{background:linear-gradient(90deg,#fdecec,#fff5f5);border-color:#f6cccc}
 .cvd .banner.bad .ic{background:var(--red)}.cvd .banner.bad .t{color:#8f1d1d}.cvd .banner.bad .s{color:#a53a3a}
+.cvd .banner.muted{background:linear-gradient(90deg,#f3f5f9,#f9fafc);border-color:var(--line)}
+.cvd .banner.muted .ic{background:var(--dim)}.cvd .banner.muted .t{color:var(--ink2)}.cvd .banner.muted .s{color:var(--dim)}
 
 /* KPI strip */
 .cvd .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
@@ -154,8 +156,14 @@ const CSS = `
 .cvd .stmt-tools button{font-size:10.5px;font-weight:700;color:var(--dim);background:#f1f3f8;border:1px solid var(--line);border-radius:6px;padding:4px 9px;cursor:pointer}
 .cvd .stmt-tools button:hover{color:var(--primary-d);border-color:var(--primary)}
 .cvd .grphd,.cvd .row.led{display:flex;align-items:center;gap:8px;padding:7px 18px;border-bottom:1px solid var(--line2);font-size:13px}
-.cvd .grphd{background:#fafbfd;font-weight:800;color:var(--primary-d);text-transform:uppercase;font-size:10.5px;letter-spacing:.6px}
-.cvd .grphd .nm{flex:1;min-width:0;overflow-wrap:anywhere}.cvd .grphd .amt{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:800}
+.cvd .grphd{background:#fafbfd;font-weight:800;color:var(--primary-d);text-transform:uppercase;font-size:10.5px;letter-spacing:.6px;
+  cursor:pointer;width:100%;text-align:left;border-top:0;border-left:0;border-right:0;font-family:inherit}
+.cvd .grphd:hover{background:#f3f6fb}
+.cvd .grphd:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.cvd .grphd .chev{color:var(--primary);font-weight:800;font-size:11px;display:inline-block;transition:transform .15s;flex:none}
+.cvd .grphd.open .chev{transform:rotate(90deg)}
+.cvd .grphd .nm{flex:1;min-width:0;overflow-wrap:anywhere}.cvd .grphd .cnt{color:var(--dim);font-weight:700;font-size:10px;flex:none}
+.cvd .grphd .amt{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:800}
 .cvd .subhd{display:flex;align-items:center;gap:8px;padding:7px 18px;border-bottom:1px solid var(--line2);font-size:13px;
   cursor:pointer;font-weight:700;color:var(--ink);width:100%;text-align:left;background:none;border-top:0;border-left:0;border-right:0;font-family:inherit}
 .cvd .subhd:hover{background:#f3f6fb}
@@ -227,10 +235,14 @@ const CSS = `
 `;
 
 // ── collapsible Tally tree (group ▸ sub-group ▸ ledger, any depth) ─────────────
-// Nodes are { name, amount, isGroup, src, items }. Top-level groups stay expanded;
-// every deeper sub-group collapses its ledgers and expands on click. A section-level
-// TreeCtx carries the expand/collapse-all default; remounting on its key re-seeds it.
-const TreeCtx = React.createContext(false);
+// Nodes are { name, amount, isGroup, src, items }. Every group is collapsible; the
+// section-level TreeCtx seeds each group's initial open state and remounting on its key
+// re-seeds it. Context is { mode, open }: mode 'all' (Expand/Collapse all) forces every
+// group to `open`; mode 'default' opens groups per the section default but keeps a few
+// naturally-long groups (Fixed Assets) folded so the section stays scannable.
+const TreeCtx = React.createContext({ mode: 'default', open: false });
+// Groups kept collapsed even when a section opens expanded (long ledger lists).
+const COLLAPSED_BY_DEFAULT = new Set(['Fixed Assets', 'Sundry Debtors']);
 const leafCount = (n) => (n.isGroup ? (n.items || []).reduce((s, c) => s + leafCount(c), 0) : 1);
 const Amt = ({ v, fmt }) => <span className={`amt ${v < 0 ? 'neg' : ''}`}>{fmt(v)}</span>;
 
@@ -242,41 +254,42 @@ function LeafRow({ node, fmt }) {
     </div>
   );
 }
-function SubNode({ node, depth, fmt }) {
-  const [open, setOpen] = useState(React.useContext(TreeCtx));
+// Every group — top-level or nested — is collapsible and seeds its open state from
+// TreeCtx, so Expand all / Collapse all (and the default collapsed state) reach every
+// level, not just deep sub-groups. Top-level groups keep the uppercase `grphd` look.
+function GroupNode({ node, depth, fmt }) {
+  const ctx = React.useContext(TreeCtx);
+  // Expand/Collapse all (mode 'all') forces every group; the default state opens groups
+  // unless they're in COLLAPSED_BY_DEFAULT (e.g. Fixed Assets stays folded).
+  const initialOpen = ctx.mode === 'all' ? ctx.open : ctx.open && !COLLAPSED_BY_DEFAULT.has(node.name);
+  const [open, setOpen] = useState(initialOpen);
+  const top = depth === 0;
   return (
     <div className="node">
-      <button type="button" className={`subhd ${open ? 'open' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button type="button" className={`${top ? 'grphd' : 'subhd'} ${open ? 'open' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span className="chev">›</span><span className="nm">{node.name}</span><span className="cnt">{leafCount(node)}</span><Amt v={node.amount} fmt={fmt} />
       </button>
-      {open && <div className="kids">{(node.items || []).map((c, i) => <TreeNode key={i} node={c} depth={depth + 1} fmt={fmt} />)}</div>}
+      {open && <div className={`kids ${top ? 'top' : ''}`}>{(node.items || []).map((c, i) => <TreeNode key={i} node={c} depth={depth + 1} fmt={fmt} />)}</div>}
     </div>
   );
 }
 function TreeNode({ node, depth, fmt }) {
   if (!node.isGroup) return <LeafRow node={node} fmt={fmt} />;
-  if (depth === 0) {
-    return (
-      <div className="node">
-        <div className="grphd"><span className="nm">{node.name}</span><Amt v={node.amount} fmt={fmt} /></div>
-        <div className="kids top">{(node.items || []).map((c, i) => <TreeNode key={i} node={c} depth={1} fmt={fmt} />)}</div>
-      </div>
-    );
-  }
-  return <SubNode node={node} depth={depth} fmt={fmt} />;
+  return <GroupNode node={node} depth={depth} fmt={fmt} />;
 }
 const TreeList = ({ nodes, fmt }) => (nodes || []).map((n, i) => <TreeNode key={i} node={n} depth={0} fmt={fmt} />);
 
 // Statement wrapper — provides the expand/collapse-all controls and default open state.
-function Stmt({ children }) {
-  const [gen, setGen] = useState({ open: false, k: 0 });
+// `defaultOpen` seeds the initial expand state (used by Section 1, which opens expanded).
+function Stmt({ children, defaultOpen = false }) {
+  const [gen, setGen] = useState({ mode: 'default', open: defaultOpen, k: 0 });
   return (
     <div className="stmt">
       <div className="stmt-tools">
-        <button type="button" onClick={() => setGen((g) => ({ open: true, k: g.k + 1 }))}>⊞ Expand all</button>
-        <button type="button" onClick={() => setGen((g) => ({ open: false, k: g.k + 1 }))}>⊟ Collapse all</button>
+        <button type="button" onClick={() => setGen((g) => ({ mode: 'all', open: true, k: g.k + 1 }))}>⊞ Expand all</button>
+        <button type="button" onClick={() => setGen((g) => ({ mode: 'all', open: false, k: g.k + 1 }))}>⊟ Collapse all</button>
       </div>
-      <TreeCtx.Provider value={gen.open}><div key={gen.k}>{children}</div></TreeCtx.Provider>
+      <TreeCtx.Provider value={{ mode: gen.mode, open: gen.open }}><div key={gen.k}>{children}</div></TreeCtx.Provider>
     </div>
   );
 }
@@ -345,7 +358,7 @@ export function CapitalVsInvestmentLive({ branch }) {
 
   // Scroll-spy: highlight the rail link for whatever section is in view.
   useEffect(() => {
-    if (!hasData) return undefined;
+    if (isLoading || error || !data) return undefined;
     const ids = NAV.map(([id]) => document.getElementById('cvd-' + id)).filter(Boolean);
     if (!ids.length || typeof IntersectionObserver === 'undefined') return undefined;
     const obs = new IntersectionObserver((entries) => {
@@ -353,7 +366,7 @@ export function CapitalVsInvestmentLive({ branch }) {
     }, { rootMargin: '-45% 0px -50% 0px' });
     ids.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
-  }, [hasData]);
+  }, [isLoading, error, data]);
 
   const jump = (id) => { const el = document.getElementById('cvd-' + id); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActive(id); };
 
@@ -407,17 +420,18 @@ export function CapitalVsInvestmentLive({ branch }) {
         <div className="content">
           {isLoading && <div className="state">Loading live capital analysis…</div>}
           {error && <div className="state" style={{ color: '#dc2626' }}>Couldn’t load: {String(error.message || error)}</div>}
-          {!isLoading && !error && data && !hasData && (
-            <div className="state">No capital or gross-profit postings for this period. Record vouchers to populate the capital-vs-investment analysis.</div>
-          )}
-
-          {!isLoading && !error && data && hasData && (<>
-            {/* verdict banner */}
-            <div className={`banner ${good ? '' : 'bad'}`}>
-              <div className="ic">{good ? '✓' : '!'}</div>
+          {/* The report always renders once data has loaded — a branch with no postings
+              shows every figure as zero (with a neutral banner) rather than a dead-end
+              empty state, so it stays consistent across all branches. */}
+          {!isLoading && !error && data && (<>
+            {/* verdict banner — neutral when there are no postings yet */}
+            <div className={`banner ${!hasData ? 'muted' : good ? '' : 'bad'}`}>
+              <div className="ic">{!hasData ? '○' : good ? '✓' : '!'}</div>
               <div>
-                <div className="t">{good ? 'In-Flow capital IS generating enough gross profit' : 'In-Flow capital is NOT generating enough gross profit'}</div>
-                <div className="s">{good
+                <div className="t">{!hasData ? 'No postings recorded for this period yet' : good ? 'In-Flow capital IS generating enough gross profit' : 'In-Flow capital is NOT generating enough gross profit'}</div>
+                <div className="s">{!hasData
+                  ? <>This branch has no capital, asset or trading entries in the selected period — every figure below shows as {cr(0)}. Record vouchers to populate the analysis.</>
+                  : good
                   ? <>{(t.gpYield || 0).toFixed(1)}% GP-yield on in-flow capital — <b>above</b> the {hurdle}% cost-of-capital hurdle. {(t.netProfit || 0) < 0
                     ? <>But operating costs of {cr(t.indirectExpense)} turn it into a <b>net loss of {cr(t.netProfit)}</b>.</>
                     : <>Working capital recycled {(t.flowTurnover || 0).toFixed(2)}× a year at a {(t.gpMargin || 0).toFixed(1)}% margin into {cr(t.grossRevenue)} of turnover.</>}</>
@@ -496,7 +510,7 @@ export function CapitalVsInvestmentLive({ branch }) {
             {/* Section 1 · Capital Invested → Employed */}
             <div className="card section" id="cvd-s1">
               <div className="sec-hd"><span className="no teal">1</span><div><div className="tt">Capital Invested → Employed</div><div className="ds">Group ▸ sub-group ▸ ledger · Capital Account{(t.quasiCapital || 0) > 0.5 ? ' + owner & partner loans' : ''} = Invested; net of retained earnings = Employed</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(employed)}</span></div>
-              <Stmt>
+              <Stmt defaultOpen>
                 <TreeList nodes={[...(data.capital || []), ...(data.quasi || [])]} fmt={inr} />
                 <TotRow label="CAPITAL INVESTED" val={t.capitalInvested} fmt={inr} />
                 {(data.capitalAdjust || []).map((a, i) => (
@@ -509,7 +523,7 @@ export function CapitalVsInvestmentLive({ branch }) {
             {/* Section 2 · Capital Blocked */}
             <div className="card section" id="cvd-s2">
               <div className="sec-hd"><span className="no amber">2</span><div><div className="tt">Capital Blocked</div><div className="ds">Fixed assets · investments · deposits · advances — group ▸ sub-group ▸ ledger</div></div><span className="right num" style={{ color: 'var(--amber)' }}>{inr(t.capitalBlocked)}</span></div>
-              <Stmt>
+              <Stmt defaultOpen>
                 <TreeList nodes={data.blocked} fmt={inr} />
                 {!(data.blocked || []).length && <Empty txt="No blocked-capital accounts in this period." />}
                 <TotRow label="TOTAL BLOCKED" val={t.capitalBlocked} tone="amberT" fmt={inr} />
@@ -529,7 +543,7 @@ export function CapitalVsInvestmentLive({ branch }) {
                 </div>
                 <div className="recon">Composition of current-asset ledgers totals <b>{inr(flowComp)}</b> — {reconciles ? 'reconciles with the in-flow residual ✓' : <>the <b>{inr(flowComp - (t.inflowCapital || 0))}</b> gap is financed by external funding (creditors · loans · current liabilities), which totals <b>{inr(t.externalFunding)}</b>.</>}</div>
               </div>
-              <Stmt>
+              <Stmt defaultOpen>
                 <TreeList nodes={data.flow} fmt={inr} />
                 {!(data.flow || []).length && <Empty txt="No current-asset ledgers in this period." />}
                 <TotRow label="COMPOSITION TOTAL (CURRENT ASSETS)" val={flowComp} fmt={inr} />

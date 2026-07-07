@@ -1,7 +1,7 @@
 /* Scenario tests for the report ghost-data fixes:
    - ClientStatement now maps a LIVE ledger statement (no simulated receipts)
    - ReportExpenseBgt actuals come from the LIVE budget-vs-actual feed
-   - capitalVsInvestment shows an empty state instead of a verdict on zeros
+   - capitalVsInvestment picks a neutral (no-postings) vs good/bad verdict banner on zeros
    These mirror the pure transforms used inside the report components. */
 
 /* ── ClientStatement: ledger posting → statement row ── */
@@ -17,7 +17,7 @@ const outstandingFromStmt = (stmt) =>
 /* ── ReportExpenseBgt: live actuals keyed by ledger code ── */
 const actByCode = (rows) => Object.fromEntries((rows || []).map((r) => [r.code, r.actual || 0]));
 
-/* ── capitalVsInvestment: empty-books guard ── */
+/* ── capitalVsInvestment: no-postings detector (selects the neutral banner tone) ── */
 const hasCapitalData = (t = {}) =>
   Math.abs(t.capitalInvested || 0) > 0.5 || Math.abs(t.grossProfit || 0) > 0.5 ||
   Math.abs(t.inflowCapital || 0) > 0.5 || Math.abs(t.grossRevenue || 0) > 0.5;
@@ -55,12 +55,12 @@ describe('ReportExpenseBgt — live actuals from budget-vs-actual', () => {
   });
 });
 
-describe('capitalVsInvestment — empty-state guard', () => {
-  test('all-zero totals → no verdict (empty state)', () => {
+describe('capitalVsInvestment — no-postings detector', () => {
+  test('all-zero totals → no postings (neutral banner, report still renders with zeros)', () => {
     expect(hasCapitalData({})).toBe(false);
     expect(hasCapitalData({ capitalInvested: 0, grossProfit: 0 })).toBe(false);
   });
-  test('any real posting → render the analysis', () => {
+  test('any real posting → good/bad verdict banner', () => {
     expect(hasCapitalData({ grossProfit: 125000 })).toBe(true);
     expect(hasCapitalData({ inflowCapital: 50000 })).toBe(true);
   });

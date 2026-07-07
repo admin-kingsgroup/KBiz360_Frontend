@@ -85,24 +85,32 @@ export function controlCockpitMenu(focus, currentUser) {
     // Accounts — the branch's full Accounts pill (Data Entry + Reports), only when focused.
     ...branchWorkspace(focus),
 
-    // Approvals — exactly two: data-entry Vouchers (same screen as the branch) and
-    // Admin Approval (every other rule approval). Plus the governance raise-points.
+    // Approvals — the two queues, then the governance raise-points. Grouped (not loose
+    // leaves) so the dropdown renders as titled columns like every other cockpit menu —
+    // never a mix of featured pills + plain text (see the shared MegaPanel renderer).
     { label: 'Approvals', icon: CheckSquare, children: [
-      { label: 'Approvals — Vouchers', href: '/tk/voucher-approvals' },
-      { label: 'Admin Approval', href: '/tk/approvals' },
-      { divider: true, label: 'Raise / govern' },
-      { label: 'Decisions', href: '/tk/decisions' },
-      { label: 'Onboarding', href: '/tk/onboarding' },
+      { label: 'Approve', children: [
+        { label: 'Approvals — Vouchers', href: '/tk/voucher-approvals' },
+        { label: 'Admin Approval', href: '/tk/approvals' },
+      ] },
+      { label: 'Raise / Govern', children: [
+        { label: 'Decisions', href: '/tk/decisions' },
+        { label: 'Onboarding', href: '/tk/onboarding' },
+      ] },
     ] },
 
     // Control & Configuration — the Power Console + the rules it governs.
     { label: 'Control & Configuration', icon: Lock, children: [
-      { label: 'Control Panel', href: '/tk/control-panel' },
-      { label: 'Control Flags', href: '/tk/controls' },
-      { label: 'Thresholds & Limits', href: '/tk/limits' },
-      { label: 'Period Locks', href: '/tk/period-locks' },
-      { label: 'Targets & Budgets', href: '/tk/targets' },
-      { label: 'Master Control (request)', href: '/tk/master-control' },
+      { label: 'Power Console', children: [
+        { label: 'Control Panel', href: '/tk/control-panel' },
+        { label: 'Control Flags', href: '/tk/controls' },
+        { label: 'Thresholds & Limits', href: '/tk/limits' },
+      ] },
+      { label: 'Rules & Requests', children: [
+        { label: 'Period Locks', href: '/tk/period-locks' },
+        { label: 'Targets & Budgets', href: '/tk/targets' },
+        { label: 'Master Control (request)', href: '/tk/master-control' },
+      ] },
     ] },
 
     // Administration — the org-wide admin panel (users / roles / access / config /
@@ -111,48 +119,67 @@ export function controlCockpitMenu(focus, currentUser) {
 
     // Masters & Ledger — the chart of accounts + party masters (central-approved).
     { label: 'Masters & Ledger', icon: Database, children: [
-      { label: 'Chart of Accounts', href: '/masters/accounts-tree' },
-      { label: 'Ledger Masters', href: '/masters/ledgers' },
-      { label: 'Account Groups', href: '/masters/groups' },
-      { label: 'Customers', href: '/masters/customers' },
-      { label: 'Suppliers', href: '/masters/suppliers' },
+      { label: 'Chart & Ledgers', children: [
+        { label: 'Chart of Accounts', href: '/masters/accounts-tree' },
+        { label: 'Ledger Masters', href: '/masters/ledgers' },
+        { label: 'Account Groups', href: '/masters/groups' },
+      ] },
+      { label: 'Party Masters', children: [
+        { label: 'Customers', href: '/masters/customers' },
+        { label: 'Suppliers', href: '/masters/suppliers' },
+      ] },
     ] },
 
     // Performance & Oversight — branchwise analytics (never blended).
     { label: 'Performance & Oversight', icon: BarChart2, children: [
-      { label: 'Branch Scorecard', href: '/tk/scorecard' },
-      { label: 'Performance vs Target', href: '/tk/performance' },
-      { label: 'Investment & Capital', href: '/tk/investment' },
-      { label: 'Assets Central', href: '/tk/assets' },
-      { label: 'Profitability', href: '/tk/profitability' },
-      { label: 'Receivables & Payables', href: '/tk/receivables-payables' },
-      { label: 'Exceptions & Risk', href: '/tk/exceptions' },
-      { label: 'Compliance & Close', href: '/tk/compliance' },
-      { label: 'Central Tax Desk', href: '/tk/tax-desk' },
+      { label: 'Performance', children: [
+        { label: 'Branch Scorecard', href: '/tk/scorecard' },
+        { label: 'Performance vs Target', href: '/tk/performance' },
+        { label: 'Profitability', href: '/tk/profitability' },
+      ] },
+      { label: 'Capital & Assets', children: [
+        { label: 'Investment & Capital', href: '/tk/investment' },
+        { label: 'Assets Central', href: '/tk/assets' },
+        { label: 'Receivables & Payables', href: '/tk/receivables-payables' },
+      ] },
+      { label: 'Risk & Close', children: [
+        { label: 'Exceptions & Risk', href: '/tk/exceptions' },
+        { label: 'Compliance & Close', href: '/tk/compliance' },
+        { label: 'Central Tax Desk', href: '/tk/tax-desk' },
+      ] },
     ] },
 
     // HR Control — governance + the HR screens.
     { label: 'HR Control', icon: Users, children: [
-      { label: 'HR Requests', href: '/tk/hr-control' },
-      { divider: true, label: 'HR screens' },
-      { label: 'Employees', href: '/hr/employees' },
-      { label: 'Payroll', href: '/hr/payroll' },
-      { label: 'Attrition', href: '/hr/attrition' },
-      { label: 'Recruitment', href: '/hr/recruitment' },
+      { label: 'Governance', children: [
+        { label: 'HR Requests', href: '/tk/hr-control' },
+      ] },
+      { label: 'HR Screens', children: [
+        { label: 'Employees', href: '/hr/employees' },
+        { label: 'Payroll', href: '/hr/payroll' },
+        { label: 'Attrition', href: '/hr/attrition' },
+        { label: 'Recruitment', href: '/hr/recruitment' },
+      ] },
     ] },
 
     // Monitoring — live drill-downs.
     { label: 'Monitoring', icon: Activity, children: [
-      { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
-      { label: 'Audit Trail', href: '/tk/audit' },
+      { label: 'Live Drill-downs', children: [
+        { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
+        { label: 'Audit Trail', href: '/tk/audit' },
+      ] },
     ] },
 
     // Setup & Roles — readiness, the go-live switch, and who does what.
     { label: 'Setup & Roles', icon: Rocket, children: [
-      { label: 'Configuration Readiness', href: '/tk/readiness' },
-      { label: 'Go-Live', href: '/tk/go-live' },
-      { label: 'My Role', href: '/tk/my-role' },
-      { label: 'Roles & Responsibilities', href: '/tk/roles' },
+      { label: 'Setup', children: [
+        { label: 'Configuration Readiness', href: '/tk/readiness' },
+        { label: 'Go-Live', href: '/tk/go-live' },
+      ] },
+      { label: 'Roles', children: [
+        { label: 'My Role', href: '/tk/my-role' },
+        { label: 'Roles & Responsibilities', href: '/tk/roles' },
+      ] },
     ] },
   ];
 }
