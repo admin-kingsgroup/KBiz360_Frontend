@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { money } from '../../core/format';
@@ -62,7 +62,7 @@ export function StagePipeline() {
         ))}
       </div>
       <p className="text-[11px] text-ink-subtle">
-        Counts are who holds it now. Most vouchers finish at <b>FM · Faiz</b> (that stage posts to the books); large / over-ceiling entries carry on to <b>Director</b> and <b>Owner</b>. The full JV detail and Approve / Reject are in the queue below.
+        Counts are who holds it now. Every voucher finishes at <b>FM · Faiz</b> (that stage posts to the books); when escalation sign-offs are engaged, large / over-ceiling entries pass through <b>Director</b> and <b>Owner</b> first. The full JV detail and Approve / Reject are in the queue below.
       </p>
     </div>
   );
