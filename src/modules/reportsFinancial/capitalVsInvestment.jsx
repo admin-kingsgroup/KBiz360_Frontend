@@ -235,10 +235,14 @@ const CSS = `
 `;
 
 // ── collapsible Tally tree (group ▸ sub-group ▸ ledger, any depth) ─────────────
-// Nodes are { name, amount, isGroup, src, items }. Top-level groups stay expanded;
-// every deeper sub-group collapses its ledgers and expands on click. A section-level
-// TreeCtx carries the expand/collapse-all default; remounting on its key re-seeds it.
-const TreeCtx = React.createContext(false);
+// Nodes are { name, amount, isGroup, src, items }. Every group is collapsible; the
+// section-level TreeCtx seeds each group's initial open state and remounting on its key
+// re-seeds it. Context is { mode, open }: mode 'all' (Expand/Collapse all) forces every
+// group to `open`; mode 'default' opens groups per the section default but keeps a few
+// naturally-long groups (Fixed Assets) folded so the section stays scannable.
+const TreeCtx = React.createContext({ mode: 'default', open: false });
+// Groups kept collapsed even when a section opens expanded (long ledger lists).
+const COLLAPSED_BY_DEFAULT = new Set(['Fixed Assets', 'Sundry Debtors']);
 const leafCount = (n) => (n.isGroup ? (n.items || []).reduce((s, c) => s + leafCount(c), 0) : 1);
 const Amt = ({ v, fmt }) => <span className={`amt ${v < 0 ? 'neg' : ''}`}>{fmt(v)}</span>;
 
@@ -254,7 +258,11 @@ function LeafRow({ node, fmt }) {
 // TreeCtx, so Expand all / Collapse all (and the default collapsed state) reach every
 // level, not just deep sub-groups. Top-level groups keep the uppercase `grphd` look.
 function GroupNode({ node, depth, fmt }) {
-  const [open, setOpen] = useState(React.useContext(TreeCtx));
+  const ctx = React.useContext(TreeCtx);
+  // Expand/Collapse all (mode 'all') forces every group; the default state opens groups
+  // unless they're in COLLAPSED_BY_DEFAULT (e.g. Fixed Assets stays folded).
+  const initialOpen = ctx.mode === 'all' ? ctx.open : ctx.open && !COLLAPSED_BY_DEFAULT.has(node.name);
+  const [open, setOpen] = useState(initialOpen);
   const top = depth === 0;
   return (
     <div className="node">
@@ -272,15 +280,16 @@ function TreeNode({ node, depth, fmt }) {
 const TreeList = ({ nodes, fmt }) => (nodes || []).map((n, i) => <TreeNode key={i} node={n} depth={0} fmt={fmt} />);
 
 // Statement wrapper — provides the expand/collapse-all controls and default open state.
-function Stmt({ children }) {
-  const [gen, setGen] = useState({ open: false, k: 0 });
+// `defaultOpen` seeds the initial expand state (used by Section 1, which opens expanded).
+function Stmt({ children, defaultOpen = false }) {
+  const [gen, setGen] = useState({ mode: 'default', open: defaultOpen, k: 0 });
   return (
     <div className="stmt">
       <div className="stmt-tools">
-        <button type="button" onClick={() => setGen((g) => ({ open: true, k: g.k + 1 }))}>⊞ Expand all</button>
-        <button type="button" onClick={() => setGen((g) => ({ open: false, k: g.k + 1 }))}>⊟ Collapse all</button>
+        <button type="button" onClick={() => setGen((g) => ({ mode: 'all', open: true, k: g.k + 1 }))}>⊞ Expand all</button>
+        <button type="button" onClick={() => setGen((g) => ({ mode: 'all', open: false, k: g.k + 1 }))}>⊟ Collapse all</button>
       </div>
-      <TreeCtx.Provider value={gen.open}><div key={gen.k}>{children}</div></TreeCtx.Provider>
+      <TreeCtx.Provider value={{ mode: gen.mode, open: gen.open }}><div key={gen.k}>{children}</div></TreeCtx.Provider>
     </div>
   );
 }
@@ -501,7 +510,7 @@ export function CapitalVsInvestmentLive({ branch }) {
             {/* Section 1 · Capital Invested → Employed */}
             <div className="card section" id="cvd-s1">
               <div className="sec-hd"><span className="no teal">1</span><div><div className="tt">Capital Invested → Employed</div><div className="ds">Group ▸ sub-group ▸ ledger · Capital Account{(t.quasiCapital || 0) > 0.5 ? ' + owner & partner loans' : ''} = Invested; net of retained earnings = Employed</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{inr(employed)}</span></div>
-              <Stmt>
+              <Stmt defaultOpen>
                 <TreeList nodes={[...(data.capital || []), ...(data.quasi || [])]} fmt={inr} />
                 <TotRow label="CAPITAL INVESTED" val={t.capitalInvested} fmt={inr} />
                 {(data.capitalAdjust || []).map((a, i) => (
@@ -514,7 +523,7 @@ export function CapitalVsInvestmentLive({ branch }) {
             {/* Section 2 · Capital Blocked */}
             <div className="card section" id="cvd-s2">
               <div className="sec-hd"><span className="no amber">2</span><div><div className="tt">Capital Blocked</div><div className="ds">Fixed assets · investments · deposits · advances — group ▸ sub-group ▸ ledger</div></div><span className="right num" style={{ color: 'var(--amber)' }}>{inr(t.capitalBlocked)}</span></div>
-              <Stmt>
+              <Stmt defaultOpen>
                 <TreeList nodes={data.blocked} fmt={inr} />
                 {!(data.blocked || []).length && <Empty txt="No blocked-capital accounts in this period." />}
                 <TotRow label="TOTAL BLOCKED" val={t.capitalBlocked} tone="amberT" fmt={inr} />
@@ -534,7 +543,7 @@ export function CapitalVsInvestmentLive({ branch }) {
                 </div>
                 <div className="recon">Composition of current-asset ledgers totals <b>{inr(flowComp)}</b> — {reconciles ? 'reconciles with the in-flow residual ✓' : <>the <b>{inr(flowComp - (t.inflowCapital || 0))}</b> gap is financed by external funding (creditors · loans · current liabilities), which totals <b>{inr(t.externalFunding)}</b>.</>}</div>
               </div>
-              <Stmt>
+              <Stmt defaultOpen>
                 <TreeList nodes={data.flow} fmt={inr} />
                 {!(data.flow || []).length && <Empty txt="No current-asset ledgers in this period." />}
                 <TotRow label="COMPOSITION TOTAL (CURRENT ASSETS)" val={flowComp} fmt={inr} />

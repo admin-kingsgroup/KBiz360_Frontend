@@ -24,8 +24,14 @@ const mockData = {
   capital: [grp('Capital Account', 5000000, [led('Owner Capital', 5000000)])],
   quasi: [],
   capitalAdjust: [{ name: 'Less: Accumulated Loss (P&L A/c)', amount: -500000, isGroup: false, src: 'bs', items: [] }],
-  blocked: [grp('Fixed Assets', 1000000, [led('Office Equipment', 1000000)])],
-  flow: [grp('Current Assets', 4000000, [grp('Sundry Debtors', 4000000, [led('B2C Farhan', 4000000)])])],
+  blocked: [
+    grp('Deposits (Asset)', 553500, [led('Security Deposit - Rent', 553500)]),
+    grp('Fixed Assets', 1000000, [led('Office Equipment', 1000000)]),
+  ],
+  flow: [
+    grp('Cash-in-Hand', 8822, [led('Petty Cash [Flow]', 8822)]),
+    grp('Sundry Debtors', 3991178, [led('B2C Farhan', 3991178)]),
+  ],
   revenue: [
     grp('Sales Accounts', 6000000, [led('Ticket Sales', 6000000, 'pl')], 'pl'),
     grp('Less: Purchase Accounts', -5200000, [led('Airline Cost', -5200000, 'pl')], 'pl'),
@@ -61,19 +67,47 @@ test('India branch (BOM) renders ₹ figures', () => {
   expect(screen.queryByText(/\$5/)).toBeNull();
 });
 
-test('USD branch (NBO) renders $ figures — group header + expanded ledger in branch currency', () => {
+test('USD branch (NBO) renders $ figures — Section 1 opens expanded, ledger in branch currency', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'NBO' }} />);
   expect(screen.getAllByText(/\$/).length).toBeGreaterThan(0);
-  // Groups are collapsed by default; the always-visible top-group header carries the $ amount.
-  expect(screen.getAllByText('Capital Account')[0].closest('.grphd')).toHaveTextContent('$');
-  // Expand the group and its ledger shows in branch currency too.
-  fireEvent.click(screen.getAllByText('Capital Account')[0]);
+  // Section 1 (Capital Invested → Employed) is expanded by default, so its ledger shows
+  // without a click — in branch currency.
   expect(screen.getAllByText('Owner Capital')[0].closest('.led')).toHaveTextContent('$');
 });
 
-test('top-level groups are collapsed by default and collapse/expand on header click', () => {
+test('Section 1 (Capital Invested → Employed) is expanded by default', () => {
   render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
-  // Office Equipment is a leaf under the top-level "Fixed Assets" group → hidden by default.
+  // Its Capital Account ledger is visible on load…
+  expect(screen.getByText('Owner Capital')).toBeInTheDocument();
+  // …while the long Fixed Assets group stays folded (its ledger hidden).
+  expect(screen.queryByText('Office Equipment')).toBeNull();
+});
+
+test('Section 2 (Capital Blocked) opens expanded but keeps Fixed Assets folded', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  // Short groups (Deposits) open by default…
+  expect(screen.getByText('Security Deposit - Rent')).toBeInTheDocument();
+  // …but the long Fixed Assets group stays collapsed even though the section is open.
+  expect(screen.queryByText('Office Equipment')).toBeNull();
+  // Expand all overrides that and opens Fixed Assets too.
+  screen.getAllByText(/Expand all/).forEach((b) => fireEvent.click(b));
+  expect(screen.getAllByText('Office Equipment').length).toBeGreaterThan(0);
+});
+
+test('Section 3 (In-Flow Capital) opens expanded but keeps Sundry Debtors folded', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  // Short group (Cash-in-Hand) open by default…
+  expect(screen.getByText('Petty Cash [Flow]')).toBeInTheDocument();
+  // …but the long Sundry Debtors group stays collapsed even though the section is open.
+  expect(screen.queryByText('B2C Farhan')).toBeNull();
+  // Expand all overrides that and opens Sundry Debtors too.
+  screen.getAllByText(/Expand all/).forEach((b) => fireEvent.click(b));
+  expect(screen.getAllByText('B2C Farhan').length).toBeGreaterThan(0);
+});
+
+test('a top-level group collapses/expands on header click (Fixed Assets)', () => {
+  render(<CapitalVsInvestmentLive branch={{ code: 'BOM' }} />);
+  // Fixed Assets is folded by default (in COLLAPSED_BY_DEFAULT) → its ledger hidden.
   expect(screen.queryByText('Office Equipment')).toBeNull();
   fireEvent.click(screen.getByText('Fixed Assets'));       // expand the top group
   expect(screen.getByText('Office Equipment')).toBeInTheDocument();
