@@ -32,14 +32,22 @@ describe('getVisibleMenu — TK Group Central vs branch', () => {
     expect(hrefs).not.toContain('/receipts');
   });
 
-  test('Focus on a branch adds its Data Entry + Reports workspace (still the cockpit)', () => {
-    const hrefs = hrefsOf(getVisibleMenu('ALL', { role: 'Super Admin' }, 'BOM'));
+  test('Focus on a branch adds its full Accounts pill (still the cockpit)', () => {
+    const menu = getVisibleMenu('ALL', { role: 'Super Admin' }, 'BOM');
+    const hrefs = hrefsOf(menu);
     expect(hrefs).toContain('/tk/control-tower');   // still the cockpit
+    // The workspace is the SAME "Accounts" pill the branch surface carries, relabelled.
+    expect(menu.some((p) => p && p.label === 'Accounts — BOM')).toBe(true);
     expect(hrefs).toContain('/receipts');            // Data Entry now reachable (operates on BOM)
     expect(hrefs).toContain('/bookings/new');        // SO/PO/GP
     expect(hrefs).toContain('/bookings/inter-branch'); // INB
-    expect(hrefs).toContain('/reports/pnl');         // full Reports
-    expect(hrefs).toContain('/trial-balance');
+    expect(hrefs).toContain('/finance/refund');      // full entry parity (refund/reissue/ADM)
+    expect(hrefs).toContain('/reports/pnl');         // full Reports (Branch MIS)
+    expect(hrefs).toContain('/reports/sreg');        // registers
+    expect(hrefs).toContain('/finance/trial-balance'); // Books & Scrutiny
+    // Masters stay central (Masters & Ledger pill), not duplicated inside Accounts.
+    const accounts = menu.find((p) => p && p.label === 'Accounts — BOM');
+    expect((accounts.children || []).some((c) => c && c.label === 'Accounts Master')).toBe(false);
   });
 
   test('Focus = ALL (branchwise) does NOT show the branch workspace (book-less)', () => {

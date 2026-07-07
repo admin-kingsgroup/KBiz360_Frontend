@@ -1,6 +1,6 @@
-import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Activity, Rocket, FilePlus, FileText, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Activity, Rocket, Calculator, ShieldCheck } from 'lucide-react';
 import { FULL_SCOPE_ROLES } from '../../core/branchScope';
-import { dashboardsFor } from '../../core/menus';
+import { dashboardsFor, MENU_ACCOUNTS } from '../../core/menus';
 
 // ─── TK GROUP CENTRAL · the control cockpit ──────────────────────────────────
 // Selecting "TK Group Central" in the branch selector ENTERS the central control
@@ -14,40 +14,23 @@ export function isCentralRole(currentUser) {
   return FULL_SCOPE_ROLES.includes(currentUser && currentUser.role);
 }
 
-// Branch Workspace — shown ONLY when a branch is spotlighted via Focus. These reuse the
-// EXACT branch routes; they operate on the focused branch (App re-scopes the operating
-// branch to the Focus). So a central user does Data Entry + sees full Reports for the
-// focused branch, in one place, without leaving TK Group. Focus = ALL → not shown (the
-// consolidated cockpit is book-less; there's nothing to enter against a group total).
+// Accounts workspace — shown ONLY when a branch is spotlighted via Focus. It is the
+// SAME "Accounts" pill the branch surface carries (MENU_ACCOUNTS is the single source
+// of truth), relabelled to the focused branch — so a central user does Data Entry AND
+// sees the full Reports/Registers/Books/MIS/Reconciliation tree for that branch, in one
+// place, identical to what a Branch Accountant sees. Every route reuses the exact branch
+// route and operates on the focused branch (App re-scopes the operating branch to Focus).
+// Focus = ALL → not shown (the consolidated cockpit is book-less; there's nothing to
+// enter against a group total).
+//
+// Masters are the one deliberate omission: the cockpit already surfaces the chart/party
+// masters centrally via the "Masters & Ledger" pill, so the "Accounts Master" group is
+// dropped here to avoid listing the same masters twice inside one nav.
 function branchWorkspace(focus) {
   const focused = focus && focus !== 'ALL';
   if (!focused) return [];
-  return [
-    { label: `Data Entry — ${focus}`, icon: FilePlus, children: [
-      { label: 'SO / PO / GP Voucher', href: '/bookings/new' },
-      { label: 'Inter-Branch (INB) Voucher', href: '/bookings/inter-branch' },
-      { label: 'Receipt Voucher', href: '/receipts' },
-      { label: 'Payment Voucher', href: '/payments' },
-      { label: 'Contra Entry', href: '/contra' },
-      { label: 'Journal Entry', href: '/journal' },
-      { label: 'Debit Note', href: '/debit-note' },
-    ] },
-    { label: `Reports — ${focus}`, icon: FileText, children: [
-      { label: 'Day Book', href: '/day-book' },
-      { label: 'Ledger Account', href: '/ledger' },
-      { label: 'Trial Balance', href: '/trial-balance' },
-      { label: 'Profit & Loss', href: '/reports/pnl' },
-      { label: 'Balance Sheet', href: '/reports/bs' },
-      { label: 'Receivables (Ageing + Settle)', href: '/reports/rec' },
-      { label: 'Payables (Ageing + Settle)', href: '/reports/pay' },
-      { divider: true, label: 'Registers' },
-      { label: 'Sales Register', href: '/reports/sreg' },
-      { label: 'Purchase Register', href: '/reports/preg' },
-      { label: 'Receipt Register', href: '/finance/receipt-register' },
-      { label: 'Payment Register', href: '/finance/payment-register' },
-      { label: 'Journal Register', href: '/finance/journal-register' },
-    ] },
-  ];
+  const children = (MENU_ACCOUNTS.children || []).filter((c) => c && c.label !== 'Accounts Master');
+  return [{ label: `Accounts — ${focus}`, icon: Calculator, children }];
 }
 
 // Administration — the org-wide admin panel, central by nature (one user list, one set
@@ -99,7 +82,7 @@ export function controlCockpitMenu(focus, currentUser) {
     // Admin; other central roles get the role-appropriate set (dashboardsFor decides).
     { ...dashboardsFor(currentUser), icon: LayoutDashboard },
 
-    // Branch Workspace (Data Entry + Reports) — only when a branch is focused.
+    // Accounts — the branch's full Accounts pill (Data Entry + Reports), only when focused.
     ...branchWorkspace(focus),
 
     // Approvals — exactly two: data-entry Vouchers (same screen as the branch) and

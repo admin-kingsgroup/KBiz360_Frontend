@@ -10,6 +10,8 @@ import { apiGet, getAuthToken } from './api';
 
 export const DEFAULT_VERIFY = ['sughra@travkings.com'];
 export const DEFAULT_APPROVE = ['faiz@travkings.com'];
+export const DEFAULT_DIRECTOR = ['farhan@travkings.com'];
+export const DEFAULT_OWNER = ['afshin.dhanani@kingsgroupco.com'];
 const SUPER = /super.?admin/i;
 
 const asList = (v, fb) => {
@@ -31,16 +33,21 @@ export function useApprovalChain() {
   const q = useQuery({
     queryKey: ['app-config', 'approval-chain'],
     queryFn: async () => {
-      const [v, a] = await Promise.all([
+      const [v, a, d, o] = await Promise.all([
         apiGet('/api/app-config/approval.verifyEmails').catch(() => null),
         apiGet('/api/app-config/approval.approveEmails').catch(() => null),
+        apiGet('/api/app-config/approval.directorEmails').catch(() => null),
+        apiGet('/api/app-config/approval.ownerEmails').catch(() => null),
       ]);
-      return { verify: asList(v && v.value, DEFAULT_VERIFY), approve: asList(a && a.value, DEFAULT_APPROVE) };
+      return {
+        verify: asList(v && v.value, DEFAULT_VERIFY), approve: asList(a && a.value, DEFAULT_APPROVE),
+        director: asList(d && d.value, DEFAULT_DIRECTOR), owner: asList(o && o.value, DEFAULT_OWNER),
+      };
     },
     staleTime: 5 * 60_000,
     enabled: !!getAuthToken(),
   });
-  return q.data || { verify: DEFAULT_VERIFY, approve: DEFAULT_APPROVE };
+  return q.data || { verify: DEFAULT_VERIFY, approve: DEFAULT_APPROVE, director: DEFAULT_DIRECTOR, owner: DEFAULT_OWNER };
 }
 
 export const stageOf = (e) => (e && e.reviewStage) || (!e?.checkedBy ? 'check' : (!e?.verifiedBy ? 'verify' : 'approve'));
@@ -56,6 +63,14 @@ export function nextActionFor(e, cfg, user = chainUser()) {
   if (stage === 'check') return { stage, action: 'check', label: 'Check', allowed: true, hint: 'Level 1 · branch accountant' };
   if (stage === 'verify') {
     return { stage, action: 'verify', label: 'Verify', allowed: su || cfg.verify.includes(user.email), hint: `Level 2 · ${cfg.verify.join(', ')}` };
+  }
+  // Escalation sign-offs (only present when approval.escalation_signoffs is engaged for a
+  // large voucher — the server sets reviewStage to 'director'/'owner').
+  if (stage === 'director') {
+    return { stage, action: 'director', label: 'Director sign-off', allowed: su || (cfg.director || DEFAULT_DIRECTOR).includes(user.email), hint: `Director · ${(cfg.director || DEFAULT_DIRECTOR).join(', ')}` };
+  }
+  if (stage === 'owner') {
+    return { stage, action: 'owner', label: 'Owner sign-off', allowed: su || (cfg.owner || DEFAULT_OWNER).includes(user.email), hint: `Owner · ${(cfg.owner || DEFAULT_OWNER).join(', ')}` };
   }
   return { stage, action: 'approve', label: 'Approve & Post', allowed: su || cfg.approve.includes(user.email), hint: `Level 3 · ${cfg.approve.join(', ')}` };
 }
@@ -106,7 +121,7 @@ export function StageTracker({ e }) {
   if (terminal === 'director' || terminal === 'owner') path.push('director');
   if (terminal === 'owner') path.push('owner');
   const s = stageOf(e); // check | verify | approve
-  const curKey = s === 'check' ? 'branch' : s === 'verify' ? 'ae' : terminal;
+  const curKey = s === 'check' ? 'branch' : s === 'verify' ? 'ae' : s === 'director' ? 'director' : s === 'owner' ? 'owner' : terminal;
   const curIdx = path.indexOf(curKey);
   const trail = [
     e?.checkedBy && `✓ Checked · ${e.checkedBy}`,
