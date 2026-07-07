@@ -882,27 +882,48 @@ function PresenceToggles({ item, num }) {
 // / closing balance (→Statement); groups → names. Its own scroll region + search.
 // Core/Own drills are RICH: a Kind tag per ledger, a kind-mix summary in the header,
 // and per-branch presence toggles (add / smart-remove a head branch by branch).
+// Ledger drills offer TWO layouts: Tree (default — Parent Group ▸ Group ▸ Sub-Group
+// ▸ Ledger with collapse/expand, mirrors the Accounts Tree filing) and Flat.
 function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, openStatement }) {
   const data = q.data || {};
   const all = data.items || [];
   const isLedger = scope.tier === 'ledger';
-  const rich = isLedger && all.some((x) => Array.isArray(x.presence));   // core/own drill
+  const rich = isLedger && all.some((x) => Array.isArray(x.presence));   // core/own/hidden drill
+  const [view, setView] = useState('tree');            // 'tree' | 'flat' (ledger drills)
+  const [closed, setClosed] = useState(() => new Set()); // collapsed group names (tree)
+  const groupsQ = useMasterList('groups');             // shared cache with the Accounts Tree
   const ql = dq.trim().toLowerCase();
   const items = ql ? all.filter((x) => (x.name || '').toLowerCase().includes(ql) || (x.group || '').toLowerCase().includes(ql) || (x.kind || '').toLowerCase().includes(ql)) : all;
   let totC = 0, net = 0;
   if (isLedger) items.forEach((l) => { totC += l.count || 0; net += l.closingBalance || 0; });
   // "Which types of ledgers are in this count" — kind mix, biggest first.
   const kindMix = rich ? [...items.reduce((m, l) => m.set(l.kind || 'Other', (m.get(l.kind || 'Other') || 0) + 1), new Map())].sort((a, b) => b[1] - a[1]) : [];
+  const groupsReady = !!(groupsQ.data && groupsQ.data.length);
+  const treeMode = isLedger && view === 'tree' && groupsReady;
 
   const wrap = { marginTop: 16, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 12, overflow: 'hidden' };
   const head = { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '11px 14px', borderBottom: '1px solid #eef1f5', background: '#f7faf8' };
   const dth = { position: 'sticky', top: 0, background: '#fff', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.05em', color: DIM, fontWeight: 700, padding: '9px 12px', borderBottom: '1.5px solid #cdd1d8', whiteSpace: 'nowrap' };
+  const viewBtn = (k, l) => (
+    <button key={k} type="button" onClick={() => setView(k)}
+      style={{ appearance: 'none', padding: '6px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: view === k ? BLUE : '#fff', color: view === k ? '#fff' : DIM }}>{l}</button>
+  );
+  const smallBtn = (label, onClick, title) => (
+    <button type="button" onClick={onClick} title={title} style={{ appearance: 'none', padding: '6px 10px', fontSize: 11, fontWeight: 700, border: '1px solid #cdd1d8', borderRadius: 7, background: '#fff', color: DARK, cursor: 'pointer' }}>{label}</button>
+  );
   return (
     <div style={wrap}>
       <div style={head}>
         <span style={{ fontWeight: 700, fontSize: 14 }}>{data.label || scope.label || 'Details'}</span>
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: DIM }}>{q.isLoading ? '…' : items.length + (isLedger ? ' ledgers' : ' groups')}</span>
         <span style={{ flex: 1, minWidth: 140 }}><input value={dq} onChange={(e) => setDq(e.target.value)} placeholder="Search…" style={{ width: '100%', padding: '9px 11px', border: '1px solid #cdd1d8', borderRadius: 8, fontSize: 13 }} /></span>
+        {isLedger && (
+          <span style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
+            {viewBtn('tree', '🌳 Tree')}{viewBtn('flat', '☰ Flat')}
+          </span>
+        )}
+        {treeMode && smallBtn('⊞', () => setClosed(new Set()), 'Expand all')}
+        {treeMode && smallBtn('⊟', () => setClosed(new Set((groupsQ.data || []).map((g) => g.name))), 'Collapse all')}
         <button type="button" onClick={onClose} aria-label="Close" style={{ appearance: 'none', border: '1px solid #cdd1d8', background: '#fff', borderRadius: 8, minHeight: 40, minWidth: 40, cursor: 'pointer', fontWeight: 700, color: DIM }}>✕</button>
       </div>
       {rich && !q.isLoading && (
@@ -925,45 +946,103 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
               <thead><tr><th style={{ ...dth, textAlign: 'left' }}>Group / Sub-Group</th><th style={{ ...dth, textAlign: 'left' }}>Sign</th></tr></thead>
               <tbody>{items.map((g) => <tr key={g.name}><td style={{ padding: '11px 12px', fontWeight: 600, borderBottom: '1px solid #eef1f5' }}>{g.name}</td><td style={{ padding: '11px 12px', color: DIM, borderBottom: '1px solid #eef1f5' }}>{scope.cat === 'wired' ? '~*' : '*'}{LOCK_ICON}</td></tr>)}</tbody>
             </table>
-          ) : (
-            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: rich ? 940 : 540 }}>
+          ) : (() => {
+            // Shared ledger row for both layouts. Tree mode drops the Group column
+            // (the hierarchy shows it) and indents the name under its group.
+            const nCols = 4 + (rich ? 1 : 0) + (treeMode ? 0 : 1); // name+kind+postings+balance (+branches when rich, +group in flat)
+            const ledgerTr = (l, indent = 0) => {
+              const z = Math.abs(l.closingBalance || 0) < 0.005;
+              return (
+                <tr key={l.code || l.name}>
+                  <td style={{ padding: 0, borderBottom: '1px solid #eef1f5' }}>
+                    <button type="button" onClick={() => openMaster(l.code)} title="Open Master detail"
+                      style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', fontWeight: 600, color: P_GREEN, textDecoration: 'underline', textDecorationColor: '#bcd8ce', textUnderlineOffset: 2, cursor: 'pointer', padding: `11px 12px 11px ${12 + indent * 18}px`, textAlign: 'left', width: '100%', minHeight: 44 }}>
+                      <span style={{ color: GREEN, marginRight: 6 }}>•</span>{l.name}</button>
+                  </td>
+                  <td style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: '#eef0f4', color: '#556' }}>{l.kind || 'Other'}</span></td>
+                  {!treeMode && <td style={{ padding: '11px 12px', color: DIM, fontSize: 12.5, borderBottom: '1px solid #eef1f5' }}>{l.group}{l.subGroup ? <span style={{ color: '#9aa2c0' }}> ▸ {l.subGroup}</span> : null}</td>}
+                  {rich && <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><PresenceToggles item={l} num={num} /></td>}
+                  <td style={{ padding: '11px 12px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DIM, borderBottom: '1px solid #eef1f5' }}>{num(l.count)}</td>
+                  <td style={{ padding: 0, borderBottom: '1px solid #eef1f5' }}>
+                    <button type="button" onClick={() => openStatement(l.name, scope.branch)} title="Open Ledger Statement"
+                      style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', fontWeight: 600, cursor: 'pointer', padding: '11px 12px', textAlign: 'right', width: '100%', minHeight: 44, color: z ? '#9aa8a1' : (l.closingBalance >= 0 ? SIGN_CLR.fixed : SIGN_CLR.deact) }}>
+                      {z ? '0.00' : money(l.closingBalance, scope.branch)} {z ? '' : (l.closingBalance >= 0 ? 'Dr' : 'Cr')}
+                    </button>
+                  </td>
+                </tr>
+              );
+            };
+
+            let bodyRows;
+            if (treeMode) {
+              // File the (already search/kind-filtered) ledgers into the shared
+              // group hierarchy — same rule as the Accounts Tree (subGroup wins).
+              const gs = groupsQ.data || [];
+              const nodes = {};
+              gs.forEach((g) => { nodes[g.name] = { ...g, children: [], ledgers: [] }; });
+              gs.forEach((g) => { if (g.parent && nodes[g.parent]) nodes[g.parent].children.push(nodes[g.name]); });
+              const orphans = [];
+              items.forEach((l) => { const t = (l.subGroup && nodes[l.subGroup]) ? l.subGroup : l.group; if (nodes[t]) nodes[t].ledgers.push(l); else orphans.push(l); });
+              const leafN = (n) => n.ledgers.length + n.children.reduce((s, c) => s + leafN(c), 0);
+              const postsN = (n) => n.ledgers.reduce((s, l) => s + (l.count || 0), 0) + n.children.reduce((s, c) => s + postsN(c), 0);
+              const roots = gs.filter(isRootGroup).map((g) => nodes[g.name])
+                .sort((a, b) => TALLY_ORDER.indexOf(a.name) - TALLY_ORDER.indexOf(b.name))
+                .filter((n) => leafN(n) > 0);
+              const filtering = !!ql;   // searching → show everything expanded
+              const TIER = (lv) => (lv === 0 ? ['Parent Group', BLUE, '#eef3fb', 800] : lv === 1 ? ['Group', '#1a3a6e', '#f6f9fd', 700] : ['Sub-Group', GOLD, '#fbfcfe', 650]);
+              const groupTr = (n, depth, lc) => {
+                const [tag, clr, bg, fw] = TIER(n.level || 0);
+                const isClosed = closed.has(n.name) && !filtering;
+                return (
+                  <tr key={'G' + n.name}>
+                    <td colSpan={nCols} style={{ padding: 0, background: bg, borderBottom: '1px solid #e2e8f2', borderTop: depth === 0 ? '1px solid #dbe5f3' : undefined }}>
+                      <button type="button" onClick={() => setClosed((s) => { const x = new Set(s); x.has(n.name) ? x.delete(n.name) : x.add(n.name); return x; })}
+                        aria-expanded={!isClosed}
+                        style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, width: '100%', textAlign: 'left', padding: `8px 12px 8px ${10 + depth * 18}px`, fontWeight: fw, color: DARK, minHeight: 40 }}>
+                        <span style={{ color: GOLD, width: 12, display: 'inline-block' }}>{isClosed ? '▸' : '▾'}</span>
+                        {n.name}{badge(tag, clr)}
+                        <span style={{ marginLeft: 'auto', fontSize: 10.5, color: DIM, fontFamily: 'monospace' }}>{lc} led{lc === 1 ? '' : 's'} · {num(postsN(n))} posts</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              };
+              const out = [];
+              const walk = (n, depth) => {
+                const lc = leafN(n); if (!lc) return;
+                out.push(groupTr(n, depth, lc));
+                if (closed.has(n.name) && !filtering) return;
+                n.children.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach((c) => walk(c, depth + 1));
+                n.ledgers.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach((l) => out.push(ledgerTr(l, depth + 1)));
+              };
+              roots.forEach((r) => walk(r, 0));
+              if (orphans.length) {
+                out.push(<tr key="G::orphans"><td colSpan={nCols} style={{ padding: '8px 12px', background: '#fbfcfe', fontWeight: 650, color: DIM, borderBottom: '1px solid #e2e8f2' }}>(Ungrouped){badge('?', GREY)}</td></tr>);
+                orphans.forEach((l) => out.push(ledgerTr(l, 1)));
+              }
+              bodyRows = out;
+            } else {
+              bodyRows = items.map((l) => ledgerTr(l, 0));
+            }
+
+            return (
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: rich ? 940 : 620 }}>
               <thead><tr>
-                <th style={{ ...dth, textAlign: 'left' }}>Ledger</th>
-                {rich && <th style={{ ...dth, textAlign: 'left' }}>Kind</th>}
-                <th style={{ ...dth, textAlign: 'left' }}>Group</th>
+                <th style={{ ...dth, textAlign: 'left' }}>{treeMode ? 'Parent Group ▸ Group ▸ Sub-Group ▸ Ledger' : 'Ledger'}</th>
+                <th style={{ ...dth, textAlign: 'left' }}>Kind</th>
+                {!treeMode && <th style={{ ...dth, textAlign: 'left' }}>Group</th>}
                 {rich && <th style={{ ...dth, textAlign: 'left' }}>Branches</th>}
                 <th style={{ ...dth, textAlign: 'right' }}>Postings</th><th style={{ ...dth, textAlign: 'right' }}>Closing Balance</th>
               </tr></thead>
-              <tbody>
-                {items.map((l) => {
-                  const z = Math.abs(l.closingBalance || 0) < 0.005;
-                  return (
-                    <tr key={l.code || l.name}>
-                      <td style={{ padding: 0, borderBottom: '1px solid #eef1f5' }}>
-                        <button type="button" onClick={() => openMaster(l.code)} title="Open Master detail"
-                          style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', fontWeight: 600, color: P_GREEN, textDecoration: 'underline', textDecorationColor: '#bcd8ce', textUnderlineOffset: 2, cursor: 'pointer', padding: '11px 12px', textAlign: 'left', width: '100%', minHeight: 44 }}>{l.name}</button>
-                      </td>
-                      {rich && <td style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: '#eef0f4', color: '#556' }}>{l.kind || 'Other'}</span></td>}
-                      <td style={{ padding: '11px 12px', color: DIM, fontSize: 12.5, borderBottom: '1px solid #eef1f5' }}>{l.group}{l.subGroup ? <span style={{ color: '#9aa2c0' }}> ▸ {l.subGroup}</span> : null}</td>
-                      {rich && <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><PresenceToggles item={l} num={num} /></td>}
-                      <td style={{ padding: '11px 12px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DIM, borderBottom: '1px solid #eef1f5' }}>{num(l.count)}</td>
-                      <td style={{ padding: 0, borderBottom: '1px solid #eef1f5' }}>
-                        <button type="button" onClick={() => openStatement(l.name, scope.branch)} title="Open Ledger Statement"
-                          style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', fontWeight: 600, cursor: 'pointer', padding: '11px 12px', textAlign: 'right', width: '100%', minHeight: 44, color: z ? '#9aa8a1' : (l.closingBalance >= 0 ? SIGN_CLR.fixed : SIGN_CLR.deact) }}>
-                          {z ? '0.00' : money(l.closingBalance, scope.branch)} {z ? '' : (l.closingBalance >= 0 ? 'Dr' : 'Cr')}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+              <tbody>{bodyRows}</tbody>
               <tfoot><tr>
-                <td colSpan={rich ? 4 : 2} style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', padding: '11px 12px', fontWeight: 700 }}>{items.length} ledgers</td>
+                <td colSpan={nCols - 2} style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', padding: '11px 12px', fontWeight: 700 }}>{items.length} ledgers</td>
                 <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, padding: '11px 12px' }}>{num(totC)}</td>
                 <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, padding: '11px 12px', color: net >= 0 ? SIGN_CLR.fixed : SIGN_CLR.deact }}>{Math.abs(net) < 0.005 ? '0.00' : money(net, scope.branch)} {net >= 0 ? 'Dr' : 'Cr'}</td>
               </tr></tfoot>
             </table>
-          )}
+            );
+          })()}
       </div>
     </div>
   );
