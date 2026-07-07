@@ -31,6 +31,7 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     {label:"Supplier — 12-Tab View", href:"/masters/supplier-tabs"},
     {label:"Sub-Agents", href:"/masters/sub-agents"},
     {label:"Vendor Credit Terms", href:"/masters/vendor-terms"},
+    {label:"Credit Facilities & Limits", href:"/masters/credit-facilities"},
   ]},
   {label:"Tax Master", children:[
     {label:"Tax / HSN-SAC Codes", href:"/masters/tax"},

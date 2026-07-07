@@ -80,7 +80,7 @@ const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('.
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsFinancial/reportsNotes'));
 const { Statistics } = lazyModule(() => import('./modules/reports/statistics'));
 const { CostCenterMasterLive } = lazyModule(() => import('./modules/masters/costCentersLive'));
-const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/masters/mastersLive'));
+const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, CreditFacilitiesMaster, GroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/masters/mastersLive'));
 const { DataImportPage } = lazyModule(() => import('./modules/dataImport'));
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
@@ -741,6 +741,7 @@ export default function KB360App(){
     if(route==="/masters/scenarios")       return <ScenariosMaster/>;
     if(route==="/masters/customers")  return <CustomersMaster/>;
     if(route==="/masters/suppliers")  return <SuppliersMaster/>;
+    if(route==="/masters/credit-facilities") return <CreditFacilitiesMaster branch={branch}/>;
     if(route==="/masters/airlines")   return <MastersAirlines/>;
     if(route==="/masters/hotels")     return <MastersHotels/>;
     if(route==="/masters/tax")        return <MastersTaxRates/>;

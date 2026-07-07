@@ -150,6 +150,7 @@ export const APP_ROUTES = [
   "/masters/chart-builder",
   "/masters/cost-categories",
   "/masters/cost-centers",
+  "/masters/credit-facilities",
   "/masters/currency",
   "/masters/customer-detail-demo",
   "/masters/customer-tabs",

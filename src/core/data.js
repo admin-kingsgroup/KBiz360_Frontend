@@ -367,6 +367,7 @@ export const ROUTE_TITLES={
   "/masters/passports":      "Passport & Document Manager",
   "/masters/markup":         "Service Charge - 2 / Net Rate Sheet",
   "/masters/vendor-terms":   "Vendor Payment Terms",
+  "/masters/credit-facilities": "Credit Facilities & Limits",
   "/purchase/ticket-control":"Air Ticket Control Register",
   "/purchase/bsp-import":    "BSP CSV Import & Reconciliation",
   "/purchase/gds-import":    "GDS PNR Import",
