@@ -6,6 +6,7 @@ import { money } from '../../core/format';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { stagePipeline } from './utils/approvalPipeline';
+import { curSym } from './utils/currency';
 import { getLimits } from './api/limits';
 
 // ─── TK GROUP CENTRAL · Approval stage pipeline ──────────────────────────────
@@ -17,9 +18,8 @@ import { getLimits } from './api/limits';
 // branch is focused — never blended across currencies branchwise.
 const oldestTone = (d) => (d >= 4 ? 'text-danger' : d >= 2 ? 'text-warning' : 'text-success');
 // Resolve a branch code → its currency SYMBOL (not the 'INR'/'USD' code, which money()
-// would print literally as "INR50,000"). Mirrors FocusSwitcher's curSym.
-const CUR_SYM = { INR: '₹', USD: '$', KES: '$', TZS: '$', CDF: '$' };
-const curOf = (code) => { const b = BRANCHES.find((x) => x.code === code); return (b && CUR_SYM[b.currency]) || '₹'; };
+// would print literally as "INR50,000").
+const curOf = (code) => { const b = BRANCHES.find((x) => x.code === code); return curSym(b && b.currency); };
 
 export function StagePipeline() {
   const focus = useCockpitFocus();

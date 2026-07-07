@@ -33,7 +33,7 @@ describe('assets utils', () => {
       { status: 'Disposed', cost: 300, wdv: 100 },
     ];
     const r = assetBranchRow({ code: 'BOM', currency: 'INR' }, list);
-    expect(r).toMatchObject({ code: 'BOM', cur: 'INR', count: 2, disposed: 1, gross: 1500, depreciation: 400, nbv: 1100 });
+    expect(r).toMatchObject({ code: 'BOM', cur: '₹', count: 2, disposed: 1, gross: 1500, depreciation: 400, nbv: 1100 });
   });
   test('assetBranchRow defensive to missing list', () => {
     expect(assetBranchRow({ code: 'X' }, null)).toMatchObject({ count: 0, gross: 0, nbv: 0, disposed: 0 });

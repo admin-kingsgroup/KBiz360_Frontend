@@ -15,7 +15,7 @@ describe('scorecard utils', () => {
       { grossProfit: 3000, netProfit: 1000 },
       { rows: [{ sale: 5000 }, { sale: 5000 }] },
     );
-    expect(row).toMatchObject({ code: 'BOM', cur: 'INR', sales: 10000, gp: 3000, np: 1000, bookings: 2, gpPct: 30 });
+    expect(row).toMatchObject({ code: 'BOM', cur: '₹', sales: 10000, gp: 3000, np: 1000, bookings: 2, gpPct: 30 });
   });
 
   test('missing data → zeros, never NaN', () => {

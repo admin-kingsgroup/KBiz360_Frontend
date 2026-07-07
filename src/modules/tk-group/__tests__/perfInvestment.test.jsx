@@ -18,7 +18,7 @@ function renderWith(ui) {
 describe('perfTarget utils', () => {
   test('perfTargetRow computes achievement + variance branchwise', () => {
     const r = perfTargetRow({ code: 'BOM', currency: 'INR' }, { target: 1000, actual: 900 });
-    expect(r).toMatchObject({ code: 'BOM', cur: 'INR', target: 1000, actual: 900, variance: -100, achievement: 90 });
+    expect(r).toMatchObject({ code: 'BOM', cur: '₹', target: 1000, actual: 900, variance: -100, achievement: 90 });
   });
   test('no target → achievement 0, never divide-by-zero', () => {
     expect(perfTargetRow({ code: 'X' }, {})).toMatchObject({ target: 0, achievement: 0 });

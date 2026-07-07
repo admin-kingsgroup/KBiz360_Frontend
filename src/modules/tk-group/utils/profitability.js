@@ -1,5 +1,6 @@
 // ─── TK GROUP CENTRAL · profitability (pure) ─────────────────────────────────
 // BRANCHWISE P&L — each branch in its own currency; never summed into a group total.
+import { curSym } from './currency';
 
 /** One branch's P&L row from a profit-and-loss payload. */
 export function profitabilityRow(branch, pnl) {
@@ -10,7 +11,7 @@ export function profitabilityRow(branch, pnl) {
   const exp = (p.indirect && Number(p.indirect.debitTotal)) || 0;
   const np = Number(p.netProfit) || 0;
   return {
-    code: branch.code, cur: branch.currency, flag: branch.flag, city: branch.city,
+    code: branch.code, cur: curSym(branch.currency), flag: branch.flag, city: branch.city,
     rev, cost, gp, exp, np,
     gpPct: rev > 0 ? +(gp / rev * 100).toFixed(1) : 0,
     npPct: rev > 0 ? +(np / rev * 100).toFixed(1) : 0,

@@ -122,8 +122,7 @@ export function ControlPanel({ setRoute }) {
             </div>
             <div className="mt-3 grid gap-2.5">
               <Row nm="Require Verify (Sughra)" ds="A voucher must be verified before approval." st="verify not required" />
-              <Row nm="Require approval before posting" ds="New vouchers start Pending — final approval (Faiz) posts the journal." st="posts directly"
-                flag="branch.pending_by_default" on={isOn('branch.pending_by_default')} onPropose={onPropose} />
+              <Row nm="Require approval before posting" ds="Every voucher starts Pending — nothing hits the books until it's approved; the maker can clear their own until you engage the review chain. Already enforced on all non-booking entries." applied />
               <Row nm="Let Sughra also Approve (AE-approve)" ds="Elevates the AE from verify-only to also give final approval on a branch-accountant voucher."
                 st="Sughra verifies only" flag="approval.ae_can_approve" on={v.aeCanApprove} onPropose={onPropose} />
               <Row nm="Owner co-sign on sensitive types" ds="Refund · reissue · write-off · adjustment JV also need Afshin." st="sensitive" />

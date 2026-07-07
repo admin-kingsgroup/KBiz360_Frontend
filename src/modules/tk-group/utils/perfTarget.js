@@ -1,5 +1,6 @@
 // ─── TK GROUP CENTRAL · performance vs target (pure) ─────────────────────────
 // BRANCHWISE — each branch's target vs actual in its own currency; never summed.
+import { curSym } from './currency';
 
 export const PERF_METRICS = [
   { key: 'sales', label: 'Sales' },
@@ -20,7 +21,7 @@ export function perfTargetRow(branch, tva) {
   const target = Number(t.target) || 0;
   const actual = Number(t.actual) || 0;
   return {
-    code: branch.code, cur: branch.currency, flag: branch.flag, city: branch.city,
+    code: branch.code, cur: curSym(branch.currency), flag: branch.flag, city: branch.city,
     target, actual,
     variance: actual - target,
     achievement: target > 0 ? Math.round((actual / target) * 100) : 0,

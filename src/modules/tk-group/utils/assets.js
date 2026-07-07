@@ -1,6 +1,7 @@
 // ─── TK GROUP CENTRAL · fixed assets (pure) ──────────────────────────────────
 // BRANCHWISE — each branch's fixed-asset register in its OWN currency; never summed
 // into a group total. Reuses /api/fixed-assets?branch=X (the instance register).
+import { curSym } from './currency';
 
 /** Net book value of one asset. Disposed → 0. Active → its written-down value when set,
  *  else its cost (a freshly-added asset not yet depreciated). Never negative. */
@@ -28,7 +29,7 @@ export function assetBranchRow(branch, list) {
   const nbv = active.reduce((s, a) => s + assetNbv(a), 0);
   const depreciation = active.reduce((s, a) => s + assetDepreciation(a), 0);
   return {
-    code: branch.code, cur: branch.currency, flag: branch.flag, city: branch.city,
+    code: branch.code, cur: curSym(branch.currency), flag: branch.flag, city: branch.city,
     count: active.length,
     disposed: arr.length - active.length,
     gross, depreciation, nbv,

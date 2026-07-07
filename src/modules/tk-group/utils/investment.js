@@ -1,5 +1,6 @@
 // ─── TK GROUP CENTRAL · investment / capital (pure) ──────────────────────────
 // BRANCHWISE — each branch's capital & investment in its own currency; never summed.
+import { curSym } from './currency';
 
 // The "fix first" auto-flag: an investment is flagged if its ROI is too low, or the
 // branch's overdue-AR or budget-overrun is too high — thresholds are Owner-configured
@@ -24,7 +25,7 @@ export function investmentRow(branch, cap) {
   const c = cap || {};
   const n = (k) => Number(c[k]) || 0;
   return {
-    code: branch.code, cur: branch.currency, flag: branch.flag, city: branch.city,
+    code: branch.code, cur: curSym(branch.currency), flag: branch.flag, city: branch.city,
     capitalInvested: n('capitalInvested'),
     investments: n('investments'),
     loans: n('loans'),

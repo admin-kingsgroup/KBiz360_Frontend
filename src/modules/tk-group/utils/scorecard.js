@@ -1,6 +1,7 @@
 // ─── TK GROUP CENTRAL · branch scorecard shaping (pure) ──────────────────────
 // BRANCHWISE ONLY — each branch stands on its own, in its own currency. Amounts are
 // never blended or consolidated into a group total (per the control model).
+import { curSym } from './currency';
 
 /** One branch's scorecard from its P&L + invoice-GP payloads. */
 export function scorecardRow(branch, pnl, invoiceGp) {
@@ -12,7 +13,7 @@ export function scorecardRow(branch, pnl, invoiceGp) {
     code: branch.code,
     city: branch.city,
     flag: branch.flag,
-    cur: branch.currency,
+    cur: curSym(branch.currency),
     sales,
     gp,
     np,
