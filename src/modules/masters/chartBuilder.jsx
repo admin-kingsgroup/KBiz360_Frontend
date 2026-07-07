@@ -655,7 +655,9 @@ function TravkingsGroupView() {
 
 // ─── Travkings Group Table View — count summary ──────────────────────────────
 // Compact count table: groups (global, Fixed */Wired ~*, NF=0 monitor) and
-// ledgers per branch (Fixed */Wired ~*/Non-fixed/Deactivated/Total, incl. inactive).
+// ledgers per branch (Fixed */Wired ~*/Not used/Deactivated/Total, incl. inactive).
+// "Not used" is an OVERLAY, not a split: ACTIVE ledgers with zero posting lines in
+// that branch (each also counts inside * or ~*), so * + ~* + Deact = Total.
 const SIGN_CLR = { fixed: P_GREEN, wired: P_AMBER, nf: '#3f5a86', deact: P_RED };
 
 const P_CUR = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
@@ -728,7 +730,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', fontSize: 11.5, color: DIM, marginBottom: 10 }}>
         <span>{chip('*', SIGN_CLR.fixed)} Fixed (system-seeded)</span>
         <span>{chip('~*', SIGN_CLR.wired)} Wired (module)</span>
-        <span>{chip('NF', SIGN_CLR.nf)} Non-fixed (ledgers only)</span>
+        <span>{chip('Not used', SIGN_CLR.nf)} Active ledger with no entries yet</span>
         <span>{chip('Deact', SIGN_CLR.deact)} Deactivated</span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{LOCK_ICON}<span style={{ marginLeft: 3 }}>Locked — groups & wired heads (non-editable)</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{UNLOCK_ICON}<span style={{ marginLeft: 3 }}>Unlocked — branch-managed ledgers (editable)</span></span>
@@ -751,8 +753,8 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
-              {/* Ledger tier: * (system-seeded) is MIXED — banks/assets/parties are editable — so no lock claim; only wired (~*) is locked, and NF is branch-managed (editable). */}
-              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF{UNLOCK_ICON}</th><th style={th()}>Deact</th><th style={th()}>Total</th>
+              {/* Ledger tier: * (system-seeded) is MIXED — banks/assets/parties are editable — so no lock claim; only wired (~*) is locked. "Not used" overlays * / ~* (active, 0 entries). */}
+              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>Not used</th><th style={th()}>Deact</th><th style={th()}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -762,7 +764,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
                 {gCols(r.branch)}
                 {cell(r.fixed, SIGN_CLR.fixed, { tier: 'ledger', branch: r.branch, cat: 'fixed' }, sep)}
                 {cell(r.wired, SIGN_CLR.wired, { tier: 'ledger', branch: r.branch, cat: 'wired' })}
-                {cell(r.nf, SIGN_CLR.nf, { tier: 'ledger', branch: r.branch, cat: 'nf' })}
+                {cell(r.notUsed ?? 0, SIGN_CLR.nf, { tier: 'ledger', branch: r.branch, cat: 'notused' })}
                 {cell(r.deactivated, SIGN_CLR.deact, { tier: 'ledger', branch: r.branch, cat: 'deactivated' })}
                 {cell(r.total, DARK, { tier: 'ledger', branch: r.branch, cat: 'total' }, null, true)}
               </tr>
@@ -776,7 +778,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               ))}
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.fixed, fontWeight: 700, borderTop: '2px solid #cdd1d8', ...sep }}>{num(tot.fixed)}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.wired, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.wired)}</td>
-              <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.nf, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.nf)}</td>
+              <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.nf, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.notUsed ?? 0)}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.deact, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.deactivated)}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DARK, fontWeight: 800, borderTop: '2px solid #cdd1d8' }}>{num(tot.total)}</td>
             </tr>
@@ -787,7 +789,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
       {drill && <DrillPanel scope={drill} q={drillQ} dq={dq} setDq={setDq} onClose={() => setDrill(null)} money={money} num={num} openMaster={openMaster} openStatement={openStatement} />}
 
       <div style={{ marginTop: 12, fontSize: 11.5, color: DIM, background: '#f7f9fc', border: '1px solid #cdd1d8', borderLeft: `3px solid ${P_GREEN}`, borderRadius: 8, padding: '10px 13px' }}>
-        <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary; totals include deactivated.
+        <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary; totals include deactivated. <b>Not used</b> counts active ledgers with no entries yet — they also sit inside * / ~*, so * + ~* + Deact = Total.
       </div>
     </div>
   );
