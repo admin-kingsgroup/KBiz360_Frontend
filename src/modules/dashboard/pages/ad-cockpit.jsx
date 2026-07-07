@@ -3,12 +3,13 @@
 // the Owner Dashboard, so the existing AD Dashboard is untouched. Group-wide oversight,
 // branch-wise, currencies NEVER summed: branches roll up into currency REGIONS
 // (₹ India / $ Africa). Period presets (ALL/CM/QTD/FY/LFY) + region→branch drill.
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { BRANCHES, branchMainCurrency, currencySymbol } from '../../../core/data';
 import { periodRange } from '../../../core/period';
 import { compactAmt } from '../../../core/format';
+import { CUR_FY } from '../../../core/dates';
 import { isLiquidRow } from '../../../core/ledgerKind';
-import { useModulePL, useBalanceSheet, useAgeing, useTrialBalance } from '../../../core/useAccounting';
+import { useModulePL, useBalanceSheet, useAgeing, useTrialBalance, useBudgetVsActual } from '../../../core/useAccounting';
 import { useDirectorDashboard } from '../hooks/use-director-dashboard';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { DashboardError } from '../../../core/ux/DashboardError';
@@ -96,9 +97,24 @@ const CSS = `
 .adc .ig-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
 .adc .ig-cell{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 12px}
 .adc .ig-v{font-size:22px;font-weight:700;line-height:1}.adc .ig-k{font-size:11px;color:var(--ink);font-weight:600;margin-top:6px}
+.adc .drawer-wrap{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55)}
+.adc .drawer{position:absolute;top:0;right:0;height:100%;width:min(400px,92vw);background:var(--panel);border-left:1px solid var(--line);padding:20px 22px;overflow-y:auto;box-shadow:-24px 0 60px rgba(0,0,0,.6)}
+.adc .dh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.adc .dt{font-size:16px;font-weight:800}
+.adc .dclose{appearance:none;background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer;flex:none}
+.adc .drow{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}.adc .drow b{font-variant-numeric:tabular-nums}
+.adc .dlink{display:inline-block;margin-top:16px;color:#7fb4ff;font-weight:700;text-decoration:none}
+.adc .dchip{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.05em;padding:3px 9px;border-radius:20px;background:#12233a;color:#7fb4ff;margin-top:10px}
 @media(max-width:900px){.adc .hero,.adc .rich2{grid-template-columns:1fr}.adc .hk-grid{grid-template-columns:repeat(2,1fr)}.adc .ig-grid{grid-template-columns:repeat(2,1fr)}}
 `;
 
+const spark = (vals, color, w = 300, h = 46) => {
+  const a = (vals || []).map(Number).filter((n) => !Number.isNaN(n));
+  if (a.length < 2) return null;
+  const min = Math.min(...a), max = Math.max(...a), rng = (max - min) || 1;
+  const pts = a.map((v, i) => `${(i / (a.length - 1) * (w - 3) + 1.5).toFixed(1)},${(h - 3 - (v - min) / rng * (h - 6)).toFixed(1)}`).join(' ');
+  return <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block', maxWidth: '100%' }}><polyline points={pts} fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+};
 const HK = ({ l, v, c }) => <div className="hk"><div className="hk-l">{l}</div><div className="hk-v mono" style={c ? { color: c } : undefined}>{v}</div></div>;
 const Panel = ({ title, sub, children }) => <div className="panel"><div className="ph">{title}<span>{sub}</span></div>{children}</div>;
 
@@ -108,6 +124,9 @@ export function AdCockpitPage({ setRoute }) {
   const [region, setRegion] = useState(null);     // currency code
   const [branchSel, setBranchSel] = useState(null); // branch code
   const [section, setSection] = useState('pulse');
+  const [drawer, setDrawer] = useState(null);
+  const openDrawer = (d) => setDrawer(d);
+  useEffect(() => { const k = (e) => { if (e.key === 'Escape') setDrawer(null); }; document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k); }, []);
 
   const range = useMemo(() => periodRange(preset), [preset]);
   const { from, to, label } = range;
@@ -117,6 +136,7 @@ export function AdCockpitPage({ setRoute }) {
   const age = useAgeing('ALL', to).data || {};
   const bs = useBalanceSheet('ALL', { to }).data || {};
   const trial = useTrialBalance('ALL', { from, to }).data || {};
+  const bud = useBudgetVsActual('ALL', { from, to, fy: CUR_FY.label }).data || {};
   const focusArg = scope === 'branch' && branchSel ? { code: branchSel } : 'ALL';
   const mplFocus = useModulePL(focusArg, { from, to }).data || {};
 
@@ -270,6 +290,67 @@ export function AdCockpitPage({ setRoute }) {
     ];
     return (<div className="ig-grid">{tiles.map((t) => (<div className="ig-cell" key={t.k}><div className="ig-v" style={{ color: sevColor[t.sev] || '#7fb4ff' }}>{t.v}</div><div className="ig-k">{t.k}</div></div>))}</div>);
   };
+  // Revenue trend — consolidated ₹-equiv (current vs last year), same source as the
+  // Owner Dashboard chart. A magnitude trend, clearly labelled; not a cross-currency total.
+  const trendPanel = () => {
+    const t = Array.isArray(D.revenueTrend) ? D.revenueTrend : [];
+    const cy = t.map((p) => p.cy ?? p.revenue ?? p.value ?? 0);
+    if (cy.length < 2) return <div className="empty">Not enough history for a trend.</div>;
+    const last = cy[cy.length - 1], prev = cy[cy.length - 2] || 0, mom = prev ? (last - prev) / Math.abs(prev) * 100 : 0;
+    return (<div>
+      <div className="hk-grid" style={{ gridTemplateColumns: '1fr' }}><HK l="Current-year revenue · latest month" v={money('INR', last)} c={mom >= 0 ? '#2ee6a6' : '#ff6b6b'} /></div>
+      <div style={{ marginTop: 12 }}>{spark(cy, '#4d9bff', 320, 48)}</div>
+      <div className="note">Consolidated ₹-equivalent (current vs last year). {mom >= 0 ? '▲' : '▼'} {Math.abs(mom).toFixed(1)}% vs prior month.</div>
+    </div>);
+  };
+  // Region Module GP — aggregate each region's branches' module splits (currency-safe,
+  // one region = one currency). Rows drill into a module drawer.
+  const regionModuleGP = (R) => {
+    const brs = new Set(rows.filter((r) => r.cur === R.cur).map((r) => r.code));
+    const acc = {};
+    (Array.isArray(mpl.byBranch) ? mpl.byBranch : []).filter((b) => brs.has(b.branch)).forEach((b) => {
+      (b.modules || []).forEach((m) => { const k = m.name || m.key; if (!k) return; const e = acc[k] || (acc[k] = { name: k, sales: 0, gp: 0 }); e.sales += m.sales || 0; e.gp += m.gp || 0; });
+    });
+    const list = Object.values(acc).sort((a, b) => b.gp - a.gp);
+    if (!list.length) return <div key={R.cur} className="empty">No module breakdown for {R.label}.</div>;
+    return (<div key={R.cur}><div className="grphd"><b style={{ color: R.accent }}>{R.flag} {R.label}</b> · {currencySymbol(R.cur)} {R.cur}</div>
+      <table><thead><tr><th>Module</th><th>Sales</th><th>GP</th><th>GP%</th></tr></thead>
+        <tbody>{list.map((m) => (<tr key={m.name} style={{ cursor: 'pointer' }} onClick={() => openDrawer({ type: 'module', cur: R.cur, m })}><td>{m.name}</td><td>{money(R.cur, m.sales)}</td><td className={m.gp < 0 ? 'r' : 'g'}>{money(R.cur, m.gp)}</td><td>{pct(m.sales ? m.gp / m.sales * 100 : 0)}</td></tr>))}</tbody></table></div>);
+  };
+  const overdueBlock = (R) => {
+    const brs = new Set(rows.filter((r) => r.cur === R.cur).map((r) => r.code));
+    const parties = [];
+    (Array.isArray(age.byBranch) ? age.byBranch : []).filter((b) => brs.has(b.branch)).forEach((b) => {
+      (b.receivables?.rows || []).forEach((row) => parties.push({ name: row.party || row.name || row.ledger || '—', total: row.total ?? row.balance ?? row.closing ?? 0, d90: row.d90 ?? row.over90 ?? 0 }));
+    });
+    const top = parties.filter((p) => (p.d90 || 0) > 0).sort((a, b) => b.d90 - a.d90).slice(0, 5);
+    if (!top.length) return <div key={R.cur} className="empty">No 90+ overdue debtors in {R.label}.</div>;
+    return (<div key={R.cur}><div className="grphd"><b style={{ color: R.accent }}>{R.flag} {R.label}</b> · top overdue (90+)</div>
+      {top.map((p, i) => (<div className="conc-row" key={i} onClick={() => openDrawer({ type: 'debtor', cur: R.cur, p })}><span>{p.name}</span><span className="conc-bar"><span style={{ width: '100%', background: '#ff6b6b' }} /></span><span className="mono conc-v">{money(R.cur, p.d90)}</span><span className="mono conc-s">90+</span></div>))}
+    </div>);
+  };
+  const expenseBudget = () => {
+    const rb = Array.isArray(bud.rows) ? bud.rows : (Array.isArray(bud.ledgers) ? bud.ledgers : []);
+    if (!rb.length) return <div className="empty">No expense budget set for this period.</div>;
+    return (<><div className="note" style={{ marginTop: 0 }}>Consolidated ₹-equivalent · top overspends first.</div>
+      <table><thead><tr><th>Head</th><th>Budget</th><th>Actual</th><th>Used</th></tr></thead>
+        <tbody>{rb.slice().sort((a, b) => ((b.actual ?? b.spent ?? 0) - (b.budget ?? b.budgeted ?? 0)) - ((a.actual ?? a.spent ?? 0) - (a.budget ?? a.budgeted ?? 0))).slice(0, 8).map((x, i) => {
+          const budg = x.budget ?? x.budgeted ?? 0, act = x.actual ?? x.spent ?? 0, p = budg ? Math.round(act / budg * 100) : 0, over = act > budg;
+          return (<tr key={x.ledger || x.name || i}><td>{x.ledger || x.name || x.head}</td><td>{money('INR', budg)}</td><td>{money('INR', act)}</td><td className={over ? 'r' : p >= 90 ? 'amber' : 'g'}>{p}%</td></tr>);
+        })}</tbody></table></>);
+  };
+  const drawerBody = () => {
+    if (!drawer) return null;
+    if (drawer.type === 'module') { const m = drawer.m, cur = drawer.cur, gpPct = m.sales ? m.gp / m.sales * 100 : 0;
+      return (<><div className="dh"><div className="dt">{m.name} · Module GP</div><button className="dclose" onClick={() => setDrawer(null)}>✕</button></div>
+        <div className="drow"><span>Sales</span><b>{money(cur, m.sales)}</b></div><div className="drow"><span>Gross Profit</span><b>{money(cur, m.gp)}</b></div><div className="drow"><span>GP margin</span><b>{pct(gpPct)}</b></div>
+        <a className="dlink" href="#" onClick={(e) => { e.preventDefault(); setDrawer(null); go('/dashboards/module-gp'); }}>Open Module GP report ↗</a><div className="dchip">routes to /dashboards/module-gp · Esc to close</div></>);
+    }
+    const p = drawer.p, cur = drawer.cur;
+    return (<><div className="dh"><div className="dt">{p.name} · Receivable</div><button className="dclose" onClick={() => setDrawer(null)}>✕</button></div>
+      <div className="drow"><span>Outstanding</span><b>{money(cur, p.total)}</b></div><div className="drow"><span>90+ overdue</span><b style={{ color: '#ff6b6b' }}>{money(cur, p.d90)}</b></div>
+      <a className="dlink" href="#" onClick={(e) => { e.preventDefault(); setDrawer(null); go('/reports/rec'); }}>Open ledger / AR statement ↗</a><div className="dchip">routes to /reports/rec · Esc to close</div></>);
+  };
 
   const branchDetail = () => {
     const r = rows.find((x) => x.code === branchSel) || {}; const cur = r.cur;
@@ -290,7 +371,7 @@ export function AdCockpitPage({ setRoute }) {
       </Panel>
       <Panel title={`${branchSel} · Profit by Module`} sub={`${label} · NP allocated by GP share`}>
         {mods.length ? (<><table><thead><tr><th>Module</th><th>Sales</th><th>GP</th><th>GP%</th><th>NP (alloc)</th></tr></thead>
-          <tbody>{mods.map((m) => { const np = npAlloc(m); return (<tr key={m.key || m.name}><td>{m.name || m.key}</td><td>{money(cur, m.sales)}</td><td className={(m.gp || 0) < 0 ? 'r' : 'g'}>{money(cur, m.gp)}</td><td>{pct(m.gpPct || (m.sales ? m.gp / m.sales * 100 : 0))}</td><td className={np < 0 ? 'r' : 'g'}>{money(cur, np)}</td></tr>); })}</tbody></table>
+          <tbody>{mods.map((m) => { const np = npAlloc(m); return (<tr key={m.key || m.name} style={{ cursor: 'pointer' }} onClick={() => openDrawer({ type: 'module', cur, m })}><td>{m.name || m.key}</td><td>{money(cur, m.sales)}</td><td className={(m.gp || 0) < 0 ? 'r' : 'g'}>{money(cur, m.gp)}</td><td>{pct(m.gpPct || (m.sales ? m.gp / m.sales * 100 : 0))}</td><td className={np < 0 ? 'r' : 'g'}>{money(cur, np)}</td></tr>); })}</tbody></table>
           <div className="note">NP (alloc) = module GP less this branch&apos;s operating expenses ({money(cur, r.opex)}) apportioned by each module&apos;s share of GP — an estimate, since overheads aren&apos;t booked per module.</div></>)
           : <div className="empty">No module breakdown for this branch/period.</div>}
       </Panel>
@@ -301,15 +382,19 @@ export function AdCockpitPage({ setRoute }) {
   const sections = {
     pulse: () => (<>{Panel({ title: 'Key Alerts', sub: 'what needs attention · live', children: alertsPanel() })}
       <div className="note">Pulse = the glance. The hero band stays on every section; deeper detail lives in the other sections.</div></>),
-    perf: () => (<>{Panel({ title: 'Branch Board', sub: `Revenue → GP → Expenses → Net Profit · ${label}`, children: branchBoard() })}</>),
+    perf: () => (<>{Panel({ title: 'Branch Board', sub: `Revenue → GP → Expenses → Net Profit · ${label}`, children: branchBoard() })}
+      {Panel({ title: 'Gross Profit by Module', sub: 'per region · click a module for detail', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(regionModuleGP)}</div> })}
+      {Panel({ title: 'Revenue Trend', sub: 'trailing months · current vs last year', children: trendPanel() })}</>),
     cash: () => (<>{Panel({ title: 'Bank Balances · by account', sub: 'liquidity · never summed across currencies', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(bankBlock)}</div> })}
-      {Panel({ title: 'AR / AP · by branch', sub: `as-on ${to || 'today'} · currencies never summed`, children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(arapBlock)}</div> })}</>),
+      {Panel({ title: 'AR / AP · by branch', sub: `as-on ${to || 'today'} · currencies never summed`, children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(arapBlock)}</div> })}
+      {Panel({ title: 'Top Overdue Debtors', sub: '90+ days · click to open the ledger', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(overdueBlock)}</div> })}</>),
     capital: () => (<>{Panel({ title: 'Capital & Returns', sub: `net worth & return · ${label}`, children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(capitalBlock)}</div> })}
       <div className="note">Net worth is as-on; Net Profit &amp; Return reflect the selected period.</div></>),
     commercial: () => (<>{Panel({ title: 'SO / PO / GP Pipeline', sub: 'whole approval queue · by region', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(pipelineBlock)}</div> })}
       {Panel({ title: 'Customer Concentration', sub: 'share of revenue · click a name to open its statement', children: concBlock(D.topCustomers, 'customer mix', 'customer') })}
       {Panel({ title: 'Supplier Concentration', sub: 'share of spend · dependency risk', children: concBlock(D.topSuppliers, 'supplier mix', 'supplier') })}</>),
     gov: () => (<>{Panel({ title: 'Data Integrity & Control', sub: 'live now · period-independent counts', children: integrityTiles() })}
+      {Panel({ title: 'Expense Budget vs Actual', sub: 'opex adherence · overspends first', children: expenseBudget() })}
       {Panel({ title: 'Governance · Alerts', sub: 'exceptions across every domain', children: alertsPanel() })}</>),
   };
 
@@ -339,6 +424,8 @@ export function AdCockpitPage({ setRoute }) {
         <div className="hero">{hero()}</div>
         {scope === 'branch' ? branchDetail() : sections[section]()}
       </div>
+      {drawer && (<div className="drawer-wrap" onClick={(e) => { if (e.target.classList.contains('drawer-wrap')) setDrawer(null); }}>
+        <aside className="drawer">{drawerBody()}</aside></div>)}
     </div>
   );
 }
