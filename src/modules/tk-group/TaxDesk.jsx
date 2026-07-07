@@ -6,7 +6,8 @@ import { calendarKpis, dueTone, filingBranchRows, prevMonth } from './utils/taxD
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { DataTable } from '../../shell/DataTable';
-import { PageSection, Badge } from '../../shell/primitives';
+import { PageSection, Badge, ResponsiveGrid } from '../../shell/primitives';
+import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { money } from '../../core/format';
 
 // ─── TK GROUP CENTRAL · Tax Desk ─────────────────────────────────────────────
@@ -32,17 +33,8 @@ const FILING_COLS = [
   { key: 'pct', header: 'Filed %', align: 'right', num: true, render: (r) => <Badge tone={r.pct === 100 ? 'success' : r.pct > 0 ? 'warning' : 'danger'} size="sm">{r.pct}%</Badge> },
 ];
 
-// KPI card — the number is tinted by severity (tone); the label is the caption. No
-// redundant chip echoing the label.
-const KPI_TONE_TEXT = { danger: 'text-danger', warning: 'text-warning', info: 'text-info', success: 'text-success' };
-function Kpi({ label, value, tone }) {
-  return (
-    <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
-      <div className="text-[11px] uppercase tracking-wide text-ink-muted">{label}</div>
-      <div className={`mt-0.5 text-[22px] font-semibold tabular-nums ${KPI_TONE_TEXT[tone] || 'text-ink'}`}>{value}</div>
-    </div>
-  );
-}
+// KPI tile — top accent border + big value, matching the shared dashboard KpiTile look.
+const KPI_TONE_COLOR = { danger: '#dc2626', warning: '#d97706', info: '#2563eb', success: '#16a34a' };
 
 export function TaxDesk() {
   const focus = useCockpitFocus();
@@ -60,9 +52,11 @@ export function TaxDesk() {
 
   return (
     <div className="grid gap-4">
-      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4">
-        {calendarKpis(totals).map((k) => <Kpi key={k.key} label={k.label} value={k.value} tone={k.tone} />)}
-      </div>
+      <ResponsiveGrid cols={4} gap="md">
+        {calendarKpis(totals).map((k) => (
+          <KpiTile key={k.key} label={k.label.toUpperCase()} value={k.value} color={KPI_TONE_COLOR[k.tone] || '#5b616e'} />
+        ))}
+      </ResponsiveGrid>
       <p className="text-xs text-ink-muted">Statutory dues owed (not yet filed): <b className="text-ink tabular-nums">{money(dueValue, '₹')}</b>. The compliance calendar is org-wide — a filing is entity / return level, never a branch sum.</p>
 
       <div data-testid="tk-tax-dues">

@@ -11,10 +11,10 @@ import { Card, Badge, ResponsiveGrid } from '../../shell/primitives';
 // Built from the shared design system (Card · Badge · ResponsiveGrid + design tokens)
 // so it matches the branch screens — no bespoke inline hex.
 
-const listBlock = (label, items, toneClass) => (items && items.length ? (
-  <div className="mt-2">
+const listBlock = (label, items, toneClass, boxClass) => (items && items.length ? (
+  <div className={`mt-2 rounded-brand border p-2.5 ${boxClass}`}>
     <div className={`text-[10.5px] font-bold uppercase tracking-wide ${toneClass}`}>{label}</div>
-    <ul className="mt-1 list-disc pl-[18px] text-xs">{items.map((d) => <li key={d}>{d}</li>)}</ul>
+    <ul className="mt-1 list-disc space-y-0.5 pl-[18px] text-xs">{items.map((d) => <li key={d}>{d}</li>)}</ul>
   </div>
 ) : null);
 
@@ -41,9 +41,9 @@ export function RolesResponsibilities() {
                 {r.person}{r.reportsTo ? ` · reports to ${r.reportsTo}` : ' · top of hierarchy'}{typeof r.inTkGroup === 'boolean' ? ` · ${r.inTkGroup ? 'TK Group Central' : 'branch-only'}` : ''}
               </div>
               {r.mandate ? <p className="mt-2 text-[12.5px] font-semibold text-ink">{r.mandate}</p> : null}
-              {listBlock('Responsibilities', r.duties, 'text-ink-muted')}
-              {listBlock('Can approve', r.approves, 'text-success')}
-              {listBlock('Cannot', r.cannot, 'text-danger')}
+              {listBlock('Responsibilities', r.duties, 'text-ink-muted', 'border-surface-border bg-surface-alt')}
+              {listBlock('Can approve', r.approves, 'text-success', 'border-success/25 bg-success-soft')}
+              {listBlock('Cannot', r.cannot, 'text-danger', 'border-danger/25 bg-danger-soft')}
             </Card>
           );
         }) : <div className="text-xs text-ink-muted">Loading roles…</div>}
