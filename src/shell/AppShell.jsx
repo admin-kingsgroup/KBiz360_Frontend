@@ -455,6 +455,10 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           <span className="hidden rounded bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-gold tablet:inline">Control</span>
           <span className="hidden text-[11px] font-semibold text-white/85 tablet:inline">TK Group Central&nbsp;▸</span>
           <FocusSwitcher dark />
+          <div className="ml-auto hidden shrink-0 items-center gap-2 desktop:flex">
+            <div className="w-56 2xl:w-64"><ModuleSearch branch={branch} currentUser={scopedUser} setRoute={setRoute} /></div>
+            <div className="w-[150px] 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} /></div>
+          </div>
         </div>
       )}
       {/* ── Sticky, blurred app-bar ──────────────────────────────────── */}
@@ -474,10 +478,14 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
 
         {/* Right cluster — tighten the gap on laptops so the items fit */}
         <div className="flex shrink-0 items-center gap-1 2xl:gap-1.5">
-          <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={scopedUser} setRoute={setRoute} /></div>
+          {!inCockpit && (
+            <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={scopedUser} setRoute={setRoute} /></div>
+          )}
 
           <FxRateChip branch={branch} />
-          <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
+          {!inCockpit && (
+            <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
+          )}
 
           {/* TK Group pending-approvals badge — central roles only, hidden at 0 (dormant-safe) */}
           <InboxBadgeLive currentUser={currentUser} setRoute={setRoute} />
