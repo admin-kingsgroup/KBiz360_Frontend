@@ -5,6 +5,7 @@ import { FlagAdmin } from './FlagAdmin';
 import { PeriodLockAdmin } from './PeriodLockAdmin';
 import { DecisionsBoard } from './DecisionsBoard';
 import { ControlTower } from './ControlTower';
+import { AdoptionMatrix } from './AdoptionMatrix';
 import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
@@ -129,6 +130,14 @@ export function TkControlTowerPage() {
   return (
     <Page title="Control Tower" subtitle="Is the control layer healthy? Pending approvals, how long they've waited, locked periods, which controls are live, and the latest control events.">
       <ControlTower />
+    </Page>
+  );
+}
+
+export function TkAdoptionPage() {
+  return (
+    <Page title="ERP Adoption" subtitle="How much of the ERP each branch actually uses — capability-milestone scoring across every module, branchwise, with a Central column for shared config. Live: the score moves as branches enter data and fix issues.">
+      <AdoptionMatrix />
     </Page>
   );
 }

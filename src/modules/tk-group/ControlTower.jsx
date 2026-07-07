@@ -5,6 +5,7 @@ import { overviewKpis, streamRows, actorName } from './utils/monitor';
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
+import { GroupHealth } from './GroupHealth';
 
 // ─── TK GROUP · FE · Control Tower (container) ───────────────────────────────
 // The "is the control layer healthy?" view: headline KPIs, pending split by stream,
@@ -26,7 +27,14 @@ export function ControlTower() {
   const events = o.recentEvents || [];
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-6">
+      {/* Branch-wise health — the alerts engine wired in, worst branch first. Leads the
+          Control Tower so issues/errors/setup gaps are the first thing seen. */}
+      <PageSection title="Group Health — branchwise">
+        <GroupHealth />
+      </PageSection>
+
+      {/* Control plane — the governance/approval oversight this page originally carried. */}
       <ResponsiveGrid min="150px" gap="md" data-testid="tk-kpis">
         {overviewKpis(o).map((k) => (
           <KpiTile key={k.key} label={k.label} value={k.value} color="#1a1c22" />

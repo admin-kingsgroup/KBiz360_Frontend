@@ -303,6 +303,7 @@ export const APP_ROUTES = [
   "/tax/tds",
   "/tax/tds-certs",
   "/tax/vat",
+  "/tk/adoption",
   "/tk/approvals",
   "/tk/assets",
   "/tk/audit",

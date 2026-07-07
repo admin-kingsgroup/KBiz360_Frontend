@@ -485,6 +485,7 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"HR Requests", href:"/tk/hr-control"},
   {divider:true, label:"Monitoring"},
   {label:"Control Tower", href:"/tk/control-tower"},
+  {label:"ERP Adoption", href:"/tk/adoption"},
   {label:"Branch Scorecard", href:"/tk/scorecard"},
   {label:"Performance vs Target", href:"/tk/performance"},
   {label:"Investment & Capital", href:"/tk/investment"},
@@ -594,6 +595,7 @@ function withOwnerDashboard(menu){
   const overview = menu.children[0];
   const newOverview = {...overview, children:[
     {label:"AD Dashboard (All)", href:"/dashboard/owner"},   // replaces "My Dashboard" for the owner
+    {label:"AD Cockpit (Beta)", href:"/dashboard/cockpit"},  // new sectioned dark cockpit — additive, owner-only
     ...overview.children.slice(1),                                        // Alerts, Capital, … (My Dashboard dropped)
   ]};
   return {...menu, children:[newOverview, ...menu.children.slice(1)]};

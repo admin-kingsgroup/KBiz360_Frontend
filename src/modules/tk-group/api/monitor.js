@@ -14,3 +14,6 @@ export async function getAudit(filter = {}) {
 export async function getAdoption() {
   try { return (await apiGet('/api/tk/monitor/adoption')) || {}; } catch { return {}; }
 }
+export async function getGroupHealth() {
+  try { return (await apiGet('/api/tk/monitor/health')) || {}; } catch { return {}; }
+}

@@ -31,7 +31,7 @@ const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RP
 const { RPT_InterbranchElim, InterBranchRegister, InterBranchMatrix, InterBranchCounterpartyLedger } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/reports/salesGpAnalytics'));
 const { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } = lazyModule(() => import('./modules/assets'));
-const { Dashboard, AlertsDashboard, OwnerDashboard, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
+const { Dashboard, AlertsDashboard, OwnerDashboard, AdCockpit, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
 const { DirectorDash, TargetsMaster } = lazyModule(() => import('./modules/directorDashboards'));
 const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } = lazyModule(() => import('./modules/finance'));
 
@@ -67,7 +67,7 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkAdoptionPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
@@ -510,6 +510,7 @@ export default function KB360App(){
     if(route==="/tk/period-locks")       return <TkPeriodLockPage/>;
     if(route==="/tk/decisions")          return <TkDecisionsPage/>;
     if(route==="/tk/control-tower")      return <TkControlTowerPage/>;
+    if(route==="/tk/adoption")           return <TkAdoptionPage/>;
     if(route==="/tk/branch-cockpit")     return <TkBranchCockpitPage/>;
     if(route==="/tk/audit")              return <TkAuditTrailPage/>;
     if(route==="/tk/targets")            return <TkTargetsPage/>;
@@ -606,6 +607,14 @@ export default function KB360App(){
     // Owner Dashboard — consolidated whole-company view. Restricted to the group
     // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
     // role + email required). Non-owners hitting the URL get a "not available" card.
+    if(route==="/dashboard/cockpit") return isOwnerDashboardUser(currentUser)
+      ? <AdCockpit setRoute={navigate}/>
+      : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>AD Cockpit</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This consolidated all-branch cockpit is restricted to the group owner.</p>
+          <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
+        </div>;
     if(route==="/dashboard/owner")    return isOwnerDashboardUser(currentUser)
       ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
