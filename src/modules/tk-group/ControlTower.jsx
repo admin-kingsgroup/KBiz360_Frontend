@@ -7,6 +7,7 @@ import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { GroupHealth } from './GroupHealth';
 import { IntegritySummary } from './IntegritySummary';
+import { ScrutinyTrend } from './ScrutinyTrend';
 
 // ─── TK GROUP · FE · Control Tower (container) ───────────────────────────────
 // The "is the control layer healthy?" view: headline KPIs, pending split by stream,
@@ -39,6 +40,12 @@ export function ControlTower() {
           Full gate × branch checklist lives at /tk/integrity. */}
       <PageSection title="Close Readiness & Integrity — branchwise">
         <IntegritySummary />
+      </PageSection>
+
+      {/* Scrutiny trend — is each branch's data quality improving (fixing faster than
+          issues appear)? Built from the alert lifecycle. */}
+      <PageSection title="Scrutiny Trend — is data quality improving?">
+        <ScrutinyTrend />
       </PageSection>
 
       {/* Control plane — the governance/approval oversight this page originally carried. */}

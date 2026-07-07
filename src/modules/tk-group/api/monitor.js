@@ -20,3 +20,6 @@ export async function getGroupHealth() {
 export async function getIntegrity() {
   try { return (await apiGet('/api/tk/monitor/integrity')) || {}; } catch { return {}; }
 }
+export async function getTrend() {
+  try { return (await apiGet('/api/tk/monitor/trend')) || {}; } catch { return {}; }
+}

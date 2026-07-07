@@ -9,7 +9,7 @@ import { periodRange } from '../../../core/period';
 import { compactAmt } from '../../../core/format';
 import { CUR_FY } from '../../../core/dates';
 import { isLiquidRow } from '../../../core/ledgerKind';
-import { useModulePL, useBalanceSheet, useAgeing, useTrialBalance, useBudgetVsActual } from '../../../core/useAccounting';
+import { useModulePL, useBalanceSheet, useAgeing, useTrialBalance, useBudgetVsActual, useAlerts } from '../../../core/useAccounting';
 import { useDirectorDashboard } from '../hooks/use-director-dashboard';
 import { DashboardSkeleton } from '../../../core/ux/DashboardSkeleton';
 import { DashboardError } from '../../../core/ux/DashboardError';
@@ -31,7 +31,7 @@ const netWorthOf = (liabs) => (Array.isArray(liabs) ? liabs : []).filter((l) => 
 const CSS = `
 .adc,.adc *{box-sizing:border-box}
 .adc{--bg:#07080a;--panel:#111318;--panel2:#0c0d10;--line:#22252d;--ink:#e7eaf0;--dim:#8b93a3;--ok:#2ee6a6;--warn:#ffd166;--crit:#ff6b6b;--blue:#2a78d6;
-  background:var(--bg);color:var(--ink);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;min-height:100vh;margin:-16px -16px 0;padding:0 0 60px}
+  background:var(--bg);color:var(--ink);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.45;min-height:100%;margin:0;padding:0 0 60px}
 .adc .mono{font-variant-numeric:tabular-nums}
 .adc .hdr{position:sticky;top:0;z-index:5;background:#0a0b0e;border-bottom:1px solid var(--line)}
 .adc .hrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:12px 22px}
@@ -132,11 +132,14 @@ export function AdCockpitPage({ setRoute }) {
   const { from, to, label } = range;
 
   const dir = useDirectorDashboard({ scope: 'ALL', from, to });
-  const mpl = useModulePL('ALL', { from, to, summary: true }).data || {};
-  const age = useAgeing('ALL', to).data || {};
+  const mplQ = useModulePL('ALL', { from, to, summary: true });
+  const ageQ = useAgeing('ALL', to);
+  const mpl = mplQ.data || {};
+  const age = ageQ.data || {};
   const bs = useBalanceSheet('ALL', { to }).data || {};
   const trial = useTrialBalance('ALL', { from, to }).data || {};
   const bud = useBudgetVsActual('ALL', { from, to, fy: CUR_FY.label }).data || {};
+  const alertsData = useAlerts('ALL').data || {};        // rich /api/alerts (single source, carries domain)
   const focusArg = scope === 'branch' && branchSel ? { code: branchSel } : 'ALL';
   const mplFocus = useModulePL(focusArg, { from, to }).data || {};
 
@@ -158,9 +161,12 @@ export function AdCockpitPage({ setRoute }) {
   const activeRegions = scope === 'group' ? REGIONS : REGIONS.filter((r) => r.cur === region);
   const regionOf = (cur) => REGION_META[cur] || { label: cur, flag: '', accent: '#888' };
 
-  if (dir.isError) return <DashboardError error={dir.error} onRetry={dir.refetch} title="Could not load the AD Cockpit." />;
-  if (dir.isLoading || !dir.data) return <DashboardSkeleton numKpis={12} />;
+  // Gate on the CORE financial hooks too — otherwise a failed module-PL / ageing fetch
+  // would silently render every branch as ₹0 instead of an error.
+  if (dir.isError || mplQ.isError || ageQ.isError) return <DashboardError error={dir.error || mplQ.error || ageQ.error} onRetry={() => { dir.refetch?.(); mplQ.refetch?.(); ageQ.refetch?.(); }} title="Could not load the AD Cockpit." />;
+  if (dir.isLoading || mplQ.isLoading || ageQ.isLoading || !dir.data) return <DashboardSkeleton numKpis={12} />;
   const D = dir.data || {};
+  const richAlerts = Array.isArray(alertsData.alerts) ? alertsData.alerts : (Array.isArray(D.keyAlerts) ? D.keyAlerts : []);
 
   // ── hero ──
   const hero = () => {
@@ -226,7 +232,7 @@ export function AdCockpitPage({ setRoute }) {
   };
 
   const alertsPanel = () => {
-    const list = Array.isArray(D.keyAlerts) ? D.keyAlerts : [];
+    const list = richAlerts;
     if (!list.length) return <div className="empty">No open alerts — books look clean for this period.</div>;
     return list.slice(0, 12).map((a, i) => { const sev = a.severity || a.sev || 'info'; const col = sevColor[sev] || '#7fb4ff';
       return (<div className="alert" key={a.key || i}><div className="ic" style={{ background: `${col}22`, color: col }}>{sev === 'error' || sev === 'crit' ? '!' : sev === 'warn' ? '▲' : 'i'}</div>
@@ -237,8 +243,12 @@ export function AdCockpitPage({ setRoute }) {
   // Customer / supplier concentration — ranked by share (% is currency-agnostic);
   // magnitudes are the consolidated ₹-equivalent the service already produces.
   const concBlock = (list, label, kind) => {
-    const arr = Array.isArray(list) ? list.slice(0, 6) : [];
-    if (!arr.length) return <div className="empty">No {label} data for this period.</div>;
+    // When drilled into a region, keep only that region's branches' entries (rows carry .branch).
+    const activeCodes = scope === 'group' ? null : new Set(rows.filter((r) => activeRegions.some((R) => R.cur === r.cur)).map((r) => r.code));
+    let arr = Array.isArray(list) ? list : [];
+    if (activeCodes) arr = arr.filter((r) => !r.branch || activeCodes.has(r.branch));
+    arr = arr.slice(0, 6);
+    if (!arr.length) return <div className="empty">No {label} data for this scope.</div>;
     const val = (r) => r.revenue ?? r.spend ?? r.value ?? r.amount ?? 0;
     const tot = arr.reduce((s, r) => s + val(r), 0) || 1;
     const mx = Math.max(1, ...arr.map((r) => val(r)));
@@ -267,26 +277,32 @@ export function AdCockpitPage({ setRoute }) {
         <HK l="Approved · to invoice" v={`${agg.aC} · ${money(R.cur, agg.aV)}`} c="#2ee6a6" />
       </div></div>);
   };
-  const bankBlock = (R) => {
-    const accs = (Array.isArray(D.bankAccounts) ? D.bankAccounts : []).filter((a) => (a.currency || 'INR') === R.cur);
-    if (!accs.length) return <div key={R.cur} className="empty">No bank accounts for {R.label}.</div>;
+  // Bank balances come from the consolidated finance snapshot (all tagged ₹-equivalent,
+  // not attributable to a branch/currency) — so this is one consolidated ₹-equiv list,
+  // clearly labelled. Region-correct cash sits in the hero / branch board (trial-balance).
+  const bankPanel = () => {
+    const accs = (Array.isArray(D.bankAccounts) ? D.bankAccounts : []).slice().sort((a, b) => Math.abs(b.openingBal || 0) - Math.abs(a.openingBal || 0));
+    if (!accs.length) return <div className="empty">No bank accounts in the snapshot.</div>;
     const mx = Math.max(1, ...accs.map((a) => Math.abs(a.openingBal || 0)));
-    return (<div key={R.cur}><div className="grphd"><b style={{ color: R.accent }}>{R.flag} {R.label}</b> · {currencySymbol(R.cur)} {R.cur} — banks</div>
-      {accs.map((a, i) => { const v = a.openingBal || 0; return (<div className="bk-row" key={a.name || a.ledger || i}>
-        <span className="bk-n">{a.name || a.ledger || a.account || 'Bank'}</span>
+    return (<div>
+      {accs.map((a, i) => { const v = a.openingBal || 0; return (<div className="bk-row" key={a.bank || a.id || a.name || i}>
+        <span className="bk-n">{a.bank || a.name || a.ledger || a.id || 'Bank'}</span>
         <span className="bk-bar"><span style={{ width: `${Math.max(Math.abs(v) / mx * 100, 3)}%`, background: v < 0 ? '#ff6b6b' : '#4d9bff' }} /></span>
-        <span className="mono bk-v" style={v < 0 ? { color: '#ff6b6b' } : undefined}>{money(R.cur, v)}</span></div>); })}
+        <span className="mono bk-v" style={v < 0 ? { color: '#ff6b6b' } : undefined}>{money('INR', v)}</span></div>); })}
+      <div className="note">Consolidated ₹-equivalent snapshot. Per-branch cash (own currency) is on the hero band &amp; Branch Board.</div>
     </div>);
   };
+  // Uses the rich /api/alerts feed (every alert carries `domain` + `type`), so the
+  // domain-keyed tiles are accurate. Falls back to severity where domain is absent.
   const integrityTiles = () => {
-    const list = Array.isArray(D.keyAlerts) ? D.keyAlerts : [];
+    const list = richAlerts;
     const cnt = (fn) => list.filter(fn).length;
     const tiles = [
       { k: 'Open exceptions', v: list.length, sev: list.length ? 'warn' : 'ok' },
       { k: 'Errors', v: cnt((a) => ['error', 'crit'].includes(a.severity || a.sev)), sev: 'crit' },
-      { k: 'Reconciliation', v: cnt((a) => a.domain === 'recon'), sev: 'warn' },
-      { k: 'Approvals pending', v: cnt((a) => ['pending', 'needs-attention'].includes(a.type)), sev: 'serious' },
-      { k: 'Masters incomplete', v: cnt((a) => a.domain === 'masters'), sev: 'warn' },
+      { k: 'Reconciliation', v: cnt((a) => a.domain === 'recon' || /recon/i.test(a.type || a.title || '')), sev: 'warn' },
+      { k: 'Approvals pending', v: cnt((a) => a.domain === 'approvals' || ['pending', 'needs-attention'].includes(a.type)), sev: 'serious' },
+      { k: 'Masters / Tax', v: cnt((a) => ['masters', 'tax'].includes(a.domain) || /gstin|pan|master|filing|gst|tds/i.test(a.type || a.title || '')), sev: 'warn' },
     ];
     return (<div className="ig-grid">{tiles.map((t) => (<div className="ig-cell" key={t.k}><div className="ig-v" style={{ color: sevColor[t.sev] || '#7fb4ff' }}>{t.v}</div><div className="ig-k">{t.k}</div></div>))}</div>);
   };
@@ -385,7 +401,7 @@ export function AdCockpitPage({ setRoute }) {
     perf: () => (<>{Panel({ title: 'Branch Board', sub: `Revenue → GP → Expenses → Net Profit · ${label}`, children: branchBoard() })}
       {Panel({ title: 'Gross Profit by Module', sub: 'per region · click a module for detail', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(regionModuleGP)}</div> })}
       {Panel({ title: 'Revenue Trend', sub: 'trailing months · current vs last year', children: trendPanel() })}</>),
-    cash: () => (<>{Panel({ title: 'Bank Balances · by account', sub: 'liquidity · never summed across currencies', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(bankBlock)}</div> })}
+    cash: () => (<>{Panel({ title: 'Bank Balances · by account', sub: 'consolidated snapshot (₹-equivalent)', children: bankPanel() })}
       {Panel({ title: 'AR / AP · by branch', sub: `as-on ${to || 'today'} · currencies never summed`, children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(arapBlock)}</div> })}
       {Panel({ title: 'Top Overdue Debtors', sub: '90+ days · click to open the ledger', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(overdueBlock)}</div> })}</>),
     capital: () => (<>{Panel({ title: 'Capital & Returns', sub: `net worth & return · ${label}`, children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(capitalBlock)}</div> })}

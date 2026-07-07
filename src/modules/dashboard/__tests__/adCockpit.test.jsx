@@ -13,13 +13,18 @@ jest.mock('../../../core/useAccounting', () => ({
   useAgeing: () => ({ data: { byBranch: [ageRow('BOM', 1590000, 964000), ageRow('NBO', 121000, 76000)] } }),
   useBalanceSheet: () => ({ data: { byBranch: [{ branch: 'BOM', liabilities: [{ name: 'Capital Account', amount: 7030000 }] }] } }),
   useTrialBalance: () => ({ data: { byBranch: [{ branch: 'BOM', rows: [] }] } }),
-  useBudgetVsActual: () => ({ data: { rows: [{ ledger: 'Salaries', budget: 4200000, actual: 3980000 }, { ledger: 'Marketing', budget: 1200000, actual: 1480000 }] } }),
+  useBudgetVsActual: () => ({ data: { rows: [{ name: 'Salaries', budget: 4200000, actual: 3980000 }, { name: 'Marketing', budget: 1200000, actual: 1480000 }] } }),
+  useAlerts: () => ({ data: { alerts: [
+    { severity: 'error', title: 'FBM net loss', detail: '−$2K MTD', domain: 'acct', type: 'neg-cashbank' },
+    { severity: 'warn', title: 'Bank reconciliation pending', detail: '12 lines', domain: 'recon', type: 'recon-bank' },
+    { severity: 'warn', title: 'GSTIN missing', detail: '3 parties', domain: 'masters', type: 'party-tax-id' },
+  ] } }),
 }));
 jest.mock('../hooks/use-director-dashboard', () => ({
   useDirectorDashboard: () => ({
     data: {
       keyAlerts: [{ severity: 'error', title: 'FBM net loss', detail: '−$2K MTD', domain: 'acct', type: 'neg-cashbank' }],
-      bankAccounts: [{ name: 'ICICI · 3566', currency: 'INR', openingBal: 5106420 }, { name: 'NBO · KCB', currency: 'USD', openingBal: 88000 }],
+      bankAccounts: [{ bank: 'ICICI · 3566', id: 'b1', currency: '₹', openingBal: 5106420 }, { bank: 'HDFC · 3261', id: 'b2', currency: '₹', openingBal: 5000000 }],
       bookingsByBranch: [{ branch: 'BOM', approved: { count: 10, sales: 6200000 }, pending: { count: 5, sales: 1800000 } }, { branch: 'NBO', approved: { count: 3, sales: 61000 }, pending: { count: 2, sales: 14000 } }],
       topCustomers: [{ name: 'Inaysha Travels', revenue: 9800000, share: 30, branch: 'BOM' }, { name: 'Akbar B2B', revenue: 7200000, share: 22, branch: 'BOM' }],
       topSuppliers: [{ name: 'TripJack', spend: 14200000, share: 35, branch: 'BOM' }],
@@ -60,6 +65,7 @@ test('Cash / Commercial / Governance sections render without error', () => {
   render(<AdCockpitPage />);
   fireEvent.click(screen.getByRole('button', { name: 'Cash & WC' }));
   expect(screen.getByText(/Bank Balances/)).toBeInTheDocument();
+  expect(screen.getByText(/ICICI/)).toBeInTheDocument(); // bank rows render (currency is a symbol, not a code — A/B fix)
   expect(screen.getByText(/Top Overdue Debtors/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Commercial' }));
   expect(screen.getByText(/SO \/ PO \/ GP Pipeline/)).toBeInTheDocument();
