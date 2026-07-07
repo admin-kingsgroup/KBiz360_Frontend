@@ -412,15 +412,23 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
         <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
       </div>
 
-      {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, background: '#f7f9fc', border: '1px solid #cdd1d8', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 11.5, color: DIM }}>
-        <span><b style={{ color: DARK }}>Groups & Sub-Groups</b> are shared across all branches (org-wide). Only <b style={{ color: DARK }}>Ledgers</b> are branch-scoped:</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Removable', RED)}<span style={{ marginLeft: 4 }}>= deactivated + 0 entries (safe to delete)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= fixed structure — Parent Group / Group / Sub-Group (locked — cannot be created, edited or deleted)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>~*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= sub-group / ledger wired to a module (locked — non-editable, non-deletable)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{UNLOCK_ICON}<span style={{ marginLeft: 4 }}>= branch-managed ledger (unlocked — editable / removable)</span></span>
+      {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. Each
+          term sits in its own tinted chip (rather than one run-on line) so the legend
+          scans instead of reads like a paragraph. */}
+      <div style={{ background: '#eef1f8', border: '1px solid #cdd1d8', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11.5, color: DIM }}>
+        <div style={{ marginBottom: 8 }}>
+          <b style={{ color: DARK }}>Groups & Sub-Groups</b> are shared across all branches (org-wide). Only <b style={{ color: DARK }}>Ledgers</b> are branch-scoped:
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}>{badge('Removable', RED)}<span style={{ marginLeft: 4 }}>= deactivated + 0 entries (safe to delete)</span></span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 8, paddingTop: 8, borderTop: '1px solid #dfe2e7' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}><span style={{ color: RED, fontWeight: 800 }}>*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= fixed structure — Parent Group / Group / Sub-Group (locked — cannot be created, edited or deleted)</span></span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}><span style={{ color: RED, fontWeight: 800 }}>~*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= sub-group / ledger wired to a module (locked — non-editable, non-deletable)</span></span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}>{UNLOCK_ICON}<span style={{ marginLeft: 4 }}>= branch-managed ledger (unlocked — editable / removable)</span></span>
+        </div>
       </div>
 
       {/* Controls: in-page Branch view + Ledger Scope filter. Hidden on the

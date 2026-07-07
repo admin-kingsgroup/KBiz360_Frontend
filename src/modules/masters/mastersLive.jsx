@@ -268,14 +268,17 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
       subtitle={`${subtitle} · ${rows.length} record${rows.length === 1 ? '' : 's'}`}
       actions={
         <>
-          {toolbar}
           <Button variant="secondary" size="sm" icon={Download} onClick={exportSheet} disabled={rows.length === 0} title="Export all records to Excel">Export Excel</Button>
           <Button variant="secondary" size="sm" icon={Printer} onClick={printList} disabled={rows.length === 0} title="Print the current list">Print</Button>
           {!readOnly && <Button variant="primary" size="sm" icon={Plus} onClick={openNew}>New</Button>}
         </>
       }
+      // Toolbar filters (Branch/Group/…) get their own full-width bordered bar —
+      // matching the table's card width — instead of being squeezed into the
+      // header actions row, where they used to wrap onto a left-aligned line.
+      filters={toolbar}
     >
-      {note && <div className="kbiz-card mb-3 px-3.5 py-2.5 text-[11px] text-ink-muted">{note}</div>}
+      {note && <div className="mb-3 rounded-brand border border-info/25 bg-info-soft px-3.5 py-2.5 text-[11px] text-ink shadow-card">{note}</div>}
 
       {list.isLoading && <LoadingState />}
       {list.isError && <ErrorState message={`${list.error?.message || 'Failed to load'} — is the ERP backend running and are you logged in?`} onRetry={list.refetch} />}
