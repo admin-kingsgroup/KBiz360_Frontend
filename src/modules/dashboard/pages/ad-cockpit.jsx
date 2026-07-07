@@ -87,7 +87,16 @@ const CSS = `
 .adc .note{color:var(--dim);font-size:10.5px;margin-top:8px;font-style:italic}
 .adc .grphd{font-size:12px;margin-bottom:10px}
 .adc .empty{color:var(--dim);font-size:12px;padding:10px 0}
-@media(max-width:900px){.adc .hero,.adc .rich2{grid-template-columns:1fr}.adc .hk-grid{grid-template-columns:repeat(2,1fr)}}
+.adc .conc-row{display:grid;grid-template-columns:1.3fr 1fr auto 40px;gap:10px;align-items:center;padding:6px 0;font-size:12px;cursor:pointer}
+.adc .conc-row:hover{background:#151a22}
+.adc .conc-bar{height:9px;background:var(--panel2);border-radius:5px;overflow:hidden}.adc .conc-bar span{display:block;height:100%;border-radius:5px;background:#4d9bff}
+.adc .conc-v{text-align:right;font-variant-numeric:tabular-nums}.adc .conc-s{text-align:right;color:var(--dim)}
+.adc .bk-row{display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}.adc .bk-row:last-child{border-bottom:none}
+.adc .bk-n{width:150px;flex:none}.adc .bk-bar{flex:1;height:12px;background:var(--panel2);border-radius:5px;overflow:hidden}.adc .bk-bar span{display:block;height:100%;border-radius:5px}.adc .bk-v{width:90px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.adc .ig-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.adc .ig-cell{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:11px 12px}
+.adc .ig-v{font-size:22px;font-weight:700;line-height:1}.adc .ig-k{font-size:11px;color:var(--ink);font-weight:600;margin-top:6px}
+@media(max-width:900px){.adc .hero,.adc .rich2{grid-template-columns:1fr}.adc .hk-grid{grid-template-columns:repeat(2,1fr)}.adc .ig-grid{grid-template-columns:repeat(2,1fr)}}
 `;
 
 const HK = ({ l, v, c }) => <div className="hk"><div className="hk-l">{l}</div><div className="hk-v mono" style={c ? { color: c } : undefined}>{v}</div></div>;
@@ -205,6 +214,63 @@ export function AdCockpitPage({ setRoute }) {
     });
   };
 
+  // Customer / supplier concentration — ranked by share (% is currency-agnostic);
+  // magnitudes are the consolidated ₹-equivalent the service already produces.
+  const concBlock = (list, label, kind) => {
+    const arr = Array.isArray(list) ? list.slice(0, 6) : [];
+    if (!arr.length) return <div className="empty">No {label} data for this period.</div>;
+    const val = (r) => r.revenue ?? r.spend ?? r.value ?? r.amount ?? 0;
+    const tot = arr.reduce((s, r) => s + val(r), 0) || 1;
+    const mx = Math.max(1, ...arr.map((r) => val(r)));
+    const conc = Math.round(arr.slice(0, 3).reduce((s, r) => s + val(r), 0) / tot * 100);
+    const risk = conc >= 60 ? 'HIGH' : conc >= 40 ? 'MODERATE' : 'LOW';
+    return (<div>
+      <div className="grphd"><b>{label}</b> <span style={{ color: 'var(--dim)' }}>top-3 = {conc}% · {risk} · consolidated (₹-equiv)</span></div>
+      {arr.map((r) => { const share = r.share != null ? r.share : Math.round(val(r) / tot * 100);
+        return (<div className="conc-row" key={r.name} onClick={() => go(kind === 'supplier' ? '/reports/pay' : '/reports/rec')}>
+          <span>{r.name}</span><span className="conc-bar"><span style={{ width: `${Math.round(val(r) / mx * 100)}%` }} /></span>
+          <span className="mono conc-v">{money('INR', val(r))}</span><span className="mono conc-s">{share}%</span></div>); })}
+    </div>);
+  };
+  // SO/PO/GP pipeline — per region (whole queue, not date-bound). Currency-safe: each
+  // region aggregates only its own branches, so ₹ and $ are never mixed.
+  const pipelineBlock = (R) => {
+    const list = Array.isArray(D.bookingsByBranch) ? D.bookingsByBranch : [];
+    const brs = rows.filter((r) => r.cur === R.cur).map((r) => r.code);
+    const agg = { aC: 0, aV: 0, pC: 0, pV: 0 };
+    list.filter((b) => brs.includes(b.branch)).forEach((b) => {
+      agg.aC += b.approved?.count || 0; agg.aV += b.approved?.sales || 0; agg.pC += b.pending?.count || 0; agg.pV += b.pending?.sales || 0;
+    });
+    return (<div key={R.cur}><div className="grphd"><b style={{ color: R.accent }}>{R.flag} {R.label}</b> · {currencySymbol(R.cur)} {R.cur}</div>
+      <div className="hk-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <HK l="Pending · to approve" v={`${agg.pC} · ${money(R.cur, agg.pV)}`} c="#ffd166" />
+        <HK l="Approved · to invoice" v={`${agg.aC} · ${money(R.cur, agg.aV)}`} c="#2ee6a6" />
+      </div></div>);
+  };
+  const bankBlock = (R) => {
+    const accs = (Array.isArray(D.bankAccounts) ? D.bankAccounts : []).filter((a) => (a.currency || 'INR') === R.cur);
+    if (!accs.length) return <div key={R.cur} className="empty">No bank accounts for {R.label}.</div>;
+    const mx = Math.max(1, ...accs.map((a) => Math.abs(a.openingBal || 0)));
+    return (<div key={R.cur}><div className="grphd"><b style={{ color: R.accent }}>{R.flag} {R.label}</b> · {currencySymbol(R.cur)} {R.cur} — banks</div>
+      {accs.map((a, i) => { const v = a.openingBal || 0; return (<div className="bk-row" key={a.name || a.ledger || i}>
+        <span className="bk-n">{a.name || a.ledger || a.account || 'Bank'}</span>
+        <span className="bk-bar"><span style={{ width: `${Math.max(Math.abs(v) / mx * 100, 3)}%`, background: v < 0 ? '#ff6b6b' : '#4d9bff' }} /></span>
+        <span className="mono bk-v" style={v < 0 ? { color: '#ff6b6b' } : undefined}>{money(R.cur, v)}</span></div>); })}
+    </div>);
+  };
+  const integrityTiles = () => {
+    const list = Array.isArray(D.keyAlerts) ? D.keyAlerts : [];
+    const cnt = (fn) => list.filter(fn).length;
+    const tiles = [
+      { k: 'Open exceptions', v: list.length, sev: list.length ? 'warn' : 'ok' },
+      { k: 'Errors', v: cnt((a) => ['error', 'crit'].includes(a.severity || a.sev)), sev: 'crit' },
+      { k: 'Reconciliation', v: cnt((a) => a.domain === 'recon'), sev: 'warn' },
+      { k: 'Approvals pending', v: cnt((a) => ['pending', 'needs-attention'].includes(a.type)), sev: 'serious' },
+      { k: 'Masters incomplete', v: cnt((a) => a.domain === 'masters'), sev: 'warn' },
+    ];
+    return (<div className="ig-grid">{tiles.map((t) => (<div className="ig-cell" key={t.k}><div className="ig-v" style={{ color: sevColor[t.sev] || '#7fb4ff' }}>{t.v}</div><div className="ig-k">{t.k}</div></div>))}</div>);
+  };
+
   const branchDetail = () => {
     const r = rows.find((x) => x.code === branchSel) || {}; const cur = r.cur;
     const steps = [
@@ -214,15 +280,18 @@ export function AdCockpitPage({ setRoute }) {
     ];
     const mx = Math.max(1, ...steps.map((s) => Math.abs(s.v)));
     const mods = (mplFocus.modules || []).slice().sort((a, b) => (b.gp || 0) - (a.gp || 0));
+    const totGp = mods.reduce((s, m) => s + (m.gp || 0), 0);
+    const npAlloc = (m) => (m.gp || 0) - (totGp ? r.opex * ((m.gp || 0) / totGp) : 0); // overhead allocated by GP share
     return (<>
       <Panel title={`${branchSel} · Profit & Loss`} sub={`${label} · ${currencySymbol(cur)} ${cur}`}>
         {steps.map((s, i) => (<div className="wf-row" key={i}><span className={`wf-k${s.b ? ' b' : ''}`}>{s.k}</span>
           <span className="wf-bar"><span style={{ width: `${Math.abs(s.v) / mx * 100}%`, background: s.c }} /></span>
           <span className={`mono wf-v${s.v < 0 ? ' neg' : ''}`}>{money(cur, s.v)}</span></div>))}
       </Panel>
-      <Panel title={`${branchSel} · Gross Profit by Module`} sub={label}>
-        {mods.length ? (<table><thead><tr><th>Module</th><th>Sales</th><th>GP</th><th>GP%</th></tr></thead>
-          <tbody>{mods.map((m) => (<tr key={m.key || m.name}><td>{m.name || m.key}</td><td>{money(cur, m.sales)}</td><td className={(m.gp || 0) < 0 ? 'r' : 'g'}>{money(cur, m.gp)}</td><td>{pct(m.gpPct || (m.sales ? m.gp / m.sales * 100 : 0))}</td></tr>))}</tbody></table>)
+      <Panel title={`${branchSel} · Profit by Module`} sub={`${label} · NP allocated by GP share`}>
+        {mods.length ? (<><table><thead><tr><th>Module</th><th>Sales</th><th>GP</th><th>GP%</th><th>NP (alloc)</th></tr></thead>
+          <tbody>{mods.map((m) => { const np = npAlloc(m); return (<tr key={m.key || m.name}><td>{m.name || m.key}</td><td>{money(cur, m.sales)}</td><td className={(m.gp || 0) < 0 ? 'r' : 'g'}>{money(cur, m.gp)}</td><td>{pct(m.gpPct || (m.sales ? m.gp / m.sales * 100 : 0))}</td><td className={np < 0 ? 'r' : 'g'}>{money(cur, np)}</td></tr>); })}</tbody></table>
+          <div className="note">NP (alloc) = module GP less this branch&apos;s operating expenses ({money(cur, r.opex)}) apportioned by each module&apos;s share of GP — an estimate, since overheads aren&apos;t booked per module.</div></>)
           : <div className="empty">No module breakdown for this branch/period.</div>}
       </Panel>
       <div className="panel"><a href="#" onClick={(e) => { e.preventDefault(); go('/dashboards/branch'); }} style={{ color: '#7fb4ff', fontWeight: 700 }}>Open full {branchSel} dashboard ↗</a><span className="note" style={{ marginLeft: 10 }}>Deep-links to the branch's P&L, ledger and AR/AP.</span></div>
@@ -233,13 +302,15 @@ export function AdCockpitPage({ setRoute }) {
     pulse: () => (<>{Panel({ title: 'Key Alerts', sub: 'what needs attention · live', children: alertsPanel() })}
       <div className="note">Pulse = the glance. The hero band stays on every section; deeper detail lives in the other sections.</div></>),
     perf: () => (<>{Panel({ title: 'Branch Board', sub: `Revenue → GP → Expenses → Net Profit · ${label}`, children: branchBoard() })}</>),
-    cash: () => (<>{Panel({ title: 'AR / AP · by branch', sub: `as-on ${to || 'today'} · currencies never summed`, children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(arapBlock)}</div> })}</>),
+    cash: () => (<>{Panel({ title: 'Bank Balances · by account', sub: 'liquidity · never summed across currencies', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(bankBlock)}</div> })}
+      {Panel({ title: 'AR / AP · by branch', sub: `as-on ${to || 'today'} · currencies never summed`, children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(arapBlock)}</div> })}</>),
     capital: () => (<>{Panel({ title: 'Capital & Returns', sub: `net worth & return · ${label}`, children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(capitalBlock)}</div> })}
       <div className="note">Net worth is as-on; Net Profit &amp; Return reflect the selected period.</div></>),
-    commercial: () => (<>{Panel({ title: 'Commercial', sub: 'drill to the full reports', children: (
-      <div className="empty">Customer / supplier concentration and the SO/PO/GP pipeline open in their reports —
-        {' '}<a href="#" onClick={(e) => { e.preventDefault(); go('/reports/gp'); }} style={{ color: '#7fb4ff', fontWeight: 700 }}>GP report ↗</a>.</div>) })}</>),
-    gov: () => (<>{Panel({ title: 'Governance · Alerts & Control', sub: 'exceptions across every domain', children: alertsPanel() })}</>),
+    commercial: () => (<>{Panel({ title: 'SO / PO / GP Pipeline', sub: 'whole approval queue · by region', children: <div className={`rich2${activeRegions.length === 1 ? ' one' : ''}`}>{activeRegions.map(pipelineBlock)}</div> })}
+      {Panel({ title: 'Customer Concentration', sub: 'share of revenue · click a name to open its statement', children: concBlock(D.topCustomers, 'customer mix', 'customer') })}
+      {Panel({ title: 'Supplier Concentration', sub: 'share of spend · dependency risk', children: concBlock(D.topSuppliers, 'supplier mix', 'supplier') })}</>),
+    gov: () => (<>{Panel({ title: 'Data Integrity & Control', sub: 'live now · period-independent counts', children: integrityTiles() })}
+      {Panel({ title: 'Governance · Alerts', sub: 'exceptions across every domain', children: alertsPanel() })}</>),
   };
 
   const crumb = (
