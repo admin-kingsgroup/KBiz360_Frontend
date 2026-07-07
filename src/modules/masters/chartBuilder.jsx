@@ -675,7 +675,7 @@ function TravkingsGroupView() {
 // shared BOM chart (equal everywhere by design — minus the India-tax heads the VAT
 // branches deliberately skip) · Own = branch-only fixed ledgers (per-branch GST/VAT
 // machinery, local parties / expense heads) — these legitimately differ per branch.
-const SIGN_CLR = { fixed: P_GREEN, own: BLUE, wired: P_AMBER, nf: '#3f5a86', deact: P_RED };
+const SIGN_CLR = { fixed: P_GREEN, own: BLUE, wired: P_AMBER, nf: '#3f5a86', hidden: '#64748b', deact: P_RED };
 
 const P_CUR = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 const sameScope = (a, b) => !!a && !!b && a.tier === b.tier && a.branch === b.branch && a.cat === b.cat;
@@ -749,6 +749,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
         <span>{chip('* Own', SIGN_CLR.own)} Branch-only fixed (local tax set / parties)</span>
         <span>{chip('~*', SIGN_CLR.wired)} Wired (module)</span>
         <span>{chip('Not used', SIGN_CLR.nf)} Active ledger with no entries yet</span>
+        <span>{chip('Hidden', SIGN_CLR.hidden)} Toggled off for that branch (restorable)</span>
         <span>{chip('Deact', SIGN_CLR.deact)} Deactivated</span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{LOCK_ICON}<span style={{ marginLeft: 3 }}>Locked — groups & wired heads (non-editable)</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{UNLOCK_ICON}<span style={{ marginLeft: 3 }}>Unlocked — branch-managed ledgers (editable)</span></span>
@@ -756,14 +757,14 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
       </div>
 
       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: '1px solid #cdd1d8', borderRadius: 10 }}>
-        <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: 1060 }}>
+        <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: 1120 }}>
           <thead>
             <tr>
               <th style={{ ...th({ textAlign: 'left' }), position: 'sticky', left: 0, zIndex: 3, background: '#fff' }}></th>
               <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Parent Group</th>
               <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Group</th>
               <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Sub-Group</th>
-              <th colSpan={6} style={{ ...th({ textAlign: 'center' }), ...sep }}>Ledgers (total)</th>
+              <th colSpan={7} style={{ ...th({ textAlign: 'center' }), ...sep }}>Ledgers (total)</th>
             </tr>
             <tr>
               <th style={{ ...th({ textAlign: 'left' }), position: 'sticky', left: 0, zIndex: 3, background: '#fff' }}>Branch</th>
@@ -771,8 +772,8 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
-              {/* Ledger tier: * (system-seeded) is MIXED — banks/assets/parties are editable — so no lock claim; only wired (~*) is locked. Total = Core + Own + ~* (active only — deactivated shown apart, not counted); "Not used" overlays the sign columns (active, 0 entries). */}
-              <th style={{ ...th(), ...sep }}>* Core</th><th style={th()}>* Own</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>Total</th><th style={th()}>Not used</th><th style={th()}>Deact</th>
+              {/* Ledger tier: * (system-seeded) is MIXED — banks/assets/parties are editable — so no lock claim; only wired (~*) is locked. Total = Core + Own + ~* (active only); Hidden = presence-toggled off (restorable); Deact shown apart, neither counted in Total. */}
+              <th style={{ ...th(), ...sep }}>* Core</th><th style={th()}>* Own</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>Total</th><th style={th()}>Not used</th><th style={th()}>Hidden</th><th style={th()}>Deact</th>
             </tr>
           </thead>
           <tbody>
@@ -785,6 +786,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
                 {cell(r.wired, SIGN_CLR.wired, { tier: 'ledger', branch: r.branch, cat: 'wired' })}
                 {cell(r.activeTotal ?? ((r.fixed || 0) + (r.wired || 0)), DARK, { tier: 'ledger', branch: r.branch, cat: 'active' }, null, true)}
                 {cell(r.notUsed ?? 0, SIGN_CLR.nf, { tier: 'ledger', branch: r.branch, cat: 'notused' })}
+                {cell(r.hidden ?? 0, SIGN_CLR.hidden, { tier: 'ledger', branch: r.branch, cat: 'hidden' })}
                 {cell(r.deactivated, SIGN_CLR.deact, { tier: 'ledger', branch: r.branch, cat: 'deactivated' })}
               </tr>
             ))}
@@ -800,6 +802,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.wired, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.wired)}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DARK, fontWeight: 800, borderTop: '2px solid #cdd1d8' }}>{num(tot.activeTotal ?? ((tot.fixed || 0) + (tot.wired || 0)))}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.nf, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.notUsed ?? 0)}</td>
+              <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.hidden, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.hidden ?? 0)}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.deact, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.deactivated)}</td>
             </tr>
           </tfoot>
@@ -809,7 +812,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
       {drill && <DrillPanel scope={drill} q={drillQ} dq={dq} setDq={setDq} onClose={() => setDrill(null)} money={money} num={num} openMaster={openMaster} openStatement={openStatement} />}
 
       <div style={{ marginTop: 12, fontSize: 11.5, color: DIM, background: '#f7f9fc', border: '1px solid #cdd1d8', borderLeft: `3px solid ${P_GREEN}`, borderRadius: 8, padding: '10px 13px' }}>
-        <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary. <b>* Core</b> is the branch's copy of the shared BOM chart — equal across branches by design (VAT branches skip the 6 India-tax heads); <b>* Own</b> is that branch's own fixed ledgers (its GST/VAT set, local parties) — these differ per branch on purpose. <b>Total = Core + Own + ~*</b> (active ledgers only — Deact is shown separately and NOT counted); <b>Not used</b> overlays the sign columns (active, 0 entries).
+        <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary. <b>* Core</b> is the branch's copy of the shared BOM chart — equal across branches by design (VAT branches skip the 6 India-tax heads); <b>* Own</b> is that branch's own fixed ledgers (its GST/VAT set, local parties) — these differ per branch on purpose. <b>Total = Core + Own + ~*</b> (active ledgers only); <b>Hidden</b> = presence-toggled off for that branch (tap the count, then the branch pill, to restore — accounting history untouched); <b>Deact</b> is separate; neither counts in Total. <b>Not used</b> overlays the sign columns (active, 0 entries).
       </div>
     </div>
   );
@@ -836,30 +839,34 @@ function PresenceToggles({ item, num }) {
     if (p.locked || m.isPending) return;
     if (p.state === 'active') {
       const { confirmed } = await confirmDialog({
-        title: `Remove “${item.name}” from ${p.br}?`,
-        message: p.posts > 0
-          ? `It holds ${num(p.posts)} posted entr${p.posts === 1 ? 'y' : 'ies'} in ${p.br} — it will be DEACTIVATED (history kept; moves to the Deact column).`
-          : `No entries in ${p.br} — the ledger will be DELETED from that branch. The branch's Total drops accordingly.`,
-        danger: true, confirmLabel: 'Remove',
+        title: `Hide “${item.name}” in ${p.br}?`,
+        message: `It moves to the Hidden column for ${p.br}${p.posts > 0 ? ` (its ${num(p.posts)} posted entr${p.posts === 1 ? 'y' : 'ies'} stay untouched)` : ''} and leaves Core/Own/Total and the pickers. Toggle it back on anytime to restore.`,
+        danger: true, confirmLabel: 'Hide',
       });
       if (!confirmed) return;
       m.mutate({ name: item.name, branch: p.br, enable: false });
     } else {
-      m.mutate({ name: item.name, branch: p.br, enable: true });   // reactivate / clone — additive, no confirm
+      m.mutate({ name: item.name, branch: p.br, enable: true });   // unhide / reactivate / clone — additive, no confirm
     }
   };
   const pill = (p) => ({
     appearance: 'none', cursor: p.locked ? 'not-allowed' : 'pointer', fontSize: 8.5, fontWeight: 800,
     padding: '3px 5px', borderRadius: 5, letterSpacing: 0.2, opacity: m.isPending ? 0.5 : p.locked ? 0.55 : 1,
     ...(p.state === 'active' ? { background: P_GREEN, color: '#fff', border: `1px solid ${P_GREEN}` }
+      : p.state === 'hidden' ? { background: '#e5e9f0', color: '#4a5568', border: '1px solid #c3cbe0', textDecoration: 'line-through' }
       : p.state === 'inactive' ? { background: '#fff', color: P_AMBER, border: '1px solid #d8c084' }
       : { background: '#fff', color: '#9aa2c0', border: '1px dashed #cdd1d8' }),
   });
+  const hint = (p) => p.locked ? 'locked — ERP-managed head'
+    : p.state === 'active' ? 'tap to hide in this branch'
+    : p.state === 'hidden' ? 'hidden — tap to restore'
+    : p.state === 'inactive' ? 'deactivated — tap to reactivate'
+    : 'tap to add to this branch';
   return (
     <span style={{ display: 'inline-flex', gap: 3, flexWrap: 'nowrap' }}>
       {(item.presence || []).map((p) => (
         <button key={p.br} type="button" disabled={p.locked || m.isPending} onClick={() => flip(p)} style={pill(p)}
-          title={`${p.br} · ${p.state}${p.posts ? ` · ${num(p.posts)} entries` : ''} · ${p.locked ? 'locked — ERP-managed head' : p.state === 'active' ? 'tap to remove from this branch' : 'tap to add to this branch'}`}>
+          title={`${p.br} · ${p.state}${p.posts ? ` · ${num(p.posts)} entries` : ''} · ${hint(p)}`}>
           {p.br}{p.locked ? '🔒' : ''}
         </button>
       ))}
@@ -903,7 +910,7 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
               {k} × {n}
             </button>
           ))}
-          <span style={{ marginLeft: 'auto', color: '#9aa2c0' }}>Branch pills: green = active · amber = deactivated · dashed = absent · tap to add / remove</span>
+          <span style={{ marginLeft: 'auto', color: '#9aa2c0' }}>Branch pills: green = active · grey struck = hidden · amber = deactivated · dashed = absent · tap to hide / restore</span>
         </div>
       )}
       <div style={{ maxHeight: '56vh', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
