@@ -163,7 +163,9 @@ export function IntegrityChecks() {
                   </button>
                   {isOpen && (
                     <div className="border-t border-surface-border pb-1">
-                      <AssignBar branch={f.branch} checkId={f.id} current={assigned} saving={saveFs.isPending} onSave={(r) => saveFs.mutate(r)} />
+                      {/* key on the assignment id so the form re-inits once the saved
+                          assignment loads (avoids showing/saving blank over an existing one) */}
+                      <AssignBar key={assigned?._id || 'unassigned'} branch={f.branch} checkId={f.id} current={assigned} saving={saveFs.isPending} onSave={(r) => saveFs.mutate(r)} />
                       <FindingDetail branch={f.branch} checkId={f.id} />
                     </div>
                   )}
