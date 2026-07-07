@@ -11,3 +11,6 @@ export async function getBranchCockpit() {
 export async function getAudit(filter = {}) {
   try { return (await apiGet('/api/tk/monitor/audit', filter)) || { items: [] }; } catch { return { items: [] }; }
 }
+export async function getAdoption() {
+  try { return (await apiGet('/api/tk/monitor/adoption')) || {}; } catch { return {}; }
+}
