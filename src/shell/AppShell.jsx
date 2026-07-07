@@ -303,7 +303,7 @@ function DesktopNav({ menu, route, go }) {
   const openAlign = open != null && open >= menu.length - 2 ? 'right' : 'left'; // keep right-most panels on-screen
 
   return (
-    <nav ref={ref} aria-label="Primary" className="hidden min-w-0 items-center gap-0.5 desktop:flex">
+    <nav ref={ref} aria-label="Primary" className="hidden min-h-16 min-w-0 flex-wrap content-center items-center gap-0.5 py-1 desktop:flex">
       {menu.map((item, i) => {
         const hasChildren = !!item.children;
         const active = hasChildren ? containsRoute(item, route) : route === item.href;
@@ -451,21 +451,30 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           the top-most bar) so selecting a branch re-aims the whole cockpit before
           the header/nav even render. The mode stays on the entity pill. ─────── */}
       {inCockpit && (
-        <div className="noprint flex shrink-0 flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-navy/40 bg-navy px-4 py-2.5 text-white tablet:px-5">
-          <span className="hidden rounded bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-gold tablet:inline">Control</span>
-          <span className="hidden text-[11px] font-semibold text-white/85 tablet:inline">TK Group Central&nbsp;▸</span>
-          <FocusSwitcher dark />
+        <div className="noprint flex shrink-0 items-center gap-3 border-b border-navy/40 bg-navy px-4 py-2.5 text-white tablet:px-5">
+          <div className="flex min-w-0 items-center gap-x-3.5">
+            <span className="hidden shrink-0 rounded bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-gold tablet:inline">Control</span>
+            <span className="hidden shrink-0 whitespace-nowrap text-[11px] font-semibold text-white/85 tablet:inline">TK Group Central&nbsp;▸</span>
+            <FocusSwitcher dark />
+          </div>
+          <div className="ml-auto hidden shrink-0 items-center gap-2 desktop:flex">
+            <div className="w-56 2xl:w-64"><ModuleSearch branch={branch} currentUser={scopedUser} setRoute={setRoute} /></div>
+            <div className="w-[150px] 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} /></div>
+          </div>
         </div>
       )}
       {/* ── Sticky, blurred app-bar ──────────────────────────────────── */}
-      <header className="noprint sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-surface-border bg-surface/80 px-3 backdrop-blur-xl transition-shadow tablet:px-5 shadow-[0_1px_0_rgba(16,18,22,0.04),0_6px_20px_-16px_rgba(16,18,22,0.16)]">
+      {/* items-start: logo + right cluster stay pinned to the first line; the nav
+          in between grows downward on its own when its tabs wrap (see DesktopNav),
+          so overflow tabs drop to a second line instead of hiding behind the icons. */}
+      <header className="noprint sticky top-0 z-40 flex shrink-0 items-start gap-2 border-b border-surface-border bg-surface/80 px-3 backdrop-blur-xl transition-shadow tablet:px-5 shadow-[0_1px_0_rgba(16,18,22,0.04),0_6px_20px_-16px_rgba(16,18,22,0.16)]">
         {/* Logo */}
-        <button type="button" onClick={() => go('/dashboard')} aria-label="Go to dashboard" className="flex shrink-0 items-center justify-center gap-2 rounded-lg pr-1 transition-colors duration-fast hover:bg-ink/[0.04] focus:outline-none focus-visible:shadow-focus-ring max-desktop:min-h-[44px] max-desktop:min-w-[44px]">
+        <button type="button" onClick={() => go('/dashboard')} aria-label="Go to dashboard" className="flex h-16 shrink-0 items-center justify-center gap-2 rounded-lg pr-1 transition-colors duration-fast hover:bg-ink/[0.04] focus:outline-none focus-visible:shadow-focus-ring max-desktop:min-h-[44px] max-desktop:min-w-[44px]">
           <img src={KBIZ_LOGO} alt="KBiz360" className="h-8 w-8 rounded-lg object-contain" />
           <span className="hidden text-[15px] font-extrabold tracking-tight text-ink tablet:block">KBiz<span className="text-gold">360</span></span>
         </button>
 
-        <span className="mx-1 hidden h-6 w-px bg-surface-border desktop:block" />
+        <span className="mx-1 hidden h-6 w-px bg-surface-border desktop:mt-5 desktop:block" />
 
         {/* Desktop horizontal nav + mega menus */}
         <DesktopNav menu={menu} route={route} go={go} />
@@ -473,11 +482,15 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
         <div className="flex-1" />
 
         {/* Right cluster — tighten the gap on laptops so the items fit */}
-        <div className="flex shrink-0 items-center gap-1 2xl:gap-1.5">
-          <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={scopedUser} setRoute={setRoute} /></div>
+        <div className="flex h-16 shrink-0 items-center gap-1 2xl:gap-1.5">
+          {!inCockpit && (
+            <div className="hidden w-40 desktop:block 2xl:w-64"><ModuleSearch branch={branch} currentUser={scopedUser} setRoute={setRoute} /></div>
+          )}
 
           <FxRateChip branch={branch} />
-          <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
+          {!inCockpit && (
+            <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
+          )}
 
           {/* TK Group pending-approvals badge — central roles only, hidden at 0 (dormant-safe) */}
           <InboxBadgeLive currentUser={currentUser} setRoute={setRoute} />

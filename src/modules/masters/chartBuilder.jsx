@@ -11,8 +11,12 @@
 // So this screen lets you pick a Branch view + a ledger Scope filter; the group
 // structure never changes, only which ledgers are shown / how they're tagged.
 import React, { useState, useEffect, useRef } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMasterList } from '../../core/useMasters';
 import { branchCode, useLedgerUsage, useBranchParity, useBranchParitySummary, useBranchParityDrill } from '../../core/useAccounting';
+import { apiPost } from '../../core/api';
+import { confirmDialog } from '../../core/ux/confirm';
+import { toastSuccess, toastError } from '../../core/ux/toast';
 import { FocusBanner } from '../../core/ux/FocusBanner';
 import { useNavFocusStore, setNavFocus } from '../../core/ux/navFocus';
 import { clickable } from '../../core/ux/clickable';
@@ -408,15 +412,23 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
         <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
       </div>
 
-      {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, background: '#f7f9fc', border: '1px solid #cdd1d8', borderRadius: 8, padding: '8px 12px', marginBottom: 10, fontSize: 11.5, color: DIM }}>
-        <span><b style={{ color: DARK }}>Groups & Sub-Groups</b> are shared across all branches (org-wide). Only <b style={{ color: DARK }}>Ledgers</b> are branch-scoped:</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Removable', RED)}<span style={{ marginLeft: 4 }}>= deactivated + 0 entries (safe to delete)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= fixed structure — Parent Group / Group / Sub-Group (locked — cannot be created, edited or deleted)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>~*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= sub-group / ledger wired to a module (locked — non-editable, non-deletable)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{UNLOCK_ICON}<span style={{ marginLeft: 4 }}>= branch-managed ledger (unlocked — editable / removable)</span></span>
+      {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. Each
+          term sits in its own tinted chip (rather than one run-on line) so the legend
+          scans instead of reads like a paragraph. */}
+      <div style={{ background: '#eef1f8', border: '1px solid #cdd1d8', borderRadius: 8, padding: '10px 12px', marginBottom: 10, fontSize: 11.5, color: DIM }}>
+        <div style={{ marginBottom: 8 }}>
+          <b style={{ color: DARK }}>Groups & Sub-Groups</b> are shared across all branches (org-wide). Only <b style={{ color: DARK }}>Ledgers</b> are branch-scoped:
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}>{badge('Removable', RED)}<span style={{ marginLeft: 4 }}>= deactivated + 0 entries (safe to delete)</span></span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 8, paddingTop: 8, borderTop: '1px solid #dfe2e7' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}><span style={{ color: RED, fontWeight: 800 }}>*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= fixed structure — Parent Group / Group / Sub-Group (locked — cannot be created, edited or deleted)</span></span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}><span style={{ color: RED, fontWeight: 800 }}>~*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= sub-group / ledger wired to a module (locked — non-editable, non-deletable)</span></span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', border: '1px solid #dfe2e7', borderRadius: 6, padding: '3px 8px' }}>{UNLOCK_ICON}<span style={{ marginLeft: 4 }}>= branch-managed ledger (unlocked — editable / removable)</span></span>
+        </div>
       </div>
 
       {/* Controls: in-page Branch view + Ledger Scope filter. Hidden on the
@@ -657,8 +669,13 @@ function TravkingsGroupView() {
 // Compact count table: groups (global, Fixed */Wired ~*, NF=0 monitor) and
 // ledgers per branch (Fixed */Wired ~*/Not used/Deactivated/Total, incl. inactive).
 // "Not used" is an OVERLAY, not a split: ACTIVE ledgers with zero posting lines in
-// that branch (each also counts inside * or ~*), so * + ~* + Deact = Total.
-const SIGN_CLR = { fixed: P_GREEN, wired: P_AMBER, nf: '#3f5a86', deact: P_RED };
+// that branch (each also counts inside a sign column). Total = Core + Own + ~*
+// (active only — Deact is a separate monitor, deliberately NOT in Total).
+// Fixed (*) is split by NAME against BOM's chart: Core = this branch's copy of the
+// shared BOM chart (equal everywhere by design — minus the India-tax heads the VAT
+// branches deliberately skip) · Own = branch-only fixed ledgers (per-branch GST/VAT
+// machinery, local parties / expense heads) — these legitimately differ per branch.
+const SIGN_CLR = { fixed: P_GREEN, own: BLUE, wired: P_AMBER, nf: '#3f5a86', deact: P_RED };
 
 const P_CUR = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 const sameScope = (a, b) => !!a && !!b && a.tier === b.tier && a.branch === b.branch && a.cat === b.cat;
@@ -672,7 +689,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
   const branches = d.branches || [];
   const grp = d.groups || {};
   const rows = d.ledgers || [];
-  const tot = d.ledgerTotals || { fixed: 0, wired: 0, nf: 0, deactivated: 0, total: 0 };
+  const tot = d.ledgerTotals || { fixed: 0, core: 0, own: 0, wired: 0, nf: 0, deactivated: 0, total: 0 };
 
   const openDrill = (scope) => { setDq(''); setDrill((cur) => (sameScope(cur, scope) ? null : scope)); };
   // Jumps (branch-scoped). Master reuses the existing ?edit=<code> deep-link;
@@ -728,7 +745,8 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', fontSize: 11.5, color: DIM, marginBottom: 10 }}>
-        <span>{chip('*', SIGN_CLR.fixed)} Fixed (system-seeded)</span>
+        <span>{chip('* Core', SIGN_CLR.fixed)} Shared BOM chart (same in every branch)</span>
+        <span>{chip('* Own', SIGN_CLR.own)} Branch-only fixed (local tax set / parties)</span>
         <span>{chip('~*', SIGN_CLR.wired)} Wired (module)</span>
         <span>{chip('Not used', SIGN_CLR.nf)} Active ledger with no entries yet</span>
         <span>{chip('Deact', SIGN_CLR.deact)} Deactivated</span>
@@ -738,14 +756,14 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
       </div>
 
       <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: '1px solid #cdd1d8', borderRadius: 10 }}>
-        <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: 1000 }}>
+        <table style={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', minWidth: 1060 }}>
           <thead>
             <tr>
               <th style={{ ...th({ textAlign: 'left' }), position: 'sticky', left: 0, zIndex: 3, background: '#fff' }}></th>
               <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Parent Group</th>
               <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Group</th>
               <th colSpan={3} style={{ ...th({ textAlign: 'center' }), ...sep }}>Sub-Group</th>
-              <th colSpan={5} style={{ ...th({ textAlign: 'center' }), ...sep }}>Ledgers (total)</th>
+              <th colSpan={6} style={{ ...th({ textAlign: 'center' }), ...sep }}>Ledgers (total)</th>
             </tr>
             <tr>
               <th style={{ ...th({ textAlign: 'left' }), position: 'sticky', left: 0, zIndex: 3, background: '#fff' }}>Branch</th>
@@ -753,8 +771,8 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
-              {/* Ledger tier: * (system-seeded) is MIXED — banks/assets/parties are editable — so no lock claim; only wired (~*) is locked. "Not used" overlays * / ~* (active, 0 entries). */}
-              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>Not used</th><th style={th()}>Deact</th><th style={th()}>Total</th>
+              {/* Ledger tier: * (system-seeded) is MIXED — banks/assets/parties are editable — so no lock claim; only wired (~*) is locked. Total = Core + Own + ~* (active only — deactivated shown apart, not counted); "Not used" overlays the sign columns (active, 0 entries). */}
+              <th style={{ ...th(), ...sep }}>* Core</th><th style={th()}>* Own</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>Total</th><th style={th()}>Not used</th><th style={th()}>Deact</th>
             </tr>
           </thead>
           <tbody>
@@ -762,11 +780,12 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               <tr key={r.branch}>
                 <td style={{ padding: '9px 10px', fontWeight: 650, color: DARK, borderBottom: '1px solid #eef1f5', position: 'sticky', left: 0, zIndex: 2, background: '#fff', boxShadow: '1px 0 0 #eef1f5' }}>{r.branch}</td>
                 {gCols(r.branch)}
-                {cell(r.fixed, SIGN_CLR.fixed, { tier: 'ledger', branch: r.branch, cat: 'fixed' }, sep)}
+                {cell(r.core ?? r.fixed, SIGN_CLR.fixed, { tier: 'ledger', branch: r.branch, cat: 'core' }, sep)}
+                {cell(r.own ?? 0, SIGN_CLR.own, { tier: 'ledger', branch: r.branch, cat: 'own' })}
                 {cell(r.wired, SIGN_CLR.wired, { tier: 'ledger', branch: r.branch, cat: 'wired' })}
+                {cell(r.activeTotal ?? ((r.fixed || 0) + (r.wired || 0)), DARK, { tier: 'ledger', branch: r.branch, cat: 'active' }, null, true)}
                 {cell(r.notUsed ?? 0, SIGN_CLR.nf, { tier: 'ledger', branch: r.branch, cat: 'notused' })}
                 {cell(r.deactivated, SIGN_CLR.deact, { tier: 'ledger', branch: r.branch, cat: 'deactivated' })}
-                {cell(r.total, DARK, { tier: 'ledger', branch: r.branch, cat: 'total' }, null, true)}
               </tr>
             ))}
           </tbody>
@@ -776,11 +795,12 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               {[['parent', 'fixed'], ['parent', 'wired'], ['parent', 'nf'], ['group', 'fixed'], ['group', 'wired'], ['group', 'nf'], ['sub', 'fixed'], ['sub', 'wired'], ['sub', 'nf']].map(([t, c], i) => (
                 <td key={t + c} style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: '#b3bcb6', fontWeight: 700, borderTop: '2px solid #cdd1d8', ...(i % 3 === 0 ? sep : {}) }}>{grp[t]?.[c] ?? 0}</td>
               ))}
-              <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.fixed, fontWeight: 700, borderTop: '2px solid #cdd1d8', ...sep }}>{num(tot.fixed)}</td>
+              <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.fixed, fontWeight: 700, borderTop: '2px solid #cdd1d8', ...sep }}>{num(tot.core ?? tot.fixed)}</td>
+              <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.own, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.own ?? 0)}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.wired, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.wired)}</td>
+              <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DARK, fontWeight: 800, borderTop: '2px solid #cdd1d8' }}>{num(tot.activeTotal ?? ((tot.fixed || 0) + (tot.wired || 0)))}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.nf, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.notUsed ?? 0)}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.deact, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.deactivated)}</td>
-              <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DARK, fontWeight: 800, borderTop: '2px solid #cdd1d8' }}>{num(tot.total)}</td>
             </tr>
           </tfoot>
         </table>
@@ -789,22 +809,79 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
       {drill && <DrillPanel scope={drill} q={drillQ} dq={dq} setDq={setDq} onClose={() => setDrill(null)} money={money} num={num} openMaster={openMaster} openStatement={openStatement} />}
 
       <div style={{ marginTop: 12, fontSize: 11.5, color: DIM, background: '#f7f9fc', border: '1px solid #cdd1d8', borderLeft: `3px solid ${P_GREEN}`, borderRadius: 8, padding: '10px 13px' }}>
-        <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary; totals include deactivated. <b>Not used</b> counts active ledgers with no entries yet — they also sit inside * / ~*, so * + ~* + Deact = Total.
+        <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary. <b>* Core</b> is the branch's copy of the shared BOM chart — equal across branches by design (VAT branches skip the 6 India-tax heads); <b>* Own</b> is that branch's own fixed ledgers (its GST/VAT set, local parties) — these differ per branch on purpose. <b>Total = Core + Own + ~*</b> (active ledgers only — Deact is shown separately and NOT counted); <b>Not used</b> overlays the sign columns (active, 0 entries).
       </div>
     </div>
   );
 }
 
+// One ledger's six branch-presence pills (Core/Own drill only). Green = active
+// here, amber = deactivated (history kept), dashed grey = not in this branch.
+// Tap: ON adds (reactivate / clone from a donor branch); OFF is the SMART remove
+// (0 entries → delete, has entries → deactivate). Locked (wired/tax) heads are
+// ERP-managed — shown with a lock, not tappable.
+function PresenceToggles({ item, num }) {
+  const qc = useQueryClient();
+  const m = useMutation({
+    mutationFn: (body) => apiPost('/api/ledgers/branch-presence', body),
+    onSuccess: (res, vars) => {
+      const act = (res && res.data && res.data.action) || (vars.enable ? 'added' : 'removed');
+      toastSuccess(`${item.name} — ${act} in ${vars.branch}`);
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['master', 'ledgers'] });
+    },
+    onError: (e) => toastError((e && e.message) || 'Could not change branch presence'),
+  });
+  const flip = async (p) => {
+    if (p.locked || m.isPending) return;
+    if (p.state === 'active') {
+      const { confirmed } = await confirmDialog({
+        title: `Remove “${item.name}” from ${p.br}?`,
+        message: p.posts > 0
+          ? `It holds ${num(p.posts)} posted entr${p.posts === 1 ? 'y' : 'ies'} in ${p.br} — it will be DEACTIVATED (history kept; moves to the Deact column).`
+          : `No entries in ${p.br} — the ledger will be DELETED from that branch. The branch's Total drops accordingly.`,
+        danger: true, confirmLabel: 'Remove',
+      });
+      if (!confirmed) return;
+      m.mutate({ name: item.name, branch: p.br, enable: false });
+    } else {
+      m.mutate({ name: item.name, branch: p.br, enable: true });   // reactivate / clone — additive, no confirm
+    }
+  };
+  const pill = (p) => ({
+    appearance: 'none', cursor: p.locked ? 'not-allowed' : 'pointer', fontSize: 8.5, fontWeight: 800,
+    padding: '3px 5px', borderRadius: 5, letterSpacing: 0.2, opacity: m.isPending ? 0.5 : p.locked ? 0.55 : 1,
+    ...(p.state === 'active' ? { background: P_GREEN, color: '#fff', border: `1px solid ${P_GREEN}` }
+      : p.state === 'inactive' ? { background: '#fff', color: P_AMBER, border: '1px solid #d8c084' }
+      : { background: '#fff', color: '#9aa2c0', border: '1px dashed #cdd1d8' }),
+  });
+  return (
+    <span style={{ display: 'inline-flex', gap: 3, flexWrap: 'nowrap' }}>
+      {(item.presence || []).map((p) => (
+        <button key={p.br} type="button" disabled={p.locked || m.isPending} onClick={() => flip(p)} style={pill(p)}
+          title={`${p.br} · ${p.state}${p.posts ? ` · ${num(p.posts)} entries` : ''} · ${p.locked ? 'locked — ERP-managed head' : p.state === 'active' ? 'tap to remove from this branch' : 'tap to add to this branch'}`}>
+          {p.br}{p.locked ? '🔒' : ''}
+        </button>
+      ))}
+    </span>
+  );
+}
+
 // Drill-down list shown below the table. Ledgers → name (→Master) / group / postings
 // / closing balance (→Statement); groups → names. Its own scroll region + search.
+// Core/Own drills are RICH: a Kind tag per ledger, a kind-mix summary in the header,
+// and per-branch presence toggles (add / smart-remove a head branch by branch).
 function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, openStatement }) {
   const data = q.data || {};
   const all = data.items || [];
   const isLedger = scope.tier === 'ledger';
+  const rich = isLedger && all.some((x) => Array.isArray(x.presence));   // core/own drill
   const ql = dq.trim().toLowerCase();
-  const items = ql ? all.filter((x) => (x.name || '').toLowerCase().includes(ql) || (x.group || '').toLowerCase().includes(ql)) : all;
+  const items = ql ? all.filter((x) => (x.name || '').toLowerCase().includes(ql) || (x.group || '').toLowerCase().includes(ql) || (x.kind || '').toLowerCase().includes(ql)) : all;
   let totC = 0, net = 0;
   if (isLedger) items.forEach((l) => { totC += l.count || 0; net += l.closingBalance || 0; });
+  // "Which types of ledgers are in this count" — kind mix, biggest first.
+  const kindMix = rich ? [...items.reduce((m, l) => m.set(l.kind || 'Other', (m.get(l.kind || 'Other') || 0) + 1), new Map())].sort((a, b) => b[1] - a[1]) : [];
 
   const wrap = { marginTop: 16, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 12, overflow: 'hidden' };
   const head = { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '11px 14px', borderBottom: '1px solid #eef1f5', background: '#f7faf8' };
@@ -817,6 +894,18 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
         <span style={{ flex: 1, minWidth: 140 }}><input value={dq} onChange={(e) => setDq(e.target.value)} placeholder="Search…" style={{ width: '100%', padding: '9px 11px', border: '1px solid #cdd1d8', borderRadius: 8, fontSize: 13 }} /></span>
         <button type="button" onClick={onClose} aria-label="Close" style={{ appearance: 'none', border: '1px solid #cdd1d8', background: '#fff', borderRadius: 8, minHeight: 40, minWidth: 40, cursor: 'pointer', fontWeight: 700, color: DIM }}>✕</button>
       </div>
+      {rich && !q.isLoading && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', padding: '8px 14px', borderBottom: '1px solid #eef1f5', background: '#fbfcfe', fontSize: 11, color: DIM }}>
+          <b style={{ color: DARK }}>Ledger types:</b>
+          {kindMix.map(([k, n]) => (
+            <button key={k} type="button" onClick={() => setDq(dq.trim().toLowerCase() === k.toLowerCase() ? '' : k)}
+              style={{ appearance: 'none', cursor: 'pointer', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 999, border: '1px solid #cdd1d8', background: dq.trim().toLowerCase() === k.toLowerCase() ? P_GREEN : '#fff', color: dq.trim().toLowerCase() === k.toLowerCase() ? '#fff' : '#3b4752' }}>
+              {k} × {n}
+            </button>
+          ))}
+          <span style={{ marginLeft: 'auto', color: '#9aa2c0' }}>Branch pills: green = active · amber = deactivated · dashed = absent · tap to add / remove</span>
+        </div>
+      )}
       <div style={{ maxHeight: '56vh', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {q.isLoading ? <div style={{ padding: 24 }}>{Array.from({ length: 5 }).map((_, i) => <div key={i} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8 }} />)}</div>
           : !items.length ? <div style={{ padding: 28, textAlign: 'center', color: '#9aa8a1' }}>Nothing here.</div>
@@ -826,9 +915,12 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
               <tbody>{items.map((g) => <tr key={g.name}><td style={{ padding: '11px 12px', fontWeight: 600, borderBottom: '1px solid #eef1f5' }}>{g.name}</td><td style={{ padding: '11px 12px', color: DIM, borderBottom: '1px solid #eef1f5' }}>{scope.cat === 'wired' ? '~*' : '*'}{LOCK_ICON}</td></tr>)}</tbody>
             </table>
           ) : (
-            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 540 }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: rich ? 940 : 540 }}>
               <thead><tr>
-                <th style={{ ...dth, textAlign: 'left' }}>Ledger</th><th style={{ ...dth, textAlign: 'left' }}>Group</th>
+                <th style={{ ...dth, textAlign: 'left' }}>Ledger</th>
+                {rich && <th style={{ ...dth, textAlign: 'left' }}>Kind</th>}
+                <th style={{ ...dth, textAlign: 'left' }}>Group</th>
+                {rich && <th style={{ ...dth, textAlign: 'left' }}>Branches</th>}
                 <th style={{ ...dth, textAlign: 'right' }}>Postings</th><th style={{ ...dth, textAlign: 'right' }}>Closing Balance</th>
               </tr></thead>
               <tbody>
@@ -840,7 +932,9 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
                         <button type="button" onClick={() => openMaster(l.code)} title="Open Master detail"
                           style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', fontWeight: 600, color: P_GREEN, textDecoration: 'underline', textDecorationColor: '#bcd8ce', textUnderlineOffset: 2, cursor: 'pointer', padding: '11px 12px', textAlign: 'left', width: '100%', minHeight: 44 }}>{l.name}</button>
                       </td>
-                      <td style={{ padding: '11px 12px', color: DIM, fontSize: 12.5, borderBottom: '1px solid #eef1f5' }}>{l.group}</td>
+                      {rich && <td style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: '#eef0f4', color: '#556' }}>{l.kind || 'Other'}</span></td>}
+                      <td style={{ padding: '11px 12px', color: DIM, fontSize: 12.5, borderBottom: '1px solid #eef1f5' }}>{l.group}{l.subGroup ? <span style={{ color: '#9aa2c0' }}> ▸ {l.subGroup}</span> : null}</td>
+                      {rich && <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><PresenceToggles item={l} num={num} /></td>}
                       <td style={{ padding: '11px 12px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DIM, borderBottom: '1px solid #eef1f5' }}>{num(l.count)}</td>
                       <td style={{ padding: 0, borderBottom: '1px solid #eef1f5' }}>
                         <button type="button" onClick={() => openStatement(l.name, scope.branch)} title="Open Ledger Statement"
@@ -853,8 +947,7 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
                 })}
               </tbody>
               <tfoot><tr>
-                <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', padding: '11px 12px', fontWeight: 700 }}>{items.length} ledgers</td>
-                <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8' }} />
+                <td colSpan={rich ? 4 : 2} style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', padding: '11px 12px', fontWeight: 700 }}>{items.length} ledgers</td>
                 <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, padding: '11px 12px' }}>{num(totC)}</td>
                 <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, padding: '11px 12px', color: net >= 0 ? SIGN_CLR.fixed : SIGN_CLR.deact }}>{Math.abs(net) < 0.005 ? '0.00' : money(net, scope.branch)} {net >= 0 ? 'Dr' : 'Cr'}</td>
               </tr></tfoot>

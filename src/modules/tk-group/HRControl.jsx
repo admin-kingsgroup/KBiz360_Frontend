@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { UserPlus } from 'lucide-react';
 import { proposeGovernance, getPendingByType } from './api/governance';
 import { HR_KINDS, hrKindLabel, isHrValid } from './utils/hr';
 import { waitingRoles } from './utils/changeRequests';
@@ -44,10 +45,16 @@ export function HRControl({ branches = DEFAULT_BRANCHES }) {
 
   return (
     <div className="grid gap-4">
-      <PageSection title="Raise an HR request">
-        {msg ? <div role="status" className="mb-2.5 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
-        <form onSubmit={submit} aria-label="Raise an HR request" className="grid max-w-[480px] gap-2.5">
-          <div className="flex gap-2.5">
+      <PageSection
+        title="Raise an HR request"
+        subtitle="Filed as a Farhan + Owner change-request — nothing is actioned until approved."
+        icon={UserPlus}
+        className="max-w-2xl"
+        bodyClassName="bg-surface-alt/60"
+      >
+        {msg ? <div role="status" className="mb-3 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
+        <form onSubmit={submit} aria-label="Raise an HR request" className="grid gap-3">
+          <div className="flex gap-3">
             <FormField label="HR item" className="flex-1">
               <Select aria-label="HR item" value={kind} onChange={(e) => setKind(e.target.value)}>
                 {HR_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
