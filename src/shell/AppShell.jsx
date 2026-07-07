@@ -451,10 +451,12 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           the top-most bar) so selecting a branch re-aims the whole cockpit before
           the header/nav even render. The mode stays on the entity pill. ─────── */}
       {inCockpit && (
-        <div className="noprint flex shrink-0 flex-wrap items-center gap-x-3.5 gap-y-2 border-b border-navy/40 bg-navy px-4 py-2.5 text-white tablet:px-5">
-          <span className="hidden rounded bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-gold tablet:inline">Control</span>
-          <span className="hidden text-[11px] font-semibold text-white/85 tablet:inline">TK Group Central&nbsp;▸</span>
-          <FocusSwitcher dark />
+        <div className="noprint flex shrink-0 items-center gap-3 border-b border-navy/40 bg-navy px-4 py-2.5 text-white tablet:px-5">
+          <div className="flex min-w-0 items-center gap-x-3.5">
+            <span className="hidden shrink-0 rounded bg-gold/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-gold tablet:inline">Control</span>
+            <span className="hidden shrink-0 whitespace-nowrap text-[11px] font-semibold text-white/85 tablet:inline">TK Group Central&nbsp;▸</span>
+            <FocusSwitcher dark />
+          </div>
           <div className="ml-auto hidden shrink-0 items-center gap-2 desktop:flex">
             <div className="w-56 2xl:w-64"><ModuleSearch branch={branch} currentUser={scopedUser} setRoute={setRoute} /></div>
             <div className="w-[150px] 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} /></div>
