@@ -106,12 +106,13 @@ describe('Owner Dashboard — Group/ALL per-branch wiring', () => {
     expect(screen.getByText('KPI|GST / Tax Net|₹80|payable')).toBeInTheDocument();
   });
 
-  test('financial-detail tables render once PER BRANCH, each in its own currency', () => {
+  test('financial-detail tables render once PER BRANCH (all six, side by side), each in its own currency', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
-    // One "financial detail" section header per branch (BOM ₹, NBO $).
-    expect(screen.getAllByText(/financial detail/).length).toBe(2);
-    expect(screen.getByText(/· \$ · financial detail/)).toBeInTheDocument();   // NBO in USD
-    expect(screen.getByText(/· ₹ · financial detail/)).toBeInTheDocument();    // BOM in ₹
+    // One "financial detail" section header per branch — every branch in the roster shows,
+    // not only the ones with postings (BOMMB/BOM/AMD in ₹, NBO/DAR/FBM in $).
+    expect(screen.getAllByText(/financial detail/).length).toBe(6);
+    expect(screen.getAllByText(/· \$ · financial detail/).length).toBe(3);   // NBO/DAR/FBM in USD
+    expect(screen.getAllByText(/· ₹ · financial detail/).length).toBe(3);    // BOMMB/BOM/AMD in ₹
   });
 
   test('GST / Tax Net card drills to the live tax-summary report (not the dead /taxation route)', () => {
@@ -139,11 +140,13 @@ describe('Owner Dashboard — Group/ALL per-branch wiring', () => {
     expect(screen.getByText(/its top suppliers/)).toBeInTheDocument();
   });
 
-  test('#3 Branch Performance lists only branches with data (BOM, NBO), sourced from mpl.byBranch', () => {
+  test('#3 Branch Performance lists ALL six branches side by side (zeros where no data)', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
-    // Both data-bearing branches appear in the scoreboard; no zero-row phantom branches.
+    // Every branch shows — data-bearing (BOM, NBO) and mid-migration (AMD, DAR, …) alike,
+    // so the group view never silently drops a branch with no postings this period.
     expect(screen.getByText('Branch Performance')).toBeInTheDocument();
-    const cells = screen.getAllByText('BOM');
-    expect(cells.length).toBeGreaterThan(0);
+    expect(screen.getAllByText('BOM').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('AMD').length).toBeGreaterThan(0);  // no postings → still listed
+    expect(screen.getAllByText('DAR').length).toBeGreaterThan(0);  // USD branch, zero-row
   });
 });

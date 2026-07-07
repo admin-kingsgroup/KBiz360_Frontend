@@ -28,7 +28,7 @@ const USERS = [
 ];
 
 const Off = () => <Badge tone="neutral" size="sm">Off</Badge>;
-const H3 = ({ children }) => <h3 className="mb-2 mt-5 font-serif text-[15px] font-semibold text-ink">{children}</h3>;
+const H3 = ({ children }) => <h3 className="mb-2 mt-5 text-[15px] font-semibold text-ink">{children}</h3>;
 // Interactive switch — flipping it PROPOSES the change (Owner-approved), it does not
 // flip live. Off = grey, On = teal (crit = red for money controls).
 function Toggle({ on, crit, onClick, label }) {
@@ -66,7 +66,7 @@ function ChainCard({ k, r, w }) {
   return (
     <div className="min-w-[170px] flex-1 rounded-brand border border-surface-border bg-surface p-3.5">
       <div className="font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">{k}</div>
-      <div className="mt-1 font-serif text-[15px] font-semibold text-ink">{r}</div>
+      <div className="mt-1 text-[15px] font-semibold text-ink">{r}</div>
       <div className="truncate text-[11px] text-ink-muted">{w}</div>
     </div>
   );
@@ -101,17 +101,17 @@ export function ControlPanel({ setRoute }) {
       case 'master':
         return (
           <>
-            <p className="psub">The one switch that makes every other setting live. While off, this console is advisory — nobody is blocked, nothing needs approval, your migration continues untouched.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The one switch that makes every other setting live. While off, this console is advisory — nobody is blocked, nothing needs approval, your migration continues untouched.</p>
             <Row nm="Engage the TK Group guard (go-live switch)"
               ds="Flip this LAST, once the other screens are set. Then everyone comes under control at once — or ramp per voucher type first."
               st="core.policy_guard" flag="core.policy_guard" on={v.masterOn} onPropose={onPropose} />
-            <div className="infobar"><span>🛡️</span><span><b>Nothing is engaged.</b> This console decides who may do what; it takes no action itself. Changes are proposed on Control Flags and Owner-approved. Hand power over slowly — one control, one voucher type, one user at a time.</span></div>
+            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🛡️</span><span><b>Nothing is engaged.</b> This console decides who may do what; it takes no action itself. Changes are proposed on Control Flags and Owner-approved. Hand power over slowly — one control, one voucher type, one user at a time.</span></div>
           </>
         );
       case 'approval':
         return (
           <>
-            <p className="psub">The three-level chain and the rights on it. Each level switchable; a person with no control on them acts independently.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The three-level chain and the rights on it. Each level switchable; a person with no control on them acts independently.</p>
             <div className="flex flex-wrap items-stretch gap-2">
               {v.levels.map((l, i) => (
                 <React.Fragment key={l.n}>
@@ -132,7 +132,7 @@ export function ControlPanel({ setRoute }) {
               {v.people.map((p) => (
                 <div key={p.key} className={`rounded-brand border bg-surface p-4 ${p.independent ? 'border-warning/40' : 'border-surface-border'}`}>
                   <div className="flex items-center justify-between gap-2">
-                    <div><div className="font-serif text-[16px] font-semibold text-ink">{p.name}</div><div className="text-[11px] text-ink-muted">{p.role} · {p.duty}</div></div>
+                    <div><div className="text-[16px] font-semibold text-ink">{p.name}</div><div className="text-[11px] text-ink-muted">{p.role} · {p.duty}</div></div>
                     {p.independent ? <Badge tone="warning" size="sm">Independent · no approval</Badge> : <Badge tone="success" size="sm">Under control</Badge>}
                   </div>
                   <p className="mt-2 text-[11px] text-ink-muted">{p.independent ? 'All controls off — reacts independently, no approval required.' : 'Operates within the approval chain.'}</p>
@@ -144,7 +144,7 @@ export function ControlPanel({ setRoute }) {
       case 'matrix':
         return (
           <>
-            <p className="psub">Turn approval on one voucher type at a time — each row independent, all off. Threshold eases in; Effective schedules it; Branch scopes it.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Turn approval on one voucher type at a time — each row independent, all off. Threshold eases in; Effective schedules it; Branch scopes it.</p>
             <div className="overflow-x-auto rounded-brand border border-surface-border bg-surface">
               <table className="w-full min-w-[720px] text-[12px]">
                 <thead><tr className="bg-surface-alt text-ink-muted">{['Voucher type', 'Enforce', 'Verify', 'Approve', 'AE-approve', 'Owner co-sign', 'Threshold', 'Effective'].map((h, i) => <th key={h} className={`p-2.5 font-mono text-[9px] font-semibold uppercase tracking-wide ${i ? 'text-center' : 'text-left'}`}>{h}</th>)}</tr></thead>
@@ -160,13 +160,13 @@ export function ControlPanel({ setRoute }) {
                 </tbody>
               </table>
             </div>
-            <div className="infobar"><span>▶</span><span><b>Load-preview, Scheduled &amp; Per-branch</b> live on this row: scope a type to some branches, date it to a future day, and preview the load it routes before it engages.</span></div>
+            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>▶</span><span><b>Load-preview, Scheduled &amp; Per-branch</b> live on this row: scope a type to some branches, date it to a future day, and preview the load it routes before it engages.</span></div>
           </>
         );
       case 'limits':
         return (
           <>
-            <p className="psub">The numbers that bound each power. Blank = inactive; nothing is capped until you set a value.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The numbers that bound each power. Blank = inactive; nothing is capped until you set a value.</p>
             <div className="grid gap-3 tablet:grid-cols-2">
               {[['Escalate to Finance Manager', '₹', 'Above this, an approval must be Faiz-level.'],
                 ['Dual control → Owner co-sign', '₹', 'Above this, Afshin must co-sign.'],
@@ -183,13 +183,13 @@ export function ControlPanel({ setRoute }) {
                 </div>
               ))}
             </div>
-            <div className="infobar"><span>📐</span><span>Set these on <button className="underline" onClick={() => go('/tk/limits')}>Thresholds &amp; Limits</button> (Owner-approved). The guard already <b>enforces</b> them once set — escalate-to-FM · dual-control-to-Owner · cash caps · cash-on-hand · back-date are live checks in the policy guard.</span></div>
+            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>📐</span><span>Set these on <button className="underline" onClick={() => go('/tk/limits')}>Thresholds &amp; Limits</button> (Owner-approved). The guard already <b>enforces</b> them once set — escalate-to-FM · dual-control-to-Owner · cash caps · cash-on-hand · back-date are live checks in the policy guard.</span></div>
           </>
         );
       case 'roles':
         return (
           <>
-            <p className="psub">Who can do what, by role — the intended posture. Nothing enforces until the Master Switch is on. ● full · ◐ conditional · ○ none.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who can do what, by role — the intended posture. Nothing enforces until the Master Switch is on. ● full · ◐ conditional · ○ none.</p>
             <div className="overflow-x-auto rounded-brand border border-surface-border bg-surface">
               <table className="w-full min-w-[760px] text-[12px]">
                 <thead><tr className="bg-surface-alt text-ink-muted">{['Role', ...CAP_COLS].map((h, i) => <th key={h} className={`p-2.5 font-mono text-[9px] font-semibold uppercase tracking-wide ${i ? 'text-center' : 'text-left'}`}>{h}</th>)}</tr></thead>
@@ -208,12 +208,12 @@ export function ControlPanel({ setRoute }) {
       case 'users':
         return (
           <>
-            <p className="psub">Power person-by-person — role, branch, the level they hold, whether they are under control or independent, and how fully each is set up. Switch a user on individually.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Power person-by-person — role, branch, the level they hold, whether they are under control or independent, and how fully each is set up. Switch a user on individually.</p>
             <div className="grid gap-3 tablet:grid-cols-2">
               {USERS.map((u) => (
                 <div key={u.n} className="rounded-brand border border-warning/40 bg-surface p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <div><div className="font-serif text-[16px] font-semibold text-ink">{u.n}</div><div className="text-[11px] text-ink-muted">{u.r} · {u.b}</div></div>
+                    <div><div className="text-[16px] font-semibold text-ink">{u.n}</div><div className="text-[11px] text-ink-muted">{u.r} · {u.b}</div></div>
                     <Badge tone="warning" size="sm">Independent · no approval</Badge>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-muted">
@@ -222,19 +222,19 @@ export function ControlPanel({ setRoute }) {
                 </div>
               ))}
             </div>
-            <div className="infobar"><span>🛡️</span><span><b>ERP (Books) login access is now gated:</b> when the master guard is on, a non-Owner granting or revoking someone's Books access is queued for the Owner instead of taking effect. CRM &amp; App toggles stay a direct control. 2FA &amp; session rules remain Planned.</span></div>
+            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🛡️</span><span><b>ERP (Books) login access is now gated:</b> when the master guard is on, a non-Owner granting or revoking someone's Books access is queued for the Owner instead of taking effect. CRM &amp; App toggles stay a direct control. 2FA &amp; session rules remain Planned.</span></div>
           </>
         );
-      case 'rights': return <><p className="psub">Two flags you set independently here (Relocate, Hide-statements). The rest engage automatically with the master guard — <b>Via master guard</b> means a branch write already stages for Owner approval once the guard is on, so you don't wire them separately.</p><ControlList items={CONTROL_LISTS.rights} isOn={isOn} onPropose={onPropose} /></>;
-      case 'sod': return <><p className="psub">Conflict rules — the same person can never both create and clear their own work. Most engage with the master guard; the branch-entry chain is its own live switch.</p><ControlList items={CONTROL_LISTS.sod} isOn={isOn} onPropose={onPropose} /></>;
-      case 'security': return <><p className="psub">Session-level protection at login. Single-device sessions and password strength are <b>already enforced</b>; the Owner has decided not to adopt 2FA, login-hours or IP restrictions.</p><ControlList items={CONTROL_LISTS.security} /></>;
-      case 'entry': return <><p className="psub">Guards at the point of entry and on statutory work. Mandatory-documents and reconciliation-before-close are live switches (dormant until engaged); future-date and tax-filing locks are already enforced.</p><ControlList items={CONTROL_LISTS.entry} isOn={isOn} onPropose={onPropose} /></>;
-      case 'notifications': return <><p className="psub">Who is told what, and when a stale item escalates — so nothing waits unseen.</p><ControlList items={CONTROL_LISTS.notifications} /></>;
-      case 'reports': return <><p className="psub">Who may export sensitive data, and the trail it leaves. These are live switches — the shared export helpers enforce them the moment you engage each flag; dormant until then.</p><ControlList items={CONTROL_LISTS.reports} isOn={isOn} onPropose={onPropose} /></>;
+      case 'rights': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Two flags you set independently here (Relocate, Hide-statements). The rest engage automatically with the master guard — <b>Via master guard</b> means a branch write already stages for Owner approval once the guard is on, so you don't wire them separately.</p><ControlList items={CONTROL_LISTS.rights} isOn={isOn} onPropose={onPropose} /></>;
+      case 'sod': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Conflict rules — the same person can never both create and clear their own work. Most engage with the master guard; the branch-entry chain is its own live switch.</p><ControlList items={CONTROL_LISTS.sod} isOn={isOn} onPropose={onPropose} /></>;
+      case 'security': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Session-level protection at login. Single-device sessions and password strength are <b>already enforced</b>; the Owner has decided not to adopt 2FA, login-hours or IP restrictions.</p><ControlList items={CONTROL_LISTS.security} /></>;
+      case 'entry': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Guards at the point of entry and on statutory work. Mandatory-documents and reconciliation-before-close are live switches (dormant until engaged); future-date and tax-filing locks are already enforced.</p><ControlList items={CONTROL_LISTS.entry} isOn={isOn} onPropose={onPropose} /></>;
+      case 'notifications': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who is told what, and when a stale item escalates — so nothing waits unseen.</p><ControlList items={CONTROL_LISTS.notifications} /></>;
+      case 'reports': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who may export sensitive data, and the trail it leaves. These are live switches — the shared export helpers enforce them the moment you engage each flag; dormant until then.</p><ControlList items={CONTROL_LISTS.reports} isOn={isOn} onPropose={onPropose} /></>;
       case 'masters':
         return (
           <>
-            <p className="psub">Who owns the chart of accounts and how a new party is brought on. These chains are the Owner's — locked, not freely editable.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who owns the chart of accounts and how a new party is brought on. These chains are the Owner's — locked, not freely editable.</p>
             <H3>Masters &amp; chart of accounts</H3>
             <div className="flex flex-wrap items-center gap-2"><ChainCard k="Maker" r="Faiz" w="creates / alters heads" /><span className="text-ink-subtle">→</span><ChainCard k="Approver" r="Afshin (Owner)" w="sole approval · all 6 branches" /><Badge tone="danger" size="sm">🔒 Locked</Badge></div>
             <H3>New party onboarding</H3>
@@ -244,47 +244,47 @@ export function ControlPanel({ setRoute }) {
               <ChainCard k="③ Verify" r="Farhan" w="Director" /><span className="text-ink-subtle">→</span>
               <ChainCard k="④ Approve" r="Afshin" w="Owner · party goes active" />
             </div>
-            <div className="infobar"><span>🔒</span><span>Branch accountants never create parties or ledgers — they only raise a request; a party appears in branch pickers only after Afshin approves.</span></div>
-            <div className="infobar"><span>🛡️</span><span><b>Wired &amp; dormant:</b> customer &amp; supplier onboarding already routes through the master guard — a branch create / edit / delete stages for the Owner the moment the guard is engaged; today it applies inline, unchanged. Ledger heads stay locked to Faiz → Owner.</span></div>
+            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🔒</span><span>Branch accountants never create parties or ledgers — they only raise a request; a party appears in branch pickers only after Afshin approves.</span></div>
+            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🛡️</span><span><b>Wired &amp; dormant:</b> customer &amp; supplier onboarding already routes through the master guard — a branch create / edit / delete stages for the Owner the moment the guard is engaged; today it applies inline, unchanged. Ledger heads stay locked to Faiz → Owner.</span></div>
           </>
         );
       case 'delegation':
         return (
           <>
-            <p className="psub">Temporary hand-over during leave — power passes for a window, then auto-reverts. Nothing delegated now.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Temporary hand-over during leave — power passes for a window, then auto-reverts. Nothing delegated now.</p>
             <div className="rounded-brand border border-surface-border bg-surface p-4 text-[12.5px] text-ink-muted">No active delegation. Example: <b className="text-ink">Faiz away 10–15 Jul → Sughra approves in his place</b>, reverting automatically. Every delegation is logged in the Change Log.</div>
           </>
         );
       case 'breakglass':
         return (
           <>
-            <p className="psub">Emergency elevated access — granted for a short window with a mandatory reason, fully audited, auto-expiring. Use only when normal approval can't run.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Emergency elevated access — granted for a short window with a mandatory reason, fully audited, auto-expiring. Use only when normal approval can't run.</p>
             <div className="rounded-brand border border-warning/40 bg-surface p-4 text-[12.5px] text-ink-muted">No break-glass session active. When invoked, it demands a reason, notifies the Owner immediately, and expires on a timer — every action inside the window is flagged in the audit trail.</div>
           </>
         );
       case 'erp':
         return (
           <>
-            <p className="psub">How much of the ERP is configured, and how much of the money flow is secured under verification — both climb as you engage controls.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">How much of the ERP is configured, and how much of the money flow is secured under verification — both climb as you engage controls.</p>
             <div className="flex flex-wrap gap-3">
               <div className="min-w-[220px] flex-1 rounded-brand border border-surface-border bg-surface p-4">
                 <div className="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Controls engaged</div>
-                <div className="mt-1 font-serif text-4xl font-black tabular-nums text-warning">{r.pct}%</div>
+                <div className="mt-1 text-4xl font-black tabular-nums text-warning">{r.pct}%</div>
                 <div className="mt-1 text-[11px] text-ink-muted">{r.engaged} of {r.total} control flags on</div>
               </div>
               <div className="min-w-[220px] flex-1 rounded-brand border border-surface-border bg-surface p-4">
                 <div className="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Secure &amp; under verification</div>
-                <div className="mt-1 font-serif text-4xl font-black tabular-nums text-danger">{r.masterOn ? '100' : '6'}%</div>
+                <div className="mt-1 text-4xl font-black tabular-nums text-danger">{r.masterOn ? '100' : '6'}%</div>
                 <div className="mt-1 text-[11px] text-ink-muted">{r.masterOn ? 'Guard engaged — enforcing' : 'Foundation locks only · master guard dormant'}</div>
               </div>
             </div>
-            <div className="infobar"><span>📈</span><span>Each control you engage lifts these — the goal is <b>100% implemented · fully secured</b>, reached when the Master Switch is on and every voucher type is enforced. Detail on <button className="underline" onClick={() => go('/tk/readiness')}>Configuration Readiness</button>.</span></div>
+            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>📈</span><span>Each control you engage lifts these — the goal is <b>100% implemented · fully secured</b>, reached when the Master Switch is on and every voucher type is enforced. Detail on <button className="underline" onClick={() => go('/tk/readiness')}>Configuration Readiness</button>.</span></div>
           </>
         );
       case 'log':
         return (
           <>
-            <p className="psub">Every power change — who, when, from → to, why. Immutable. It fills as you engage controls; nothing changed yet.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Every power change — who, when, from → to, why. Immutable. It fills as you engage controls; nothing changed yet.</p>
             <div className="rounded-brand border border-surface-border bg-surface p-6 text-center text-[12.5px] text-ink-muted">No power changes yet — this log records every toggle, grant, delegation and freeze once you begin.</div>
           </>
         );
@@ -323,8 +323,7 @@ export function ControlPanel({ setRoute }) {
 
         {/* active screen */}
         <section>
-          <h2 className="font-serif text-[22px] font-semibold text-ink">{activeLabel}</h2>
-          <style>{`.psub{color:var(--ink-muted,#5b616e);font-size:13.5px;margin:5px 0 16px;max-width:78ch}.infobar{display:flex;gap:10px;align-items:flex-start;background:#FBF4E4;border:1px solid #E7D6AE;border-radius:9px;padding:12px 15px;font-size:12.5px;color:#6E5518;margin-top:18px}.infobar b{color:#8A6413}`}</style>
+          <h2 className="text-[22px] font-semibold text-ink">{activeLabel}</h2>
           {screenBody()}
         </section>
       </div>

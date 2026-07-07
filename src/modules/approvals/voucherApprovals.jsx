@@ -26,7 +26,7 @@ import { PeriodBar, periodRange } from '../../core/period';
 import { CONSOLIDATED_LABEL } from '../../core/data';
 import { SkeletonTable } from '../../shell/primitives';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
-import { useApprovalChain, nextActionFor, StageChip, StageTracker } from '../../core/approvalChain';
+import { useApprovalChain, nextActionFor, StageTracker } from '../../core/approvalChain';
 
 // Full branch-currency amount (₹ India · $ USD branches) — NO Cr/L abbreviation.
 // Grouping follows the currency: Indian lakh/crore for ₹, Western thousands for $.
@@ -804,6 +804,10 @@ function InbEditGate({ linkNo, branch, onDone }) {
     branch: deal.fromBranch, toBranch: deal.toBranch, module: deal.module,
     packageType: deal.packageType, date: deal.date, headerRef: deal.reference, passenger: deal.passenger,
     noSupplier: deal.noSupplier, fareLines: deal.fareLines, serviceFee: deal.serviceFee,
+    // Purchase-side detail: the Supplier Service Charge head + incentive/GST-mode live
+    // here (not in fareLines) — without them the Edit grid opens blank on those fields
+    // and the next save silently drops them from the rebuilt purchase leg.
+    purchaseHeads: deal.purchaseHeads || [], purchase: deal.purchase || null,
     supplier: deal.supplier
       ? { name: deal.supplier.name, ledgerName: deal.supplier.ledgerName, ledgerGroup: deal.supplier.ledgerGroup }
       : { name: '', ledgerName: '', ledgerGroup: '' },
@@ -1208,7 +1212,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                               {(() => {
                                 // Stage-aware chain action (stage lives on the sale leg; review acts on BOTH legs).
                                 const na = nextActionFor(d.sale || d.purchase || {}, chainCfg);
-                                if (na.action !== 'approve') return <><StageChip e={d.sale || d.purchase || {}} /><button disabled={busy || !na.allowed} onClick={() => doReviewDeal(d, na.action)} title={na.hint} style={{ margin: '0 6px', padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? C.blue : C.gold) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button></>;
+                                if (na.action !== 'approve') return <><StageTracker e={d.sale || d.purchase || {}} /><button disabled={busy || !na.allowed} onClick={() => doReviewDeal(d, na.action)} title={na.hint} style={{ margin: '0 6px', padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? C.blue : C.gold) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button></>;
                                 return <button disabled={busy || !na.allowed} onClick={() => doApprove([d])} title={na.allowed ? 'Approve (L3) → post both legs to OUR (seller) books now' : na.hint} style={{ marginRight: 6, padding: '5px 10px', background: na.allowed ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>Approve</button>;
                               })()}
                               <button disabled={busy} onClick={() => doReject(d)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>

@@ -23,7 +23,7 @@ export function DashboardControls({ range, setRange, scope, setScope }) {
   const dates = rangeToDates(range);
   const scopeLabel =
     scope === 'ALL'
-      ? 'Group Company · all branches consolidated'
+      ? 'TK Group Central · all branches, branchwise (never summed)'
       : (() => { const b = BRANCHES.find((x) => x.code === scope); return b ? `${b.code} — ${b.city}` : scope; })();
 
   return (

@@ -39,7 +39,7 @@ function Kpi({ label, value, tone }) {
   return (
     <div className="rounded-brand border border-surface-border bg-surface px-4 py-3">
       <div className="text-[11px] uppercase tracking-wide text-ink-muted">{label}</div>
-      <div className={`mt-0.5 font-serif text-[22px] font-semibold tabular-nums ${KPI_TONE_TEXT[tone] || 'text-ink'}`}>{value}</div>
+      <div className={`mt-0.5 text-[22px] font-semibold tabular-nums ${KPI_TONE_TEXT[tone] || 'text-ink'}`}>{value}</div>
     </div>
   );
 }

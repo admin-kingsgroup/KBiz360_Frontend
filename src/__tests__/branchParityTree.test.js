@@ -13,8 +13,8 @@ const PAYLOAD = {
   groups: [{ name: 'Domestic Flights', parent: 'Sales Accounts', level: 1, tilde: true, backbone: true, states: ['used', 'dormant'], posts: [12, 0], total: 12, present: 2 }],
   subGroups: [],
   ledgers: [
-    { name: 'DT-Base Fare', group: 'Domestic Flights', tilde: true, backbone: true, states: ['used', 'dormant'], posts: [12, 0], total: 12, present: 2 },
-    { name: 'Acme Travel', group: 'Sales Accounts', backbone: false, states: ['local', 'absent'], posts: [3, 0], total: 3, present: 1 },
+    { name: 'DT-Base Fare', group: 'Domestic Flights', tilde: true, backbone: true, locked: true, states: ['used', 'dormant'], posts: [12, 0], total: 12, present: 2 },
+    { name: 'Acme Travel', group: 'Sales Accounts', backbone: false, locked: false, states: ['local', 'absent'], posts: [3, 0], total: 3, present: 1 },
   ],
 };
 
@@ -58,6 +58,13 @@ describe('buildParityTree', () => {
     expect(dt.tilde).toBe(true);
     expect(dt.states).toEqual(['used', 'dormant']);
     expect(dt.present).toBe(2);
+  });
+
+  test('carries the lock flag onto ledger nodes (drives the 🔒/🔓 sign)', () => {
+    const dt = roots[0].children.find((c) => c.name === 'Domestic Flights').children[0];
+    const acme = roots[0].children.find((c) => c.name === 'Acme Travel');
+    expect(dt.locked).toBe(true);    // wired head → locked
+    expect(acme.locked).toBe(false); // branch party → editable
   });
 
   test('handles empty / missing payload without throwing', () => {

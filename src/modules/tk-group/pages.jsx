@@ -37,7 +37,7 @@ const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
 // they look like the rest of the app. DORMANT-SAFE: with core.policy_guard OFF the
 // /api/tk/* endpoints return empty / read-only, so pages render a benign empty state.
 
-function Page({ title, subtitle, children, maxWidth = 'max-w-[1280px]' }) {
+function Page({ title, subtitle, children, maxWidth = 'max-w-[1600px]' }) {
   return (
     <PageLayout title={title} subtitle={subtitle} maxWidth={maxWidth}>
       {children}

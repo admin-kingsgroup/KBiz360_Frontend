@@ -15,6 +15,7 @@
 // is POSITIVE (this is what Tally's import expects in <AMOUNT> and in a
 // ledger's <OPENINGBALANCE>, where a positive figure is a credit balance).
 // ───────────────────────────────────────────────────────────────────────────
+import { guardExport } from './exportGuard';
 
 export const TALLY_DEFAULT_COMPANY = 'Travkings Tours & Travels';
 
@@ -180,16 +181,23 @@ function looksNumeric(s) {
   return /^-?\(?\d[\d.]*\)?%?$/.test(t.replace(/[()]/g, ''));
 }
 
-// Trigger a browser download of XML text.
-export function downloadXml(filename, xml) {
-  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const safe = String(filename || 'tally-export').replace(/[^\w.-]+/g, '-').replace(/-+/g, '-');
-  a.download = safe.endsWith('.xml') ? safe : `${safe}.xml`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
+// Trigger a browser download of XML text. Routed through the Report/Export controls
+// guard (dormant unless the Owner engages the export policy) — then a restricted Tally
+// export is blocked (and logged) instead of downloading. Byte-identical while dormant.
+export function downloadXml(filename, xml, meta = {}) {
+  return guardExport(
+    { report: meta.report || filename || 'Tally export', scope: meta.scope || 'branch', branch: meta.branch, format: 'tally-xml' },
+    () => {
+      const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safe = String(filename || 'tally-export').replace(/[^\w.-]+/g, '-').replace(/-+/g, '-');
+      a.download = safe.endsWith('.xml') ? safe : `${safe}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    },
+  );
 }

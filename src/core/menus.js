@@ -407,7 +407,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Month-End Checklist / Day-Close", href:"/accounts/month-end"},
     {label:"Suspense / Unspecified Clearing", href:"/accounts/suspense"},
     {label:"Recurring Vouchers", href:"/accounting/recurring"},
-    {label:"Year-End Close (HO)", href:"/accounting/year-close"},
+    {label:"Year-End Close", href:"/accounting/year-close"},
   ]},
   // Accounts Master — the Chart-of-Accounts masters now live under THIS Accounts
   // header (moved out of the standalone Masters pill). Cost Centres are Super-Admin-

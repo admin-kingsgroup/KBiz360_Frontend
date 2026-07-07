@@ -89,19 +89,22 @@ export function branchesWithPending(agg) {
 }
 
 // ─── 5-stage pipeline — where each pending entry is waiting NOW ────────────────
-// Maps the real chain stage (reviewStage) + the amount-tier escalation onto the five
-// people-stages: Branch → AE·Sughra → FM·Faiz → Director·Farhan → Owner·Afshin.
-//   check  → Branch (the entry is with the branch accountant)
-//   verify → AE · Sughra
-//   approve / direct → FM · Faiz, UNLESS the amount escalates it:
-//        amount > voucherDual      → Owner · Afshin (only he may sign)
-//        amount > voucherEscalate  → Director · Farhan (a senior must clear)
+// Maps the real chain stage (reviewStage) onto the five people-stages, in backend order:
+//   Branch → AE·Sughra → Director·Farhan → Owner·Afshin → FM·Faiz (posts).
+//   check    → Branch (the entry is with the branch accountant)
+//   verify   → AE · Sughra
+//   director → Director · Farhan   (only present when escalation sign-offs are engaged)
+//   owner    → Owner · Afshin      (only present when engaged + over the dual ceiling)
+//   approve / direct → FM · Faiz (the posting gate — the LAST step, after any sign-offs)
+// We bucket by reviewStage ALONE: the backend already bakes the escalation flag + amount
+// ceilings into reviewStage (it is 'director'/'owner' only when engaged), so a large
+// voucher with the flag OFF stays 'approve' → FM, never a phantom Director/Owner bucket.
 export const PIPELINE_STAGES = [
   { key: 'branch', role: 'Branch', name: 'Accountants', wait: 'entered' },
   { key: 'ae', role: 'Verify · AE', name: 'Sughra', wait: 'to verify' },
-  { key: 'fm', role: 'Approve · FM', name: 'Faiz', wait: 'to post', gate: true },
   { key: 'director', role: 'Director', name: 'Farhan', wait: 'escalated' },
   { key: 'owner', role: 'Owner', name: 'Afshin Dhanani', wait: 'sole sign-off' },
+  { key: 'fm', role: 'Approve · FM', name: 'Faiz', wait: 'to post', gate: true },
 ];
 
 const ageDaysOf = (e, nowMs) => {
@@ -110,11 +113,11 @@ const ageDaysOf = (e, nowMs) => {
   return Number.isNaN(t) ? 0 : Math.max(0, Math.floor((nowMs - t) / 86_400_000));
 };
 
-/** Fold pending entries into the five people-stages. Returns rows in pipeline order,
- *  each { key, role, name, wait, gate?, n, amount, oldest }. Pure & testable. */
+/** Fold pending entries into the five people-stages, bucketed by their real reviewStage
+ *  (which the backend already made flag-aware). Returns rows in pipeline order, each
+ *  { key, role, name, wait, gate?, n, amount, oldest }. Pure & testable. `limits` is
+ *  accepted for call-site stability but no longer needed — reviewStage is authoritative. */
 export function stagePipeline(entries = [], limits = {}, nowMs = Date.now()) {
-  const dual = Number(limits.voucherDual) > 0 ? Number(limits.voucherDual) : Infinity;
-  const escalate = Number(limits.voucherEscalate) > 0 ? Number(limits.voucherEscalate) : Infinity;
   const acc = {};
   for (const s of PIPELINE_STAGES) acc[s.key] = { ...s, n: 0, amount: 0, oldest: 0 };
   for (const e of (Array.isArray(entries) ? entries : [])) {
@@ -123,7 +126,9 @@ export function stagePipeline(entries = [], limits = {}, nowMs = Date.now()) {
     let key;
     if (stage === 'check') key = 'branch';
     else if (stage === 'verify') key = 'ae';
-    else key = amt > dual ? 'owner' : amt > escalate ? 'director' : 'fm'; // approve / direct
+    else if (stage === 'director') key = 'director';
+    else if (stage === 'owner') key = 'owner';
+    else key = 'fm'; // approve / direct / blank — FM posts it
     const b = acc[key];
     b.n += 1; b.amount += amt; b.oldest = Math.max(b.oldest, ageDaysOf(e, nowMs));
   }

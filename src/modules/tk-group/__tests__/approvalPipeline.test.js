@@ -51,34 +51,34 @@ describe('stageFunnel — pending under whom, from real reviewStage', () => {
   });
 });
 
-describe('stagePipeline — 5 people-stages (Branch→AE→FM→Director→Owner)', () => {
+describe('stagePipeline — 5 people-stages (Branch→AE→Director→Owner→FM), by reviewStage', () => {
   const NOW = Date.parse('2026-07-07T00:00:00Z');
-  const limits = { voucherEscalate: 500000, voucherDual: 1500000 };
   const day = (n) => new Date(NOW - n * 86400000).toISOString();
 
-  test('maps chain stage → person; approve/direct escalate by amount', () => {
+  test('buckets each pending entry by its real reviewStage (backend bakes in the flag)', () => {
     const entries = [
       { reviewStage: 'check', total: 20000, date: day(3) },              // → Branch
       { reviewStage: 'verify', total: 40000, date: day(1) },             // → AE
-      { reviewStage: 'approve', total: 200000, date: day(2) },           // → FM (under escalate)
-      { reviewStage: 'approve', total: 800000, date: day(1) },           // → Director (over escalate)
-      { reviewStage: 'approve', total: 2000000, date: day(4) },          // → Owner (over dual)
+      { reviewStage: 'approve', total: 200000, date: day(2) },           // → FM
+      { reviewStage: 'director', total: 800000, date: day(1) },          // → Director (engaged, escalated)
+      { reviewStage: 'owner', total: 2000000, date: day(4) },            // → Owner (engaged, over dual)
       { reviewStage: '', total: 10000, date: day(0) },                   // direct → FM
     ];
-    const p = stagePipeline(entries, limits, NOW);
+    const p = stagePipeline(entries, {}, NOW);
     const by = Object.fromEntries(p.map((s) => [s.key, s]));
     expect(by.branch.n).toBe(1);
     expect(by.ae.n).toBe(1);
     expect(by.fm.n).toBe(2);         // 200k approve + direct
-    expect(by.director.n).toBe(1);   // 800k
-    expect(by.owner.n).toBe(1);      // 2m
+    expect(by.director.n).toBe(1);   // 800k, stage director
+    expect(by.owner.n).toBe(1);      // 2m, stage owner
     expect(by.owner.oldest).toBe(4); // oldest age tracked
-    expect(p.map((s) => s.key)).toEqual(['branch', 'ae', 'fm', 'director', 'owner']); // order
+    expect(p.map((s) => s.key)).toEqual(['branch', 'ae', 'director', 'owner', 'fm']); // FM posts last
   });
 
-  test('no limits → nothing escalates (all approve/direct land on FM)', () => {
+  test('DORMANT (flag off): a large approve entry stays at FM, never phantom-escalates', () => {
     const p = stagePipeline([{ reviewStage: 'approve', total: 9999999 }], {}, NOW);
     expect(p.find((s) => s.key === 'fm').n).toBe(1);
+    expect(p.find((s) => s.key === 'director').n).toBe(0);
     expect(p.find((s) => s.key === 'owner').n).toBe(0);
   });
 

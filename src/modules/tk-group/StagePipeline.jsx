@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { money } from '../../core/format';
@@ -7,13 +7,13 @@ import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { stagePipeline } from './utils/approvalPipeline';
 import { curSym } from './utils/currency';
-import { getLimits } from './api/limits';
 
 // ─── TK GROUP CENTRAL · Approval stage pipeline ──────────────────────────────
-// Where every pending voucher is waiting NOW, across the five people-stages:
-//   Branch → AE · Sughra → FM · Faiz → Director · Farhan → Owner · Afshin.
-// Real per-voucher stage (reviewStage) + amount-tier escalation. Sits above the full
-// approval screen (UnifiedApprovals) so the funnel and the JV detail share one page.
+// Where every pending voucher is waiting NOW, across the five people-stages, in backend
+// order: Branch → AE · Sughra → Director · Farhan → Owner · Afshin → FM · Faiz (posts).
+// Bucketed by the real per-voucher stage (reviewStage) — which already reflects whether
+// escalation sign-offs are engaged. Sits above the full approval screen (UnifiedApprovals)
+// so the funnel and the JV detail share one page.
 // Counts are currency-neutral (safe to pool); the ₹ value is shown ONLY when a single
 // branch is focused — never blended across currencies branchwise.
 const oldestTone = (d) => (d >= 4 ? 'text-danger' : d >= 2 ? 'text-warning' : 'text-success');
@@ -32,10 +32,8 @@ export function StagePipeline() {
       staleTime: 30_000,
     })),
   });
-  const lq = useQuery({ queryKey: ['tk', 'limits'], queryFn: getLimits, staleTime: 5 * 60_000 });
-  const limits = (lq.data && lq.data.limits) || {};
   const entries = view.flatMap((b, i) => ((q[i] && q[i].data && q[i].data.entries) || []));
-  const stages = stagePipeline(entries, limits);
+  const stages = stagePipeline(entries);
   const total = stages.reduce((s, x) => s + x.n, 0);
   const cur = focused ? curOf(focus) : null; // amount shown only for a single-currency (focused) view
 
@@ -54,7 +52,7 @@ export function StagePipeline() {
               </div>
               <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-extrabold ${s.gate ? 'bg-gold text-navy' : 'bg-surface-alt text-ink-subtle'}`}>{i + 1}</span>
             </div>
-            <div className="mt-2 font-serif text-[28px] font-bold leading-none tabular-nums text-ink">{s.n}</div>
+            <div className="mt-2 text-[28px] font-bold leading-none tabular-nums text-ink">{s.n}</div>
             <div className="mt-1 text-[11px] text-ink-muted">
               {s.wait}{cur ? <> · <b className="text-ink tabular-nums">{money(s.amount, cur)}</b></> : null}
             </div>
@@ -64,7 +62,7 @@ export function StagePipeline() {
         ))}
       </div>
       <p className="text-[11px] text-ink-subtle">
-        Counts are who holds it now. Most vouchers finish at <b>FM · Faiz</b> (that stage posts to the books); large / over-ceiling entries carry on to <b>Director</b> and <b>Owner</b>. The full JV detail and Approve / Reject are in the queue below.
+        Counts are who holds it now. Every voucher finishes at <b>FM · Faiz</b> (that stage posts to the books); when escalation sign-offs are engaged, large / over-ceiling entries pass through <b>Director</b> and <b>Owner</b> first. The full JV detail and Approve / Reject are in the queue below.
       </p>
     </div>
   );

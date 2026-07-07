@@ -37,6 +37,17 @@ const scopeBadge = (l) => (isCommon(l) ? badge('Common', GREY) : badge(l.branch,
 // them, dimmed and flagged, so the chart can show the full picture on demand.
 const AMBER = '#b45309';
 const RED = '#dc2626', RED_TINT = '#fef2f2';
+// Lock-state marks — shown ALONGSIDE the */~*/NF signs, never replacing them.
+// LOCKED (🔒) = non-editable/non-deletable: ALL groups & sub-groups (frozen structure),
+// module-wired (~*) heads, and any ledger whose `locked` flag is set. UNLOCKED (🔓) = an
+// editable ledger. NOTE: a system-seeded (source='system') LEDGER is NOT automatically
+// locked — banks, fixed assets, deposits and parties are seeded system yet stay editable —
+// so a ledger's lock is driven by the authoritative `locked` flag, never by source / `*`.
+const LOCK_ICON = <span title="Locked — frozen group structure, module-wired head, or a locked ledger; cannot be created, edited or deleted" style={{ fontSize: 10, marginLeft: 3 }}>🔒</span>;
+const UNLOCK_ICON = <span title="Unlocked — branch-managed ledger; editable / removable" style={{ fontSize: 10, marginLeft: 3 }}>🔓</span>;
+// A ledger's lock mark: locked heads lock (🔒); an active editable ledger unlocks (🔓);
+// deactivated rows carry their own Inactive/Removable badge, so no lock mark.
+const ledgerLock = (l) => (l.locked ? LOCK_ICON : isInactive(l) ? null : UNLOCK_ICON);
 // Side-by-Side sentinel: the "Direct Ledgers" bucket a node exposes when it holds
 // ledgers directly AND has child groups — a distinct, selectable item so those
 // ledgers don't show implicitly and confuse the Ledger column.
@@ -233,14 +244,14 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
   );
   // Parent Group + Group are the MANDATORY chart backbone — fixed in every branch,
   // and can't be created / edited / deleted. A red * marks them.
-  const mandatoryStar = <span title="Mandatory — fixed in all branches; cannot be created, edited or deleted" style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>*</span>;
+  const mandatoryStar = <span title="Mandatory — fixed in all branches; cannot be created, edited or deleted"><span style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>*</span>{LOCK_ICON}</span>;
   // A sub-group wired to a module/posting/tax path → locked. ~ = module-wired, * = non-editable / non-deletable.
-  const wiredMark = <span title="Wired to a module — locked (non-editable, non-deletable)" style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>~*</span>;
+  const wiredMark = <span title="Wired to a module — locked (non-editable, non-deletable)"><span style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>~*</span>{LOCK_ICON}</span>;
   const ledgerRow = (l, indent) => {
     const n = entriesFor(l), rm = removableOf(l, n);
     return (
       <div key={'L' + l.id} id={'led-' + l.id} style={{ display: 'flex', alignItems: 'center', padding: `4px 12px 4px ${indent}px`, fontSize: 12, borderBottom: '1px solid #dfe2e7', color: rm ? RED : isInactive(l) ? '#9aa2c0' : DARK, background: fLower && (l.name || '').toLowerCase() === fLower ? '#FFF6D6' : rm ? RED_TINT : undefined }}>
-        <span style={{ color: rm ? RED : isInactive(l) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}{rm ? badge('Removable', RED) : isInactive(l) && badge('Inactive', AMBER)}
+        <span style={{ color: rm ? RED : isInactive(l) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{l.name}{scopeBadge(l)}{ledgerLock(l)}{rm ? badge('Removable', RED) : isInactive(l) && badge('Inactive', AMBER)}
         {l._overrides && <span style={{ fontSize: 9, color: GOLD, marginLeft: 6, fontStyle: 'italic' }}>overrides Common</span>}
         {countChip(n)}
       </div>
@@ -312,7 +323,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
           const isGrp = kind !== 'ledger' && !direct;   // any group / sub-group item → locked (~* if wired, else *)
           return (
           <div key={kind === 'ledger' ? 'L' + it.id : (it.name || it.id)} {...(onPick ? clickable(() => onPick(it), { role: 'option' }) : {})} style={{ padding: '6px 10px', fontSize: 12, cursor: onPick ? 'pointer' : 'default', background: selVal === (it.name) ? '#eef3fb' : rm ? RED_TINT : (direct ? '#fbfcfe' : 'transparent'), borderBottom: '1px solid #dfe2e7', color: DARK, fontWeight: selVal === it.name ? 700 : 500, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontStyle: direct ? 'italic' : undefined }}>
-            <span style={kind === 'ledger' ? (rm ? { color: RED } : isInactive(it) ? { color: '#9aa2c0' } : undefined) : (direct ? { color: DIM } : undefined)}>{kind === 'ledger' ? <><span style={{ color: rm ? RED : isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{rm ? badge('Removable', RED) : isInactive(it) && badge('Inactive', AMBER)}</> : direct ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>Direct Ledgers</> : <>{it.name}{isGrp && (it.wired ? wiredMark : mandatoryStar)}</>}</span>
+            <span style={kind === 'ledger' ? (rm ? { color: RED } : isInactive(it) ? { color: '#9aa2c0' } : undefined) : (direct ? { color: DIM } : undefined)}>{kind === 'ledger' ? <><span style={{ color: rm ? RED : isInactive(it) ? '#c3cbe0' : GREEN, marginRight: 6 }}>•</span>{it.name}{scopeBadge(it)}{ledgerLock(it)}{rm ? badge('Removable', RED) : isInactive(it) && badge('Inactive', AMBER)}</> : direct ? <><span style={{ color: GREEN, marginRight: 6 }}>•</span>Direct Ledgers</> : <>{it.name}{isGrp && (it.wired ? wiredMark : mandatoryStar)}</>}</span>
             {kind === 'ledger' ? countChip(n) : direct ? countChip(it.__count) : (onPick && <span style={{ color: '#c3cbe0' }}>›</span>)}
           </div>
           );
@@ -403,8 +414,9 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Common', GREY)}<span style={{ marginLeft: 4 }}>= shared by every branch (ALL)</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('BOM', BLUE)}<span style={{ marginLeft: 4 }}>= specific to that branch</span></span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge('Removable', RED)}<span style={{ marginLeft: 4 }}>= deactivated + 0 entries (safe to delete)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>*</span><span style={{ marginLeft: 4 }}>= fixed structure — Parent Group / Group / Sub-Group (cannot be created, edited or deleted)</span></span>
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>~*</span><span style={{ marginLeft: 4 }}>= sub-group wired to a module (locked — non-editable, non-deletable)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= fixed structure — Parent Group / Group / Sub-Group (locked — cannot be created, edited or deleted)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}><span style={{ color: RED, fontWeight: 800 }}>~*</span>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= sub-group / ledger wired to a module (locked — non-editable, non-deletable)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{UNLOCK_ICON}<span style={{ marginLeft: 4 }}>= branch-managed ledger (unlocked — editable / removable)</span></span>
       </div>
 
       {/* Controls: in-page Branch view + Ledger Scope filter. Hidden on the
@@ -474,7 +486,7 @@ export function buildParityTree(data) {
   const mk = (r, type) => ({
     name: r.name, type, parent: (type === 'ledger' ? r.group : r.parent) || '',
     states: r.states || [], posts: r.posts || [], total: r.total || 0,
-    star: !!r.star, tilde: !!r.tilde, backbone: !!r.backbone,
+    star: !!r.star, tilde: !!r.tilde, backbone: !!r.backbone, locked: !!r.locked,
     present: r.present != null ? r.present : (r.states || []).filter((s) => s !== 'absent').length,
     children: [],
   });
@@ -552,7 +564,16 @@ function TravkingsGroupView() {
   roots.forEach(push);
 
   const tag = (t) => <span style={{ flex: 'none', fontSize: 9, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 5, background: '#eef0f4', color: '#556' }}>{TIER_TAG[t]}</span>;
-  const sign = (n) => (n.star ? <span style={{ color: P_GREEN, fontWeight: 800, fontFamily: 'monospace' }}>*</span> : n.tilde ? <span style={{ color: P_AMBER, fontWeight: 800, fontFamily: 'monospace' }}>~*</span> : null);
+  // Lock mark next to the sign: wired (~*) is always locked; a system (*) or branch
+  // ledger locks only when its `locked` flag is set (a system-seeded bank/asset/party
+  // is NOT locked); groups & sub-groups are structurally locked in every branch.
+  const sign = (n) => {
+    const led = n.type === 'ledger';
+    const locked = led ? n.locked : true;
+    if (n.tilde) return <span style={{ color: P_AMBER, fontWeight: 800, fontFamily: 'monospace' }}>~*{LOCK_ICON}</span>;
+    if (n.star) return <span style={{ color: P_GREEN, fontWeight: 800, fontFamily: 'monospace' }}>*{locked ? LOCK_ICON : null}</span>;
+    return led ? (locked ? LOCK_ICON : UNLOCK_ICON) : null;
+  };
   const scopePill = (k, l) => <button key={k} onClick={() => setScope(k)} style={{ padding: '5px 11px', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer', background: scope === k ? BLUE : '#fff', color: scope === k ? '#fff' : DIM }}>{l}</button>;
 
   if (parityQ.isLoading) return <div style={{ padding: 14 }}>{Array.from({ length: 8 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}</div>;
@@ -567,6 +588,8 @@ function TravkingsGroupView() {
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{parityGlyph('used', true)} Wired backbone (~★)</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{parityGlyph('local', false)} Branch-specific (auto/manual/import)</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{parityGlyph('absent', false)} Not in this branch</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{LOCK_ICON}<span style={{ marginLeft: 4 }}>= locked (groups & wired heads — non-editable)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{UNLOCK_ICON}<span style={{ marginLeft: 4 }}>= unlocked (branch-managed ledger — editable)</span></span>
       </div>
       {/* Controls */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginBottom: 10 }}>
@@ -703,10 +726,12 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', fontSize: 11.5, color: DIM, marginBottom: 10 }}>
-        <span>{chip('*', SIGN_CLR.fixed)} Fixed</span>
+        <span>{chip('*', SIGN_CLR.fixed)} Fixed (system-seeded)</span>
         <span>{chip('~*', SIGN_CLR.wired)} Wired (module)</span>
         <span>{chip('NF', SIGN_CLR.nf)} Non-fixed (ledgers only)</span>
         <span>{chip('Deact', SIGN_CLR.deact)} Deactivated</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{LOCK_ICON}<span style={{ marginLeft: 3 }}>Locked — groups & wired heads (non-editable)</span></span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>{UNLOCK_ICON}<span style={{ marginLeft: 3 }}>Unlocked — branch-managed ledgers (editable)</span></span>
         <span style={{ color: SIGN_CLR.fixed, fontWeight: 700 }}>👆 Tap any number to list what’s behind it</span>
       </div>
 
@@ -722,10 +747,12 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
             </tr>
             <tr>
               <th style={{ ...th({ textAlign: 'left' }), position: 'sticky', left: 0, zIndex: 3, background: '#fff' }}>Branch</th>
-              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*</th><th style={th()}>NF</th>
-              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*</th><th style={th()}>NF</th>
-              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*</th><th style={th()}>NF</th>
-              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*</th><th style={th()}>NF</th><th style={th()}>Deact</th><th style={th()}>Total</th>
+              {/* Group tiers are structurally locked (both * and ~*); NF is always 0. */}
+              <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
+              <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
+              <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
+              {/* Ledger tier: * (system-seeded) is MIXED — banks/assets/parties are editable — so no lock claim; only wired (~*) is locked, and NF is branch-managed (editable). */}
+              <th style={{ ...th(), ...sep }}>*</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF{UNLOCK_ICON}</th><th style={th()}>Deact</th><th style={th()}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -794,7 +821,7 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
           : !isLedger ? (
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 420 }}>
               <thead><tr><th style={{ ...dth, textAlign: 'left' }}>Group / Sub-Group</th><th style={{ ...dth, textAlign: 'left' }}>Sign</th></tr></thead>
-              <tbody>{items.map((g) => <tr key={g.name}><td style={{ padding: '11px 12px', fontWeight: 600, borderBottom: '1px solid #eef1f5' }}>{g.name}</td><td style={{ padding: '11px 12px', color: DIM, borderBottom: '1px solid #eef1f5' }}>{scope.cat === 'wired' ? '~*' : '*'}</td></tr>)}</tbody>
+              <tbody>{items.map((g) => <tr key={g.name}><td style={{ padding: '11px 12px', fontWeight: 600, borderBottom: '1px solid #eef1f5' }}>{g.name}</td><td style={{ padding: '11px 12px', color: DIM, borderBottom: '1px solid #eef1f5' }}>{scope.cat === 'wired' ? '~*' : '*'}{LOCK_ICON}</td></tr>)}</tbody>
             </table>
           ) : (
             <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 540 }}>

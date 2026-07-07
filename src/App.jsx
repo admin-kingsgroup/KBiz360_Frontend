@@ -73,6 +73,7 @@ import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
 import { FULL_SCOPE_ROLES, hasNoAssignedBranch } from './core/branchScope';
 import { BRANCHES } from './core/referenceCache';
+import { setActiveCurrency } from './core/format';
 import { useCockpitFocus } from './store/cockpitFocus';
 import { FOCUS_ALL } from './modules/tk-group/utils/cockpitFocus';
 const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('./modules/reportsFinancial/financialStatements'));
@@ -170,6 +171,14 @@ export default function KB360App(){
   const inGroupMode = branch === 'ALL' || (branch && branch.code === 'ALL');
   const branchFocused = isCentral && inGroupMode && focus && focus !== FOCUS_ALL;
   const opBranch = branchFocused ? (BRANCHES.find((b) => b.code === focus) || branch) : branch;
+
+  // Branch-aware money: the whole app's default currency follows the OPERATING branch, so
+  // the ₹-defaulting formatters (fmt / fmtINR / money's default) print $ + Western scale
+  // on the Africa USD branches (NBO/DAR/FBM) and ₹ + lakh/crore on India / consolidated.
+  useEffect(() => {
+    const code = (opBranch && typeof opBranch === 'object') ? opBranch.currency : null;
+    setActiveCurrency(code === 'USD' ? '$' : '₹');
+  }, [opBranch]);
 
   // TK Group Central mode: a central role selecting the consolidated entity ENTERS the
   // control cockpit. With Focus = ALL keep them on control routes (book-less); with a

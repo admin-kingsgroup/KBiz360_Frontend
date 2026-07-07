@@ -10,7 +10,7 @@
 //      they read as `toLocaleString('en-IN', {…})` and are intentionally exempt).
 import fs from 'fs';
 import path from 'path';
-import { localeOf } from '../format';
+import { localeOf, setActiveCurrency, activeCurrency, fmt, fmtINR, money } from '../format';
 
 describe('localeOf — grouping follows the currency', () => {
   test('₹ → Indian lakh/crore grouping', () => {
@@ -21,6 +21,36 @@ describe('localeOf — grouping follows the currency', () => {
   test('$ (USD branches) → Western thousands grouping', () => {
     expect(localeOf('$')).toBe('en-US');
     expect((123456).toLocaleString(localeOf('$'))).toBe('123,456');
+  });
+});
+
+describe('active branch currency — fmt/fmtINR/money default follows the operating branch', () => {
+  afterEach(() => setActiveCurrency('₹')); // reset to the default after each
+
+  test('default is ₹ + Indian scale — byte-identical to before any branch is set', () => {
+    expect(activeCurrency()).toBe('₹');
+    expect(money(50000)).toBe('₹50,000');
+    expect(fmtINR(150000)).toBe('₹1.50L');
+    expect(fmt(150000)).toBe('1.50 L');
+  });
+
+  test('a USD branch → $ + Western K/M/B + thousands grouping (no lakh/crore)', () => {
+    setActiveCurrency('$');
+    expect(activeCurrency()).toBe('$');
+    expect(money(50000)).toBe('$50,000');
+    expect(money(123456)).toBe('$123,456');   // NOT $1,23,456
+    expect(fmtINR(1500000)).toBe('$1.50M');    // NOT ₹15.00L
+    expect(fmt(1500000)).toBe('1.50 M');
+  });
+
+  test('an explicit currency always wins over the active default', () => {
+    setActiveCurrency('$');
+    expect(money(50000, '₹')).toBe('₹50,000');
+  });
+
+  test('blank / falsy resets to ₹', () => {
+    setActiveCurrency('');
+    expect(activeCurrency()).toBe('₹');
   });
 });
 

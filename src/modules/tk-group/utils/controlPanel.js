@@ -118,6 +118,7 @@ export const CONTROL_LISTS = {
     { nm: 'Master create ≠ Master approve', ds: 'Faiz creates; the Owner approves — never the same hand (locked meta-rule).', applied: true },
     { nm: 'Payment prepared ≠ Payment released', ds: 'Money-out starts Pending and the maker is barred from approving it (SoD) — so a different person must release it.', guarded: true, crit: true },
     { nm: 'Branch entries walk Check → Verify → Approve', ds: 'A branch-accountant ERP voucher goes Check (entry) → Verify (Sughra) → Approve (Faiz) — not the maker single-step approving their own. Central-role entries use SoD. Dormant until engaged.', flag: 'approval.chain_branch_entries' },
+    { nm: 'Large-voucher escalation sign-offs', ds: 'Over the escalate ceiling a voucher also needs a Director (Farhan) sign-off; over the dual ceiling, an Owner (Afshin) sign-off too — before Faiz’s final approval posts. FM-approve alone is enough while off.', flag: 'approval.escalation_signoffs' },
   ],
   security: [
     { nm: 'Single active session per user', ds: 'Already enforced — a new Books login invalidates every earlier session (per-app login floor), so other devices are signed out on their next request.', applied: true },

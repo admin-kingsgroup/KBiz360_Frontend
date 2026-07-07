@@ -30,8 +30,9 @@ import { ArApSettlementView } from '../../../core/ArApSettlementView';
 /**
  * OWNER DASHBOARD — whole-company financial view (owner-only, gated by email +
  * Super Admin in App.jsx / getMenu). Follows the top-right branch selector:
- *   • Group (TK HO Group) ⇒ consolidated, all branches.
- *   • a specific branch   ⇒ that branch's financials only.
+ *   • Group (TK Group Central) ⇒ all branches side by side, each in its own currency
+ *     (branchwise — figures are NEVER summed across currencies).
+ *   • a specific branch        ⇒ that branch's financials only.
  * Carries the financial/governance widgets (Balance Sheet, Net Worth, Cash &
  * Bank, Tax) that the role-scoped Director Dashboard deliberately omits.
  */
@@ -162,8 +163,14 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   // dashboard ALREADY fetched (Group), or the selected branch's own totals (single-branch).
   // No separate per-branch fanout: the rows match the per-branch KPI cards exactly and we
   // save N redundant /module-pl round-trips.
+  // Group/ALL renders EVERY branch side by side (each in its own currency), never only
+  // the ones that happen to have postings this period — so a branch mid-migration (no
+  // data yet) still shows as its own zero-row rather than vanishing from the group view.
   const branchRows = isAll
-    ? (Array.isArray(mpl.byBranch) ? mpl.byBranch : []).map((b) => ({ code: b.branch, sales: b.totals?.sales || 0, gp: b.totals?.gp || 0, net: b.bridge?.netProfit || 0 }))
+    ? BRANCHES.map((bx) => {
+        const b = (Array.isArray(mpl.byBranch) ? mpl.byBranch : []).find((x) => x.branch === bx.code) || {};
+        return { code: bx.code, sales: b.totals?.sales || 0, gp: b.totals?.gp || 0, net: b.bridge?.netProfit || 0 };
+      })
     : [{ code: effScope, sales: mpl.totals?.sales || 0, gp: mpl.totals?.gp || 0, net: mpl.bridge?.netProfit || 0 }];
 
   // ── Per-branch headline KPIs (Group/ALL scope only) ──
@@ -175,13 +182,18 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   const liquidOf = (rows) => (rows || []).filter(isLiquidRow).reduce((s, r) => s + ((r.closingDebit || 0) - (r.closingCredit || 0)), 0);
   const perBranchKpis = React.useMemo(() => {
     if (!isAll) return [];
+    // Always list ALL branches (roster order, matching the top-right selector) so the
+    // group view shows every branch side by side — a branch with no postings this period
+    // renders zeros instead of dropping out. Any stray code returned by a hook but not in
+    // the roster is appended defensively (should never happen).
     const codes = [...new Set([
+      ...BRANCHES.map((b) => b.code),
       ...(Array.isArray(mpl.byBranch) ? mpl.byBranch : []).map((b) => b.branch),
       ...(Array.isArray(trial.byBranch) ? trial.byBranch : []).map((b) => b.branch),
       ...(Array.isArray(bs.byBranch) ? bs.byBranch : []).map((b) => b.branch),
       ...(Array.isArray(age.byBranch) ? age.byBranch : []).map((b) => b.branch),
       ...(Array.isArray(tax.byBranch) ? tax.byBranch : []).map((b) => b.branch),
-    ])].filter(Boolean).sort();
+    ])].filter(Boolean);
     const byCode = (arr, code) => (Array.isArray(arr) ? arr.find((x) => x.branch === code) : null) || {};
     return codes.map((code) => {
       const p = byCode(mpl.byBranch, code);
@@ -229,6 +241,14 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   const fig = data.figures || { revenue: 0, gp: 0, gpPct: 0, netProfit: 0, outstanding: 0, payable: 0, cash: 0 };
   const pb = data.pendingBookings || { count: 0, sales: 0, gp: 0 };
   const rangeShort = period.label || 'Period';
+
+  // Pipeline per branch — every branch in roster order, zeros where the backend returned
+  // no bookings, so the group pipeline mirrors the KPI cards (all 6 branches side by side).
+  const zeroBooking = { sales: 0, gp: 0, count: 0 };
+  const bookingRows = BRANCHES.map((bx) => {
+    const b = (Array.isArray(data.bookingsByBranch) ? data.bookingsByBranch : []).find((x) => x.branch === bx.code);
+    return b || { branch: bx.code, approved: zeroBooking, pending: zeroBooking };
+  });
 
   const assets = bs.assets || [], liabs = bs.liabilities || [];
   const bankRows = (trial.rows || []).filter(isLiquidRow);
@@ -345,7 +365,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
     };
   };
 
-  const pageSubtitle = effScope === 'ALL' ? 'Group view — all branches consolidated' : `Branch view — ${effScope} only`;
+  const pageSubtitle = effScope === 'ALL' ? 'Group view — all branches side by side, each in its own currency (never summed)' : `Branch view — ${effScope} only`;
 
   return (
     <PageLayout>
@@ -408,12 +428,9 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
           ? <>SO/PO/GP Pipeline <span className="font-normal">· whole queue (not date-bound)</span></>
           : <>Sales &amp; GP Pipeline <span className="font-normal">· all sources — Approved matches Revenue · {rangeShort}</span></>}
       </div>
-      {isAll && Array.isArray(data.bookingsByBranch) ? (
+      {isAll ? (
         <div className="mb-4">
-          {data.bookingsByBranch.length === 0 && (
-            <div className="rounded-brand border border-surface-border bg-surface px-3.5 py-4 text-xs text-ink-muted">No pipeline bookings in any branch.</div>
-          )}
-          {data.bookingsByBranch.map((b) => (
+          {bookingRows.map((b) => (
             <div key={b.branch} className="mb-3">
               <div className="mb-1.5 flex items-baseline gap-2 border-b-2 pb-1" style={{ borderColor: '#185FA5' }}>
                 <span className="text-sm font-extrabold text-ink">{b.branch}</span>
