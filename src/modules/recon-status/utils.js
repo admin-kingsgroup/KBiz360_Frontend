@@ -5,6 +5,7 @@ export const ACCOUNT_TYPES = [
   { value: 'bank', label: 'Bank' },
   { value: 'client', label: 'Client' },
   { value: 'supplier', label: 'Supplier' },
+  { value: 'accruals', label: 'Month-end accruals' },
   { value: 'other', label: 'Other' },
 ];
 

@@ -64,6 +64,7 @@ const { AccountsTreeView } = lazyModule(() => import('./modules/masters/chartBui
 const { PnLTallyLive } = lazyModule(() => import('./modules/reportsFinancial/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/reportsFinancial/balanceSheetTally'));
 const { ReconStatusPage } = lazyModule(() => import('./modules/recon-status'));
+const { Gstr2bPage } = lazyModule(() => import('./modules/gstr2b'));
 const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFinancial/capitalVsInvestment'));
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
@@ -562,6 +563,7 @@ export default function KB360App(){
     if(route==="/finance/tds-calculator")return <TDSCalculator/>;
     if(route==="/finance/interest-calc") return <InterestCalculator/>;
     if(route==="/finance/recon-status")  return <ReconStatusPage/>;
+    if(route==="/tax/gstr2b-itc")        return <Gstr2bPage/>;
     if(route==="/finance/investments")   return <InvestmentRegister branch={branch}/>;
     if(route==="/finance/loan-amort")    return <LoanAmortization/>;
     if(route==="/finance/reco-queue")    return <ReconciliationQueue branch={branch} setRoute={navigate}/>;

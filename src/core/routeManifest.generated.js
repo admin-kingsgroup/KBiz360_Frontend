@@ -298,6 +298,7 @@ export const APP_ROUTES = [
   "/tax/gstr1",
   "/tax/gstr2a",
   "/tax/gstr2b",
+  "/tax/gstr2b-itc",
   "/tax/gstr3b",
   "/tax/gstr9c",
   "/tax/rcm",

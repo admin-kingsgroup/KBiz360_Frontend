@@ -87,6 +87,7 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
      dedicated "Reconciliation" head under the Accounts pill for bank/supplier). — */
   {divider:true, label:"Reconciliation"},
   {label:"GSTR-2B Reconciliation (ITC)", href:"/tax/gstr2b"},
+  {label:"GSTR-2B Import & ITC Match",   href:"/tax/gstr2b-itc"},
   {label:"GSTR-2A Reconciliation",       href:"/tax/gstr2a"},
   {label:"GSTR-9C — Audit Reco",         href:"/tax/gstr9c"},
   {label:"Tax Reco (3B/1/TDS vs Books)", href:"/tax/reconciliation"},

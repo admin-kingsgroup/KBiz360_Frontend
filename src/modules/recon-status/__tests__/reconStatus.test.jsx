@@ -26,6 +26,6 @@ describe('recon status · FE utils (pure)', () => {
 
   test('constants present', () => {
     expect(BRANCHES).toHaveLength(6);
-    expect(ACCOUNT_TYPES.map((t) => t.value)).toEqual(['bank', 'client', 'supplier', 'other']);
+    expect(ACCOUNT_TYPES.map((t) => t.value)).toEqual(['bank', 'client', 'supplier', 'accruals', 'other']);
   });
 });
