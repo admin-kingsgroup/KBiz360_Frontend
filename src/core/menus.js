@@ -88,6 +88,7 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
   ]},
   {label:"Books", children:[
     {label:"Trial Balance", href:"/trial-balance"},
+    {label:"Reconciliation Status", href:"/finance/recon-status"},
   ]},
   {label:"BSP & Airline Memos", children:[
     {label:"GDS / PNR Import", href:"/purchase/gds-import"},

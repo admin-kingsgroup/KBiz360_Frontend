@@ -99,6 +99,7 @@ export const APP_ROUTES = [
   "/finance/purchase-expense-register",
   "/finance/receipt-register",
   "/finance/reco-queue",
+  "/finance/recon-status",
   "/finance/refund",
   "/finance/refund-partial",
   "/finance/refund-register",
