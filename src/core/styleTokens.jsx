@@ -88,8 +88,8 @@ export function KpiCard({label,value,subtitle,trend,Icon,accent="neutral",onClic
     success:{bg:"#e8f6ed",c:"#16a34a",b:"#bfe6cc"},
     warning:{bg:"#fbeedb",c:"#b45309",b:"#f5d9a8"},
     danger: {bg:"#fbe9e9",c:"#dc2626",b:"#f3c0c0"},
-    neutral:{bg:"#f4f5f7",c:"#5b616e",b:"#e6e8ec"},
-  }[accent]||{bg:"#f4f5f7",c:"#5b616e",b:"#e6e8ec"};
+    neutral:{bg:"#f4f5f7",c:"#5b616e",b:"#cdd1d8"},
+  }[accent]||{bg:"#f4f5f7",c:"#5b616e",b:"#cdd1d8"};
   const clickable=!!onClick;
   return (
     <div onClick={onClick}

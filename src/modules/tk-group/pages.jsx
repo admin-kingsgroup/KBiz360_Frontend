@@ -39,7 +39,7 @@ const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
 
 function Page({ title, subtitle, children }) {
   return (
-    <PageLayout title={title} subtitle={subtitle} maxWidth="max-w-[1280px]">
+    <PageLayout title={title} subtitle={subtitle} maxWidth="max-w-[1600px]">
       {children}
     </PageLayout>
   );

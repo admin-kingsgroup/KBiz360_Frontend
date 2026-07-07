@@ -96,32 +96,47 @@ export function StageChip({ e }) {
   );
 }
 
-// Compact 5-node stage tracker for a pending row — Branch → AE · Sughra → FM · Faiz →
-// Director · Farhan → Owner · Afshin. Filled navy bead = cleared, gold = here now, hollow
-// = still ahead. The path shown is what THIS voucher passes: Branch→AE→FM always, plus
-// Director (amount over the escalate ceiling) and Owner (over the dual ceiling). Rendered
-// ONLY for chain entries (reviewStage set) — single-step / legacy entries show nothing,
-// exactly like StageChip, so the branch approval view is unchanged.
-const TRACK_NODES = { branch: 'B', ae: 'AE', fm: 'FM', director: 'D', owner: 'O' };
-const TRACK_LABEL = { branch: 'Branch', ae: 'AE · Sughra', fm: 'FM · Faiz', director: 'Director · Farhan', owner: 'Owner · Afshin' };
+// Compact stage tracker for a pending row — Branch → AE · Sughra → (Director · Farhan →
+// Owner · Afshin) → FM · Faiz. Filled navy bead = cleared, gold = here now, hollow = still
+// ahead. The path matches the backend order: Branch→AE→FM always, with Director (amount
+// over the escalate ceiling) and Owner (over the dual ceiling) inserted BEFORE FM's final
+// approve — but ONLY when the escalation sign-offs flag is engaged; with it off, FM's
+// approve is the final step, so no Director/Owner beads appear (dormant = unchanged).
+// Rendered ONLY for chain entries (reviewStage set) — single-step / legacy entries show
+// nothing, exactly like StageChip, so the branch approval view is unchanged.
+const TRACK_NODES = { branch: 'B', ae: 'AE', director: 'D', owner: 'O', fm: 'FM' };
+const TRACK_LABEL = { branch: 'Branch', ae: 'AE · Sughra', director: 'Director · Farhan', owner: 'Owner · Afshin', fm: 'FM · Faiz' };
 export function StageTracker({ e }) {
-  const q = useQuery({
+  const lq = useQuery({
     queryKey: ['tk', 'limits'],
     queryFn: () => apiGet('/api/tk/limits').catch(() => ({})),
     staleTime: 5 * 60_000,
     enabled: !!getAuthToken(),
   });
+  const fq = useQuery({
+    queryKey: ['tk', 'flags'],
+    queryFn: () => apiGet('/api/tk/flags').catch(() => ({})),
+    staleTime: 5 * 60_000,
+    enabled: !!getAuthToken(),
+  });
   if (!e || !e.reviewStage) return null;
-  const lim = (q.data && (q.data.limits || q.data)) || {};
+  const lim = (lq.data && (lq.data.limits || lq.data)) || {};
+  const flags = (fq.data && fq.data.flags) || {};
+  const ef = flags['approval.escalation_signoffs'] || {};
+  const escOn = ef.enabled === true || ef.foundation === true;
   const amt = Math.abs(Number(e.total != null ? e.total : e.amount) || 0);
   const esc = Number(lim.voucherEscalate) > 0 ? Number(lim.voucherEscalate) : Infinity;
   const dual = Number(lim.voucherDual) > 0 ? Number(lim.voucherDual) : Infinity;
-  const terminal = amt > dual ? 'owner' : amt > esc ? 'director' : 'fm';
-  const path = ['branch', 'ae', 'fm'];
-  if (terminal === 'director' || terminal === 'owner') path.push('director');
-  if (terminal === 'owner') path.push('owner');
-  const s = stageOf(e); // check | verify | approve
-  const curKey = s === 'check' ? 'branch' : s === 'verify' ? 'ae' : s === 'director' ? 'director' : s === 'owner' ? 'owner' : terminal;
+  const s = stageOf(e); // check | verify | director | owner | approve
+  // Director/Owner beads show only when the feature is engaged AND the amount crosses the
+  // ceiling — or when the entry is already sitting at that stage (backend truth, race-proof).
+  const wantDirector = (escOn && amt > esc) || s === 'director' || s === 'owner';
+  const wantOwner = (escOn && amt > dual) || s === 'owner';
+  const path = ['branch', 'ae'];
+  if (wantDirector) path.push('director');
+  if (wantOwner) path.push('owner');
+  path.push('fm'); // FM posts last, after any sign-offs
+  const curKey = s === 'check' ? 'branch' : s === 'verify' ? 'ae' : s === 'director' ? 'director' : s === 'owner' ? 'owner' : 'fm';
   const curIdx = path.indexOf(curKey);
   const trail = [
     e?.checkedBy && `✓ Checked · ${e.checkedBy}`,
