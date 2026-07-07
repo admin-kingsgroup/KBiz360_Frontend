@@ -11,8 +11,12 @@
 // So this screen lets you pick a Branch view + a ledger Scope filter; the group
 // structure never changes, only which ledgers are shown / how they're tagged.
 import React, { useState, useEffect, useRef } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMasterList } from '../../core/useMasters';
 import { branchCode, useLedgerUsage, useBranchParity, useBranchParitySummary, useBranchParityDrill } from '../../core/useAccounting';
+import { apiPost } from '../../core/api';
+import { confirmDialog } from '../../core/ux/confirm';
+import { toastSuccess, toastError } from '../../core/ux/toast';
 import { FocusBanner } from '../../core/ux/FocusBanner';
 import { useNavFocusStore, setNavFocus } from '../../core/ux/navFocus';
 import { clickable } from '../../core/ux/clickable';
@@ -811,16 +815,73 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
   );
 }
 
+// One ledger's six branch-presence pills (Core/Own drill only). Green = active
+// here, amber = deactivated (history kept), dashed grey = not in this branch.
+// Tap: ON adds (reactivate / clone from a donor branch); OFF is the SMART remove
+// (0 entries → delete, has entries → deactivate). Locked (wired/tax) heads are
+// ERP-managed — shown with a lock, not tappable.
+function PresenceToggles({ item, num }) {
+  const qc = useQueryClient();
+  const m = useMutation({
+    mutationFn: (body) => apiPost('/api/ledgers/branch-presence', body),
+    onSuccess: (res, vars) => {
+      const act = (res && res.data && res.data.action) || (vars.enable ? 'added' : 'removed');
+      toastSuccess(`${item.name} — ${act} in ${vars.branch}`);
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['master', 'ledgers'] });
+    },
+    onError: (e) => toastError((e && e.message) || 'Could not change branch presence'),
+  });
+  const flip = async (p) => {
+    if (p.locked || m.isPending) return;
+    if (p.state === 'active') {
+      const { confirmed } = await confirmDialog({
+        title: `Remove “${item.name}” from ${p.br}?`,
+        message: p.posts > 0
+          ? `It holds ${num(p.posts)} posted entr${p.posts === 1 ? 'y' : 'ies'} in ${p.br} — it will be DEACTIVATED (history kept; moves to the Deact column).`
+          : `No entries in ${p.br} — the ledger will be DELETED from that branch. The branch's Total drops accordingly.`,
+        danger: true, confirmLabel: 'Remove',
+      });
+      if (!confirmed) return;
+      m.mutate({ name: item.name, branch: p.br, enable: false });
+    } else {
+      m.mutate({ name: item.name, branch: p.br, enable: true });   // reactivate / clone — additive, no confirm
+    }
+  };
+  const pill = (p) => ({
+    appearance: 'none', cursor: p.locked ? 'not-allowed' : 'pointer', fontSize: 8.5, fontWeight: 800,
+    padding: '3px 5px', borderRadius: 5, letterSpacing: 0.2, opacity: m.isPending ? 0.5 : p.locked ? 0.55 : 1,
+    ...(p.state === 'active' ? { background: P_GREEN, color: '#fff', border: `1px solid ${P_GREEN}` }
+      : p.state === 'inactive' ? { background: '#fff', color: P_AMBER, border: '1px solid #d8c084' }
+      : { background: '#fff', color: '#9aa2c0', border: '1px dashed #cdd1d8' }),
+  });
+  return (
+    <span style={{ display: 'inline-flex', gap: 3, flexWrap: 'nowrap' }}>
+      {(item.presence || []).map((p) => (
+        <button key={p.br} type="button" disabled={p.locked || m.isPending} onClick={() => flip(p)} style={pill(p)}
+          title={`${p.br} · ${p.state}${p.posts ? ` · ${num(p.posts)} entries` : ''} · ${p.locked ? 'locked — ERP-managed head' : p.state === 'active' ? 'tap to remove from this branch' : 'tap to add to this branch'}`}>
+          {p.br}{p.locked ? '🔒' : ''}
+        </button>
+      ))}
+    </span>
+  );
+}
+
 // Drill-down list shown below the table. Ledgers → name (→Master) / group / postings
 // / closing balance (→Statement); groups → names. Its own scroll region + search.
+// Core/Own drills are RICH: a Kind tag per ledger, a kind-mix summary in the header,
+// and per-branch presence toggles (add / smart-remove a head branch by branch).
 function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, openStatement }) {
   const data = q.data || {};
   const all = data.items || [];
   const isLedger = scope.tier === 'ledger';
+  const rich = isLedger && all.some((x) => Array.isArray(x.presence));   // core/own drill
   const ql = dq.trim().toLowerCase();
-  const items = ql ? all.filter((x) => (x.name || '').toLowerCase().includes(ql) || (x.group || '').toLowerCase().includes(ql)) : all;
+  const items = ql ? all.filter((x) => (x.name || '').toLowerCase().includes(ql) || (x.group || '').toLowerCase().includes(ql) || (x.kind || '').toLowerCase().includes(ql)) : all;
   let totC = 0, net = 0;
   if (isLedger) items.forEach((l) => { totC += l.count || 0; net += l.closingBalance || 0; });
+  // "Which types of ledgers are in this count" — kind mix, biggest first.
+  const kindMix = rich ? [...items.reduce((m, l) => m.set(l.kind || 'Other', (m.get(l.kind || 'Other') || 0) + 1), new Map())].sort((a, b) => b[1] - a[1]) : [];
 
   const wrap = { marginTop: 16, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 12, overflow: 'hidden' };
   const head = { display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', padding: '11px 14px', borderBottom: '1px solid #eef1f5', background: '#f7faf8' };
@@ -833,6 +894,18 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
         <span style={{ flex: 1, minWidth: 140 }}><input value={dq} onChange={(e) => setDq(e.target.value)} placeholder="Search…" style={{ width: '100%', padding: '9px 11px', border: '1px solid #cdd1d8', borderRadius: 8, fontSize: 13 }} /></span>
         <button type="button" onClick={onClose} aria-label="Close" style={{ appearance: 'none', border: '1px solid #cdd1d8', background: '#fff', borderRadius: 8, minHeight: 40, minWidth: 40, cursor: 'pointer', fontWeight: 700, color: DIM }}>✕</button>
       </div>
+      {rich && !q.isLoading && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', padding: '8px 14px', borderBottom: '1px solid #eef1f5', background: '#fbfcfe', fontSize: 11, color: DIM }}>
+          <b style={{ color: DARK }}>Ledger types:</b>
+          {kindMix.map(([k, n]) => (
+            <button key={k} type="button" onClick={() => setDq(dq.trim().toLowerCase() === k.toLowerCase() ? '' : k)}
+              style={{ appearance: 'none', cursor: 'pointer', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 999, border: '1px solid #cdd1d8', background: dq.trim().toLowerCase() === k.toLowerCase() ? P_GREEN : '#fff', color: dq.trim().toLowerCase() === k.toLowerCase() ? '#fff' : '#3b4752' }}>
+              {k} × {n}
+            </button>
+          ))}
+          <span style={{ marginLeft: 'auto', color: '#9aa2c0' }}>Branch pills: green = active · amber = deactivated · dashed = absent · tap to add / remove</span>
+        </div>
+      )}
       <div style={{ maxHeight: '56vh', overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {q.isLoading ? <div style={{ padding: 24 }}>{Array.from({ length: 5 }).map((_, i) => <div key={i} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8 }} />)}</div>
           : !items.length ? <div style={{ padding: 28, textAlign: 'center', color: '#9aa8a1' }}>Nothing here.</div>
@@ -842,9 +915,12 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
               <tbody>{items.map((g) => <tr key={g.name}><td style={{ padding: '11px 12px', fontWeight: 600, borderBottom: '1px solid #eef1f5' }}>{g.name}</td><td style={{ padding: '11px 12px', color: DIM, borderBottom: '1px solid #eef1f5' }}>{scope.cat === 'wired' ? '~*' : '*'}{LOCK_ICON}</td></tr>)}</tbody>
             </table>
           ) : (
-            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 540 }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: rich ? 940 : 540 }}>
               <thead><tr>
-                <th style={{ ...dth, textAlign: 'left' }}>Ledger</th><th style={{ ...dth, textAlign: 'left' }}>Group</th>
+                <th style={{ ...dth, textAlign: 'left' }}>Ledger</th>
+                {rich && <th style={{ ...dth, textAlign: 'left' }}>Kind</th>}
+                <th style={{ ...dth, textAlign: 'left' }}>Group</th>
+                {rich && <th style={{ ...dth, textAlign: 'left' }}>Branches</th>}
                 <th style={{ ...dth, textAlign: 'right' }}>Postings</th><th style={{ ...dth, textAlign: 'right' }}>Closing Balance</th>
               </tr></thead>
               <tbody>
@@ -856,7 +932,9 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
                         <button type="button" onClick={() => openMaster(l.code)} title="Open Master detail"
                           style={{ appearance: 'none', border: 0, background: 'transparent', font: 'inherit', fontWeight: 600, color: P_GREEN, textDecoration: 'underline', textDecorationColor: '#bcd8ce', textUnderlineOffset: 2, cursor: 'pointer', padding: '11px 12px', textAlign: 'left', width: '100%', minHeight: 44 }}>{l.name}</button>
                       </td>
-                      <td style={{ padding: '11px 12px', color: DIM, fontSize: 12.5, borderBottom: '1px solid #eef1f5' }}>{l.group}</td>
+                      {rich && <td style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: '#eef0f4', color: '#556' }}>{l.kind || 'Other'}</span></td>}
+                      <td style={{ padding: '11px 12px', color: DIM, fontSize: 12.5, borderBottom: '1px solid #eef1f5' }}>{l.group}{l.subGroup ? <span style={{ color: '#9aa2c0' }}> ▸ {l.subGroup}</span> : null}</td>
+                      {rich && <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><PresenceToggles item={l} num={num} /></td>}
                       <td style={{ padding: '11px 12px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DIM, borderBottom: '1px solid #eef1f5' }}>{num(l.count)}</td>
                       <td style={{ padding: 0, borderBottom: '1px solid #eef1f5' }}>
                         <button type="button" onClick={() => openStatement(l.name, scope.branch)} title="Open Ledger Statement"
@@ -869,8 +947,7 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
                 })}
               </tbody>
               <tfoot><tr>
-                <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', padding: '11px 12px', fontWeight: 700 }}>{items.length} ledgers</td>
-                <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8' }} />
+                <td colSpan={rich ? 4 : 2} style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', padding: '11px 12px', fontWeight: 700 }}>{items.length} ledgers</td>
                 <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, padding: '11px 12px' }}>{num(totC)}</td>
                 <td style={{ position: 'sticky', bottom: 0, background: '#f2f7f5', borderTop: '2px solid #cdd1d8', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, padding: '11px 12px', color: net >= 0 ? SIGN_CLR.fixed : SIGN_CLR.deact }}>{Math.abs(net) < 0.005 ? '0.00' : money(net, scope.branch)} {net >= 0 ? 'Dr' : 'Cr'}</td>
               </tr></tfoot>
