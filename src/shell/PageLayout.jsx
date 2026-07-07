@@ -118,7 +118,7 @@ export function PageLayout({
 }) {
   const hasHeader = title || subtitle || actions || (breadcrumbs && breadcrumbs.length);
   return (
-    <div className={cn('w-full px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8', maxWidth, className)}>
+    <div className={cn('mx-auto w-full px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8', maxWidth, className)}>
       {hasHeader && (
         <PageHeader title={title} subtitle={subtitle} breadcrumbs={breadcrumbs} actions={actions} className={filters ? 'mb-3' : 'mb-4'} />
       )}

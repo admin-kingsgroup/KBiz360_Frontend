@@ -41,15 +41,13 @@ export function FocusSwitcher({ dark = false }) {
   );
 
   // Two skins: light (default) for a light bar, dark for the navy cockpit top-bar.
-  const captionCls = dark ? 'text-white/55' : 'text-ink-subtle';
   const containerCls = dark ? 'border-white/15 bg-white/[0.06]' : 'border-surface-border bg-surface';
   const sepCls = dark ? 'border-white/10' : 'border-surface-border';
   const idleCls = dark ? 'text-white/75 hover:bg-white/10 hover:text-white' : 'text-ink-muted hover:bg-gold/10 hover:text-navy';
   const idleCurCls = dark ? 'text-white/40' : 'text-ink-subtle';
   return (
-    <div className="flex flex-wrap items-center gap-2.5">
-      <span className={['text-[10px] font-bold uppercase tracking-[0.14em] whitespace-nowrap', captionCls].join(' ')}>Focus <span className="opacity-70">· scopes everything below</span></span>
-      <div role="group" aria-label="Branch focus" className={['inline-flex flex-wrap overflow-hidden rounded-lg border', containerCls].join(' ')}>
+    <div className="flex flex-nowrap items-center gap-2.5">
+      <div role="group" aria-label="Branch focus" className={['inline-flex shrink-0 flex-nowrap overflow-hidden rounded-lg border', containerCls].join(' ')}>
         {options.map((o, i) => {
           const on = focus === o.code;
           return (
@@ -59,7 +57,7 @@ export function FocusSwitcher({ dark = false }) {
               aria-pressed={on}
               onClick={() => setFocus(o.code, codes)}
               className={[
-                'inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
+                'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
                 i > 0 ? `border-l ${sepCls}` : '',
                 on ? 'bg-gold text-navy' : idleCls,
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50',
@@ -71,9 +69,6 @@ export function FocusSwitcher({ dark = false }) {
           );
         })}
       </div>
-      <span className={['text-[11px] whitespace-nowrap', captionCls].join(' ')}>
-        {focus === FOCUS_ALL ? 'branchwise · never summed' : 'scoped to this branch · full authority'}
-      </span>
     </div>
   );
 }
