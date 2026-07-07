@@ -49,7 +49,7 @@ export function branchKeys(d) {
 export function findingRows(d) {
   const rows = [];
   ((d && d.branches) || []).forEach((b) => (b.checks || []).forEach((c) => {
-    if (c.status === 'fail' || c.status === 'warn') rows.push({ branch: b.branch, status: c.status, label: c.label, category: c.category, detail: c.detail, count: c.count, sample: c.sample || [] });
+    if (c.status === 'fail' || c.status === 'warn') rows.push({ id: c.id, branch: b.branch, status: c.status, label: c.label, category: c.category, detail: c.detail, count: c.count, sample: c.sample || [] });
   }));
   const rank = { fail: 0, warn: 1 };
   return rows.sort((a, b) => (rank[a.status] - rank[b.status]) || (b.count - a.count));

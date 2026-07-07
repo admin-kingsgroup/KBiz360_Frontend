@@ -49,10 +49,10 @@ describe('TK integrity · FE shaping (pure)', () => {
     expect(branchKeys(payload)).toEqual(['BOM', 'AMD']);
   });
 
-  test('findingRows: only fail/warn, fails first', () => {
+  test('findingRows: only fail/warn, fails first, carries the check id for drill-down', () => {
     const f = findingRows(payload);
     expect(f).toHaveLength(1);
-    expect(f[0]).toMatchObject({ branch: 'BOM', status: 'fail', count: 78 });
+    expect(f[0]).toMatchObject({ id: 'sod-self-approved', branch: 'BOM', status: 'fail', count: 78 });
   });
 
   test('fail-soft on empty payload', () => {

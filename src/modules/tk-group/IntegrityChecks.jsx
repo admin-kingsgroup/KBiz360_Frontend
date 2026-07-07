@@ -1,8 +1,8 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getIntegrity } from './api/monitor';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getIntegrity, getIntegrityDetail, getFindingStatus, saveFindingStatus } from './api/monitor';
 import { integrityKpis, branchCards, matrixRows, branchKeys, findingRows, statusTone, statusGlyph } from './utils/integrity';
-import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
+import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, FormField } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 
@@ -21,14 +21,57 @@ function Cell({ status }) {
   );
 }
 
-const FINDING_COLS = [
-  { key: 'branch', header: 'Branch', render: (r) => <b className="text-ink">{r.branch}</b> },
-  { key: 'status', header: 'Gate', align: 'center', render: (r) => <Badge tone={statusTone(r.status)} size="sm">{r.status === 'fail' ? 'blocks close' : 'review'}</Badge> },
-  { key: 'label', header: 'Check', render: (r) => (
-    <div><div className="font-medium text-ink">{r.label}</div><div className="text-[11px] text-ink-muted">{r.detail}{r.sample && r.sample.length ? ` · e.g. ${r.sample.slice(0, 2).join(', ')}` : ''}</div></div>
-  ) },
-  { key: 'count', header: 'Count', align: 'right', num: true, render: (r) => <span className="tabular-nums font-semibold">{r.count}</span> },
-];
+const fmt = (n) => (n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : '');
+
+// Drill-down: the FULL offending list for one gate on one branch, fetched on expand.
+function FindingDetail({ branch, checkId }) {
+  const q = useQuery({ queryKey: ['tk', 'monitor', 'integrity', 'detail', branch, checkId], queryFn: () => getIntegrityDetail(branch, checkId), staleTime: 60_000 });
+  const rows = (q.data && q.data.rows) || [];
+  if (q.isLoading) return <div className="px-3 py-2 text-xs text-ink-subtle">Loading…</div>;
+  if (!rows.length) return <div className="px-3 py-2 text-xs text-ink-subtle">No line-level detail to list for this gate.</div>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-left text-ink-subtle">
+            <th className="py-1 pl-9 font-medium">Reference</th><th className="font-medium">Detail</th><th className="font-medium">Note</th><th className="pr-3 text-right font-medium">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-t border-surface-border/60">
+              <td className="py-1 pl-9 text-ink">{r.ref}</td>
+              <td className="capitalize text-ink-muted">{r.primary}</td>
+              <td className="text-ink-subtle">{r.secondary}</td>
+              <td className="pr-3 text-right tabular-nums text-ink">{fmt(r.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {q.data && q.data.count > rows.length && <div className="px-3 py-1 text-[11px] text-ink-subtle">Showing {rows.length} of {q.data.count}.</div>}
+    </div>
+  );
+}
+
+// Assign an owner / status / due date to a finding (branch × gate).
+function AssignBar({ branch, checkId, current, onSave, saving }) {
+  const [owner, setOwner] = useState((current && current.owner) || '');
+  const [status, setStatus] = useState((current && current.status) || 'open');
+  const [dueDate, setDueDate] = useState((current && current.dueDate) || '');
+  return (
+    <div className="flex flex-wrap items-end gap-2 bg-surface-alt/60 px-9 py-2">
+      <FormField label="Owner"><Input value={owner} placeholder="assignee" onChange={(e) => setOwner(e.target.value)} /></FormField>
+      <FormField label="Status">
+        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="open">Open</option><option value="acknowledged">Acknowledged</option><option value="in-progress">In progress</option>
+        </Select>
+      </FormField>
+      <FormField label="Due"><Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></FormField>
+      <Button size="sm" onClick={() => onSave({ branch, checkId, owner: owner.trim(), status, dueDate })} loading={saving}>Save</Button>
+      {current && current.updatedBy && <span className="pb-2 text-[11px] text-ink-subtle">last set by {current.updatedBy}</span>}
+    </div>
+  );
+}
 
 export function IntegrityChecks() {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'integrity'], queryFn: getIntegrity, staleTime: 60_000, refetchInterval: 300_000 });
@@ -38,6 +81,13 @@ export function IntegrityChecks() {
   const branches = branchKeys(d);
   const rows = matrixRows(d);
   const findings = findingRows(d);
+  const [open, setOpen] = useState(() => new Set());
+  const toggle = (k) => setOpen((prev) => { const n = new Set(prev); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+
+  const qc = useQueryClient();
+  const fsQ = useQuery({ queryKey: ['tk', 'finding-status'], queryFn: getFindingStatus, staleTime: 60_000 });
+  const fsMap = useMemo(() => { const m = {}; (fsQ.data || []).forEach((r) => { m[`${r.branch}:${r.checkId}`] = r; }); return m; }, [fsQ.data]);
+  const saveFs = useMutation({ mutationFn: saveFindingStatus, onSuccess: () => qc.invalidateQueries({ queryKey: ['tk', 'finding-status'] }) });
 
   const matrixCols = [
     { key: 'label', header: 'Integrity / Close gate', render: (r) => (
@@ -89,17 +139,40 @@ export function IntegrityChecks() {
         stickyHeader
       />
 
-      <DataTable
-        title="Findings — what blocks the close"
-        columns={FINDING_COLS}
-        rows={findings}
-        getRowKey={(r, i) => `${r.branch}:${r.label}:${i}`}
-        loading={q.isLoading}
-        emptyMessage="No open findings — every branch is clean."
-        searchable
-        showDensityToggle={false}
-        zebra
-      />
+      <PageSection title="Findings — what blocks the close (click to drill down)">
+        {findings.length ? (
+          <div className="grid gap-1.5">
+            {findings.map((f, i) => {
+              const k = `${f.branch}:${f.id}:${i}`;
+              const isOpen = open.has(k);
+              const assigned = fsMap[`${f.branch}:${f.id}`];
+              const hasOwner = assigned && (assigned.owner || (assigned.status && assigned.status !== 'open') || assigned.dueDate);
+              return (
+                <div key={k} className="rounded-lg border border-surface-border bg-surface">
+                  <button type="button" onClick={() => toggle(k)} aria-expanded={isOpen}
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-alt">
+                    <span className="w-3 text-ink-subtle">{isOpen ? '▾' : '▸'}</span>
+                    <Badge tone={statusTone(f.status)} size="sm">{f.branch}</Badge>
+                    <span className="font-medium text-ink">{f.label}</span>
+                    <span className="hidden truncate text-[11px] text-ink-muted tablet:inline">— {f.detail}</span>
+                    <span className="ml-auto flex items-center gap-2">
+                      {hasOwner && <Badge tone="info" size="sm">{assigned.owner || 'assigned'}{assigned.status !== 'open' ? ` · ${assigned.status}` : ''}{assigned.dueDate ? ` · due ${assigned.dueDate}` : ''}</Badge>}
+                      <Badge tone={f.status === 'fail' ? 'danger' : 'warning'} size="sm">{f.status === 'fail' ? 'blocks close' : 'review'}</Badge>
+                      {f.count > 0 && <b className="tabular-nums text-ink">{f.count}</b>}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <div className="border-t border-surface-border pb-1">
+                      <AssignBar branch={f.branch} checkId={f.id} current={assigned} saving={saveFs.isPending} onSave={(r) => saveFs.mutate(r)} />
+                      <FindingDetail branch={f.branch} checkId={f.id} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="text-xs text-ink-subtle">No open findings — every branch is clean.</p>}
+      </PageSection>
     </div>
   );
 }
