@@ -6,6 +6,7 @@ import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { GroupHealth } from './GroupHealth';
+import { IntegritySummary } from './IntegritySummary';
 
 // ─── TK GROUP · FE · Control Tower (container) ───────────────────────────────
 // The "is the control layer healthy?" view: headline KPIs, pending split by stream,
@@ -32,6 +33,12 @@ export function ControlTower() {
           Control Tower so issues/errors/setup gaps are the first thing seen. */}
       <PageSection title="Group Health — branchwise">
         <GroupHealth />
+      </PageSection>
+
+      {/* Close-readiness — the SAP-style integrity/close gates, branchwise, in brief.
+          Full gate × branch checklist lives at /tk/integrity. */}
+      <PageSection title="Close Readiness & Integrity — branchwise">
+        <IntegritySummary />
       </PageSection>
 
       {/* Control plane — the governance/approval oversight this page originally carried. */}
