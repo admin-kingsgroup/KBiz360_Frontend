@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getOverview } from './api/monitor';
 import { overviewKpis, streamRows, actorName } from './utils/monitor';
@@ -8,6 +8,27 @@ import { DataTable } from '../../shell/DataTable';
 import { GroupHealth } from './GroupHealth';
 import { IntegritySummary } from './IntegritySummary';
 import { ScrutinyTrend } from './ScrutinyTrend';
+
+// Defer the heavy branch-wide live bands (health / integrity / trend each fan out over
+// all 6 branches) until after first paint, so the Control Tower shell + governance
+// overview render instantly and the live bands stream in a beat later — snappier first
+// paint without hiding anything.
+function useDeferredMount() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const ric = window.requestIdleCallback || ((cb) => window.setTimeout(cb, 1));
+    const cic = window.cancelIdleCallback || window.clearTimeout;
+    const id = ric(() => setReady(true));
+    return () => cic(id);
+  }, []);
+  return ready;
+}
+
+function Deferred({ minHeight = 96, children }) {
+  const ready = useDeferredMount();
+  if (!ready) return <div className="animate-pulse rounded-lg bg-surface-alt" style={{ minHeight }} aria-hidden="true" />;
+  return children;
+}
 
 // ─── TK GROUP · FE · Control Tower (container) ───────────────────────────────
 // The "is the control layer healthy?" view: headline KPIs, pending split by stream,
@@ -33,19 +54,19 @@ export function ControlTower() {
       {/* Branch-wise health — the alerts engine wired in, worst branch first. Leads the
           Control Tower so issues/errors/setup gaps are the first thing seen. */}
       <PageSection title="Group Health — branchwise">
-        <GroupHealth />
+        <Deferred minHeight={160}><GroupHealth /></Deferred>
       </PageSection>
 
       {/* Close-readiness — the SAP-style integrity/close gates, branchwise, in brief.
           Full gate × branch checklist lives at /tk/integrity. */}
       <PageSection title="Close Readiness & Integrity — branchwise">
-        <IntegritySummary />
+        <Deferred minHeight={140}><IntegritySummary /></Deferred>
       </PageSection>
 
       {/* Scrutiny trend — is each branch's data quality improving (fixing faster than
           issues appear)? Built from the alert lifecycle. */}
       <PageSection title="Scrutiny Trend — is data quality improving?">
-        <ScrutinyTrend />
+        <Deferred minHeight={120}><ScrutinyTrend /></Deferred>
       </PageSection>
 
       {/* Control plane — the governance/approval oversight this page originally carried. */}

@@ -5,8 +5,5 @@ import { apiGet, apiPost, apiDelete } from '../../core/api';
 export async function getReconList({ branch, period } = {}) {
   try { return (await apiGet('/api/recon-status', { branch, period }))?.items || []; } catch { return []; }
 }
-export async function getReconSummary(period) {
-  try { return (await apiGet('/api/recon-status/summary', { period })) || { items: [] }; } catch { return { items: [] }; }
-}
 export function saveRecon(row) { return apiPost('/api/recon-status', row); }
 export function deleteRecon(id) { return apiDelete(`/api/recon-status/${id}`); }
