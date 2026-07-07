@@ -35,4 +35,21 @@ describe('cockpit menu integrity', () => {
     expect(isCentralRole({ role: 'Super Admin' })).toBe(true);
     expect(isCentralRole({ role: 'Branch Accountant' })).toBe(false);
   });
+
+  // The shared MegaPanel renderer promotes a section's LEADING title-less link to a
+  // boxed "featured" pill, while grouped/post-divider links become titled columns — so
+  // a section with loose top-level leaves renders as a different format (pills, or a
+  // mix). To keep every header dropdown ONE consistent titled-column look, no cockpit
+  // section may expose a bare leaf as a direct child: each must wrap its links in groups.
+  test('every cockpit section wraps its links in titled groups (no loose featured pills)', () => {
+    const menu = controlCockpitMenu(undefined, { role: 'Super Admin' });
+    const offenders = [];
+    menu.forEach((section) => {
+      if (!section || !section.children) return; // Control Tower is a direct top-level link
+      section.children.forEach((child) => {
+        if (child && child.href && !child.children && !child.divider) offenders.push(`${section.label} › ${child.label}`);
+      });
+    });
+    expect(offenders).toEqual([]);
+  });
 });
