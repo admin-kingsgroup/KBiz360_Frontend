@@ -121,9 +121,10 @@ export function rowsForEdit(spec, booking) {
 }
 
 // Rebuild the INB entry grid from a reconstructed deal (getDeal → { fareLines:[{amt,
-// desc}], serviceFee, passenger }). Each fare component maps to its fare column by label;
-// the service fee is the seller's margin (the ssvc column). ONE row reproduces both legs
-// — the fares pass through to the sale AND are the airline cost. GST recomputes on save.
+// desc}], serviceFee, purchaseHeads, purchase, passenger }). Each fare component maps to
+// its fare column by label; the service fee is the seller's margin (the ssvc column). ONE
+// row reproduces both legs — the fares pass through to the sale AND are the airline cost.
+// GST recomputes on save.
 export function inbRowsFromDeal(spec, deal) {
   const line = blankLine(spec);
   const cols = spec.fareCols || [];
@@ -132,6 +133,20 @@ export function inbRowsFromDeal(spec, deal) {
     if (col) line[col.key] = num(f.amt);
   }
   line.ssvc = num(deal.serviceFee);
+  // PURCHASE side: the fares mirror the sale (set above), but the Supplier Service
+  // Charge ('Supp SVCHG') exists ONLY on the purchase leg's heads, and the supplier
+  // incentive rides on deal.purchase — neither is in fareLines. Without restoring them
+  // the Edit grid opened with psvc/incentive BLANK, so the user's saved figures looked
+  // lost and the next save silently dropped them from the rebuilt purchase voucher.
+  for (const h of (deal.purchaseHeads || [])) {
+    if (/^supp\s*svchg$/i.test(String(h.desc || '').trim())) line.psvc = round2(num(line.psvc) + num(h.amt));
+  }
+  if (deal.purchase) {
+    if (num(deal.purchase.incentiveAmt)) line.incentive = num(deal.purchase.incentiveAmt);
+    // Holiday package: the supplier's GST is a manual entry (psvcGst), carried on the
+    // purchase leg as its taxAmt — restore it so the pkg grid doesn't recompute it as 0.
+    if (spec && spec.model === 'package' && num(deal.purchase.gst)) line.psvcGst = num(deal.purchase.gst);
+  }
   const parts = String(deal.passenger || '').trim().split(/\s+/);
   if (parts[0]) { line.fn = parts[0]; line.sn = parts.slice(1).join(' '); }
   return [line];
@@ -310,7 +325,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // out-of-state supplier purchase → inter). Default sale=intra; on edit, prefer the
   // leg's own stored mode, falling back to the legacy booking-level gstMode.
   const [saleGstMode, setSaleGstMode] = useState(editing ? (editBooking.so?.gstMode || editBooking.gstMode || 'intra') : 'intra');
-  const [purGstMode, setPurGstMode] = useState(editing ? (editBooking.po?.gstMode || editBooking.gstMode || 'intra') : 'intra');
+  // INB deals carry the purchase leg's mode on editBooking.purchase (getDeal shape).
+  const [purGstMode, setPurGstMode] = useState(editing ? (editBooking.po?.gstMode || editBooking.purchase?.gstMode || editBooking.gstMode || 'intra') : 'intra');
   // No silent default — the user MUST consciously pick International vs Domestic
   // (that choice IS the cost centre). A blank leaves it untagged: it still saves as
   // Pending but the approval gate refuses to post it until it's tagged.

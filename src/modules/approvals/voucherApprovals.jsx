@@ -804,6 +804,10 @@ function InbEditGate({ linkNo, branch, onDone }) {
     branch: deal.fromBranch, toBranch: deal.toBranch, module: deal.module,
     packageType: deal.packageType, date: deal.date, headerRef: deal.reference, passenger: deal.passenger,
     noSupplier: deal.noSupplier, fareLines: deal.fareLines, serviceFee: deal.serviceFee,
+    // Purchase-side detail: the Supplier Service Charge head + incentive/GST-mode live
+    // here (not in fareLines) — without them the Edit grid opens blank on those fields
+    // and the next save silently drops them from the rebuilt purchase leg.
+    purchaseHeads: deal.purchaseHeads || [], purchase: deal.purchase || null,
     supplier: deal.supplier
       ? { name: deal.supplier.name, ledgerName: deal.supplier.ledgerName, ledgerGroup: deal.supplier.ledgerGroup }
       : { name: '', ledgerName: '', ledgerGroup: '' },
