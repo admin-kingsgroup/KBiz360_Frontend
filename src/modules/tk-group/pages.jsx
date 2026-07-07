@@ -6,6 +6,7 @@ import { PeriodLockAdmin } from './PeriodLockAdmin';
 import { DecisionsBoard } from './DecisionsBoard';
 import { ControlTower } from './ControlTower';
 import { AdoptionMatrix } from './AdoptionMatrix';
+import { IntegrityChecks } from './IntegrityChecks';
 import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
@@ -138,6 +139,14 @@ export function TkAdoptionPage() {
   return (
     <Page title="ERP Adoption" subtitle="How much of the ERP each branch actually uses — capability-milestone scoring across every module, branchwise, with a Central column for shared config. Live: the score moves as branches enter data and fix issues.">
       <AdoptionMatrix />
+    </Page>
+  );
+}
+
+export function TkIntegrityPage() {
+  return (
+    <Page title="Close Readiness & Integrity" subtitle="SAP-style close checklist, branchwise: journal drift, orphan journals, self-approvals, duplicate numbers/masters, suspense, sub-ledger↔GL, FX revaluation, depreciation, accruals & GSTR-2B. Live — a fix clears the gate on refresh.">
+      <IntegrityChecks />
     </Page>
   );
 }

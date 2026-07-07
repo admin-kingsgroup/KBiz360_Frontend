@@ -67,7 +67,7 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkAdoptionPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkAdoptionPage, TkIntegrityPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
@@ -511,6 +511,7 @@ export default function KB360App(){
     if(route==="/tk/decisions")          return <TkDecisionsPage/>;
     if(route==="/tk/control-tower")      return <TkControlTowerPage/>;
     if(route==="/tk/adoption")           return <TkAdoptionPage/>;
+    if(route==="/tk/integrity")          return <TkIntegrityPage/>;
     if(route==="/tk/branch-cockpit")     return <TkBranchCockpitPage/>;
     if(route==="/tk/audit")              return <TkAuditTrailPage/>;
     if(route==="/tk/targets")            return <TkTargetsPage/>;

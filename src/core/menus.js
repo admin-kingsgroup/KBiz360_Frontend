@@ -486,6 +486,7 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {divider:true, label:"Monitoring"},
   {label:"Control Tower", href:"/tk/control-tower"},
   {label:"ERP Adoption", href:"/tk/adoption"},
+  {label:"Close Readiness & Integrity", href:"/tk/integrity"},
   {label:"Branch Scorecard", href:"/tk/scorecard"},
   {label:"Performance vs Target", href:"/tk/performance"},
   {label:"Investment & Capital", href:"/tk/investment"},

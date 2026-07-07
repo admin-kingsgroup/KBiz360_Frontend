@@ -166,6 +166,7 @@ export function controlCockpitMenu(focus, currentUser) {
     { label: 'Monitoring', icon: Activity, children: [
       { label: 'Live Drill-downs', children: [
         { label: 'ERP Adoption', href: '/tk/adoption' },
+        { label: 'Close Readiness & Integrity', href: '/tk/integrity' },
         { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
         { label: 'Audit Trail', href: '/tk/audit' },
       ] },
