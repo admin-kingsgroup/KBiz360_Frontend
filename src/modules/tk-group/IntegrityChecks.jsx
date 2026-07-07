@@ -142,8 +142,8 @@ export function IntegrityChecks() {
       <PageSection title="Findings — what blocks the close (click to drill down)">
         {findings.length ? (
           <div className="grid gap-1.5">
-            {findings.map((f, i) => {
-              const k = `${f.branch}:${f.id}:${i}`;
+            {findings.map((f) => {
+              const k = `${f.branch}:${f.id}`; // one finding per (branch, gate) — stable across refetch re-sorts
               const isOpen = open.has(k);
               const assigned = fsMap[`${f.branch}:${f.id}`];
               const hasOwner = assigned && (assigned.owner || (assigned.status && assigned.status !== 'open') || assigned.dueDate);

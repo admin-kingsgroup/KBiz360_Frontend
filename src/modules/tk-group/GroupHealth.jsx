@@ -14,18 +14,22 @@ import { DataTable } from '../../shell/DataTable';
 
 const TONE_COLOR = { good: '#1a7a4c', warn: '#a86a10', poor: '#b4531a', critical: '#b23b3b' };
 
-const ISSUE_COLS = [
-  { key: 'branch', header: 'Branch', render: (r) => <b className="text-ink">{r.branch}</b> },
-  { key: 'severity', header: 'Severity', align: 'center', render: (r) => (
-    <Badge tone={severityTone(r.severity)} size="sm">{r.severity === 'error' ? 'critical' : r.severity}</Badge>
-  ) },
-  { key: 'title', header: 'Issue', render: (r) => (
-    <div><div className="font-medium text-ink">{r.title}</div><div className="text-[11px] text-ink-muted">{r.detail}</div></div>
-  ) },
-  { key: 'link', header: '', align: 'right', render: (r) => (r.link ? <a className="text-[12px] font-medium text-info hover:underline" href={r.link}>Open →</a> : null) },
-];
+function issueColumns(setRoute) {
+  return [
+    { key: 'branch', header: 'Branch', render: (r) => <b className="text-ink">{r.branch}</b> },
+    { key: 'severity', header: 'Severity', align: 'center', render: (r) => (
+      <Badge tone={severityTone(r.severity)} size="sm">{r.severity === 'error' ? 'critical' : r.severity}</Badge>
+    ) },
+    { key: 'title', header: 'Issue', render: (r) => (
+      <div><div className="font-medium text-ink">{r.title}</div><div className="text-[11px] text-ink-muted">{r.detail}</div></div>
+    ) },
+    { key: 'link', header: '', align: 'right', render: (r) => (r.link
+      ? <button type="button" onClick={() => (setRoute ? setRoute(r.link) : (window.location.href = r.link))} className="text-[12px] font-medium text-info hover:underline">Open →</button>
+      : null) },
+  ];
+}
 
-export function GroupHealth() {
+export function GroupHealth({ setRoute } = {}) {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'health'], queryFn: getGroupHealth, staleTime: 60_000, refetchInterval: 300_000 });
   const d = q.data || {};
   const kpis = healthKpis(d);
@@ -63,7 +67,7 @@ export function GroupHealth() {
 
       <DataTable
         title="Top issues across all branches"
-        columns={ISSUE_COLS}
+        columns={issueColumns(setRoute)}
         rows={issues}
         getRowKey={(r, i) => `${r.branch}:${r.type}:${i}`}
         loading={q.isLoading}

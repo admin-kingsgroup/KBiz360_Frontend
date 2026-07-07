@@ -13,7 +13,7 @@ import { KpiTile } from '../dashboard/components/cards/KpiTile';
 const OK = '#1a7a4c';
 const BAD = '#b23b3b';
 
-export function IntegritySummary() {
+export function IntegritySummary({ setRoute } = {}) {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'integrity'], queryFn: getIntegrity, staleTime: 60_000, refetchInterval: 300_000 });
   const d = q.data || {};
   const kpis = integrityKpis(d);
@@ -49,7 +49,8 @@ export function IntegritySummary() {
         </div>
       )}
 
-      <a href="/tk/integrity" className="text-[12px] font-medium text-info hover:underline">View full close checklist →</a>
+      <button type="button" onClick={() => (setRoute ? setRoute('/tk/integrity') : (window.location.href = '/tk/integrity'))}
+        className="w-fit text-[12px] font-medium text-info hover:underline">View full close checklist →</button>
     </div>
   );
 }

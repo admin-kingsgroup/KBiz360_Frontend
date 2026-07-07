@@ -43,7 +43,7 @@ const EVENT_COLS = [
   { key: 'branch', header: 'Branch', render: (r) => r.branch || '—' },
 ];
 
-export function ControlTower() {
+export function ControlTower({ setRoute } = {}) {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'overview'], queryFn: getOverview, staleTime: 30_000, refetchInterval: 60_000 });
   const o = q.data || {};
   const controls = o.controls || [];
@@ -54,13 +54,13 @@ export function ControlTower() {
       {/* Branch-wise health — the alerts engine wired in, worst branch first. Leads the
           Control Tower so issues/errors/setup gaps are the first thing seen. */}
       <PageSection title="Group Health — branchwise">
-        <Deferred minHeight={160}><GroupHealth /></Deferred>
+        <Deferred minHeight={160}><GroupHealth setRoute={setRoute} /></Deferred>
       </PageSection>
 
       {/* Close-readiness — the SAP-style integrity/close gates, branchwise, in brief.
           Full gate × branch checklist lives at /tk/integrity. */}
       <PageSection title="Close Readiness & Integrity — branchwise">
-        <Deferred minHeight={140}><IntegritySummary /></Deferred>
+        <Deferred minHeight={140}><IntegritySummary setRoute={setRoute} /></Deferred>
       </PageSection>
 
       {/* Scrutiny trend — is each branch's data quality improving (fixing faster than

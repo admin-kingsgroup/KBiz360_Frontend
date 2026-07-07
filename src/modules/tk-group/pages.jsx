@@ -127,10 +127,10 @@ export function TkDecisionsPage() {
   );
 }
 
-export function TkControlTowerPage() {
+export function TkControlTowerPage({ setRoute }) {
   return (
     <Page title="Control Tower" subtitle="Is the control layer healthy? Pending approvals, how long they've waited, locked periods, which controls are live, and the latest control events.">
-      <ControlTower />
+      <ControlTower setRoute={setRoute} />
     </Page>
   );
 }

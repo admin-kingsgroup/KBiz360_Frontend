@@ -511,7 +511,7 @@ export default function KB360App(){
     if(route==="/tk/controls")           return <TkControlsPage/>;
     if(route==="/tk/period-locks")       return <TkPeriodLockPage/>;
     if(route==="/tk/decisions")          return <TkDecisionsPage/>;
-    if(route==="/tk/control-tower")      return <TkControlTowerPage/>;
+    if(route==="/tk/control-tower")      return <TkControlTowerPage setRoute={navigate}/>;
     if(route==="/tk/adoption")           return <TkAdoptionPage/>;
     if(route==="/tk/integrity")          return <TkIntegrityPage/>;
     if(route==="/tk/branch-cockpit")     return <TkBranchCockpitPage/>;
