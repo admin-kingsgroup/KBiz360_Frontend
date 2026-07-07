@@ -131,7 +131,7 @@ export function ControlPanel({ setRoute }) {
             <H3>Who is under control</H3>
             <div className="grid gap-3 tablet:grid-cols-2">
               {v.people.map((p) => (
-                <div key={p.key} className={`rounded-brand border bg-surface p-4 ${p.independent ? 'border-amber-300' : 'border-surface-border'}`}>
+                <div key={p.key} className={`rounded-brand border bg-surface p-4 ${p.independent ? 'border-warning/40' : 'border-surface-border'}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div><div className="font-serif text-[16px] font-semibold text-ink">{p.name}</div><div className="text-[11px] text-ink-muted">{p.role} · {p.duty}</div></div>
                     {p.independent ? <Badge tone="warning" size="sm">Independent · no approval</Badge> : <Badge tone="success" size="sm">Under control</Badge>}
@@ -212,7 +212,7 @@ export function ControlPanel({ setRoute }) {
             <p className="psub">Power person-by-person — role, branch, the level they hold, whether they are under control or independent, and how fully each is set up. Switch a user on individually.</p>
             <div className="grid gap-3 tablet:grid-cols-2">
               {USERS.map((u) => (
-                <div key={u.n} className="rounded-brand border border-amber-300 bg-surface p-4">
+                <div key={u.n} className="rounded-brand border border-warning/40 bg-surface p-4">
                   <div className="flex items-center justify-between gap-2">
                     <div><div className="font-serif text-[16px] font-semibold text-ink">{u.n}</div><div className="text-[11px] text-ink-muted">{u.r} · {u.b}</div></div>
                     <Badge tone="warning" size="sm">Independent · no approval</Badge>
@@ -260,7 +260,7 @@ export function ControlPanel({ setRoute }) {
         return (
           <>
             <p className="psub">Emergency elevated access — granted for a short window with a mandatory reason, fully audited, auto-expiring. Use only when normal approval can't run.</p>
-            <div className="rounded-brand border border-amber-300 bg-surface p-4 text-[12.5px] text-ink-muted">No break-glass session active. When invoked, it demands a reason, notifies the Owner immediately, and expires on a timer — every action inside the window is flagged in the audit trail.</div>
+            <div className="rounded-brand border border-warning/40 bg-surface p-4 text-[12.5px] text-ink-muted">No break-glass session active. When invoked, it demands a reason, notifies the Owner immediately, and expires on a timer — every action inside the window is flagged in the audit trail.</div>
           </>
         );
       case 'erp':
@@ -298,10 +298,10 @@ export function ControlPanel({ setRoute }) {
   return (
     <div data-testid="tk-control-panel">
       {/* status strip */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-amber-300 bg-amber-50 px-4 py-2.5">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-amber-800">Power Console</span>
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-warning/40 bg-warning-soft px-4 py-2.5">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-warning">Power Console</span>
         <Badge tone="warning">Everything OFF · dormant</Badge>
-        <span className="text-[12px] text-amber-800">Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.</span>
+        <span className="text-[12px] text-warning">Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.</span>
       </div>
 
       {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}

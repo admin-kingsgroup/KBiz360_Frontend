@@ -16,7 +16,10 @@ import { getLimits } from './api/limits';
 // Counts are currency-neutral (safe to pool); the ₹ value is shown ONLY when a single
 // branch is focused — never blended across currencies branchwise.
 const oldestTone = (d) => (d >= 4 ? 'text-danger' : d >= 2 ? 'text-warning' : 'text-success');
-const curOf = (code) => { const b = BRANCHES.find((x) => x.code === code); return (b && b.currency) || '₹'; };
+// Resolve a branch code → its currency SYMBOL (not the 'INR'/'USD' code, which money()
+// would print literally as "INR50,000"). Mirrors FocusSwitcher's curSym.
+const CUR_SYM = { INR: '₹', USD: '$', KES: '$', TZS: '$', CDF: '$' };
+const curOf = (code) => { const b = BRANCHES.find((x) => x.code === code); return (b && CUR_SYM[b.currency]) || '₹'; };
 
 export function StagePipeline() {
   const focus = useCockpitFocus();

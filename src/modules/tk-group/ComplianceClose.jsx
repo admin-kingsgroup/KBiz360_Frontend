@@ -17,7 +17,7 @@ const COMPLIANCE_COLS = [
     render: (r) => {
       const locks = r.lockedPeriods || [];
       return locks.length > 0
-        ? <Badge tone="success" size="sm">{`Locked · ${locks[0]}`}</Badge>
+        ? <Badge tone="info" size="sm">{`Locked · ${locks[0]}`}</Badge>
         : <Badge tone="neutral" size="sm">Open</Badge>;
     },
   },

@@ -26,7 +26,7 @@ import { PeriodBar, periodRange } from '../../core/period';
 import { CONSOLIDATED_LABEL } from '../../core/data';
 import { SkeletonTable } from '../../shell/primitives';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
-import { useApprovalChain, nextActionFor, StageChip } from '../../core/approvalChain';
+import { useApprovalChain, nextActionFor, StageChip, StageTracker } from '../../core/approvalChain';
 
 // Full branch-currency amount (₹ India · $ USD branches) — NO Cr/L abbreviation.
 // Grouping follows the currency: Indian lakh/crore for ₹, Western thousands for $.
@@ -322,7 +322,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   const actionCell = (e) => (
     status === 'pending' ? (
       <>
-        <StageChip e={e} />
+        <StageTracker e={e} />
         <button onClick={() => setEditId(e.id)} disabled={busy} style={{ ...ABTN(C.blue), marginLeft: 6 }}>Edit</button>
         {(() => {
           // Stage-aware action: Check (L1, anyone in branch) → Verify (L2) → Approve & Post (L3).
@@ -1267,7 +1267,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                     <td style={{ padding: '7px 12px', ...num }}><RefundAmountCell entry={e} money={money} /></td>
                     {pendingTab
                       ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
-                          <StageChip e={e} />
+                          <StageTracker e={e} />
                           {isApprover && <>
                             {/* Single voucher (RF/RI) — edit it in place via the shared voucher
                                 editor (saving reverts it to Pending), then re-enter the chain. */}

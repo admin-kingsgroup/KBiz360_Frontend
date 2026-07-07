@@ -6,11 +6,14 @@ import { DataTable } from '../../shell/DataTable';
 // ─── TK GROUP · FE · Branch Cockpit (container) ──────────────────────────────
 // Per-branch control posture: pending decisions / governance items and locked
 // periods, so you can see at a glance which branch needs attention. Read-only.
-const attentionCls = (r) =>
-  ((r.pendingDecisions || 0) + (r.pendingGovernance || 0)) ? 'bg-warning-soft' : '';
+const needsAttention = (r) => !!((r.pendingDecisions || 0) + (r.pendingGovernance || 0));
 
 const COCKPIT_COLS = [
-  { key: 'branch', header: 'Branch', className: 'font-bold', render: (r) => <span className={attentionCls(r)}>{r.branch}</span> },
+  { key: 'branch', header: 'Branch', className: 'font-bold', render: (r) => (
+    needsAttention(r)
+      ? <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2 py-0.5 font-bold text-warning" title="Pending decisions or governance need attention"><span className="h-1.5 w-1.5 rounded-full bg-warning" />{r.branch}</span>
+      : <span className="font-bold">{r.branch}</span>
+  ) },
   { key: 'pendingDecisions', header: 'Pending decisions', num: true, render: (r) => r.pendingDecisions || 0 },
   { key: 'pendingGovernance', header: 'Pending governance', num: true, render: (r) => r.pendingGovernance || 0 },
   { key: 'lockedPeriods', header: 'Locked periods', render: (r) => ((r.lockedPeriods || []).length ? r.lockedPeriods.join(', ') : '—') },

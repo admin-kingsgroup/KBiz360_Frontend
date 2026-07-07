@@ -80,3 +80,57 @@ export function StageChip({ e }) {
     </span>
   );
 }
+
+// Compact 5-node stage tracker for a pending row — Branch → AE · Sughra → FM · Faiz →
+// Director · Farhan → Owner · Afshin. Filled navy bead = cleared, gold = here now, hollow
+// = still ahead. The path shown is what THIS voucher passes: Branch→AE→FM always, plus
+// Director (amount over the escalate ceiling) and Owner (over the dual ceiling). Rendered
+// ONLY for chain entries (reviewStage set) — single-step / legacy entries show nothing,
+// exactly like StageChip, so the branch approval view is unchanged.
+const TRACK_NODES = { branch: 'B', ae: 'AE', fm: 'FM', director: 'D', owner: 'O' };
+const TRACK_LABEL = { branch: 'Branch', ae: 'AE · Sughra', fm: 'FM · Faiz', director: 'Director · Farhan', owner: 'Owner · Afshin' };
+export function StageTracker({ e }) {
+  const q = useQuery({
+    queryKey: ['tk', 'limits'],
+    queryFn: () => apiGet('/api/tk/limits').catch(() => ({})),
+    staleTime: 5 * 60_000,
+    enabled: !!getAuthToken(),
+  });
+  if (!e || !e.reviewStage) return null;
+  const lim = (q.data && (q.data.limits || q.data)) || {};
+  const amt = Math.abs(Number(e.total != null ? e.total : e.amount) || 0);
+  const esc = Number(lim.voucherEscalate) > 0 ? Number(lim.voucherEscalate) : Infinity;
+  const dual = Number(lim.voucherDual) > 0 ? Number(lim.voucherDual) : Infinity;
+  const terminal = amt > dual ? 'owner' : amt > esc ? 'director' : 'fm';
+  const path = ['branch', 'ae', 'fm'];
+  if (terminal === 'director' || terminal === 'owner') path.push('director');
+  if (terminal === 'owner') path.push('owner');
+  const s = stageOf(e); // check | verify | approve
+  const curKey = s === 'check' ? 'branch' : s === 'verify' ? 'ae' : terminal;
+  const curIdx = path.indexOf(curKey);
+  const trail = [
+    e?.checkedBy && `✓ Checked · ${e.checkedBy}`,
+    e?.verifiedBy && `✓ Verified · ${e.verifiedBy}`,
+    `● Now at ${TRACK_LABEL[curKey]}`,
+  ].filter(Boolean).join('\n');
+  return (
+    <span title={trail} style={{ display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', marginLeft: 6 }}>
+      {path.map((k, i) => {
+        const state = i < curIdx ? 'done' : i === curIdx ? 'here' : 'wait';
+        const bead = state === 'done'
+          ? { background: '#1a1c22', color: '#fff', border: '1px solid #1a1c22' }
+          : state === 'here'
+            ? { background: '#c2a04a', color: '#1a1c22', border: '1px solid #c2a04a', boxShadow: '0 0 0 3px rgba(194,160,74,0.22)' }
+            : { background: '#fff', color: '#8a90a2', border: '1.5px solid #cdd1d8' };
+        return (
+          <React.Fragment key={k}>
+            {i > 0 && <span style={{ width: 11, height: 2, background: i <= curIdx ? '#1a1c22' : '#cdd1d8' }} />}
+            <span aria-label={TRACK_LABEL[k]} style={{ width: 16, height: 16, borderRadius: '50%', display: 'inline-grid', placeItems: 'center', fontSize: 7.5, fontWeight: 800, ...bead }}>
+              {state === 'done' ? '✓' : TRACK_NODES[k]}
+            </span>
+          </React.Fragment>
+        );
+      })}
+    </span>
+  );
+}
