@@ -1736,6 +1736,11 @@ const isAdminRole = (u) => ['Super Admin', 'Director'].includes(u?.role);
 // Revoking un-posts a posted booking — approver-level roles only (the server enforces
 // this too; this just gates the button). Stricter than approving, looser than delete.
 const isApproverRole = (u) => ['Super Admin', 'Director', 'Senior Finance Manager', 'Sr. Accounts Executive'].includes(u?.role);
+// Booking revoke is one notch looser than the approver set: Branch Accountant may also
+// revoke SO/PO/GP bookings (branch-scoped server-side), so they can pull an approved
+// booking back to Pending, edit it and send it through the chain again. Approver-only
+// actions elsewhere (refund queue, finance vouchers) still use isApproverRole.
+const canRevokeBooking = (u) => isApproverRole(u) || u?.role === 'Branch Accountant';
 
 // Shared Revoke handler factory for the booking screens — runs the server preflight so
 // the dialog shows the blast radius (which legs un-post) and any warnings, blocks on a
@@ -1865,7 +1870,7 @@ export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const [groupBy, setGroupBy] = useState('none');
   const [paxEdit, setPaxEdit] = useState(null); // booking whose passenger details are being edited in place
   const canDelete = isAdminRole(currentUser);
-  const canRevoke = isApproverRole(currentUser);
+  const canRevoke = canRevokeBooking(currentUser);
   const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: toast });
 
   const rows = data.filter((b) => b.status === 'approved' || b.status === 'posted');
@@ -2150,7 +2155,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
     try { await apiPost('/api/booking-orders/' + b.id + '/delete', { reason }); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); setOpen(null); setMsg(`✓ Deleted ${b.bookingNo}.`); }
     catch (e) { setMsg('⚠ ' + (e.message || 'Delete failed')); } finally { setBusyId(null); }
   };
-  const canRevoke = isApproverRole(currentUser);
+  const canRevoke = canRevokeBooking(currentUser);
   const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: (m, kind) => setMsg((kind === 'error' ? '⚠ ' : '✓ ') + m) });
   const onApproveSelected = async () => {
     if (!sel.size) return;
