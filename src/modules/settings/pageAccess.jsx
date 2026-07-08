@@ -73,7 +73,9 @@ function groupItems(items) {
   return order.map((name) => ({ name, items: map.get(name) }));
 }
 
-export function PageAccessControl({ currentUser, setRoute }) {
+// `embedded` renders the control without its own PageLayout header, so a host
+// page (TK User Control Center) can mount it under its own title and tabs.
+export function PageAccessControl({ currentUser, setRoute, embedded = false }) {
   const usersLive = useUsersAdmin().data;
 
   const [selId, setSelId] = useState(null);
@@ -237,18 +239,17 @@ export function PageAccessControl({ currentUser, setRoute }) {
   /* ── Access gate: only the visibility administrator opens this page. All hooks
        above run unconditionally (Rules of Hooks); the gate is checked after. ── */
   if (!isPageAccessAdmin(currentUser)) {
-    return (
-      <PageLayout title="Page Visibility Control">
-        <PageSection className="mx-auto max-w-xl">
-          <EmptyState
-            icon={Lock}
-            title="Restricted"
-            hint="Only afshin.dhanani@kingsgroupco.com (or a Super Admin) can manage page visibility."
-            action={<Button variant="primary" onClick={() => setRoute && setRoute('/dashboard')}>← Back to Dashboard</Button>}
-          />
-        </PageSection>
-      </PageLayout>
+    const gate = (
+      <PageSection className="mx-auto max-w-xl">
+        <EmptyState
+          icon={Lock}
+          title="Restricted"
+          hint="Only afshin.dhanani@kingsgroupco.com (or a Super Admin) can manage page visibility."
+          action={<Button variant="primary" onClick={() => setRoute && setRoute('/dashboard')}>← Back to Dashboard</Button>}
+        />
+      </PageSection>
     );
+    return embedded ? gate : <PageLayout title="Page Visibility Control">{gate}</PageLayout>;
   }
 
   const filteredUsers = users.filter((u) => {
@@ -256,11 +257,8 @@ export function PageAccessControl({ currentUser, setRoute }) {
     return !t || (u.name || '').toLowerCase().includes(t) || (u.email || '').toLowerCase().includes(t);
   });
 
-  return (
-    <PageLayout
-      title="Page Visibility Control"
-      subtitle="Choose which branches and which pages & reports each user can see. Toggle on = visible, off = hidden from that user's menu and direct links."
-    >
+  const body = (
+    <>
       {/* ── Branded intro banner ── */}
       <div className="mb-4 flex items-start gap-2.5 rounded-brand bg-navy px-4 py-3.5 text-white tablet:px-5">
         <ShieldCheck size={22} className="mt-0.5 shrink-0 text-gold" />
@@ -500,6 +498,12 @@ export function PageAccessControl({ currentUser, setRoute }) {
           )}
         </div>
       </div>
-    </PageLayout>
+    </>
+  );
+  return embedded ? body : (
+    <PageLayout
+      title="Page Visibility Control"
+      subtitle="Choose which branches and which pages & reports each user can see. Toggle on = visible, off = hidden from that user's menu and direct links."
+    >{body}</PageLayout>
   );
 }
