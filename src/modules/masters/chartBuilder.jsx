@@ -826,16 +826,36 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
 // ERP-managed — shown with a lock, not tappable.
 function PresenceToggles({ item, num }) {
   const qc = useQueryClient();
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['master', 'ledgers'] }); };
   const m = useMutation({
     mutationFn: (body) => apiPost('/api/ledgers/branch-presence', body),
     onSuccess: (res, vars) => {
       const act = (res && res.data && res.data.action) || (vars.enable ? 'added' : 'removed');
       toastSuccess(`${item.name} — ${act} in ${vars.branch}`);
-      qc.invalidateQueries({ queryKey: ['accounting'] });
-      qc.invalidateQueries({ queryKey: ['master', 'ledgers'] });
+      refresh();
     },
     onError: (e) => toastError((e && e.message) || 'Could not change branch presence'),
   });
+  // Org-wide lock toggle: locking moves the head from * to ~*🔒 in EVERY branch
+  // (and back on unlock) — counts shift together, so branches stay equal.
+  const lockM = useMutation({
+    mutationFn: (body) => apiPost('/api/ledgers/lock', body),
+    onSuccess: (res, vars) => { toastSuccess(`${item.name} — ${vars.locked ? 'locked → moved to ~*' : 'unlocked → back to *'}`); refresh(); },
+    onError: (e) => toastError((e && e.message) || 'Could not change the lock'),
+  });
+  const headLocked = (item.presence || []).some((p) => p.locked);
+  const flipLock = async () => {
+    if (item.statutory || lockM.isPending) return;
+    const toLock = !headLocked;
+    const { confirmed } = await confirmDialog({
+      title: `${toLock ? 'Lock' : 'Unlock'} “${item.name}”?`,
+      message: toLock
+        ? 'Locks this head in EVERY branch: it moves to the ~*🔒 column, becomes non-editable / non-deletable in the app, and its branch toggles freeze.'
+        : 'Unlocks this head in EVERY branch: it moves back to the * column and becomes branch-manageable again.',
+      danger: toLock, confirmLabel: toLock ? 'Lock' : 'Unlock',
+    });
+    if (confirmed) lockM.mutate({ name: item.name, locked: toLock });
+  };
   const flip = async (p) => {
     if (p.locked || m.isPending) return;
     if (p.state === 'active') {
@@ -864,13 +884,22 @@ function PresenceToggles({ item, num }) {
     : p.state === 'inactive' ? 'deactivated — tap to reactivate'
     : 'tap to add to this branch';
   return (
-    <span style={{ display: 'inline-flex', gap: 3, flexWrap: 'nowrap' }}>
+    <span style={{ display: 'inline-flex', gap: 3, flexWrap: 'nowrap', alignItems: 'center' }}>
       {(item.presence || []).map((p) => (
         <button key={p.br} type="button" disabled={p.locked || m.isPending} onClick={() => flip(p)} style={pill(p)}
           title={`${p.br} · ${p.state}${p.posts ? ` · ${num(p.posts)} entries` : ''} · ${hint(p)}`}>
           {p.br}{p.locked ? '🔒' : ''}
         </button>
       ))}
+      {item.statutory
+        ? <span title="Statutory / module head — its lock is ERP-managed" style={{ fontSize: 12, marginLeft: 3, opacity: 0.55, cursor: 'not-allowed' }}>🔒</span>
+        : (
+          <button type="button" disabled={lockM.isPending} onClick={flipLock}
+            title={headLocked ? 'Locked (org-wide) — tap to unlock, moves back to *' : 'Tap to lock (org-wide) — moves to ~*🔒'}
+            style={{ appearance: 'none', border: `1px solid ${headLocked ? '#d8c084' : '#cdd1d8'}`, background: headLocked ? '#fdf6e3' : '#fff', borderRadius: 5, padding: '2px 5px', fontSize: 11, cursor: 'pointer', marginLeft: 3, opacity: lockM.isPending ? 0.5 : 1 }}>
+            {headLocked ? '🔒' : '🔓'}
+          </button>
+        )}
     </span>
   );
 }
