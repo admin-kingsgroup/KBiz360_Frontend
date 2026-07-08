@@ -165,6 +165,8 @@ export function controlCockpitMenu(focus, currentUser) {
     // Monitoring — live drill-downs.
     { label: 'Monitoring', icon: Activity, children: [
       { label: 'Live Drill-downs', children: [
+        { label: 'ERP Health Scorecard', href: '/tk/health-scorecard' },
+        { label: 'Control Tower — by Module', href: '/tk/modules' },
         { label: 'ERP Adoption', href: '/tk/adoption' },
         { label: 'Close Readiness & Integrity', href: '/tk/integrity' },
         { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },

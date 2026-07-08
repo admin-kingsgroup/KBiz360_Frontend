@@ -26,6 +26,14 @@ export async function getIntegrityDetail(branch, check) {
 export async function getTrend() {
   try { return (await apiGet('/api/tk/monitor/trend')) || {}; } catch { return {}; }
 }
+// NOTE: does NOT swallow errors (unlike the other getters) — the module tree must show a
+// real error state, not a false "all clean", if the roll-up fails.
+export async function getHealthScorecard() {
+  try { return (await apiGet('/api/tk/monitor/scorecard')) || {}; } catch { return {}; }
+}
+export async function getModules() {
+  return (await apiGet('/api/tk/monitor/modules')) || {};
+}
 export async function getFindingStatus() {
   try { return (await apiGet('/api/tk/finding-status'))?.items || []; } catch { return []; }
 }

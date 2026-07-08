@@ -7,6 +7,8 @@ import { DecisionsBoard } from './DecisionsBoard';
 import { ControlTower } from './ControlTower';
 import { AdoptionMatrix } from './AdoptionMatrix';
 import { IntegrityChecks } from './IntegrityChecks';
+import { ModuleTower } from './ModuleTower';
+import { HealthScorecard } from './HealthScorecard';
 import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
@@ -147,6 +149,22 @@ export function TkIntegrityPage() {
   return (
     <Page title="Close Readiness & Integrity" subtitle="SAP-style close checklist, branchwise: journal drift, orphan journals, self-approvals, duplicate numbers/masters, suspense, sub-ledger↔GL, FX revaluation, depreciation, accruals & GSTR-2B. Live — a fix clears the gate on refresh.">
       <IntegrityChecks />
+    </Page>
+  );
+}
+
+export function TkHealthScorecardPage() {
+  return (
+    <Page title="ERP Health Scorecard" subtitle="One composite health % and letter grade per branch — a weighted blend of Health (50%), Close-Readiness (30%) and Adoption (20%). Branchwise; the group figure is the mean of the branches.">
+      <HealthScorecard />
+    </Page>
+  );
+}
+
+export function TkModulesPage({ setRoute }) {
+  return (
+    <Page title="Control Tower — by Module" subtitle="Every one of the 75 ERP modules, grouped by head module, each with a live issue count (Health · Integrity · Adoption, branchwise). Click a module, then a problem, to drill to the exact ledgers / parties / vouchers.">
+      <ModuleTower setRoute={setRoute} />
     </Page>
   );
 }
