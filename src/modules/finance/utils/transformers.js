@@ -51,6 +51,10 @@ export function trialBalanceTotals(rows = []) {
  * vouchers usually have no `party` (they move money between ledgers), so the
  * displayed "account" falls back to billTo → counterParty → the first line's
  * ledger. Narration prefers the top-level remarks, then the first line desc.
+ *
+ * Amount prefers `partyNet` (refund vouchers only): the net actually POSTED to the
+ * party in the journal — a full-reversal refund nets its debtor leg, so the header
+ * `total` (gross) is not what the ledger (or the JV view) shows.
  */
 export function toVoucherRegisterRow(v = {}) {
   const lines = Array.isArray(v.lines) ? v.lines : [];
@@ -63,7 +67,7 @@ export function toVoucherRegisterRow(v = {}) {
     branch: v.branch || '',
     account: v.party || v.billTo || v.counterParty || firstLedger || '—',
     narration: v.remarks || (lines[0] && lines[0].desc) || '',
-    amount: num(v.total) || num(v.subtotal),
+    amount: num(v.partyNet) || num(v.total) || num(v.subtotal),
     status: v.status || '',
     mode: v.paymentMode || '',
   };
