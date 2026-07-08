@@ -55,7 +55,6 @@ export function BranchScorecard() {
           title="Branch Scorecard"
           columns={COLS}
           rows={rows}
-          loading={[...pnl, ...inv].some((x) => x.isLoading)}
           isError={pnl.length > 0 && pnl.every((x) => x.isError) && inv.every((x) => x.isError)}
           getRowKey={(r) => r.code}
           emptyMessage="No branch figures yet."
