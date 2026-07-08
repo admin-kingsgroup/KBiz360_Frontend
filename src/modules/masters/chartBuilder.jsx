@@ -913,6 +913,11 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
       <div style={head}>
         <span style={{ fontWeight: 700, fontSize: 14 }}>{data.label || scope.label || 'Details'}</span>
         <span style={{ fontFamily: 'monospace', fontSize: 12, color: DIM }}>{q.isLoading ? '…' : items.length + (isLedger ? ' ledgers' : ' groups')}</span>
+        {(data.excludedNotUsed || 0) > 0 && (
+          <span title="Untouched ledgers (0 entries, 0 balance) are not listed here — tap the Not used count to see and manage them" style={{ fontSize: 10.5, fontWeight: 700, color: '#3f5a86', background: '#3f5a8618', padding: '3px 9px', borderRadius: 999 }}>
+            + {data.excludedNotUsed} untouched → see Not used
+          </span>
+        )}
         <span style={{ flex: 1, minWidth: 140 }}><input value={dq} onChange={(e) => setDq(e.target.value)} placeholder="Search…" style={{ width: '100%', padding: '9px 11px', border: '1px solid #cdd1d8', borderRadius: 8, fontSize: 13 }} /></span>
         {isLedger && (
           <span style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
