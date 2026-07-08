@@ -848,7 +848,30 @@ function PresenceToggles({ item, num }) {
     onSuccess: (res, vars) => { toastSuccess(`${item.name} — ${vars.locked ? 'locked → moved to LL' : 'unlocked → back to OL'}`); refresh(); },
     onError: (e) => toastError((e && e.message) || 'Could not change the lock'),
   });
+  // Org-wide deactivate/restore: parks a not-needed head in Deact (every
+  // branch), or brings it back. Blocked for statutory + LL-locked heads.
+  const deactM = useMutation({
+    mutationFn: (body) => apiPost('/api/ledgers/active', body),
+    onSuccess: (res, vars) => { toastSuccess(`${item.name} — ${vars.active ? 'restored from Deact' : 'moved to Deact'}`); refresh(); },
+    onError: (e) => toastError((e && e.message) || 'Could not change activation'),
+  });
   const headLocked = (item.presence || []).some((p) => p.locked);
+  const anyLive = (item.presence || []).some((p) => p.state === 'active' || p.state === 'hidden');
+  const anyInactive = (item.presence || []).some((p) => p.state === 'inactive');
+  const flipActive = async () => {
+    if (item.statutory || headLocked || deactM.isPending) return;
+    const toDeact = anyLive;
+    const totalPosts = (item.presence || []).reduce((s, p) => s + (p.posts || 0), 0);
+    if (toDeact && totalPosts > 0) {   // posted head → confirm; untouched → instant
+      const { confirmed } = await confirmDialog({
+        title: `Deactivate “${item.name}”?`,
+        message: `It holds ${num(totalPosts)} posted entr${totalPosts === 1 ? 'y' : 'ies'} across branches — the entries stay untouched, but the ledger moves to the Deact column in every branch and can no longer be posted to. Restore it anytime from the Deact drill.`,
+        danger: true, confirmLabel: 'Deactivate',
+      });
+      if (!confirmed) return;
+    }
+    deactM.mutate({ name: item.name, active: !toDeact });
+  };
   const flipLock = async () => {
     if (item.statutory || lockM.isPending) return;
     const toLock = !headLocked;
@@ -910,6 +933,13 @@ function PresenceToggles({ item, num }) {
             {headLocked ? '🔒' : '🔓'}
           </button>
         )}
+      {!item.statutory && !headLocked && (anyLive || anyInactive) && (
+        <button type="button" disabled={deactM.isPending} onClick={flipActive}
+          title={anyLive ? 'Deactivate (org-wide) — moves to the Deact column; restorable' : 'Restore (org-wide) — brings it back from Deact'}
+          style={{ appearance: 'none', border: `1px solid ${anyLive ? '#f3c1bb' : '#bcd8ce'}`, background: anyLive ? '#fef2f2' : '#effaf5', color: anyLive ? '#b23c2b' : '#14795f', borderRadius: 5, padding: '2px 5px', fontSize: 11, fontWeight: 800, cursor: 'pointer', marginLeft: 2, opacity: deactM.isPending ? 0.5 : 1 }}>
+          {anyLive ? '⊘' : '↺'}
+        </button>
+      )}
     </span>
   );
 }
