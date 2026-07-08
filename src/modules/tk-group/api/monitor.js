@@ -17,6 +17,9 @@ export async function getAdoption() {
 export async function getGroupHealth() {
   try { return (await apiGet('/api/tk/monitor/health')) || {}; } catch { return {}; }
 }
+export async function getSetupReadiness() {
+  try { return (await apiGet('/api/tk/monitor/readiness')) || {}; } catch { return {}; }
+}
 export async function getIntegrity() {
   try { return (await apiGet('/api/tk/monitor/integrity')) || {}; } catch { return {}; }
 }

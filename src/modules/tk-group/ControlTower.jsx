@@ -6,6 +6,7 @@ import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { GroupHealth } from './GroupHealth';
+import { SetupReadiness } from './SetupReadiness';
 import { IntegritySummary } from './IntegritySummary';
 import { ScrutinyTrend } from './ScrutinyTrend';
 
@@ -55,6 +56,13 @@ export function ControlTower({ setRoute } = {}) {
           Control Tower so issues/errors/setup gaps are the first thing seen. */}
       <PageSection title="Group Health — branchwise">
         <Deferred minHeight={160}><GroupHealth setRoute={setRoute} /></Deferred>
+      </PageSection>
+
+      {/* Setup / Configuration Readiness — every module still awaiting data entry or
+          config, branchwise, riding the live adoption engine (auto-clears as data lands).
+          Kept here in the Control Tower only — deliberately off the notification bell. */}
+      <PageSection title="Setup & Configuration Readiness — pending data entry">
+        <Deferred minHeight={160}><SetupReadiness setRoute={setRoute} /></Deferred>
       </PageSection>
 
       {/* Close-readiness — the SAP-style integrity/close gates, branchwise, in brief.
