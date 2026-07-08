@@ -1,4 +1,4 @@
-import { statusTone, statusLabel, sevTone, scopeLabel, ruleKpis, toggleTarget, SCOPE_LEVELS, OPS } from '../utils/rules';
+import { statusTone, statusLabel, sevTone, scopeLabel, ruleKpis, toggleTarget, isCommonRule, groupRulesByBranch, SCOPE_LEVELS, OPS } from '../utils/rules';
 
 describe('TK rules manager · FE utils (pure)', () => {
   test('statusTone + statusLabel', () => {
@@ -32,6 +32,29 @@ describe('TK rules manager · FE utils (pure)', () => {
   test('toggleTarget flips active↔inactive', () => {
     expect(toggleTarget('active')).toBe('inactive');
     expect(toggleTarget('draft')).toBe('active');
+  });
+
+  test('isCommonRule — ALL / empty / missing branches are common', () => {
+    expect(isCommonRule({ scope: { branches: ['ALL'] } })).toBe(true);
+    expect(isCommonRule({ scope: { branches: [] } })).toBe(true);
+    expect(isCommonRule({ scope: {} })).toBe(true);
+    expect(isCommonRule({})).toBe(true);
+    expect(isCommonRule({ scope: { branches: ['BOM'] } })).toBe(false);
+  });
+
+  test('groupRulesByBranch — common first, branch sections in given order, multi-branch rules repeat', () => {
+    const rows = [
+      { ruleId: 'A', scope: { branches: ['ALL'] } },
+      { ruleId: 'B', scope: { branches: ['NBO'] } },
+      { ruleId: 'C', scope: { branches: ['BOM', 'NBO'] } },
+      { ruleId: 'D', scope: {} },
+    ];
+    const g = groupRulesByBranch(rows, ['BOM', 'NBO']);
+    expect(g.common.map((r) => r.ruleId)).toEqual(['A', 'D']);
+    expect(g.branches.map((b) => b.branch)).toEqual(['BOM', 'NBO']);
+    expect(g.branches[0].rules.map((r) => r.ruleId)).toEqual(['C']);
+    expect(g.branches[1].rules.map((r) => r.ruleId)).toEqual(['B', 'C']);
+    expect(groupRulesByBranch([])).toEqual({ common: [], branches: [] });
   });
 
   test('catalogue constants', () => {

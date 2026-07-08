@@ -37,3 +37,31 @@ export function ruleKpis(rows) {
 
 /** Next status action for a row (what the button does). */
 export function toggleTarget(status) { return status === 'active' ? 'inactive' : 'active'; }
+
+/** A rule is "common" when it applies to every branch (no scope.branches, empty, or 'ALL'). */
+export function isCommonRule(rule) {
+  const b = rule && rule.scope && rule.scope.branches;
+  return !Array.isArray(b) || b.length === 0 || b.includes('ALL');
+}
+
+/**
+ * Split rules into Common (all-branch) + per-branch sections.
+ * A rule naming several branches appears under each. branchOrder pins the
+ * section order (unknown codes go last, alphabetically).
+ */
+export function groupRulesByBranch(rows, branchOrder = []) {
+  const common = [];
+  const map = new Map();
+  for (const r of rows || []) {
+    if (isCommonRule(r)) { common.push(r); continue; }
+    for (const b of r.scope.branches) {
+      if (!map.has(b)) map.set(b, []);
+      map.get(b).push(r);
+    }
+  }
+  const pos = (b) => { const i = branchOrder.indexOf(b); return i === -1 ? branchOrder.length : i; };
+  const branches = [...map.keys()]
+    .sort((a, b) => pos(a) - pos(b) || a.localeCompare(b))
+    .map((branch) => ({ branch, rules: map.get(branch) }));
+  return { common, branches };
+}
