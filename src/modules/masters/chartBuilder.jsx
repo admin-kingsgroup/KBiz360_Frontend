@@ -672,12 +672,13 @@ function TravkingsGroupView() {
 // ─── Travkings Group Table View — count summary ──────────────────────────────
 // Compact count table: groups (global, Fixed */Wired ~*, NF=0 monitor) and
 // ledgers per branch (Fixed */Wired ~*/Not used/Deactivated/Total, incl. inactive).
-// The ledger columns are DISJOINT buckets (see backend deriveSummary): Core/Own =
-// the branch's USED unlocked fixed chart (split by base name vs BOM's chart);
-// ~*🔒 = module-wired + ALL governance-locked statutory heads (never in Core);
-// Not used = untouched ledgers (0 postings, 0 opening) — auto-migrates to
-// Core/Own on the first entry; Hidden = presence-toggled off; Deact separate.
-// Total = Core + Own + ~* + Not used (all active — equal across branches).
+// Ledger columns (see backend deriveSummary): Core/Own = the branch's UNLOCKED
+// fixed chart — STRUCTURAL (split by base name vs BOM; never 0 for a branch
+// that hasn't booked yet); ~*🔒 = module-wired + ALL governance-locked
+// statutory heads (never in Core); Not used = untouched INDICATOR (0 postings,
+// 0 opening — such rows also count in Core/Own and clear automatically on the
+// first entry); Hidden = presence-toggled off; Deact separate.
+// Total = Core + Own + ~* (all active — equal across branches).
 const SIGN_CLR = { fixed: P_GREEN, own: BLUE, wired: P_AMBER, nf: '#3f5a86', hidden: '#64748b', deact: P_RED };
 
 const P_CUR = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
@@ -748,10 +749,10 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', fontSize: 11.5, color: DIM, marginBottom: 10 }}>
-        <span>{chip('* Core', SIGN_CLR.fixed)} Shared chart, in use (has entries / balance)</span>
-        <span>{chip('* Own', SIGN_CLR.own)} Branch-only, in use</span>
+        <span>{chip('* Core', SIGN_CLR.fixed)} Shared chart (same in every branch)</span>
+        <span>{chip('* Own', SIGN_CLR.own)} Branch-only fixed ledgers</span>
         <span>{chip('~*', SIGN_CLR.wired)} Wired / locked (module + statutory heads 🔒)</span>
-        <span>{chip('Not used', SIGN_CLR.nf)} Untouched (0 entries, 0 balance) — moves to Core/Own on first entry</span>
+        <span>{chip('Not used', SIGN_CLR.nf)} Untouched (0 entries, 0 balance) — clears on first entry</span>
         <span>{chip('Hidden', SIGN_CLR.hidden)} Toggled off for that branch (restorable)</span>
         <span>{chip('Deact', SIGN_CLR.deact)} Deactivated</span>
         <span style={{ display: 'inline-flex', alignItems: 'center' }}>{LOCK_ICON}<span style={{ marginLeft: 3 }}>Locked — groups & wired heads (non-editable)</span></span>
@@ -775,7 +776,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
               <th style={{ ...th(), ...sep }}>*{LOCK_ICON}</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>NF</th>
-              {/* Ledger tier — DISJOINT buckets: Core/Own = used unlocked chart; ~*🔒 = module-wired + ALL locked statutory heads; Not used = untouched (auto-migrates on first entry); Total = Core+Own+~*+Not used. Hidden/Deact shown apart, not in Total. */}
+              {/* Ledger tier: Core/Own = the unlocked chart (structural); ~*🔒 = module-wired + ALL locked statutory heads; Total = Core+Own+~*; Not used = untouched indicator (clears on first entry). Hidden/Deact shown apart, not in Total. */}
               <th style={{ ...th(), ...sep }}>* Core</th><th style={th()}>* Own</th><th style={th()}>~*{LOCK_ICON}</th><th style={th()}>Total</th><th style={th()}>Not used</th><th style={th()}>Hidden</th><th style={th()}>Deact</th>
             </tr>
           </thead>
@@ -815,7 +816,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
       {drill && <DrillPanel scope={drill} q={drillQ} dq={dq} setDq={setDq} onClose={() => setDrill(null)} money={money} num={num} openMaster={openMaster} openStatement={openStatement} />}
 
       <div style={{ marginTop: 12, fontSize: 11.5, color: DIM, background: '#f7f9fc', border: '1px solid #cdd1d8', borderLeft: `3px solid ${P_GREEN}`, borderRadius: 8, padding: '10px 13px' }}>
-        <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary. The buckets are <b>disjoint</b>: <b>* Core</b> = shared-chart ledgers this branch is USING (entries or a balance); <b>* Own</b> = branch-only ledgers in use; <b>~*🔒</b> = module-wired + locked statutory heads (GST/VAT sets, control heads — never under Core); <b>Not used</b> = untouched ledgers (0 entries, 0 balance) — a ledger moves from Not used into Core/Own automatically on its first entry. <b>Total = Core + Own + ~* + Not used</b> (all active ledgers — equal across branches); <b>Hidden</b> = presence-toggled off (tap the count, then the branch pill, to restore); <b>Deact</b> is separate; neither counts in Total.
+        <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary. <b>* Core</b> = the branch's copy of the shared unlocked chart (equal across branches by design); <b>* Own</b> = branch-only fixed ledgers; <b>~*🔒</b> = module-wired + locked statutory heads (GST/VAT sets, control heads — never under Core). <b>Total = Core + Own + ~*</b> (all active ledgers — equal across branches). <b>Not used</b> is an indicator of untouched ledgers (0 entries, 0 balance) — they also sit in Core/Own and drop off the indicator automatically on their first entry. <b>Hidden</b> = presence-toggled off (tap the count, then the branch pill, to restore); <b>Deact</b> is separate; neither counts in Total.
       </div>
     </div>
   );
