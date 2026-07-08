@@ -17,7 +17,7 @@ jest.mock('../../core/api', () => ({
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DevControlPage } from '../devControl';
-import { DEV_REGISTRY, ALL_ITEMS, STATUS_META, TRACK_META } from '../devControl/registry';
+import { DEV_REGISTRY, ALL_ITEMS, STATUS_META, TRACK_META, isCleared, moduleRollup, VERDICT_META } from '../devControl/registry';
 import { fullMenuRoots, MENU_DEV_CONTROL } from '../../core/menus';
 
 const renderPage = (user) => {
@@ -40,6 +40,7 @@ describe('DevControlPage — Super-Admin gate', () => {
     renderPage({ role: 'Super Admin', email: 'x@y.com' });
     expect(screen.getAllByText(/ERP completion/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Pending from the developer/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Module status — what fully works/i)).toBeInTheDocument();
     expect(screen.getByText(/Area readiness — worst first/i)).toBeInTheDocument();
     expect(screen.getByText(/Live API wiring check/i)).toBeInTheDocument();
     expect(screen.getByText(/Script runbook/i)).toBeInTheDocument();
@@ -67,6 +68,45 @@ describe('registry integrity', () => {
 
   test('tracking statuses cover the workflow incl. terminal states', () => {
     expect(Object.keys(TRACK_META)).toEqual(expect.arrayContaining(['open', 'in-progress', 'done', 'wont-do']));
+  });
+
+  test('every NON-LIVE item carries a how-to-fix remark', () => {
+    for (const item of ALL_ITEMS.filter((i) => i.status !== 'live')) {
+      expect(typeof item.remark).toBe('string');
+      expect(item.remark.length).toBeGreaterThan(10);
+    }
+  });
+});
+
+describe('module rollup + shared clearing (Dev Control ↔ Control Tower contract)', () => {
+  test('rollup covers every module with a known verdict', () => {
+    const rollup = moduleRollup({});
+    expect(rollup.length).toBe(DEV_REGISTRY.length);
+    for (const m of rollup) {
+      expect(Object.keys(VERDICT_META)).toContain(m.verdict);
+      expect(m.cleared + m.open.length).toBe(m.total);
+    }
+  });
+
+  test('marking an item done in Dev Control clears it from the rollup (and thus the Tower lens)', () => {
+    const target = ALL_ITEMS.find((i) => i.status !== 'live');
+    const before = moduleRollup({}).find((m) => m.area === target.area);
+    const after = moduleRollup({ [target.id]: { status: 'done' } }).find((m) => m.area === target.area);
+    expect(isCleared(target, { status: 'done' })).toBe(true);
+    expect(isCleared(target, { status: 'open' })).toBe(false);
+    expect(after.open.length).toBe(before.open.length - 1);
+    expect(after.cleared).toBe(before.cleared + 1);
+  });
+
+  test('verdict tiers: stub/pending open → broken; only partial/audit/dormant → gaps; all cleared → working', () => {
+    const area = DEV_REGISTRY.find((a) => a.items.some((i) => i.status === 'stub' || i.status === 'pending'));
+    expect(moduleRollup({}).find((m) => m.area === area.area).verdict).toBe('broken');
+    // close every stub/pending in that area → verdict must improve past 'broken'
+    const closed = Object.fromEntries(area.items.filter((i) => i.status === 'stub' || i.status === 'pending').map((i) => [i.id, { status: 'done' }]));
+    expect(moduleRollup(closed).find((m) => m.area === area.area).verdict).not.toBe('broken');
+    // close everything → working
+    const all = Object.fromEntries(area.items.map((i) => [i.id, { status: 'done' }]));
+    expect(moduleRollup(all).find((m) => m.area === area.area).verdict).toBe('working');
   });
 });
 

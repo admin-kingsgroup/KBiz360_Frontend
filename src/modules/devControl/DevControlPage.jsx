@@ -33,14 +33,9 @@ import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { getAuthToken, API_BASE, apiGet, apiPost } from '../../core/api';
 import { APP_ROUTES } from '../../core/routeManifest.generated';
-import { DEV_REGISTRY, ALL_ITEMS, STATUS_META, TRACK_META, SEVERITY_ORDER, RUNBOOK, KNOWN_ISSUES, HEALTH_CHECKS } from './registry';
+import { DEV_REGISTRY, ALL_ITEMS, STATUS_META, TRACK_META, SEVERITY_ORDER, RUNBOOK, KNOWN_ISSUES, HEALTH_CHECKS, isCleared, moduleRollup, VERDICT_META } from './registry';
 
 const isSuperAdmin = (u) => ['Super Admin', 'super_admin'].includes(u?.role || '');
-
-/* An item is CLEARED (off the pending board) when its registry row says 'live',
-   or when its tracking row was closed as done / won't-do. */
-const isCleared = (item, tracked) =>
-  item.status === 'live' || ['done', 'wont-do'].includes(tracked?.status || '');
 
 async function getDevStatus() {
   try { return (await apiGet('/api/dev-control'))?.items || []; } catch { return []; }
@@ -123,8 +118,13 @@ function FindingRow({ item, tracked, setRoute, onSave, saving }) {
               assignment loads (avoids saving blank over an existing one) */}
           <AssignBar key={tracked?._id || 'unassigned'} itemId={item.id} current={tracked} saving={saving} onSave={onSave} />
           <div className="grid gap-1 px-4 py-2 text-xs">
-            {item.note && <p className="leading-relaxed text-ink-muted">{item.note}</p>}
-            {tracked?.note && <p className="leading-relaxed text-ink"><b>Tracker note:</b> {tracked.note}</p>}
+            {item.note && <p className="leading-relaxed text-ink-muted"><b>What's wrong:</b> {item.note}</p>}
+            {item.remark && (
+              <p className="rounded-md px-2.5 py-1.5 leading-relaxed" style={{ background: '#fff8e1', color: '#5a4a00' }}>
+                <b>How to fix:</b> {item.remark}
+              </p>
+            )}
+            {tracked?.note && <p className="leading-relaxed text-ink"><b>Progress note:</b> {tracked.note}</p>}
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 pt-1">
               {(item.routes || []).map((r) => (
                 <a key={r} onClick={() => setRoute && setRoute(r)} className="cursor-pointer font-mono text-[11px] text-brand hover:underline" style={{ color: '#0070f2' }}>{r}</a>
@@ -212,6 +212,71 @@ function HealthSection() {
           </div>
         </div>
       )}
+    </PageSection>
+  );
+}
+
+/* ── module status — every module, working or not, with fix remarks ── */
+function VerdictPill({ verdict }) {
+  const m = VERDICT_META[verdict];
+  return (
+    <span title={m.desc} style={{
+      display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 11,
+      fontWeight: 700, whiteSpace: 'nowrap', color: m.color, background: m.bg,
+      border: `1px solid ${m.color}33`,
+    }}>{m.label}</span>
+  );
+}
+
+function ModuleStatusSection({ trackMap, setRoute }) {
+  const rollup = useMemo(() => moduleRollup(trackMap), [trackMap]);
+  const [openArea, setOpenArea] = useState(null);
+  const working = rollup.filter((r) => r.verdict === 'working').length;
+  return (
+    <PageSection
+      title="Module status — what fully works, what doesn't"
+      subtitle={`Every module of the ERP with a working verdict. ${working} of ${rollup.length} modules fully working. Expand a module to see exactly what's not working and the remark on how to fix it.`}
+    >
+      <div className="grid gap-1.5">
+        {rollup.map((m) => {
+          const open = openArea === m.area;
+          return (
+            <div key={m.area} className="rounded-lg border border-surface-border bg-surface">
+              <button type="button" onClick={() => setOpenArea(open ? null : m.area)} aria-expanded={open}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-alt">
+                <span className="w-3 text-ink-subtle">{m.open.length ? (open ? '▾' : '▸') : '·'}</span>
+                <VerdictPill verdict={m.verdict} />
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{m.area}</span>
+                <span className="ml-auto flex shrink-0 items-center gap-3">
+                  <span className="text-[11px] tabular-nums text-ink-subtle">{m.cleared}/{m.total} items working</span>
+                  {m.open.length > 0 && <Badge tone={m.verdict === 'broken' ? 'danger' : 'warning'} size="sm">{m.open.length} to fix</Badge>}
+                </span>
+              </button>
+              {open && m.open.length > 0 && (
+                <div className="grid gap-2 border-t border-surface-border px-4 py-3">
+                  {m.open.map((i) => (
+                    <div key={i.id} className="grid gap-1 rounded-md border border-surface-border/60 p-2.5 text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusPill status={i.status} />
+                        <b className="text-ink">{i.name}</b>
+                        {(i.routes || []).slice(0, 2).map((r) => (
+                          <a key={r} onClick={() => setRoute && setRoute(r)} className="cursor-pointer font-mono text-[10.5px]" style={{ color: '#0070f2' }}>{r}</a>
+                        ))}
+                      </div>
+                      {i.note && <p className="leading-relaxed text-ink-muted"><b>What's wrong:</b> {i.note}</p>}
+                      {i.remark && (
+                        <p className="rounded-md px-2.5 py-1.5 leading-relaxed" style={{ background: '#fff8e1', color: '#5a4a00' }}>
+                          <b>How to fix:</b> {i.remark}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </PageSection>
   );
 }
@@ -304,6 +369,9 @@ export function DevControlPage({ setRoute, currentUser }) {
           <KpiTile label="Needs audit" value={pending.filter((i) => i.status === 'audit').length} sub="wiring unverified" color="#57606a" />
         </ResponsiveGrid>
 
+        {/* ── module status — working / not-working verdict per module ── */}
+        <ModuleStatusSection trackMap={trackMap} setRoute={setRoute} />
+
         {/* ── area readiness — worst first ── */}
         <PageSection title="Area readiness — worst first" subtitle="Per module area: how much is wired or cleared vs still pending from the developer.">
           <ResponsiveGrid min="170px" gap="md">
@@ -330,7 +398,7 @@ export function DevControlPage({ setRoute, currentUser }) {
         {/* ── THE BOARD — pending from the developer ── */}
         <PageSection
           title="Pending from the developer — what blocks ERP completion"
-          subtitle="Every feature not yet wired end-to-end, worst first. Expand a finding to assign an owner, set status / due date, and leave a note — saved centrally, like Control-Tower findings. Mark Done / Won't do to clear it, or flip it to 'live' in registry.js when truly wired."
+          subtitle="Every feature not yet wired end-to-end, worst first. Expand a finding for the What's-wrong note and the How-to-fix remark; assign an owner, set status / due date, leave a progress note. Mark Done / Won't do (or flip the registry row to 'live') to clear it — it also clears from the TK Control Tower's Development lens automatically."
         >
           <FilterBar className="mb-2">
             <Select value={sevFilter} onChange={(e) => setSevFilter(e.target.value)} aria-label="Filter by severity">
