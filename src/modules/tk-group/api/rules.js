@@ -1,9 +1,9 @@
 import { apiGet, apiPost, apiPut, apiDelete } from '../../../core/api';
 
-// Rules Manager — OWNER only (the API enforces Super Admin). Reads fail soft to empty;
-// writes surface errors to the caller so the form can show them.
+// Rules Manager — OWNER only (the API enforces Super Admin). Does NOT swallow errors —
+// the screen must show a real error/owner-only state, not a false "no rules".
 export async function getRules(params = {}) {
-  try { return (await apiGet('/api/tk/rules', params))?.items || []; } catch { return []; }
+  return (await apiGet('/api/tk/rules', params))?.items || [];
 }
 export function createRule(rule) { return apiPost('/api/tk/rules', rule); }
 export function updateRule(id, rule) { return apiPut(`/api/tk/rules/${id}`, rule); }

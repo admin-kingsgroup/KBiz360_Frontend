@@ -28,6 +28,10 @@ export function RulesManager({ canManage = true }) {
   const k = ruleKpis(rows);
   const set = (path, v) => setForm((f) => { const n = { ...f }; if (path.includes('.')) { const [a, b] = path.split('.'); n[a] = { ...n[a], [b]: v }; } else n[path] = v; return n; });
   const save = () => create.mutate(form);
+  const remove = (r) => { if (window.confirm(`Delete rule "${r.title}"? This cannot be undone.`)) del.mutate(r._id); };
+  // A field rule needs a collection + field; a numeric op needs a value.
+  const numericOp = ['>', '>=', '==', '!='].includes(form.condition.op);
+  const formOk = form.title.trim() && form.condition.coll.trim() && form.condition.field.trim() && (!numericOp || String(form.condition.value).trim() !== '');
 
   if (!canManage) {
     return <div className="rounded-lg border border-dashed border-warning p-8 text-center text-sm text-warning">This screen is for the Owner only. Ask the Owner to manage monitoring rules.</div>;
@@ -76,7 +80,8 @@ export function RulesManager({ canManage = true }) {
             </div>
             <FormField label="Remark"><Textarea rows={2} value={form.remark} placeholder="Why this rule / how to refine it" onChange={(e) => set('remark', e.target.value)} /></FormField>
             <div className="flex items-center gap-3">
-              <Button onClick={save} disabled={!form.title.trim() || create.isPending} loading={create.isPending}>Save as Draft</Button>
+              <Button onClick={save} disabled={!formOk || create.isPending} loading={create.isPending}>Save as Draft</Button>
+              {!formOk && <span className="text-[11px] text-ink-subtle">Needs a title, collection, field{numericOp ? ' and value' : ''}.</span>}
               {create.isError && <span className="text-xs text-danger">{create.error?.message || 'Save failed'}</span>}
             </div>
           </div>
@@ -110,7 +115,7 @@ export function RulesManager({ canManage = true }) {
                             {r.status === 'active' ? 'Deactivate' : 'Activate ▸'}
                           </Button>
                         )}
-                        {!r.system && <Button size="sm" variant="ghost" onClick={() => del.mutate(r._id)} aria-label="Delete rule">✕</Button>}
+                        {!r.system && <Button size="sm" variant="ghost" onClick={() => remove(r)} aria-label="Delete rule">✕</Button>}
                         {tr && (
                           <span className="text-[12px] text-ink-muted">
                             {tr.evaluable ? <> would flag <b className="text-ink">{tr.total}</b>{tr.branches?.length ? <> — {tr.branches.filter((b) => b.violations).map((b) => `${b.branch}:${b.violations}`).join(' ')}</> : null}</>
