@@ -113,6 +113,8 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Thresholds & Limits', href: '/tk/limits' },
       ] },
       { label: 'Rules & Requests', children: [
+        // Owner-only: the rules engine (ERP monitoring + per-user access), tabbed on one page.
+        ...(isOwner ? [{ label: 'ERP Rules Manager', href: '/tk/rules' }] : []),
         { label: 'Period Locks', href: '/tk/period-locks' },
         { label: 'Targets & Budgets', href: '/tk/targets' },
         { label: 'Master Control (request)', href: '/tk/master-control' },
@@ -123,9 +125,8 @@ export function controlCockpitMenu(focus, currentUser) {
       ] },
     ] },
 
-    // Rules Manager — its OWN icon, sitting right beside Control & Configuration.
-    // Owner-only (config-driven monitoring-rules engine; new rules land Inactive/Draft).
-    ...(isOwner ? [{ label: 'Rules Manager', icon: ShieldCheck, href: '/tk/rules' }] : []),
+    // (The Rules Manager now lives INSIDE Control & Configuration → Rules & Requests,
+    // as "ERP Rules Manager" — a tabbed page holding ERP Rules + User Rules.)
 
     // Administration — the org-wide admin panel (users / roles / access / config /
     // integrations). Central by nature; the branch surface no longer carries it.

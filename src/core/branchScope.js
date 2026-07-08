@@ -9,6 +9,21 @@ import { BRANCHES } from './data';
 // scoping (auth.middleware enforceBranchScope) and the BranchSwitcher.
 export const FULL_SCOPE_ROLES = ['Super Admin', 'Director', 'Senior Finance Manager', 'Sr. Accounts Executive'];
 
+// The backend treats 'super_admin' and 'Super Admin' as the SAME Owner identity (its
+// role CANON map). The frontend, however, keys every owner gate on the title-case form
+// ('Super Admin') — FULL_SCOPE_ROLES here, plus the central-cockpit, dashboards,
+// page-access and data-migration checks. So we canonicalise the role ONCE, at user
+// ingest (see App.jsx: restore/switch/set), and every downstream check just works —
+// rather than sprinkling a dual-alias in a dozen places and risking one being missed.
+export function canonicalRole(role) {
+  return role === 'super_admin' ? 'Super Admin' : role;
+}
+export function withCanonicalRole(user) {
+  if (!user || !user.role) return user;
+  const role = canonicalRole(user.role);
+  return role === user.role ? user : { ...user, role };
+}
+
 export function isFullScope(user) {
   return !user || FULL_SCOPE_ROLES.includes(user?.role);
 }

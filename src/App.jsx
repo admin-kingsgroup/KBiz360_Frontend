@@ -10,7 +10,7 @@ import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
 import { ErrorBoundary } from './shell/ErrorBoundary';
-import { pickBranchForUser } from './core/branchScope';
+import { pickBranchForUser, withCanonicalRole } from './core/branchScope';
 import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
@@ -119,7 +119,9 @@ export default function KB360App(){
   /* ── Restore the session from localStorage so a refresh keeps the user
      signed in (the JWT lives under 'kb360-token', the user under 'kb360-user'). */
   const restoredUser = (() => {
-    try { if(localStorage.getItem("kb360-token")) return JSON.parse(localStorage.getItem("kb360-user")||"null"); }
+    // Canonicalise the role on restore too — a session saved with 'super_admin' must
+    // come back as the title-case Owner every owner gate recognises.
+    try { if(localStorage.getItem("kb360-token")) return withCanonicalRole(JSON.parse(localStorage.getItem("kb360-user")||"null")); }
     catch { /* ignore */ }
     return null;
   })();
@@ -232,7 +234,10 @@ export default function KB360App(){
      refresh-time initializer uses). This is the fix for "some pages show failed
      to fetch until I refresh": login left the branch at a stale/out-of-scope
      value, which the server-side branch scoping then rejected with 403s. */
-  const switchUser = (newUser) => {
+  const switchUser = (rawUser) => {
+    // Canonicalise 'super_admin' → 'Super Admin' so the Owner gets full scope + the
+    // central cockpit + every owner-only surface, not a half-owner.
+    const newUser = withCanonicalRole(rawUser);
     setCurrentUser(newUser);
     setBranch(pickBranchForUser(newUser));
     // Redirect on user switch (current route may be forbidden). Accountants land on
@@ -250,7 +255,7 @@ export default function KB360App(){
       // Drop any minimized/parked (branch-scoped) items so they never leak to the next session.
       try{ window.dispatchEvent(new CustomEvent("kbiz:logout")); }catch{ /* ignore */ }
     }
-    setCurrentUser(u);
+    setCurrentUser(withCanonicalRole(u));
   };
 
   /* ── Auto-renew the JWT so an open session never reaches the token expiry.
