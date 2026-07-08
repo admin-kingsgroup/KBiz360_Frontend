@@ -6,6 +6,7 @@ import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { BandError } from './BandError';
+import { ModuleReadinessMap } from './ModuleReadinessMap';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 
 // ─── TK GROUP · FE · Setup / Configuration Readiness (on the Control Tower) ───
@@ -142,6 +143,11 @@ export function SetupReadiness({ setRoute } = {}) {
           </div>
         </PageSection>
       )}
+
+      {/* The whole ERP as a setup checklist: 11 head modules · 75 sub-modules, each
+          with live health + what it needs (manual configuration / development / both)
+          and the fix narration on expand. Follows the same branch scope as above. */}
+      <ModuleReadinessMap data={d} branch={branch} setRoute={setRoute} />
     </div>
   );
 }
