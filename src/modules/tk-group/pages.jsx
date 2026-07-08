@@ -11,6 +11,7 @@ import { ModuleTower } from './ModuleTower';
 import { HealthScorecard } from './HealthScorecard';
 import { RulesManager } from './RulesManager';
 import { UserRulesManager } from './UserRulesManager';
+import { RuleBook } from './RuleBook';
 import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
@@ -155,11 +156,13 @@ export function TkIntegrityPage() {
   );
 }
 
-// Two managers under one route: ERP Rules (Control-Tower monitoring) + User Rules
-// (per-user access). Tabbed so they sit together under Control & Configuration.
+// Three surfaces under one route: ERP Rules (Control-Tower monitoring) + User Rules
+// (per-user access) + Rule Book (read-only reference of the rules enforced in code).
+// Tabbed so they sit together under Control & Configuration.
 const RULES_TABS = [
   { id: 'erp', label: 'ERP Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate the rules the Control Tower monitors. New rules land Inactive (Draft) and do nothing until you Test them on live data and Activate. System rules (🔒) are enforced in code and read-only.' },
   { id: 'user', label: 'User Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate per-user access rules — who may reach which branch, module or action, an approval ceiling, view-only or a login window. New rules land Inactive (Draft) until you Test the blast radius and Activate.' },
+  { id: 'book', label: 'Rule Book', subtitle: 'Read-only reference of every Accounts & Operations rule the ERP enforces in code — searchable, filterable by Accounts / Operations, each citing the file that enforces it. Documentation only; nothing here is evaluated on live data.' },
 ];
 
 export function TkRulesPage({ owner, initialTab = 'erp' }) {
@@ -180,7 +183,9 @@ export function TkRulesPage({ owner, initialTab = 'erp' }) {
           </button>
         ))}
       </div>
-      {tab === 'erp' ? <RulesManager canManage={!!owner} /> : <UserRulesManager canManage={!!owner} />}
+      {tab === 'erp' ? <RulesManager canManage={!!owner} />
+        : tab === 'user' ? <UserRulesManager canManage={!!owner} />
+          : <RuleBook />}
     </Page>
   );
 }
