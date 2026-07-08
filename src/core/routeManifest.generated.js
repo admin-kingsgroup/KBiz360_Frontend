@@ -75,6 +75,7 @@ export const APP_ROUTES = [
   "/debit-note/deleted",
   "/debit-note/pending",
   "/debit-note/rejected",
+  "/dev/control",
   "/expense/budget",
   "/finance/acm-voucher",
   "/finance/adm-voucher",

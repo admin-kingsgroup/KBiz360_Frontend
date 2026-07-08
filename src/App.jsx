@@ -84,6 +84,7 @@ const { Statistics } = lazyModule(() => import('./modules/reports/statistics'));
 const { CostCenterMasterLive } = lazyModule(() => import('./modules/masters/costCentersLive'));
 const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, CreditFacilitiesMaster, GroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/masters/mastersLive'));
 const { DataImportPage } = lazyModule(() => import('./modules/dataImport'));
+const { DevControlPage } = lazyModule(() => import('./modules/devControl'));
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
 import { SideNav } from './shell/SideNav';
@@ -809,6 +810,18 @@ export default function KB360App(){
         if(route==="/settings/banking-api")            return <BankingApiSettings branch={branch} setRoute={navigate}/>;
         if(route==="/settings/gsp-irp")                return <GspIrpSettings branch={branch} setRoute={navigate}/>;
         if(route==="/settings/page-access")            return <PageAccessControl currentUser={currentUser} setRoute={navigate}/>;
+    // Developer Control — the engineering status console (what's wired / partial /
+    // stub / dormant / pending across the whole ERP). SUPER-ADMIN ONLY: the menu
+    // entry is role-gated in menus.js, and this route blocks everyone else even by
+    // direct URL (the component re-checks the role too, as defense in depth).
+    if(route==="/dev/control") return ['Super Admin','super_admin'].includes(currentUser?.role||'')
+      ? <DevControlPage setRoute={navigate} currentUser={currentUser}/>
+      : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Developer Control</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This engineering console is restricted to the Super Admin.</p>
+          <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
+        </div>;
     return <Placeholder route={route} setRoute={navigate}/>;
   }
 

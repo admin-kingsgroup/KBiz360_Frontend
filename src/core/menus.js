@@ -520,6 +520,12 @@ export const MENU_DECISIONS = {label:"Decisions", icon:Scale, href:"/tk/decision
 // roleMenuRoots below (full menu AND the Branch-Accountant workspace).
 export const MENU_SUPPORT = {label:"Support", icon:LifeBuoy, href:"/support/tickets"};
 
+// Developer Control — the engineering status console (/dev/control): what's wired,
+// partial, stub, dormant or pending across the whole ERP, plus live API checks and
+// the script runbook. SUPER-ADMIN ONLY: appended in fullMenuRoots() for that role
+// alone, and the route itself is role-gated in App.jsx (direct URLs blocked too).
+export const MENU_DEV_CONTROL = {label:"Dev Control", icon:Wrench, href:"/dev/control"};
+
 export const MENU_COMMON_TOP = [
   {label:"Dashboard",   icon:LayoutDashboard, href:"/dashboard"},
   MENU_FINANCE,        // finance-only items not duplicated in the Accounts pill (combined register, period-end, tools)
@@ -711,7 +717,10 @@ export function fullMenuRoots(branch, currentUser){
   // selecting "TK Group Central" in the branch selector enters the control cockpit
   // (see modules/tk-group/menu.js → getVisibleMenu). Here we only keep Decisions as a
   // branch pill so branches can RAISE credit/funds/onboarding/investment requests.
-  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT];
+  // Dev Control is a Super-Admin-only pill — every other role never sees it
+  // (and App.jsx blocks the route for them even by direct URL).
+  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
+    ...(role === 'Super Admin' ? [MENU_DEV_CONTROL] : [])];
 }
 
 // The menu roots a user's ROLE exposes, BEFORE their personal hidden/granted lists.

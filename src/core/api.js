@@ -22,6 +22,10 @@ import { errMessage } from './apiError';
 import { unwrapEnvelope } from './apiEnvelope';
 
 const BASE = import.meta.env.VITE_KBIZ_API_BASE || 'http://localhost:9090';
+// Exported for the rare consumer that needs raw fetch() against the same backend
+// (e.g. Dev Control's wiring probes, which need HTTP status codes the axios
+// interceptors strip). Everything else should use apiGet/apiPost below.
+export const API_BASE = BASE;
 
 // CRM stores its access token under 'kb360-token' in localStorage (see
 // CRM-Frontend/src/api/axios.js). Reading the same key means a user logged
