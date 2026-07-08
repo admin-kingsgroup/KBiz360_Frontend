@@ -9,6 +9,7 @@ import { AdoptionMatrix } from './AdoptionMatrix';
 import { IntegrityChecks } from './IntegrityChecks';
 import { ModuleTower } from './ModuleTower';
 import { HealthScorecard } from './HealthScorecard';
+import { RulesManager } from './RulesManager';
 import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
@@ -149,6 +150,14 @@ export function TkIntegrityPage() {
   return (
     <Page title="Close Readiness & Integrity" subtitle="SAP-style close checklist, branchwise: journal drift, orphan journals, self-approvals, duplicate numbers/masters, suspense, sub-ledger↔GL, FX revaluation, depreciation, accruals & GSTR-2B. Live — a fix clears the gate on refresh.">
       <IntegrityChecks />
+    </Page>
+  );
+}
+
+export function TkRulesPage({ owner }) {
+  return (
+    <Page title="Rules Manager" subtitle="OWNER ONLY. Add, verify and activate the rules the Control Tower monitors. New rules land Inactive (Draft) and do nothing until you Test them on live data and Activate. System rules (🔒) are enforced in code and read-only.">
+      <RulesManager canManage={!!owner} />
     </Page>
   );
 }

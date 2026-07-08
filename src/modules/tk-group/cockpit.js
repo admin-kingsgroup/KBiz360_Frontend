@@ -73,6 +73,7 @@ function administration(currentUser) {
 }
 
 export function controlCockpitMenu(focus, currentUser) {
+  const isOwner = (currentUser && currentUser.role) === 'Super Admin';
   return [
     // Overview — the cockpit landing.
     { label: 'Control Tower', icon: LayoutDashboard, href: '/tk/control-tower' },
@@ -166,6 +167,7 @@ export function controlCockpitMenu(focus, currentUser) {
     { label: 'Monitoring', icon: Activity, children: [
       { label: 'Live Drill-downs', children: [
         { label: 'ERP Health Scorecard', href: '/tk/health-scorecard' },
+        ...(isOwner ? [{ label: 'Rules Manager (Owner)', href: '/tk/rules' }] : []),
         { label: 'Control Tower — by Module', href: '/tk/modules' },
         { label: 'ERP Adoption', href: '/tk/adoption' },
         { label: 'Close Readiness & Integrity', href: '/tk/integrity' },

@@ -333,6 +333,7 @@ export const APP_ROUTES = [
   "/tk/readiness",
   "/tk/receivables-payables",
   "/tk/roles",
+  "/tk/rules",
   "/tk/scorecard",
   "/tk/targets",
   "/tk/tax-desk",
