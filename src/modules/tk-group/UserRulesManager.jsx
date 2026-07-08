@@ -29,6 +29,9 @@ export function UserRulesManager({ canManage = true }) {
   const [form, setForm] = useState(empty);
   const k = ruleKpis(rows);
   const set = (path, v) => setForm((f) => { const n = { ...f }; if (path.includes('.')) { const [a, b] = path.split('.'); n[a] = { ...n[a], [b]: v }; } else n[path] = v; return n; });
+  // Switching the constraint kind clears the other kinds' params so a rule never
+  // saves carrying stale values (e.g. a view-only rule keeping old branch codes).
+  const setConstraintKind = (kind) => setForm((f) => ({ ...f, constraint: { ...f.constraint, kind, values: '', limit: '', from: '', to: '' } }));
   // Comma-separated values → array; the form keeps them as a string for editing.
   const toValues = (s) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean);
   const save = () => create.mutate({ ...form, constraint: { ...form.constraint, values: toValues(form.constraint.values) } });
@@ -80,7 +83,7 @@ export function UserRulesManager({ canManage = true }) {
               <FormField label="Severity"><Select value={form.severity} onChange={(e) => set('severity', e.target.value)}>{SEVERITIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</Select></FormField>
             </div>
             <div className="flex flex-wrap items-end gap-3">
-              <FormField label="Access"><Select value={form.constraint.kind} onChange={(e) => set('constraint.kind', e.target.value)}>{CONSTRAINT_KINDS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</Select></FormField>
+              <FormField label="Access"><Select value={form.constraint.kind} onChange={(e) => setConstraintKind(e.target.value)}>{CONSTRAINT_KINDS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</Select></FormField>
               <FormField label="Effect"><Select value={form.constraint.effect} onChange={(e) => set('constraint.effect', e.target.value)}>{EFFECTS.map((e) => <option key={e.value} value={e.value}>{e.label}</option>)}</Select></FormField>
               {needs === 'values' && (
                 <FormField label="Values (comma-separated)" className="min-w-[220px] flex-1"><Input value={form.constraint.values} placeholder={(CONSTRAINT_KINDS.find((c) => c.value === form.constraint.kind) || {}).ph} onChange={(e) => set('constraint.values', e.target.value)} /></FormField>
