@@ -420,11 +420,17 @@ function AppAccessTab({ rows, search, setSearch, onToggle, loaded }){
   );
 }
 
-export function SettingsUsers(){
+/* Props (all optional — the standalone /settings/users route passes none):
+   `embedded` hides the screen's own header + tab bar so a host page (TK User
+   Control Center) can supply its own; `tab` + `onTabChange` then control which
+   of users | roles | access renders. */
+export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
   const usersLive=useUsersAdmin().data;                          // DB-backed (/api/auth/users)
   const [users,setUsers]=useState([]);
   useEffect(()=>{ if(usersLive) setUsers(usersLive); },[usersLive]);
-  const [tab,setTab]=useState("users"); // users | roles | access
+  const [tabState,setTabState]=useState("users"); // users | roles | access
+  const tab=tabProp||tabState;
+  const setTab=(t)=>{ if(onTabChange) onTabChange(t); else setTabState(t); };
   // App Access tab: EVERY CRM + ERP user with their per-app login toggles (/api/user-access).
   const accessLive=useUserAccess().data;
   const [accessRows,setAccessRows]=useState([]);
@@ -845,7 +851,8 @@ export function SettingsUsers(){
   );
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={embedded?undefined:{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+      {!embedded&&(
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FCEBEB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔐</div>
@@ -860,6 +867,7 @@ export function SettingsUsers(){
           <button onClick={()=>setTab("users")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="users"?700:500,background:tab==="users"?"#fff":"transparent",borderRadius:6}}>👥 Users</button><button onClick={()=>setTab("roles")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="roles"?700:500,background:tab==="roles"?"#fff":"transparent",borderRadius:6}}>🎭 Role Templates</button><button onClick={()=>setTab("access")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="access"?700:500,background:tab==="access"?"#fff":"transparent",borderRadius:6}}>🔐 App Access</button>
         </div>
       </div>
+      )}
 
       {/* Summary KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>

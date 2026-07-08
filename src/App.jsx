@@ -515,7 +515,7 @@ export default function KB360App(){
     if(route==="/tk/modules")            return <TkModulesPage setRoute={navigate}/>;
     if(route==="/tk/health-scorecard")   return <TkHealthScorecardPage/>;
     if(route==="/tk/rules")              return <TkRulesPage owner={['Super Admin','super_admin'].includes(currentUser?.role)}/>;
-    if(route==="/tk/user-rules")         return <TkUserRulesPage owner={['Super Admin','super_admin'].includes(currentUser?.role)}/>;
+    if(route==="/tk/user-rules")         return <TkUserRulesPage owner={['Super Admin','super_admin'].includes(currentUser?.role)} currentUser={currentUser} setRoute={navigate}/>;
     if(route==="/tk/branch-cockpit")     return <TkBranchCockpitPage/>;
     if(route==="/tk/audit")              return <TkAuditTrailPage/>;
     if(route==="/tk/targets")            return <TkTargetsPage/>;

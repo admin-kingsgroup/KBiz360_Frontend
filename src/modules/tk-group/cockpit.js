@@ -117,7 +117,7 @@ export function controlCockpitMenu(focus, currentUser) {
         // per-user access rules. Both open the same tabbed page on their respective tab.
         ...(isOwner ? [
           { label: 'ERP Rules Manager', href: '/tk/rules' },
-          { label: 'User Rules Manager', href: '/tk/user-rules' },
+          { label: 'User Control Center', href: '/tk/user-rules' },
         ] : []),
         { label: 'Period Locks', href: '/tk/period-locks' },
         { label: 'Targets & Budgets', href: '/tk/targets' },

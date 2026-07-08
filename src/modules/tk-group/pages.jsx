@@ -35,6 +35,8 @@ import { AssetsCentral } from './AssetsCentral';
 import { LimitsAdmin } from './LimitsAdmin';
 import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
+import { SettingsUsers } from '../settings/legacy';
+import { PageAccessControl } from '../settings/pageAccess';
 
 const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
 
@@ -186,12 +188,41 @@ export function TkRulesPage({ owner, initialTab = 'erp' }) {
   );
 }
 
-// User Rules Manager — its own standalone page (a separate entry under Rules & Requests),
-// no longer a tab on the ERP Rules Manager page.
-export function TkUserRulesPage({ owner }) {
+// User Control Center — ONE owner-only hub for everything user-related: the user
+// list & creation, role templates, per-app login access, per-user page visibility
+// and the per-user access rules. Users / Roles / App Access are the SAME component
+// as Settings → Users & Roles (SettingsUsers, embedded with a controlled tab) and
+// Page Visibility is Settings → Page Visibility Control (PageAccessControl,
+// embedded) — both routes keep working; this page just centralises them.
+const USER_TABS = [
+  { id: 'users', label: 'Users', subtitle: 'Every user with a Books login — add users, set role & branch access, edit the permission matrix, activate / deactivate.' },
+  { id: 'roles', label: 'Role Templates', subtitle: 'The ERP role templates — what each role can reach, its special access toggles and how many users hold it.' },
+  { id: 'access', label: 'App Access', subtitle: 'Per-app login toggles for CRM, ERP (Books) and Smart Connect. Off = login blocked; open sessions end within ~1 min.' },
+  { id: 'pages', label: 'Page Visibility', subtitle: 'Per-user page & report visibility plus branch scope — toggle exactly which screens each user sees, grant out-of-role pages, reset passwords.' },
+  { id: 'rules', label: 'User Rules', subtitle: 'Add, verify and activate per-user access rules — who may reach which branch, module or action, an approval ceiling, view-only or a login window. New rules land Inactive (Draft) until you Test the blast radius and Activate.' },
+];
+
+export function TkUserRulesPage({ owner, currentUser, setRoute, initialTab = 'users' }) {
+  const [tab, setTab] = useState(USER_TABS.some((t) => t.id === initialTab) ? initialTab : 'users');
+  // Deep-links may target a specific tab; sync when the prop changes (the page does
+  // not remount on route change). In-page tab clicks are unaffected.
+  React.useEffect(() => { if (USER_TABS.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]);
+  const meta = USER_TABS.find((t) => t.id === tab) || USER_TABS[0];
   return (
-    <Page title="User Rules Manager" subtitle="OWNER ONLY. Add, verify and activate per-user access rules — who may reach which branch, module or action, an approval ceiling, view-only or a login window. New rules land Inactive (Draft) until you Test the blast radius and Activate.">
-      <UserRulesManager canManage={!!owner} />
+    <Page title="User Control Center" subtitle={`OWNER ONLY. ${meta.subtitle}`}>
+      <div className="mb-4 flex flex-wrap gap-1 border-b border-surface-border">
+        {USER_TABS.map((t) => (
+          <button key={t.id} type="button" onClick={() => setTab(t.id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${tab === t.id ? 'border-accent text-accent' : 'border-transparent text-ink-muted hover:text-ink'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {!owner ? (
+        <div className="rounded-lg border border-dashed border-warning p-8 text-center text-sm text-warning">This screen is for the Owner (Super Admin) only. Ask the Owner to manage users and access.</div>
+      ) : tab === 'rules' ? <UserRulesManager canManage />
+        : tab === 'pages' ? <PageAccessControl embedded currentUser={currentUser} setRoute={setRoute} />
+          : <SettingsUsers embedded tab={tab} onTabChange={setTab} />}
     </Page>
   );
 }
