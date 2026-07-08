@@ -240,6 +240,9 @@ export const MENU_SETTINGS = {label:"Settings", icon:Settings, children:[
     {label:"Period Locking", href:"/settings/period-lock"},
     {label:"Approval Workflow", href:"/settings/approval-workflow"},
     {label:"Pending Approvals Queue", href:"/approvals"},
+    {label:"Statutory Filing Register", href:"/settings/filing-register"},
+    {label:"Master Change Request Queue", href:"/settings/master-change-queue"},
+    {label:"Vacation Delegations", href:"/settings/delegations"},
   ]},
   {label:"Integrations", children:[
     {label:"Banking API", href:"/settings/banking-api"},
@@ -445,29 +448,18 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
 
 /* ── HO CONTROL CENTER ─────────────────────────────────────────── */
 
-export const MENU_HO_CONTROL = {label:"HO Control", icon:Settings, children:[
-  {label:"Group Monthly Dashboard", href:"/ho/group-dashboard"},
-  {divider:true, label:"Authority & Approvals"},
-  {label:"Authority Configuration Center", href:"/settings/authority-config"},
-  {label:"Master Change Request Queue", href:"/settings/master-change-queue"},
-  {label:"Vacation Delegations", href:"/settings/delegations"},
-  {divider:true, label:"Asset & Procurement"},
-  {label:"Asset Procurement Workflow", href:"/ho/asset-procurement"},
-  {divider:true, label:"Master Data Control"},
-  {label:"Vendor Master Lock", href:"/ho/vendor-master-lock"},
-  {label:"Banking Relationship Control", href:"/ho/banking-control"},
-  {divider:true, label:"Compliance & Audit"},
-  {label:"Statutory Filing Register", href:"/ho/filing-register"},
-  {label:"Period Lock Control", href:"/ho/period-lock"},
-  {label:"Central Audit Queue (100%)", href:"/ho/audit-queue"},
-]};
+// MENU_HO_CONTROL (the "HO Control" section) was removed — the TK Group model has
+// no Head Office (six equal peer branches). Its dead prototype screens were deleted;
+// the three real entries (Statutory Filing Register, Master Change Request Queue,
+// Vacation Delegations) were re-homed into MENU_SETTINGS ▸ Compliance & Workflow.
 
 
 // ─── TK GROUP · central-control pill ─────────────────────────────────────────
 // The REAL governance surfaces backed by /api/tk/*: your role briefing, the
-// change-request approvals inbox, and the control-flag switchboard. Distinct from
-// the (static-prototype) HO Control pill. Dormant-safe — every page shows an
-// empty / read-only state until core.policy_guard is switched on at go-live.
+// change-request approvals inbox, and the control-flag switchboard. This is the
+// group's only central-control plane (the old static-prototype "HO Control" pill
+// was removed). Dormant-safe — every page shows an empty / read-only state until
+// core.policy_guard is switched on at go-live.
 export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"My Role", href:"/tk/my-role"},
   {label:"Roles & Responsibilities", href:"/tk/roles"},
@@ -549,7 +541,7 @@ export const MENU_IMPORT_EXPORT = {label:"Import / Export Data", icon:Database, 
 
 // Back-office sections grouped under one "Admin" header pill (cleaner top bar).
 // HR now has its own top-level pill (MENU_HR) — no longer nested under Admin.
-export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_ASSETS, MENU_HO_CONTROL, MENU_SETTINGS, MENU_IMPORT_EXPORT]};
+export const MENU_ADMIN = {label:"Admin", icon:Lock, children:[MENU_ASSETS, MENU_SETTINGS, MENU_IMPORT_EXPORT]};
 // The BRANCH surface keeps only OPERATIONAL admin — fixed-asset entry + data import.
 // Org administration (Users & Roles, Permissions, Access, Config, Integrations, HO
 // Control) is central: it lives in TK Group Central ▸ Administration, off the branch
@@ -781,8 +773,8 @@ export function getMenu(branch, currentUser){
 // sales, assets…). Everything accounting/finance/reports/masters/tax stays reachable;
 // per-PAGE control is the hidden deny-list (Page Visibility Control).
 //   hr → employees/payroll/salaries · settings → users & roles / company config ·
-//   ho → HO Control · group-dashboard → group-level dashboard.
-const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'ho', 'group-dashboard']);
+//   group-dashboard → group-level dashboard.
+const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'group-dashboard']);
 
 // Hard route-level lockout used by App.jsx: can this user OPEN this route directly?
 // Full-menu roles (Super Admin / Director / everyone who isn't an accountant) reach

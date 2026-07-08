@@ -112,7 +112,6 @@ const PREFIX = [
   ['/dashboards/', CENTRAL],
   ['/dashboard/', CENTRAL],   // /dashboard/owner · /director · /alerts  (/dashboard exact = branch, see OVERRIDES)
   ['/settings/', CENTRAL],
-  ['/ho/', CENTRAL],
   ['/assets/', CENTRAL],
   ['/tk/', CENTRAL],
   ['/hr/', CENTRAL],

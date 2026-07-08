@@ -53,7 +53,6 @@ function issueColumns(setRoute) {
 export function SetupReadiness({ setRoute } = {}) {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'readiness'], queryFn: getSetupReadiness, staleTime: 60_000, refetchInterval: 300_000 });
   const d = q.data || {};
-  const kpis = readinessKpis(d);
   const allRows = readinessRows(d);
   const cats = categoryRows(d);
   const branches = branchRows(d);
@@ -67,6 +66,7 @@ export function SetupReadiness({ setRoute } = {}) {
   // Filter to the chosen branch, then (re)serial-number the visible rows 1..n.
   const rows = (branch === 'ALL' ? allRows : allRows.filter((r) => r.branch === branch)).map((r, i) => ({ ...r, sr: i + 1 }));
   const cur = branches.find((b) => b.branch === branch);
+  const kpis = readinessKpis(d, branch); // tiles follow the selected branch, matching the table + Overview
 
   // Placed after the hooks above (useState) to keep hook order stable. A failed
   // roll-up must not read as an honest "nothing pending / all set up".
@@ -81,8 +81,9 @@ export function SetupReadiness({ setRoute } = {}) {
         ))}
       </ResponsiveGrid>
 
-      {/* Branch separator — pick a branch to scope the list (TK Group style). */}
-      {branches.length > 0 && (
+      {/* Branch separator — only when NOT spotlighted from the top selector (which is
+          then the single branch control); within 'ALL' it lets you drill into one branch. */}
+      {focus === 'ALL' && branches.length > 0 && (
         <div className="flex flex-wrap items-center gap-2" data-testid="tk-readiness-branchbar">
           <span className="text-[11px] font-bold uppercase tracking-wide text-ink-subtle">Branch</span>
           <button type="button" onClick={() => setBranch('ALL')}

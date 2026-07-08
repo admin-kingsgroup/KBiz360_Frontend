@@ -141,7 +141,6 @@ export const DEV_REGISTRY = [
     items: [
       { name: 'TK Group control layer (flags, change-requests, inbox, decisions, limits, period locks)', status: 'dormant', routes: ['/tk/control-panel', '/tk/controls', '/tk/approvals', '/tk/decisions'], api: ['/api/tk/flags', '/api/tk/change-requests', '/api/tk/inbox', '/api/tk/decisions', '/api/tk/limits', '/api/tk/period-locks'], note: 'REAL backend, dormant-safe by design: every page shows empty/read-only until core.policy_guard flag is switched on at go-live.' },
       { name: 'Control Tower / Branch Cockpit / monitoring rules', status: 'live', routes: ['/tk/control-tower', '/tk/branch-cockpit', '/tk/rules'], api: ['/api/tk/monitor', '/api/tk/rules', '/api/tk/finding-status'], note: 'Rules Manager is OWNER-only.' },
-      { name: 'HO Control pill (authority config, vendor lock, audit queue…)', status: 'stub', routes: ['/ho/group-dashboard', '/settings/authority-config', '/ho/audit-queue'], note: 'STATIC PROTOTYPE (per menus.js) — distinct from the real /api/tk/* surfaces. Do not confuse the two.' },
     ],
   },
   {

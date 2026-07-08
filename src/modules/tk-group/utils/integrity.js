@@ -12,14 +12,16 @@ export function statusGlyph(status) {
   return { pass: '✓', fail: '✗', warn: '!', na: '–' }[status] || '–';
 }
 
-/** Header KPI tiles: group close score, failing gates, warnings, branches ready. */
-export function integrityKpis(d) {
+/** Header KPI tiles: close score, failing gates, warnings, branches ready. `focus` (a
+ *  branch code or 'ALL') only adjusts copy so a focused view doesn't claim group scope. */
+export function integrityKpis(d, focus) {
   const g = (d && d.group) || {};
+  const scoped = focus && focus !== 'ALL';
   return [
-    { key: 'score', label: 'Close-readiness', value: `${g.score == null ? 100 : g.score}`, sub: 'group avg' },
+    { key: 'score', label: 'Close-readiness', value: `${g.score == null ? 100 : g.score}`, sub: scoped ? focus : 'group avg' },
     { key: 'fails', label: 'Failing gates', value: `${g.fails || 0}`, sub: 'block close' },
     { key: 'warns', label: 'Warnings', value: `${g.warns || 0}`, sub: 'to review' },
-    { key: 'ready', label: 'Branches ready', value: `${g.closeReadyBranches || 0}/${g.totalBranches || 0}`, sub: 'no failing gate' },
+    { key: 'ready', label: scoped ? 'Close-ready?' : 'Branches ready', value: scoped ? (g.closeReadyBranches ? 'Yes' : 'No') : `${g.closeReadyBranches || 0}/${g.totalBranches || 0}`, sub: 'no failing gate' },
   ];
 }
 

@@ -70,7 +70,9 @@ describe('TK group health · FE shaping (pure)', () => {
       expect(v.branches).toEqual([d.branches[0]]);
       expect(v.group).toEqual({ score: 21, errors: 4, warn: 1, info: 0, branchesWithErrors: 1 });
       expect(v.byDomain).toEqual([{ key: 'ar', label: 'AR', error: 3, branches: ['BOM'] }]); // only BOM's domains
-      expect(healthKpis(v)[0]).toMatchObject({ value: '21' }); // KPI now reads the branch's score
+      expect(healthKpis(v)[0]).toMatchObject({ value: '21', label: 'Group health' }); // no focus arg → group copy
+      expect(healthKpis(v, 'BOM')[0]).toMatchObject({ value: '21', label: 'Branch health' }); // focused copy
+      expect(healthKpis(v, 'BOM')[2]).toMatchObject({ key: 'warn', sub: 'in this branch' });
     });
     test('a branch with no errors → branchesWithErrors 0', () => {
       expect(focusView(d, 'AMD').group.branchesWithErrors).toBe(0);

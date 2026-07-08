@@ -3,6 +3,8 @@ import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { assetBranchRow } from './utils/assets';
+import { branchLoadState } from './utils/branchLoad';
+import { BranchLoadNotice } from './BranchLoadNotice';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { DataTable } from '../../shell/DataTable';
@@ -25,19 +27,21 @@ export function AssetsCentral() {
   const focus = useCockpitFocus();
   const view = focusedBranches(focus, BRANCHES);
   const q = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'assets', b.code], queryFn: () => apiGet('/api/fixed-assets', { branch: b.code }), staleTime: 60_000 })) });
-  const rows = view.map((b, i) => assetBranchRow(b, q[i] && q[i].data));
+  const load = branchLoadState(q, view);
+  const rows = view.map((b, i) => (q[i] && q[i].isError) ? null : assetBranchRow(b, q[i] && q[i].data)).filter(Boolean);
 
   return (
     <div className="grid gap-4">
       <p className="text-xs text-ink-muted">
         {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>} — each branch's fixed-asset register in its own currency, never consolidated.
       </p>
+      <BranchLoadNotice load={load} onRetry={() => q.forEach((x) => x.refetch())} />
       <div data-testid="tk-assets">
         <DataTable
           title="Fixed-Asset Register"
           columns={COLS}
           rows={rows}
-          isError={q.length > 0 && q.every((x) => x.isError)}
+          isError={load.allFailed}
           getRowKey={(r) => r.code}
           emptyMessage="No fixed assets yet."
           searchable={false}

@@ -3,6 +3,8 @@ import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { scorecardRow, fyRange } from './utils/scorecard';
+import { branchLoadState } from './utils/branchLoad';
+import { BranchLoadNotice } from './BranchLoadNotice';
 import { DataTable } from '../../shell/DataTable';
 import { money } from '../../core/format';
 import { useCockpitFocus } from '../../store/cockpitFocus';
@@ -43,19 +45,21 @@ export function BranchScorecard() {
   // Rows are the (focused) branch roster — the full set branchwise, or the single
   // focused branch — numbers fill in as each branch's data arrives, so it renders
   // immediately rather than hiding behind a loading skeleton.
-  const rows = view.map((b, i) => scorecardRow(b, pnl[i] && pnl[i].data, inv[i] && inv[i].data));
+  const load = branchLoadState(pnl, view, inv);
+  const rows = view.map((b, i) => ((pnl[i] && pnl[i].isError) || (inv[i] && inv[i].isError)) ? null : scorecardRow(b, pnl[i] && pnl[i].data, inv[i] && inv[i].data)).filter(Boolean);
 
   return (
     <div className="grid gap-4">
       <p className="text-xs text-ink-muted">
         FY {from} → {to} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>} — {isFocused(focus) ? 'this branch, in its own currency.' : 'each branch in its own currency, never consolidated.'}
       </p>
+      <BranchLoadNotice load={load} onRetry={() => { pnl.forEach((x) => x.refetch()); inv.forEach((x) => x.refetch()); }} />
       <div data-testid="tk-scorecard">
         <DataTable
           title="Branch Scorecard"
           columns={COLS}
           rows={rows}
-          isError={pnl.length > 0 && pnl.every((x) => x.isError) && inv.every((x) => x.isError)}
+          isError={load.allFailed}
           getRowKey={(r) => r.code}
           emptyMessage="No branch figures yet."
           searchable={false}

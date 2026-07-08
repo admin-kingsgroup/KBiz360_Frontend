@@ -35,7 +35,8 @@ export function GroupHealth({ setRoute } = {}) {
   const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'health'], queryFn: getGroupHealth, staleTime: 60_000, refetchInterval: 300_000 });
   const d = focusView(q.data || {}, focus); // narrow to the spotlighted branch (ALL = group)
-  const kpis = healthKpis(d);
+  const scoped = focus && focus !== 'ALL';
+  const kpis = healthKpis(d, focus);
   const cards = branchCards(d);
   const issues = issueRows(d);
   const domains = domainRows(d);
@@ -52,7 +53,7 @@ export function GroupHealth({ setRoute } = {}) {
         ))}
       </ResponsiveGrid>
 
-      <PageSection title="Branch health — worst first">
+      <PageSection title={scoped ? 'Branch health' : 'Branch health — worst first'}>
         <ResponsiveGrid min="150px" gap="md">
           {cards.length ? cards.map((c) => (
             <div key={c.branch} className="rounded-lg border border-surface-border bg-surface p-3" style={{ borderLeft: `4px solid ${TONE_COLOR[c.tone]}` }}>
@@ -72,7 +73,7 @@ export function GroupHealth({ setRoute } = {}) {
       </PageSection>
 
       <DataTable
-        title="Top issues across all branches"
+        title={scoped ? `Top issues — ${focus}` : 'Top issues across all branches'}
         columns={issueColumns(setRoute)}
         rows={issues}
         getRowKey={(r, i) => `${r.branch}:${r.type}:${i}`}
@@ -85,7 +86,7 @@ export function GroupHealth({ setRoute } = {}) {
       />
 
       {domains.length > 0 && (
-        <PageSection title="By area (branches affected)">
+        <PageSection title={scoped ? 'By area' : 'By area (branches affected)'}>
           <div className="grid gap-1.5">
             {domains.map((dm) => (
               <div key={dm.key} className="flex items-center justify-between text-xs">

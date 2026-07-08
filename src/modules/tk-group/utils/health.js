@@ -24,13 +24,15 @@ export function healthVerdict(score) {
   return 'Critical';
 }
 
-/** The header KPI tiles: group score + issue totals + exposure. */
-export function healthKpis(d) {
+/** The header KPI tiles: group/branch score + issue totals. `focus` (a branch code or
+ *  'ALL') only adjusts the copy so a focused view doesn't claim group scope. */
+export function healthKpis(d, focus) {
   const g = (d && d.group) || {};
+  const scoped = focus && focus !== 'ALL';
   return [
-    { key: 'score', label: 'Group health', value: `${g.score == null ? 100 : g.score}`, sub: healthVerdict(g.score == null ? 100 : g.score) },
-    { key: 'errors', label: 'Critical errors', value: `${g.errors || 0}`, sub: `${g.branchesWithErrors || 0} branch(es)` },
-    { key: 'warn', label: 'Warnings', value: `${g.warn || 0}`, sub: 'across group' },
+    { key: 'score', label: scoped ? 'Branch health' : 'Group health', value: `${g.score == null ? 100 : g.score}`, sub: healthVerdict(g.score == null ? 100 : g.score) },
+    { key: 'errors', label: 'Critical errors', value: `${g.errors || 0}`, sub: scoped ? `in ${focus}` : `${g.branchesWithErrors || 0} branch(es)` },
+    { key: 'warn', label: 'Warnings', value: `${g.warn || 0}`, sub: scoped ? 'in this branch' : 'across group' },
     { key: 'info', label: 'Info', value: `${g.info || 0}`, sub: 'to review' },
   ];
 }

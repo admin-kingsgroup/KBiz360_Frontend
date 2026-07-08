@@ -35,7 +35,7 @@ export function ScrutinyTrend() {
   const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'trend'], queryFn: getTrend, staleTime: 60_000, refetchInterval: 300_000 });
   const d = focusView(q.data || {}, focus); // narrow to the spotlighted branch (ALL = group)
-  const kpis = trendKpis(d);
+  const kpis = trendKpis(d, focus);
   const rows = branchRows(d);
   const dir = (d.group && d.group.direction) || 'flat';
 

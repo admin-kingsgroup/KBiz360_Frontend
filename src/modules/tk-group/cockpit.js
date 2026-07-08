@@ -47,7 +47,6 @@ function administration(currentUser) {
     { label: 'Permissions Matrix', href: '/settings/permissions-matrix' },
     { label: 'Field-Level Access', href: '/settings/field-access' },
     { label: 'Approval Matrix Builder', href: '/settings/approval-matrix-builder' },
-    { label: 'Authority Configuration', href: '/settings/authority-config' },
   ] }] : [];
   return { label: 'Administration', icon: ShieldCheck, children: [
     ...usersAccess,
@@ -58,6 +57,7 @@ function administration(currentUser) {
       { label: 'Vacation Delegations', href: '/settings/delegations' },
       { label: 'Approval Workflow', href: '/settings/approval-workflow' },
       { label: 'Master Change Queue', href: '/settings/master-change-queue' },
+      { label: 'Statutory Filing Register', href: '/settings/filing-register' },
     ] },
     { label: 'Templates & Integrations', children: [
       { label: 'Document Templates', href: '/settings/doc-templates' },

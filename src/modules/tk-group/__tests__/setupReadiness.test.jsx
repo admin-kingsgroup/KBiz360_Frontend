@@ -19,7 +19,7 @@ describe('TK setup readiness · FE shaping (pure)', () => {
     expect(severityTone('info')).toBe('info');
   });
 
-  test('readinessKpis: pending / error / warn / branches from summary', () => {
+  test('readinessKpis: pending / error / warn / branches from summary (ALL)', () => {
     const d = { summary: { modulesPending: 12, error: 5, warn: 4, info: 3, branchesAffected: 6 } };
     const k = readinessKpis(d);
     expect(k[0]).toMatchObject({ key: 'pending', value: '12' });
@@ -27,6 +27,20 @@ describe('TK setup readiness · FE shaping (pure)', () => {
     expect(k[2]).toMatchObject({ key: 'warn', value: '4' });
     expect(k[3]).toMatchObject({ key: 'branches', value: '6' });
     expect(k).toHaveLength(4);
+  });
+
+  test('readinessKpis(d, branch): tiles read the branch slice, not the group total', () => {
+    // The bug this guards: a branch-filtered table under group KPIs. Focus BOM → tiles = BOM.
+    const d = {
+      summary: { modulesPending: 182, error: 164, warn: 13, branchesAffected: 6 },
+      byBranch: [{ branch: 'BOM', pending: 26, error: 23, warn: 3, info: 0, live: 5, total: 31 }],
+    };
+    const k = readinessKpis(d, 'BOM');
+    expect(k[0]).toMatchObject({ key: 'pending', value: '26' }); // NOT 182
+    expect(k[1]).toMatchObject({ key: 'error', value: '23' });   // NOT 164
+    expect(k[2]).toMatchObject({ key: 'warn', value: '3' });
+    expect(k[3]).toMatchObject({ key: 'branches', value: '5/31' }); // modules live for BOM
+    expect(readinessKpis(d, 'ALL')[0]).toMatchObject({ value: '182' }); // ALL still group
   });
 
   test('ownerTone maps teams to Badge tones', () => {

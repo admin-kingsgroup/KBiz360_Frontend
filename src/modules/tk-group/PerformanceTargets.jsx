@@ -4,6 +4,8 @@ import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { fyRange } from './utils/scorecard';
 import { perfTargetRow, PERF_METRICS, fyStr } from './utils/perfTarget';
+import { branchLoadState } from './utils/branchLoad';
+import { BranchLoadNotice } from './BranchLoadNotice';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { Select } from '../../shell/primitives';
@@ -33,7 +35,8 @@ export function PerformanceTargets() {
   const focus = useCockpitFocus();
   const view = focusedBranches(focus, BRANCHES);
   const q = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'pvt', metric, b.code, fy], queryFn: () => apiGet('/api/accounting/targets-vs-actual', { branch: b.code, metric, from, to, fy }), staleTime: 60_000 })) });
-  const rows = view.map((b, i) => perfTargetRow(b, q[i] && q[i].data));
+  const load = branchLoadState(q, view);
+  const rows = view.map((b, i) => (q[i] && q[i].isError) ? null : perfTargetRow(b, q[i] && q[i].data)).filter(Boolean);
   const noTargets = rows.every((r) => r.target === 0);
 
   return (
@@ -45,12 +48,13 @@ export function PerformanceTargets() {
         </Select>
         <span className="text-xs text-ink-muted">FY {fy} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>}</span>
       </div>
+      <BranchLoadNotice load={load} onRetry={() => q.forEach((x) => x.refetch())} />
       <div data-testid="tk-perf-target">
         <DataTable
           title="Performance vs Target"
           columns={COLS}
           rows={rows}
-          isError={q.length > 0 && q.every((x) => x.isError)}
+          isError={load.allFailed}
           getRowKey={(r) => r.code}
           emptyMessage="No branches to compare."
           searchable={false}

@@ -69,11 +69,13 @@ describe('TK integrity · FE shaping (pure)', () => {
       expect(v.branches).toEqual([payload.branches[0]]);
       expect(v.group).toEqual({ score: 63, fails: 2, warns: 0, closeReadyBranches: 0, totalBranches: 1 });
       expect(v.catalogue).toBe(payload.catalogue); // gate list preserved
-      expect(integrityKpis(v)[3]).toMatchObject({ key: 'ready', value: '0/1' });
+      expect(integrityKpis(v)[3]).toMatchObject({ key: 'ready', value: '0/1' }); // no focus arg → group form
+      expect(integrityKpis(v, 'BOM')[3]).toMatchObject({ label: 'Close-ready?', value: 'No' }); // focused copy
+      expect(integrityKpis(v, 'BOM')[0]).toMatchObject({ key: 'score', value: '63', sub: 'BOM' });
       expect(matrixRows(v).find((r) => r.id === 'sod-self-approved').byBranch).toEqual({ BOM: 'fail' });
     });
-    test('a close-ready branch → 1/1 ready', () => {
-      expect(integrityKpis(focusView(payload, 'AMD'))[3]).toMatchObject({ value: '1/1' });
+    test('a close-ready branch → "Yes"', () => {
+      expect(integrityKpis(focusView(payload, 'AMD'), 'AMD')[3]).toMatchObject({ value: 'Yes' });
     });
     test('unknown branch → empty, perfect group', () => {
       expect(focusView(payload, 'ZZZ')).toMatchObject({ branches: [], group: { score: 100, fails: 0, totalBranches: 0 } });

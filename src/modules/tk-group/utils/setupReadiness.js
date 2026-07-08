@@ -30,14 +30,21 @@ export function branchRows(d) {
   return (d && d.byBranch) || [];
 }
 
-/** Header KPI tiles: modules pending + severity split + branch fan-out. */
-export function readinessKpis(d) {
+/** Header KPI tiles: modules pending + severity split + branch fan-out. When a branch
+ *  is selected (the in-tab bar, which follows the cockpit Focus) the tiles read THAT
+ *  branch's byBranch slice, so they match the filtered table below and the Overview card
+ *  — never the group total under a branch-filtered list. 'ALL' (or unset) → group summary. */
+export function readinessKpis(d, branch) {
   const s = (d && d.summary) || {};
+  const b = branch && branch !== 'ALL' ? ((d && d.byBranch) || []).find((x) => x.branch === branch) : null;
+  const src = b || s;
   return [
-    { key: 'pending', label: 'Modules pending', value: `${s.modulesPending || 0}`, sub: 'need setup' },
-    { key: 'error', label: 'Not started', value: `${s.error || 0}`, sub: 'no data entered' },
-    { key: 'warn', label: 'Partly set up', value: `${s.warn || 0}`, sub: 'finish configuring' },
-    { key: 'branches', label: 'Branches affected', value: `${s.branchesAffected || 0}`, sub: 'across group' },
+    { key: 'pending', label: 'Modules pending', value: `${b ? (b.pending || 0) : (s.modulesPending || 0)}`, sub: 'need setup' },
+    { key: 'error', label: 'Not started', value: `${src.error || 0}`, sub: 'no data entered' },
+    { key: 'warn', label: 'Partly set up', value: `${src.warn || 0}`, sub: 'finish configuring' },
+    b
+      ? { key: 'branches', label: 'Modules live', value: `${b.live || 0}/${b.total || 0}`, sub: `${branch} in focus` }
+      : { key: 'branches', label: 'Branches affected', value: `${s.branchesAffected || 0}`, sub: 'across group' },
   ];
 }
 

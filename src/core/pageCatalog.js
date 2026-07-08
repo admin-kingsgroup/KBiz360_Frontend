@@ -68,11 +68,11 @@ const PREFERRED_SECTIONS = [
   'MENU_HR', 'MENU_ADMIN',
 ];
 // Exports skipped when auto-appending. MENU_COMMON_TOP is an array of pills already
-// covered elsewhere. MENU_ADMIN is the section root that NESTS Assets / HO Control /
-// Settings / Import-Export (mirroring the top-nav "Admin" dropdown), so those four are
+// covered elsewhere. MENU_ADMIN is the section root that NESTS Assets / Settings /
+// Import-Export (mirroring the top-nav "Admin" dropdown), so those three are
 // skipped as standalone sections — they render as sub-groups under one "Admin" section.
 const SECTION_SKIP = new Set([
-  'MENU_COMMON_TOP', 'MENU_ASSETS', 'MENU_HO_CONTROL', 'MENU_SETTINGS', 'MENU_IMPORT_EXPORT',
+  'MENU_COMMON_TOP', 'MENU_ASSETS', 'MENU_SETTINGS', 'MENU_IMPORT_EXPORT',
 ]);
 
 // The top-level sections to expose. We take the curated order first, then
@@ -108,7 +108,7 @@ function collectLeaves(node, trail, out) {
 // Friendly section name for a standalone route (one not found in any menu),
 // grouped by its first path segment so related extras sit together.
 const PREFIX_SECTION = {
-  finance: 'Finance', reports: 'Reports', hr: 'HR & Payroll', ho: 'HO Control',
+  finance: 'Finance', reports: 'Reports', hr: 'HR & Payroll',
   tax: 'Taxation', masters: 'Masters', settings: 'Settings', accounts: 'Accounts',
   accounting: 'Accounting', assets: 'Assets', sales: 'Sales', purchase: 'Purchase',
   'purchase-expense': 'Purchase', dashboards: 'Dashboards', dashboard: 'Dashboards',

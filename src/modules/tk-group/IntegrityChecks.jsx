@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getIntegrity, getIntegrityDetail, getFindingStatus, saveFindingStatus } from './api/monitor';
-import { integrityKpis, branchCards, matrixRows, branchKeys, findingRows, statusTone, statusGlyph } from './utils/integrity';
+import { integrityKpis, branchCards, matrixRows, branchKeys, findingRows, statusTone, statusGlyph, focusView } from './utils/integrity';
 import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, FormField } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { BandError } from './BandError';
+import { useCockpitFocus } from '../../store/cockpitFocus';
 
 // ─── TK GROUP · FE · Close-Readiness & Integrity (SAP-style checklist) ───────
 // A branch-wise financial-close cockpit: accounting-integrity + governance gates that
@@ -75,9 +76,10 @@ function AssignBar({ branch, checkId, current, onSave, saving }) {
 }
 
 export function IntegrityChecks() {
+  const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'integrity'], queryFn: getIntegrity, staleTime: 60_000, refetchInterval: 300_000 });
-  const d = q.data || {};
-  const kpis = integrityKpis(d);
+  const d = focusView(q.data || {}, focus); // full checklist narrows to the spotlighted branch (ALL = every branch)
+  const kpis = integrityKpis(d, focus);
   const cards = branchCards(d);
   const branches = branchKeys(d);
   const rows = matrixRows(d);

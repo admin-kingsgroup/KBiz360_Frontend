@@ -19,7 +19,7 @@ export function IntegritySummary({ setRoute } = {}) {
   const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'integrity'], queryFn: getIntegrity, staleTime: 60_000, refetchInterval: 300_000 });
   const d = focusView(q.data || {}, focus); // narrow to the spotlighted branch (ALL = group)
-  const kpis = integrityKpis(d);
+  const kpis = integrityKpis(d, focus);
   const cards = branchCards(d);
   const findings = findingRows(d).slice(0, 4);
 

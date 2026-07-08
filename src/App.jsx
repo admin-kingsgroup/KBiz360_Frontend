@@ -47,7 +47,7 @@ import { supportRoutes } from './modules/support/routes';
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes];
-const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
+const { BankingApiSettings, DelegationsManager, GroupDashboard, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/masters/mastersParties'));
@@ -382,7 +382,7 @@ export default function KB360App(){
     /* ── Hard route-level lockout for restricted roles ───────────────────────
        A Branch Accountant's nav is limited to their Accounts workspace, but the
        nav filter alone doesn't stop a direct URL. canReachRoute() blocks the
-       out-of-scope admin areas (HR, Settings, HO Control, Group dashboard) by
+       out-of-scope admin areas (HR, Settings, Group dashboard) by
        direct link too. Full-menu roles (Super Admin/Director/…) reach everything;
        finer per-page control stays with the `hidden` deny-list above. ── */
     if(!canReachRoute(route, currentUser)){
@@ -486,18 +486,10 @@ export default function KB360App(){
     if(route==="/reports/tax-board")      return <RPT_TaxFilingBoard branch={branch}/>;
     if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure branch={branch}/>;
                         /* HR Self-Service */
-        /* HO Control Center */
-        /* Authority Configuration */
-    if(route==="/settings/authority-config")  return <AuthorityConfigCenter/>;
+        /* Settings — Authority & Compliance (HO Control Center prototype removed; no Head Office in TK Group model) */
     if(route==="/settings/delegations")       return <DelegationsManager/>;
     if(route==="/settings/master-change-queue")return <MasterChangeQueue/>;
-    if(route==="/ho/asset-procurement")  return <HOAssetProcurement/>;
-    if(route==="/ho/vendor-master-lock") return <HOVendorMasterLock/>;
-    if(route==="/ho/banking-control")    return <HOBankingControl/>;
-    if(route==="/ho/group-dashboard")    return <GroupMonthlyDashboard/>;
-    if(route==="/ho/filing-register")    return <StatutoryFilingRegister/>;
-    if(route==="/ho/period-lock")        return <PeriodLockControl/>;
-    if(route==="/ho/audit-queue")        return <CentralAuditQueue/>;
+    if(route==="/settings/filing-register")   return <StatutoryFilingRegister/>;
     /* TK Group — central control (real /api/tk/* pages; dormant until core.policy_guard on) */
     if(route==="/tk/my-role")            return <TkMyRolePage/>;
     if(route==="/tk/approvals")          return <TkApprovalsPage/>;

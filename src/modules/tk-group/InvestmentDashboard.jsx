@@ -5,6 +5,8 @@ import { BRANCHES } from '../../core/referenceCache';
 import { getLimits } from './api/limits';
 import { fyRange } from './utils/scorecard';
 import { investmentRow, fixFirstFlags } from './utils/investment';
+import { branchLoadState } from './utils/branchLoad';
+import { BranchLoadNotice } from './BranchLoadNotice';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { PageSection, Input } from '../../shell/primitives';
@@ -55,7 +57,8 @@ export function InvestmentDashboard() {
   const focus = useCockpitFocus();
   const view = focusedBranches(focus, BRANCHES);
   const q = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'invest', b.code, from, to], queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: b.code, from, to }), staleTime: 60_000 })) });
-  const rows = view.map((b, i) => investmentRow(b, q[i] && q[i].data));
+  const load = branchLoadState(q, view);
+  const rows = view.map((b, i) => (q[i] && q[i].isError) ? null : investmentRow(b, q[i] && q[i].data)).filter(Boolean);
 
   return (
     <div className="grid gap-4">
@@ -63,12 +66,13 @@ export function InvestmentDashboard() {
       <p className="text-xs text-ink-muted">
         FY {from} → {to} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>} — each branch in its own currency, never consolidated.
       </p>
+      <BranchLoadNotice load={load} onRetry={() => q.forEach((x) => x.refetch())} />
       <div data-testid="tk-investment">
         <DataTable
           title="Investment / Capital"
           columns={COLS}
           rows={rows}
-          isError={q.length > 0 && q.every((x) => x.isError)}
+          isError={load.allFailed}
           getRowKey={(r) => r.code}
           emptyMessage="No capital figures yet."
           searchable={false}

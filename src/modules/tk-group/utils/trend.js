@@ -12,11 +12,13 @@ export function directionGlyph(direction) {
   return { improving: '▲', worsening: '▼', flat: '▬' }[direction] || '▬';
 }
 
-/** Header KPI tiles: open now, opened & fixed over the window, avg time-to-fix. */
-export function trendKpis(d) {
+/** Header KPI tiles: open now, opened & fixed over the window, avg time-to-fix. `focus`
+ *  (a branch code or 'ALL') only adjusts copy so a focused view doesn't claim group scope. */
+export function trendKpis(d, focus) {
   const g = (d && d.group) || {};
+  const scoped = focus && focus !== 'ALL';
   return [
-    { key: 'open', label: 'Open now', value: `${g.openNow || 0}`, sub: 'across group' },
+    { key: 'open', label: 'Open now', value: `${g.openNow || 0}`, sub: scoped ? `in ${focus}` : 'across group' },
     { key: 'fixed', label: 'Fixed (8 wk)', value: `${g.fixed || 0}`, sub: 'issues cleared' },
     { key: 'opened', label: 'Opened (8 wk)', value: `${g.opened || 0}`, sub: 'issues raised' },
     { key: 'avgfix', label: 'Avg time-to-fix', value: `${g.avgFixHrs || 0}h`, sub: `${Math.round((g.avgFixHrs || 0) / 24)}d` },
