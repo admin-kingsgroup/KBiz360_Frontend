@@ -44,6 +44,9 @@ describe('ControlTower', () => {
     renderWith(<ControlTower />);
     expect(await screen.findByText('Master')).toBeInTheDocument();
     expect(screen.getByTestId('tk-kpis')).toHaveTextContent('9');
+    // Sectioned into tabs (like the ERP Rules Manager), Overview default.
+    ['Overview', 'Group Health', 'Setup Readiness', 'Close & Integrity', 'Scrutiny Trend', 'Governance']
+      .forEach((t) => expect(screen.getByRole('button', { name: t })).toBeInTheDocument());
   });
 });
 

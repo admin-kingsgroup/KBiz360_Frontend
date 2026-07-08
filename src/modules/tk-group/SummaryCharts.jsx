@@ -7,9 +7,11 @@ import React from 'react';
 // helpers (polar / arcPath / linePoints / stackSegments) that are unit-tested
 // without a DOM. Every chart is presentational: it takes numbers, draws, no fetch.
 
-// Palette mirrors tailwind.config.js so charts read as part of the same system.
+// Palette mirrors the Control-Tower DETAIL bands (GroupHealth / IntegritySummary /
+// ScrutinyTrend use these exact hexes) so a summary chart and its full tab read as one
+// system — same green/amber/red for the same meaning. App is light-only.
 export const SEM = {
-  ok: '#16a34a', warn: '#d97706', err: '#dc2626', info: '#2563eb',
+  ok: '#1a7a4c', warn: '#a86a10', err: '#b23b3b', info: '#2563eb',
   accent: '#c2a04a', track: '#eceef1', ink: '#14161a', mut: '#5b616e', sub: '#9197a3',
 };
 
@@ -24,12 +26,13 @@ export function polar(cx, cy, r, frac) {
   const a = Math.PI * (1 - frac);
   return [cx + r * Math.cos(a), cy - r * Math.sin(a)];
 }
-/** SVG arc path along the top semicircle from frac f0 → f1 (clockwise). */
+/** SVG arc path along the top semicircle from frac f0 → f1 (clockwise). A sub-arc of a
+ *  180° semicircle NEVER exceeds 180°, so the large-arc-flag is always 0 — deriving it
+ *  from the span put arcs past the halfway point on the wrong circle (they bulged out). */
 export function arcPath(cx, cy, r, f0, f1) {
   const [x0, y0] = polar(cx, cy, r, f0);
   const [x1, y1] = polar(cx, cy, r, f1);
-  const large = (f1 - f0) > 0.5 ? 1 : 0;
-  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
 }
 /** Evenly-spaced points for a line/area over `vals` scaled to a w×h box. */
 export function linePoints(vals, w, h, pad = 6, max = 100) {
@@ -66,7 +69,9 @@ export function SemiGauge({ value = 0, size = 150, label = 'out of 100' }) {
 }
 
 // ── 100% stacked bar (a small N-part split, e.g. not-started / in-progress / awaiting) ──
-export function StackedBar({ segments = [], height = 26, showCounts = true }) {
+// showCounts is OFF by default: the bar's viewBox is stretched (preserveAspectRatio none),
+// which distorts inline <text>. Pair it with a Legend for the numbers instead.
+export function StackedBar({ segments = [], height = 26, showCounts = false }) {
   const segs = stackSegments(segments);
   return (
     <svg viewBox="0 0 100 10" width="100%" height={height} preserveAspectRatio="none" role="img" aria-label="proportion" style={{ borderRadius: 6, overflow: 'hidden' }}>

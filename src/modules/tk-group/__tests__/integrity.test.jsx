@@ -1,4 +1,4 @@
-import { statusTone, statusGlyph, integrityKpis, branchCards, matrixRows, branchKeys, findingRows } from '../utils/integrity';
+import { statusTone, statusGlyph, integrityKpis, branchCards, matrixRows, branchKeys, findingRows, focusView } from '../utils/integrity';
 
 const payload = {
   group: { score: 88, fails: 3, warns: 3, closeReadyBranches: 5, totalBranches: 6 },
@@ -60,5 +60,23 @@ describe('TK integrity · FE shaping (pure)', () => {
     expect(branchCards({})).toEqual([]);
     expect(matrixRows({})).toEqual([]);
     expect(findingRows(undefined)).toEqual([]);
+  });
+
+  describe('focusView (cockpit Focus scoping)', () => {
+    test('ALL passes through unchanged', () => { expect(focusView(payload, 'ALL')).toBe(payload); });
+    test('a branch keeps it, rebuilds group from it, keeps the catalogue (matrix stays)', () => {
+      const v = focusView(payload, 'BOM');
+      expect(v.branches).toEqual([payload.branches[0]]);
+      expect(v.group).toEqual({ score: 63, fails: 2, warns: 0, closeReadyBranches: 0, totalBranches: 1 });
+      expect(v.catalogue).toBe(payload.catalogue); // gate list preserved
+      expect(integrityKpis(v)[3]).toMatchObject({ key: 'ready', value: '0/1' });
+      expect(matrixRows(v).find((r) => r.id === 'sod-self-approved').byBranch).toEqual({ BOM: 'fail' });
+    });
+    test('a close-ready branch → 1/1 ready', () => {
+      expect(integrityKpis(focusView(payload, 'AMD'))[3]).toMatchObject({ value: '1/1' });
+    });
+    test('unknown branch → empty, perfect group', () => {
+      expect(focusView(payload, 'ZZZ')).toMatchObject({ branches: [], group: { score: 100, fails: 0, totalBranches: 0 } });
+    });
   });
 });

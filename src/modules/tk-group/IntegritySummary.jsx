@@ -1,10 +1,11 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getIntegrity } from './api/monitor';
-import { integrityKpis, branchCards, findingRows, statusTone } from './utils/integrity';
+import { integrityKpis, branchCards, findingRows, statusTone, focusView } from './utils/integrity';
 import { ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { BandError } from './BandError';
+import { useCockpitFocus } from '../../store/cockpitFocus';
 
 // ─── TK GROUP · FE · Close-Readiness summary (compact, on the Control Tower) ──
 // A glanceable band for the Control Tower landing: group close-readiness KPIs, a
@@ -15,8 +16,9 @@ const OK = '#1a7a4c';
 const BAD = '#b23b3b';
 
 export function IntegritySummary({ setRoute } = {}) {
+  const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'integrity'], queryFn: getIntegrity, staleTime: 60_000, refetchInterval: 300_000 });
-  const d = q.data || {};
+  const d = focusView(q.data || {}, focus); // narrow to the spotlighted branch (ALL = group)
   const kpis = integrityKpis(d);
   const cards = branchCards(d);
   const findings = findingRows(d).slice(0, 4);

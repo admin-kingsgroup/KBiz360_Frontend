@@ -56,3 +56,18 @@ export function issueRows(d) {
 export function domainRows(d) {
   return (d && d.byDomain) || [];
 }
+
+/** Narrow a live payload to the cockpit Focus: when a single branch is spotlighted,
+ *  keep only that branch and rebuild the group KPIs from it (so "Group health" reads as
+ *  the branch's own health); 'ALL' (or unset) passes the group payload through unchanged. */
+export function focusView(d, focus) {
+  if (!d || !focus || focus === 'ALL') return d || {};
+  const b = (d.branches || []).find((x) => x.branch === focus);
+  if (!b) return { ...d, branches: [], byDomain: [], group: { score: 100, errors: 0, warn: 0, info: 0, branchesWithErrors: 0 } };
+  return {
+    ...d,
+    branches: [b],
+    byDomain: (d.byDomain || []).filter((dm) => (dm.branches || []).includes(focus)),
+    group: { score: b.score, errors: b.errors, warn: b.warn, info: b.info, branchesWithErrors: b.errors > 0 ? 1 : 0 },
+  };
+}

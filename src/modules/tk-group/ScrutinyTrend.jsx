@@ -1,10 +1,11 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getTrend } from './api/monitor';
-import { trendKpis, branchRows, branchMax, directionTone, directionGlyph, trendVerdict } from './utils/trend';
+import { trendKpis, branchRows, branchMax, directionTone, directionGlyph, trendVerdict, focusView } from './utils/trend';
 import { ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { BandError } from './BandError';
+import { useCockpitFocus } from '../../store/cockpitFocus';
 
 // ─── TK GROUP · FE · Scrutiny Trend (is data quality improving?) ─────────────
 // A compact Control-Tower band from the alert lifecycle: per branch, issues OPENED
@@ -31,8 +32,9 @@ function WeekBars({ branch }) {
 }
 
 export function ScrutinyTrend() {
+  const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'trend'], queryFn: getTrend, staleTime: 60_000, refetchInterval: 300_000 });
-  const d = q.data || {};
+  const d = focusView(q.data || {}, focus); // narrow to the spotlighted branch (ALL = group)
   const kpis = trendKpis(d);
   const rows = branchRows(d);
   const dir = (d.group && d.group.direction) || 'flat';

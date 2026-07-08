@@ -68,7 +68,7 @@ function LensCard({ title, onOpen, chart, legend, foot }) {
 }
 
 // ── Overview: every lens as a summary chart, scoped by the cockpit Focus ──
-function Overview({ focus, setRoute, goTab }) {
+function Overview({ focus, goTab }) {
   const ov = useQuery({ queryKey: ['tk', 'monitor', 'overview'], queryFn: getOverview, staleTime: 30_000, refetchInterval: 60_000 });
   const hq = useQuery({ queryKey: ['tk', 'monitor', 'health'], queryFn: getGroupHealth, staleTime: 60_000 });
   const iq = useQuery({ queryKey: ['tk', 'monitor', 'integrity'], queryFn: getIntegrity, staleTime: 60_000 });
@@ -79,6 +79,7 @@ function Overview({ focus, setRoute, goTab }) {
   const health = scopeHealth(hq.data, focus);
   const setup = scopeSetup(rq.data, focus);
   const gates = scopeGates(iq.data, focus);
+  const ig = (iq.data && iq.data.group) || {}; // group close-ready count, for the ALL footer
   const trend = scopeTrend(tq.data, focus);
   const tmax = seriesMax(trend.opened, trend.fixed);
   const streams = streamRows(o);
@@ -109,21 +110,23 @@ function Overview({ focus, setRoute, goTab }) {
         <LensCard title="Setup Readiness" onOpen={() => goTab('setup')}
           chart={<div className="w-[130px]"><StackedBar segments={[{ value: setup.error, color: SEM.err }, { value: setup.warn, color: SEM.warn }, { value: setup.info, color: SEM.info }]} /></div>}
           legend={<Legend items={[{ label: 'Not started', value: setup.error, color: SEM.err }, { label: 'In progress', value: setup.warn, color: SEM.warn }, { label: 'Awaiting', value: setup.info, color: SEM.info }]} />}
-          foot={<><span className="text-ink-subtle">modules built, not set up</span><Badge tone="danger" size="sm">{setup.total} pending</Badge></>} />
+          foot={<><span className="text-ink-subtle">modules built, not set up</span><Badge tone={setup.total ? 'danger' : 'success'} size="sm">{setup.total} pending</Badge></>} />
 
         <LensCard title="Close & Integrity" onOpen={() => goTab('close')}
           chart={<GateDots pass={gates.pass} warn={gates.warn} fail={gates.fail} na={gates.na} />}
           legend={<Legend items={[{ label: 'Pass', value: gates.pass, color: SEM.ok }, { label: 'Warn', value: gates.warn, color: SEM.warn }, { label: 'Fail', value: gates.fail, color: SEM.err }]} />}
-          foot={<><span className="text-ink-subtle">SAP-style gates</span><Badge tone={gates.fail ? 'danger' : gates.warn ? 'warning' : 'success'} size="sm">{gates.pass}/{gates.total} pass</Badge></>} />
+          foot={(!focus || focus === 'ALL')
+            ? <><span className="text-ink-subtle">gates, worst-of branches</span><Badge tone={ig.totalBranches && ig.closeReadyBranches === ig.totalBranches ? 'success' : 'warning'} size="sm">{ig.closeReadyBranches || 0}/{ig.totalBranches || 0} branches ready</Badge></>
+            : <><span className="text-ink-subtle">SAP-style gates</span><Badge tone={gates.fail ? 'danger' : gates.warn ? 'warning' : 'success'} size="sm">{gates.pass}/{gates.total} pass</Badge></>} />
 
         <LensCard title="Scrutiny Trend" onOpen={() => goTab('trend')}
-          chart={<div className="w-[150px]"><DualLine a={trend.fixed} b={trend.opened} max={tmax} height={70} /></div>}
-          legend={<Legend items={[{ label: 'Fixed / week', color: SEM.accent }, { label: 'Opened', color: SEM.err }]} />}
+          chart={<div className="w-[150px]"><DualLine a={trend.fixed} b={trend.opened} max={tmax} height={70} aColor={SEM.ok} /></div>}
+          legend={<Legend items={[{ label: 'Fixed / week', color: SEM.ok }, { label: 'Opened', color: SEM.err }]} />}
           foot={<span className="text-ink-subtle">fixed vs opened, last weeks</span>} />
 
         <LensCard title="Governance" onOpen={() => goTab('gov')}
           chart={<div className="w-[150px]"><MiniBars items={streams.map((s) => ({ label: s.label, value: s.value, color: SEM.accent }))} /></div>}
-          foot={<><span className="text-ink-subtle">approvals waiting</span><Badge tone="info" size="sm">{o.pendingTotal || 0} pending</Badge></>} />
+          foot={<><span className="text-ink-subtle">approvals waiting</span><Badge tone={o.pendingTotal ? 'info' : 'neutral'} size="sm">{o.pendingTotal || 0} pending</Badge></>} />
 
         <LensCard title="Controls"
           chart={<div className="grid w-full gap-1.5">
@@ -140,7 +143,7 @@ function Overview({ focus, setRoute, goTab }) {
 }
 
 // ── Governance tab: the control plane in detail ──
-function Governance({ setRoute }) {
+function Governance() {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'overview'], queryFn: getOverview, staleTime: 30_000, refetchInterval: 60_000 });
   const o = q.data || {};
   const controls = o.controls || [];
@@ -205,12 +208,12 @@ export function ControlTower({ setRoute } = {}) {
         ))}
       </div>
 
-      {tab === 'overview' && <Overview focus={focus} setRoute={setRoute} goTab={setTab} />}
+      {tab === 'overview' && <Overview focus={focus} goTab={setTab} />}
       {tab === 'health' && <GroupHealth setRoute={setRoute} />}
       {tab === 'setup' && <SetupReadiness setRoute={setRoute} />}
       {tab === 'close' && <IntegritySummary setRoute={setRoute} />}
       {tab === 'trend' && <ScrutinyTrend />}
-      {tab === 'gov' && <Governance setRoute={setRoute} />}
+      {tab === 'gov' && <Governance />}
     </div>
   );
 }

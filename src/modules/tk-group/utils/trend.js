@@ -41,3 +41,16 @@ export function trendVerdict(d) {
   if (dir === 'worsening') return `Worsening — ${g.opened} opened vs ${g.fixed} fixed`;
   return 'Flat — opened and fixed in balance';
 }
+
+/** Narrow a live payload to the cockpit Focus: keep only the spotlighted branch and take
+ *  its own open-now / opened / fixed / direction as the group KPIs. 'ALL' passes through. */
+export function focusView(d, focus) {
+  if (!d || !focus || focus === 'ALL') return d || {};
+  const b = (d.branches || []).find((x) => x.branch === focus);
+  if (!b) return { ...d, branches: [], group: { openNow: 0, fixed: 0, opened: 0, avgFixHrs: 0, direction: 'flat' } };
+  return {
+    ...d,
+    branches: [b],
+    group: { openNow: b.openNow, fixed: b.fixed, opened: b.opened, avgFixHrs: b.avgFixHrs, direction: b.direction },
+  };
+}

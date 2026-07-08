@@ -2,7 +2,8 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
-import { calendarKpis, dueTone, filingBranchRows, prevMonth } from './utils/taxDesk';
+import { calendarKpis, dueTone, filingBranchRows, prevMonth, dueValueParts } from './utils/taxDesk';
+import { curSym } from './utils/currency';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { DataTable } from '../../shell/DataTable';
@@ -20,7 +21,7 @@ const DUE_COLS = [
   { key: 'authority', header: 'Authority', align: 'left', render: (r) => r.authority },
   { key: 'filing', header: 'Filing', align: 'left', render: (r) => r.filing },
   { key: 'entity', header: 'Entity', align: 'left', render: (r) => r.entity || '—' },
-  { key: 'amount', header: 'Amount', align: 'right', num: true, render: (r) => money(r.amount, '₹') },
+  { key: 'amount', header: 'Amount', align: 'right', num: true, render: (r) => (r.amount ? money(r.amount, curSym(r.currency)) : '—') },
   { key: 'daysLeft', header: 'Days', align: 'right', num: true, render: (r) => <span className="tabular-nums">{r.daysLeft}</span> },
   { key: 'status', header: 'Status', align: 'left', render: (r) => <Badge tone={dueTone(r.status)} size="sm">{r.status}</Badge> },
 ];
@@ -48,7 +49,7 @@ export function TaxDesk() {
   const totals = (dq.data && dq.data.totals) || {};
   const dueRows = (dq.data && Array.isArray(dq.data.rows)) ? dq.data.rows : [];
   const filingRows = filingBranchRows(bq.data, focusCodes);
-  const dueValue = Number(totals.dueValue) || 0;
+  const dueParts = dueValueParts(totals);
 
   return (
     <div className="grid gap-4">
@@ -57,7 +58,7 @@ export function TaxDesk() {
           <KpiTile key={k.key} label={k.label.toUpperCase()} value={k.value} color={KPI_TONE_COLOR[k.tone] || '#5b616e'} />
         ))}
       </ResponsiveGrid>
-      <p className="text-xs text-ink-muted">Statutory dues owed (not yet filed): <b className="text-ink tabular-nums">{money(dueValue, '₹')}</b>. The compliance calendar is org-wide — a filing is entity / return level, never a branch sum.</p>
+      <p className="text-xs text-ink-muted">Statutory dues owed (not yet filed): <b className="text-ink tabular-nums">{dueParts.length ? dueParts.map((p) => money(p.amount, p.sym)).join(' · ') : '—'}</b>. Money is kept per currency — ₹ India (GST/TDS) and $ Africa (VAT/WHT) are never blended. The compliance calendar is org-wide — a filing is entity / return level, never a branch sum.</p>
 
       <div data-testid="tk-tax-dues">
         <DataTable title="Statutory Dues Calendar" columns={DUE_COLS} rows={dueRows} getRowKey={(r) => r.id} emptyMessage="No statutory dues on the calendar." searchable={false} showDensityToggle={false} zebra />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getSetupReadiness } from './api/monitor';
 import { readinessKpis, readinessRows, categoryRows, branchRows, statusTone, statusLabel, severityTone, ownerTone } from './utils/setupReadiness';
@@ -6,6 +6,7 @@ import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { BandError } from './BandError';
+import { useCockpitFocus } from '../../store/cockpitFocus';
 
 // ─── TK GROUP · FE · Setup / Configuration Readiness (on the Control Tower) ───
 // The "what still needs setting up before it works?" punch-list. Rides the live adoption
@@ -57,7 +58,12 @@ export function SetupReadiness({ setRoute } = {}) {
   const cats = categoryRows(d);
   const branches = branchRows(d);
 
-  const [branch, setBranch] = useState('ALL');
+  // The in-tab branch bar follows the top TK Group Central selector (cockpit Focus):
+  // it starts on the spotlighted branch and re-syncs when the top selector changes, so
+  // the whole Tower stays on one branch. Within 'ALL' the bar still lets you drill in.
+  const focus = useCockpitFocus();
+  const [branch, setBranch] = useState(focus || 'ALL');
+  useEffect(() => { setBranch(focus || 'ALL'); }, [focus]);
   // Filter to the chosen branch, then (re)serial-number the visible rows 1..n.
   const rows = (branch === 'ALL' ? allRows : allRows.filter((r) => r.branch === branch)).map((r, i) => ({ ...r, sr: i + 1 }));
   const cur = branches.find((b) => b.branch === branch);

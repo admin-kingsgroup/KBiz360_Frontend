@@ -54,3 +54,18 @@ export function findingRows(d) {
   const rank = { fail: 0, warn: 1 };
   return rows.sort((a, b) => (rank[a.status] - rank[b.status]) || (b.count - a.count));
 }
+
+/** Narrow a live payload to the cockpit Focus: keep only the spotlighted branch and
+ *  rebuild the group close-readiness KPIs from it (score/fails/warns become that branch's,
+ *  "branches ready" becomes 0/1). 'ALL' passes through. Catalogue is kept so the gate
+ *  matrix still lists every gate — now with a single branch column. */
+export function focusView(d, focus) {
+  if (!d || !focus || focus === 'ALL') return d || {};
+  const b = (d.branches || []).find((x) => x.branch === focus);
+  if (!b) return { ...d, branches: [], group: { score: 100, fails: 0, warns: 0, closeReadyBranches: 0, totalBranches: 0 } };
+  return {
+    ...d,
+    branches: [b],
+    group: { score: b.score, fails: b.fails, warns: b.warns, closeReadyBranches: b.closeReady ? 1 : 0, totalBranches: 1 },
+  };
+}

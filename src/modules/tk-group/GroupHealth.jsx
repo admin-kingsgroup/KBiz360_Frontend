@@ -1,11 +1,12 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getGroupHealth } from './api/monitor';
-import { healthKpis, branchCards, issueRows, domainRows, healthTone, severityTone, healthVerdict } from './utils/health';
+import { healthKpis, branchCards, issueRows, domainRows, healthTone, severityTone, healthVerdict, focusView } from './utils/health';
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { BandError } from './BandError';
+import { useCockpitFocus } from '../../store/cockpitFocus';
 
 // ─── TK GROUP · FE · Group Health (branch-wise alerts, on the Control Tower) ──
 // Wires the live per-branch alerts engine into the Control Tower: group health score,
@@ -31,8 +32,9 @@ function issueColumns(setRoute) {
 }
 
 export function GroupHealth({ setRoute } = {}) {
+  const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'health'], queryFn: getGroupHealth, staleTime: 60_000, refetchInterval: 300_000 });
-  const d = q.data || {};
+  const d = focusView(q.data || {}, focus); // narrow to the spotlighted branch (ALL = group)
   const kpis = healthKpis(d);
   const cards = branchCards(d);
   const issues = issueRows(d);

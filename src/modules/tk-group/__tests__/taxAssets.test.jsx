@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { assetNbv, assetDepreciation, assetBranchRow, assetsByCategory } from '../utils/assets';
-import { calendarKpis, dueTone, filingBranchRows, prevMonth } from '../utils/taxDesk';
+import { calendarKpis, dueTone, filingBranchRows, prevMonth, dueValueParts } from '../utils/taxDesk';
 
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn().mockResolvedValue({}) }));
 // eslint-disable-next-line import/first
@@ -73,6 +73,17 @@ describe('taxDesk utils', () => {
   test('filingBranchRows with no focus → all entities; defensive to empty board', () => {
     expect(filingBranchRows({ entities: [{ entity: 'A', taxes: {} }] }, null)).toHaveLength(1);
     expect(filingBranchRows(null, ['BOM'])).toEqual([]);
+  });
+  test('dueValueParts splits by currency (₹ India / $ Africa), never blended', () => {
+    expect(dueValueParts({ dueByCurrency: { INR: 70000, USD: 1000 } }))
+      .toEqual([{ code: 'INR', sym: '₹', amount: 70000 }, { code: 'USD', sym: '$', amount: 1000 }]);
+    // drops zero-value currencies
+    expect(dueValueParts({ dueByCurrency: { INR: 5000, USD: 0 } }))
+      .toEqual([{ code: 'INR', sym: '₹', amount: 5000 }]);
+    // legacy payload (no dueByCurrency) → single ₹ part; nothing due → empty
+    expect(dueValueParts({ dueValue: 4200 })).toEqual([{ code: 'INR', sym: '₹', amount: 4200 }]);
+    expect(dueValueParts({ dueByCurrency: {} })).toEqual([]);
+    expect(dueValueParts({})).toEqual([]);
   });
   test('prevMonth returns YYYY-MM of the previous month, with year rollover', () => {
     expect(prevMonth(new Date(2026, 6, 15))).toBe('2026-06'); // Jul → Jun

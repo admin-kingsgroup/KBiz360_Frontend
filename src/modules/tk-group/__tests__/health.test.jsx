@@ -1,4 +1,4 @@
-import { healthTone, severityTone, healthVerdict, healthKpis, branchCards, issueRows, domainRows } from '../utils/health';
+import { healthTone, severityTone, healthVerdict, healthKpis, branchCards, issueRows, domainRows, focusView } from '../utils/health';
 
 describe('TK group health · FE shaping (pure)', () => {
   test('healthTone bands', () => {
@@ -56,5 +56,27 @@ describe('TK group health · FE shaping (pure)', () => {
     expect(branchCards({})).toEqual([]);
     expect(issueRows(undefined)).toEqual([]);
     expect(domainRows({})).toEqual([]);
+  });
+
+  describe('focusView (cockpit Focus scoping)', () => {
+    const d = {
+      group: { score: 61, errors: 5, warn: 2, info: 1, branchesWithErrors: 2 },
+      branches: [{ branch: 'BOM', score: 21, errors: 4, warn: 1, info: 0, topIssues: [] }, { branch: 'AMD', score: 58, errors: 0, warn: 1, info: 1, topIssues: [] }],
+      byDomain: [{ key: 'ar', label: 'AR', error: 3, branches: ['BOM'] }, { key: 'bank', label: 'Bank', error: 2, branches: ['AMD'] }],
+    };
+    test('ALL passes through unchanged', () => { expect(focusView(d, 'ALL')).toBe(d); });
+    test('a branch keeps only it and rebuilds group KPIs from it', () => {
+      const v = focusView(d, 'BOM');
+      expect(v.branches).toEqual([d.branches[0]]);
+      expect(v.group).toEqual({ score: 21, errors: 4, warn: 1, info: 0, branchesWithErrors: 1 });
+      expect(v.byDomain).toEqual([{ key: 'ar', label: 'AR', error: 3, branches: ['BOM'] }]); // only BOM's domains
+      expect(healthKpis(v)[0]).toMatchObject({ value: '21' }); // KPI now reads the branch's score
+    });
+    test('a branch with no errors → branchesWithErrors 0', () => {
+      expect(focusView(d, 'AMD').group.branchesWithErrors).toBe(0);
+    });
+    test('unknown branch → empty, healthy group', () => {
+      expect(focusView(d, 'ZZZ')).toMatchObject({ branches: [], group: { score: 100, errors: 0 } });
+    });
   });
 });
