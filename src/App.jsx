@@ -47,7 +47,7 @@ import { supportRoutes } from './modules/support/routes';
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes];
-const { BankingApiSettings, DelegationsManager, GroupDashboard, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
+const { BankingApiSettings, DelegationsManager, GroupDashboard, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/masters/mastersParties'));
@@ -796,7 +796,9 @@ export default function KB360App(){
         if(route==="/reports/cf-direct")               return <CashFlowDirect branch={branch} setRoute={navigate}/>;
         if(route==="/reports/msme-aging")              return <MsmeTracker branch={branch} setRoute={navigate}/>;
         if(route==="/hr/loans-advances")               return <EmployeeAdvances branch={branch} setRoute={navigate}/>;
-        if(route==="/settings/period-lock")            return <PeriodLocking branch={branch} setRoute={navigate}/>;
+        // The old PeriodLocking screen was a dead second lock UI (empty data, inert
+        // buttons) — this route now serves the real TK period-lock admin instead.
+        if(route==="/settings/period-lock")            return <TkPeriodLockPage/>;
         if(route==="/settings/approval-workflow")      return <ApprovalWorkflow branch={branch} setRoute={navigate}/>;
         if(route==="/approvals")                       return <PendingApprovals branch={branch} setRoute={navigate}/>;
         if(route==="/settings/banking-api")            return <BankingApiSettings branch={branch} setRoute={navigate}/>;
