@@ -465,7 +465,9 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #cdd1d8', marginBottom: 12 }}>
-        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('parity', 'TK Group Central View')}{tabBtn('paritytable', 'TK Group Central Table')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
+        {/* Retired tabs (Side-by-Side, TK Group Central View, Inactive) removed per user
+            2026-07-08 — their renderers stay below for the exported/tested pure helpers. */}
+        {tabBtn('tree', 'Tree View')}{tabBtn('paritytable', 'TK Group Central Table')}
         {tab === 'tree' && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, padding: '4px 0' }}>
             <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊞ Expand all</button>
@@ -479,7 +481,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
           {Array.from({ length: 7 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}
         </div>
       )}
-      {tab === 'tree' ? treeView() : tab === 'side' ? sideView() : tab === 'parity' ? <TravkingsGroupView /> : tab === 'paritytable' ? <TravkingsGroupTableView setRoute={setRoute} setBranch={setBranch} /> : inactiveView()}
+      {tab === 'paritytable' ? <TravkingsGroupTableView setRoute={setRoute} setBranch={setBranch} /> : treeView()}
     </div>
   );
 }
