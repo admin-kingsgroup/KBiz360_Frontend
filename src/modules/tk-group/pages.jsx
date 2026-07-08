@@ -156,21 +156,19 @@ export function TkIntegrityPage() {
   );
 }
 
-// Three surfaces under one route: ERP Rules (Control-Tower monitoring) + User Rules
-// (per-user access) + Rule Book (read-only reference of the rules enforced in code).
-// Tabbed so they sit together under Control & Configuration.
+// Two surfaces under one route: ERP Rules (Control-Tower monitoring) + Rule Book
+// (read-only reference of the rules enforced in code). Tabbed so they sit together
+// under Control & Configuration. User Rules Manager is its own separate entry under
+// Rules & Requests (/tk/user-rules → TkUserRulesPage), so it is no longer a tab here.
 const RULES_TABS = [
   { id: 'erp', label: 'ERP Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate the rules the Control Tower monitors. New rules land Inactive (Draft) and do nothing until you Test them on live data and Activate. System rules (🔒) are enforced in code and read-only.' },
-  { id: 'user', label: 'User Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate per-user access rules — who may reach which branch, module or action, an approval ceiling, view-only or a login window. New rules land Inactive (Draft) until you Test the blast radius and Activate.' },
   { id: 'book', label: 'Rule Book', subtitle: 'Read-only reference of every Accounts & Operations rule the ERP enforces in code — searchable, filterable by Accounts / Operations, each citing the file that enforces it. Documentation only; nothing here is evaluated on live data.' },
 ];
 
 export function TkRulesPage({ owner, initialTab = 'erp' }) {
   const [tab, setTab] = useState(RULES_TABS.some((t) => t.id === initialTab) ? initialTab : 'erp');
-  // The router renders the SAME TkRulesPage for /tk/rules and /tk/user-rules (it does
-  // not remount on route change), so sync the tab when the deep-link prop changes —
-  // otherwise clicking the other menu entry would leave the wrong tab showing. In-page
-  // tab clicks are unaffected (this only fires when initialTab actually changes).
+  // Deep-links may target a specific tab; sync when the prop changes (the page does not
+  // remount on route change). In-page tab clicks are unaffected.
   React.useEffect(() => { if (RULES_TABS.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]);
   const meta = RULES_TABS.find((t) => t.id === tab) || RULES_TABS[0];
   return (
@@ -183,9 +181,17 @@ export function TkRulesPage({ owner, initialTab = 'erp' }) {
           </button>
         ))}
       </div>
-      {tab === 'erp' ? <RulesManager canManage={!!owner} />
-        : tab === 'user' ? <UserRulesManager canManage={!!owner} />
-          : <RuleBook />}
+      {tab === 'erp' ? <RulesManager canManage={!!owner} /> : <RuleBook />}
+    </Page>
+  );
+}
+
+// User Rules Manager — its own standalone page (a separate entry under Rules & Requests),
+// no longer a tab on the ERP Rules Manager page.
+export function TkUserRulesPage({ owner }) {
+  return (
+    <Page title="User Rules Manager" subtitle="OWNER ONLY. Add, verify and activate per-user access rules — who may reach which branch, module or action, an approval ceiling, view-only or a login window. New rules land Inactive (Draft) until you Test the blast radius and Activate.">
+      <UserRulesManager canManage={!!owner} />
     </Page>
   );
 }
