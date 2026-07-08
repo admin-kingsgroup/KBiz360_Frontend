@@ -1,4 +1,4 @@
-// AD Cockpit (Beta) — smoke test. Mocks the live hooks and asserts the sectioned dark
+// AD Cockpit — smoke test. Mocks the live hooks and asserts the sectioned dark
 // cockpit renders its region hero (₹ India / $ Africa, never summed) and drills to a branch.
 const branch = (code, currency) => ({ code, currency });
 jest.mock('../../../core/data', () => ({

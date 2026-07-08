@@ -1,4 +1,4 @@
-// ─── AD Cockpit (Beta) — sectioned dark "Command Bridge" owner cockpit ──────────
+// ─── AD Cockpit — sectioned dark "Command Bridge" owner cockpit ──────────
 // Additive, owner-only route (/dashboard/cockpit) that reuses the SAME live hooks as
 // the Owner Dashboard, so the existing AD Dashboard is untouched. Group-wide oversight,
 // branch-wise, currencies NEVER summed: branches roll up into currency REGIONS
@@ -428,7 +428,7 @@ export function AdCockpitPage({ setRoute }) {
       <style>{CSS}</style>
       <div className="hdr">
         <div className="hrow">
-          <div className="brand"><span className="dot" /> TK Group Central <small>· AD Cockpit (Beta)</small></div>
+          <div className="brand"><span className="dot" /> TK Group Central <small>· AD Cockpit</small></div>
           <div className="spacer" />
           <div className="pills">{PRESETS.map(([k, lb]) => <button key={k} className={preset === k ? 'on' : ''} onClick={() => setPreset(k)}>{lb}</button>)}</div>
         </div>

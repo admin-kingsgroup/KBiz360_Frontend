@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MyRole } from './MyRole';
 import { ApprovalsInbox } from './ApprovalsInbox';
 import { FlagAdmin } from './FlagAdmin';
@@ -10,6 +10,7 @@ import { IntegrityChecks } from './IntegrityChecks';
 import { ModuleTower } from './ModuleTower';
 import { HealthScorecard } from './HealthScorecard';
 import { RulesManager } from './RulesManager';
+import { UserRulesManager } from './UserRulesManager';
 import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
@@ -154,10 +155,27 @@ export function TkIntegrityPage() {
   );
 }
 
+// Two managers under one route: ERP Rules (Control-Tower monitoring) + User Rules
+// (per-user access). Tabbed so they sit together under Control & Configuration.
+const RULES_TABS = [
+  { id: 'erp', label: 'ERP Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate the rules the Control Tower monitors. New rules land Inactive (Draft) and do nothing until you Test them on live data and Activate. System rules (🔒) are enforced in code and read-only.' },
+  { id: 'user', label: 'User Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate per-user access rules — who may reach which branch, module or action, an approval ceiling, view-only or a login window. New rules land Inactive (Draft) until you Test the blast radius and Activate.' },
+];
+
 export function TkRulesPage({ owner }) {
+  const [tab, setTab] = useState('erp');
+  const meta = RULES_TABS.find((t) => t.id === tab) || RULES_TABS[0];
   return (
-    <Page title="Rules Manager" subtitle="OWNER ONLY. Add, verify and activate the rules the Control Tower monitors. New rules land Inactive (Draft) and do nothing until you Test them on live data and Activate. System rules (🔒) are enforced in code and read-only.">
-      <RulesManager canManage={!!owner} />
+    <Page title={meta.label} subtitle={meta.subtitle}>
+      <div className="mb-4 flex gap-1 border-b border-surface-border">
+        {RULES_TABS.map((t) => (
+          <button key={t.id} type="button" onClick={() => setTab(t.id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${tab === t.id ? 'border-accent text-accent' : 'border-transparent text-ink-muted hover:text-ink'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'erp' ? <RulesManager canManage={!!owner} /> : <UserRulesManager canManage={!!owner} />}
     </Page>
   );
 }

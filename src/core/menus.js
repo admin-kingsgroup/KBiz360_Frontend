@@ -600,7 +600,7 @@ function withOwnerDashboard(menu){
   const overview = menu.children[0];
   const newOverview = {...overview, children:[
     {label:"AD Dashboard (All)", href:"/dashboard/owner"},   // replaces "My Dashboard" for the owner
-    {label:"AD Cockpit (Beta)", href:"/dashboard/cockpit"},  // new sectioned dark cockpit — additive, owner-only
+    {label:"AD Cockpit", href:"/dashboard/cockpit"},  // sectioned dark cockpit — additive, owner-only
     ...overview.children.slice(1),                                        // Alerts, Capital, … (My Dashboard dropped)
   ]};
   return {...menu, children:[newOverview, ...menu.children.slice(1)]};
