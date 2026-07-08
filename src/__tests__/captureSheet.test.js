@@ -79,6 +79,17 @@ describe('buildCaptureSheet — register capture columns & row refs', () => {
     expect(sheet.rows[0]._booking).toBe(booking);
   });
 
+  test('Final Invoice Value prefers partyNet (the JV\'s net client-ledger figure on a refund) over the gross total', () => {
+    // A posted refund: header total is the GROSS reversal (60,518) but the JV nets the
+    // customer to their true refund payable (51,370) — the column must show the latter,
+    // matching the JV popup it opens. Unposted refunds carry no partyNet → gross total.
+    const rf = { ...saleVoucher, vno: 'RF1', type: 'RF', total: 60518, partyNet: 51370.01 };
+    const sheet = buildCaptureSheet([rf, saleVoucher], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });
+    expect(sheet.rows[0].finalValue).toBe(51370.01);
+    expect(sheet.rows[1].finalValue).toBe(1180);      // plain sale: unchanged
+    expect(sheet.totals.finalValue).toBe(52550.01);   // footer follows the shown figures
+  });
+
   test('Sale Date column carries the voucher date (labelled per side)', () => {
     const dated = { ...saleVoucher, date: '16-Mar-26' };
     const sale = buildCaptureSheet([dated], { tab: 'sales', tag: 'BOM', linkIndex, bookingByLink, showType: true });

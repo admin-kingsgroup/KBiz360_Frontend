@@ -1456,7 +1456,11 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
       clientType: v.partyGroup || '',
       clientLedger: v.party || v.billTo || '',
       pax: tv.passengers || '', pnr: tv.pnrs || '', ticket: tv.tickets || '',
-      finalValue: r2(v.total),
+      // Refund vouchers NET their party leg in the posted JV, so the header `total`
+      // (gross reversal) is NOT what hit the client ledger. `partyNet` (attached by
+      // the backend from the posted journal) is that net figure — show it so the
+      // column matches the JV popup / party ledger; absent (unposted) → total.
+      finalValue: r2(v.partyNet != null ? v.partyNet : v.total),
       cgst: g.cgst, sgst: g.sgst, igst: g.igst, vat: g.vat,
       ocgst: og.cgst, osgst: og.sgst, oigst: og.igst, ovat: og.vat,
       tcs: r2(v.tcsAmt), tds: r2(v.tdsAmt),
