@@ -20,6 +20,16 @@ export function severityTone(sev) {
   return { error: 'danger', warn: 'warning', info: 'info' }[sev] || 'neutral';
 }
 
+/** Map a responsible team to a Badge tone, so the Owner column reads at a glance. */
+export function ownerTone(owner) {
+  return { Accounts: 'info', Operations: 'warning' }[owner] || 'neutral';
+}
+
+/** The per-branch rollup rows (pending + live/total), already ordered by the API. */
+export function branchRows(d) {
+  return (d && d.byBranch) || [];
+}
+
 /** Header KPI tiles: modules pending + severity split + branch fan-out. */
 export function readinessKpis(d) {
   const s = (d && d.summary) || {};

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getSetupReadiness } from './api/monitor';
-import { readinessKpis, readinessRows, categoryRows, statusTone, statusLabel, severityTone } from './utils/setupReadiness';
+import { readinessKpis, readinessRows, categoryRows, branchRows, statusTone, statusLabel, severityTone, ownerTone } from './utils/setupReadiness';
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
@@ -12,19 +12,29 @@ import { DataTable } from '../../shell/DataTable';
 // the data — nothing here is a hand-ticked checkbox. Branchwise, never blended. Read-only;
 // dormant-safe. Kept OUT of the notification bell/dashboard on purpose — this is the one
 // place these "module not set up yet" reminders live, so daily alerts aren't drowned.
+//
+// A branch SEPARATOR sits on top (like TK Group Central): pick a branch and the list
+// filters + re-serial-numbers to that branch; each item is OWNED by a team (Accounts /
+// Operations / IT & Admin / HR) so it reads as an owned to-do, not just a category.
 
 const KPI_COLOR = { pending: '#1a1c22', error: '#b23b3b', warn: '#a86a10', branches: '#1a1c22' };
 
 function issueColumns(setRoute) {
   return [
-    { key: 'branch', header: 'Scope', render: (r) => (
+    { key: 'sr', header: 'SR', align: 'right', render: (r) => (
+      <span className="tabular-nums text-[12px] font-semibold text-ink-subtle">{r.sr}</span>
+    ) },
+    { key: 'branch', header: 'Branch', render: (r) => (
       <Badge tone={r.scope === 'central' ? 'neutral' : 'info'} size="sm">{r.branch}</Badge>
     ) },
-    { key: 'label', header: 'Module', render: (r) => (
+    { key: 'label', header: 'Function / Module', render: (r) => (
       <div>
         <div className="font-medium text-ink">{r.label}</div>
         <div className="text-[11px] text-ink-subtle">{r.category}</div>
       </div>
+    ) },
+    { key: 'owner', header: 'Owner', render: (r) => (
+      <Badge tone={ownerTone(r.owner)} size="sm">{r.owner || '—'}</Badge>
     ) },
     { key: 'status', header: 'Status', align: 'center', render: (r) => (
       <Badge tone={statusTone(r.status)} size="sm">{statusLabel(r.status)}</Badge>
@@ -42,8 +52,14 @@ export function SetupReadiness({ setRoute } = {}) {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'readiness'], queryFn: getSetupReadiness, staleTime: 60_000, refetchInterval: 300_000 });
   const d = q.data || {};
   const kpis = readinessKpis(d);
-  const rows = readinessRows(d);
+  const allRows = readinessRows(d);
   const cats = categoryRows(d);
+  const branches = branchRows(d);
+
+  const [branch, setBranch] = useState('ALL');
+  // Filter to the chosen branch, then (re)serial-number the visible rows 1..n.
+  const rows = (branch === 'ALL' ? allRows : allRows.filter((r) => r.branch === branch)).map((r, i) => ({ ...r, sr: i + 1 }));
+  const cur = branches.find((b) => b.branch === branch);
 
   return (
     <div className="grid gap-4">
@@ -54,16 +70,39 @@ export function SetupReadiness({ setRoute } = {}) {
         ))}
       </ResponsiveGrid>
 
+      {/* Branch separator — pick a branch to scope the list (TK Group style). */}
+      {branches.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" data-testid="tk-readiness-branchbar">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-ink-subtle">Branch</span>
+          <button type="button" onClick={() => setBranch('ALL')}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${branch === 'ALL' ? 'border-accent bg-accent text-white' : 'border-surface-border bg-surface text-ink-muted hover:border-accent hover:text-accent'}`}>
+            All <span className="tabular-nums opacity-80">{allRows.length}</span>
+          </button>
+          {branches.map((b) => (
+            <button key={b.branch} type="button" onClick={() => setBranch(b.branch)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${branch === b.branch ? 'border-accent bg-accent text-white' : 'border-surface-border bg-surface text-ink-muted hover:border-accent hover:text-accent'}`}>
+              {b.branch} <span className="tabular-nums opacity-80">{b.pending}</span>
+            </button>
+          ))}
+          {cur && (
+            <span className="ml-1 text-[11px] text-ink-subtle">
+              <b className="tabular-nums text-ink-muted">{cur.live}</b> / {cur.total} modules live
+            </span>
+          )}
+        </div>
+      )}
+
       <PageSection title="How readiness is tracked">
         <p className="text-xs text-ink-muted">
           Each module is checked against its live setup milestones (masters created? · limits/terms set? · has data this year?).
           A module is listed here until every milestone is met, then it drops off automatically — nothing is hand-ticked.
           <b> Not started</b> = no data entered yet · <b>In progress</b> = partly configured · <b>Awaiting setup</b> = feature needs enabling.
+          Each item is owned by <b>Accounts</b>, <b>Operations</b>, <b>IT &amp; Admin</b> or <b>HR</b>.
         </p>
       </PageSection>
 
       <DataTable
-        title="Pending setup — modules awaiting data entry / configuration"
+        title={`Pending setup — modules awaiting data entry / configuration${branch === 'ALL' ? '' : ` · ${branch}`}`}
         columns={issueColumns(setRoute)}
         rows={rows}
         getRowKey={(r, i) => `${r.branch}:${r.key}:${i}`}

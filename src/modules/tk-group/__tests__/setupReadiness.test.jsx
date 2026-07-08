@@ -1,4 +1,4 @@
-import { statusTone, statusLabel, severityTone, readinessKpis, readinessRows, categoryRows } from '../utils/setupReadiness';
+import { statusTone, statusLabel, severityTone, ownerTone, readinessKpis, readinessRows, categoryRows, branchRows } from '../utils/setupReadiness';
 
 describe('TK setup readiness · FE shaping (pure)', () => {
   test('statusTone maps to Badge tones', () => {
@@ -29,15 +29,29 @@ describe('TK setup readiness · FE shaping (pure)', () => {
     expect(k).toHaveLength(4);
   });
 
-  test('readinessRows / categoryRows pass through payload arrays', () => {
-    const d = { issues: [{ key: 'hr-attendance' }], byCategory: [{ category: 'HR', error: 2 }] };
+  test('ownerTone maps teams to Badge tones', () => {
+    expect(ownerTone('Accounts')).toBe('info');
+    expect(ownerTone('Operations')).toBe('warning');
+    expect(ownerTone('IT & Admin')).toBe('neutral');
+    expect(ownerTone('HR')).toBe('neutral');
+    expect(ownerTone(undefined)).toBe('neutral');
+  });
+
+  test('readinessRows / categoryRows / branchRows pass through payload arrays', () => {
+    const d = {
+      issues: [{ key: 'hr-attendance' }],
+      byCategory: [{ category: 'HR', error: 2 }],
+      byBranch: [{ branch: 'BOM', pending: 3, live: 5, total: 31 }],
+    };
     expect(readinessRows(d)).toHaveLength(1);
     expect(categoryRows(d)[0].category).toBe('HR');
+    expect(branchRows(d)[0]).toMatchObject({ branch: 'BOM', pending: 3, live: 5, total: 31 });
   });
 
   test('fail-soft on empty payload', () => {
     expect(readinessKpis({})[0]).toMatchObject({ value: '0' });
     expect(readinessRows(undefined)).toEqual([]);
     expect(categoryRows({})).toEqual([]);
+    expect(branchRows(undefined)).toEqual([]);
   });
 });
