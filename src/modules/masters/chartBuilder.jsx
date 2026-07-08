@@ -859,12 +859,17 @@ function PresenceToggles({ item, num }) {
   const flip = async (p) => {
     if (p.locked || m.isPending) return;
     if (p.state === 'active') {
-      const { confirmed } = await confirmDialog({
-        title: `Hide “${item.name}” in ${p.br}?`,
-        message: `It moves to the Hidden column for ${p.br}${p.posts > 0 ? ` (its ${num(p.posts)} posted entr${p.posts === 1 ? 'y' : 'ies'} stay untouched)` : ''} and leaves Core/Own/Total and the pickers. Toggle it back on anytime to restore.`,
-        danger: true, confirmLabel: 'Hide',
-      });
-      if (!confirmed) return;
+      // Untouched ledger (0 entries) → hides instantly on tap; the confirm
+      // dialog appears ONLY when the ledger holds posted entries — that's the
+      // case worth a second look before hiding.
+      if (p.posts > 0) {
+        const { confirmed } = await confirmDialog({
+          title: `Hide “${item.name}” in ${p.br}?`,
+          message: `It holds ${num(p.posts)} posted entr${p.posts === 1 ? 'y' : 'ies'} in ${p.br} — the entries stay untouched, but the ledger moves to the Hidden column and leaves the pickers. Toggle it back on anytime to restore.`,
+          danger: true, confirmLabel: 'Hide',
+        });
+        if (!confirmed) return;
+      }
       m.mutate({ name: item.name, branch: p.br, enable: false });
     } else {
       m.mutate({ name: item.name, branch: p.br, enable: true });   // unhide / reactivate / clone — additive, no confirm
