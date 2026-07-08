@@ -37,6 +37,7 @@ export function ReceivablesPayables() {
           title="Receivables & Payables"
           columns={COLS}
           rows={rows}
+          isError={q.length > 0 && q.every((x) => x.isError)}
           getRowKey={(r) => r.code}
           emptyMessage="No outstanding balances."
           searchable={false}

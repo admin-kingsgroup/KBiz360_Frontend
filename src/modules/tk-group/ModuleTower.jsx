@@ -4,6 +4,13 @@ import { getModules, getIntegrityDetail } from './api/monitor';
 import { statusTone, countLabel, sevTone, sevLabel, heads as headsOf, moduleKpis, issuesFor } from './utils/modules';
 import { ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
+import { BRANCHES } from '../../core/referenceCache';
+import { curSym } from './utils/currency';
+
+// A module issue carries `br` (branch code); its amount is in that branch's own
+// currency — ₹ for India, $ for the USD books (NBO/DAR/FBM). Group-level issues
+// (no branch) fall back to ₹.
+const brSym = (code) => curSym((BRANCHES.find((b) => b.code === code) || {}).currency);
 
 // ─── TK GROUP · FE · Control Tower by Module ─────────────────────────────────
 // The 75-module tree: a sidebar of head modules → sub-modules each with a live issue
@@ -32,7 +39,7 @@ function Detail({ branch, checkId }) {
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} className="border-t border-surface-border/60">
-              <td className="py-1 pl-9 text-ink">{r.ref}</td><td className="capitalize text-ink-muted">{r.primary}{r.secondary ? ` · ${r.secondary}` : ''}</td><td className="pr-3 text-right tabular-nums text-ink">{fmt(r.amount)}</td>
+              <td className="py-1 pl-9 text-ink">{r.ref}</td><td className="capitalize text-ink-muted">{r.primary}{r.secondary ? ` · ${r.secondary}` : ''}</td><td className="pr-3 text-right tabular-nums text-ink">{r.amount ? `${brSym(branch)}${fmt(r.amount)}` : ''}</td>
             </tr>
           ))}
         </tbody>
@@ -57,7 +64,7 @@ function Issue({ issue, showMod, open, onToggle, setRoute }) {
           <span className="mt-0.5 block truncate text-[11px] text-ink-muted">{issue.detail}</span>
         </span>
         <span className="flex items-center gap-2">
-          {issue.amount ? <span className="tabular-nums text-sm font-bold text-ink">₹{fmt(issue.amount)}</span> : issue.count ? <span className="tabular-nums text-sm font-bold text-ink">{issue.count}</span> : null}
+          {issue.amount ? <span className="tabular-nums text-sm font-bold text-ink">{brSym(issue.br)}{fmt(issue.amount)}</span> : issue.count ? <span className="tabular-nums text-sm font-bold text-ink">{issue.count}</span> : null}
           {issue.br && <Badge tone="neutral" size="sm">{issue.br}</Badge>}
         </span>
       </button>

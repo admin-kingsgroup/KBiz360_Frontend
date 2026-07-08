@@ -22,14 +22,19 @@ export function fixFirstFlags(m, limits) {
 
 /** One branch's investment row from a capital-analysis payload. */
 export function investmentRow(branch, cap) {
-  const c = cap || {};
-  const n = (k) => Number(c[k]) || 0;
+  // capital-analysis returns its scalars under `.totals` (capitalInvested,
+  // capitalEmployed, capitalBlocked, quasiCapital, netProfit …) — never at the top
+  // level. Three of the columns have no eponymous key, so they map to the closest
+  // real figure: Investments → capitalBlocked, Loans → quasiCapital (director/partner
+  // loans), Profit → netProfit (period P&L).
+  const t = (cap && cap.totals) || {};
+  const n = (k) => Number(t[k]) || 0;
   return {
     code: branch.code, cur: curSym(branch.currency), flag: branch.flag, city: branch.city,
     capitalInvested: n('capitalInvested'),
-    investments: n('investments'),
-    loans: n('loans'),
+    investments: n('capitalBlocked'),
+    loans: n('quasiCapital'),
     capitalEmployed: n('capitalEmployed'),
-    profit: n('profit'),
+    profit: n('netProfit'),
   };
 }

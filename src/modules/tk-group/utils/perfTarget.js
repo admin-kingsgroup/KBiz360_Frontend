@@ -17,7 +17,10 @@ export function fyStr(now) {
 
 /** One branch's target/actual row from a targets-vs-actual payload. */
 export function perfTargetRow(branch, tva) {
-  const t = tva || {};
+  // targets-vs-actual returns the group aggregate under `.totals` (target, actual,
+  // variance, pct, status) and the per-module breakdown in `.rows` — there is no
+  // top-level target/actual, so read from `.totals`.
+  const t = (tva && tva.totals) || {};
   const target = Number(t.target) || 0;
   const actual = Number(t.actual) || 0;
   return {

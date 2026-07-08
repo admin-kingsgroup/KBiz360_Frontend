@@ -5,6 +5,7 @@ import { adoptionKpis, adoptionTone, badgeTone, branchKeys, matrixRows, cellFor,
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
+import { BandError } from './BandError';
 
 // ─── TK GROUP · FE · ERP Adoption (branch × function matrix) ─────────────────
 // The "how much of the ERP is each branch actually using?" board. LIVE: it hits
@@ -32,6 +33,9 @@ export function AdoptionMatrix() {
   const central = d.central || {};
   const branches = branchKeys(d);
   const rows = matrixRows(d);
+
+  // A failed roll-up must not read as honest "0% everywhere" adoption.
+  if (q.isError) return <BandError label="the adoption matrix" onRetry={q.refetch} />;
 
   const columns = [
     { key: 'label', header: 'ERP Function', render: (r) => (

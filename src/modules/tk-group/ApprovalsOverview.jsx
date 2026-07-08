@@ -40,6 +40,10 @@ export function ApprovalsOverview() {
     code: b.code, flag: b.flag, cur: curSym(b),
     counts: (q[i] && q[i].data && q[i].data.counts) || {},
   }));
+  // Without these, a backend failure renders a full grid of pending.n=0 — a real
+  // outage would read as "nothing pending". Surface the true load/error state instead.
+  const loading = q.some((x) => x.isLoading);
+  const isError = q.some((x) => x.isError);
   const agg = aggregateApprovals(perBranch);
   // aggregate keeps code+cur; graft the flag back (same order as view, no sort).
   const rows = agg.byBranch.map((r, i) => ({ ...r, flag: perBranch[i] && perBranch[i].flag }));
@@ -68,6 +72,8 @@ export function ApprovalsOverview() {
           title="Pending approvals — by branch"
           columns={COLS}
           rows={rows}
+          loading={loading}
+          isError={isError}
           getRowKey={(r) => r.code}
           emptyMessage="Nothing pending."
           searchable={false}

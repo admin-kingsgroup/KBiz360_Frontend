@@ -4,7 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { overviewKpis, streamRows, actorName } from '../utils/monitor';
 
 // api/monitor pulls core/api (import.meta) → mock for the container smoke tests.
-jest.mock('../api/monitor', () => ({ getOverview: jest.fn(), getBranchCockpit: jest.fn(), getAudit: jest.fn() }));
+// The Control Tower Overview also reads the health/integrity/trend/readiness summaries;
+// stub them to empty so the summary charts render (zeros) without a network.
+jest.mock('../api/monitor', () => ({
+  getOverview: jest.fn(), getBranchCockpit: jest.fn(), getAudit: jest.fn(),
+  getGroupHealth: jest.fn().mockResolvedValue({}), getIntegrity: jest.fn().mockResolvedValue({}),
+  getTrend: jest.fn().mockResolvedValue({}), getSetupReadiness: jest.fn().mockResolvedValue({}),
+}));
 // eslint-disable-next-line import/first
 import { getOverview, getBranchCockpit, getAudit } from '../api/monitor';
 // eslint-disable-next-line import/first

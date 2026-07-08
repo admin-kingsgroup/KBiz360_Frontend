@@ -5,6 +5,7 @@ import { readinessKpis, readinessRows, categoryRows, branchRows, statusTone, sta
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
+import { BandError } from './BandError';
 
 // ─── TK GROUP · FE · Setup / Configuration Readiness (on the Control Tower) ───
 // The "what still needs setting up before it works?" punch-list. Rides the live adoption
@@ -60,6 +61,10 @@ export function SetupReadiness({ setRoute } = {}) {
   // Filter to the chosen branch, then (re)serial-number the visible rows 1..n.
   const rows = (branch === 'ALL' ? allRows : allRows.filter((r) => r.branch === branch)).map((r, i) => ({ ...r, sr: i + 1 }));
   const cur = branches.find((b) => b.branch === branch);
+
+  // Placed after the hooks above (useState) to keep hook order stable. A failed
+  // roll-up must not read as an honest "nothing pending / all set up".
+  if (q.isError) return <BandError label="setup readiness" onRetry={q.refetch} />;
 
   return (
     <div className="grid gap-4">

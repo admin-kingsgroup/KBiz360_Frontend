@@ -4,6 +4,7 @@ import { getTrend } from './api/monitor';
 import { trendKpis, branchRows, branchMax, directionTone, directionGlyph, trendVerdict } from './utils/trend';
 import { ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
+import { BandError } from './BandError';
 
 // ─── TK GROUP · FE · Scrutiny Trend (is data quality improving?) ─────────────
 // A compact Control-Tower band from the alert lifecycle: per branch, issues OPENED
@@ -35,6 +36,9 @@ export function ScrutinyTrend() {
   const kpis = trendKpis(d);
   const rows = branchRows(d);
   const dir = (d.group && d.group.direction) || 'flat';
+
+  // A failed roll-up must not read as a calm "flat / zero" trend.
+  if (q.isError) return <BandError label="scrutiny trend" onRetry={q.refetch} />;
 
   return (
     <div className="grid gap-3">

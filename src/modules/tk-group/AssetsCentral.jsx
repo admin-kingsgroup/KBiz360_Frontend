@@ -37,6 +37,7 @@ export function AssetsCentral() {
           title="Fixed-Asset Register"
           columns={COLS}
           rows={rows}
+          isError={q.length > 0 && q.every((x) => x.isError)}
           getRowKey={(r) => r.code}
           emptyMessage="No fixed assets yet."
           searchable={false}

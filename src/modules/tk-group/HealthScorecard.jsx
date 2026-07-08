@@ -5,6 +5,7 @@ import { scoreColor, gradeTone, verdict, subScores, branchRows, groupScore } fro
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
+import { BandError } from './BandError';
 
 // ─── TK GROUP · FE · ERP Health Scorecard ────────────────────────────────────
 // One composite health % + letter grade per branch (and group), blending the three live
@@ -32,6 +33,9 @@ export function HealthScorecard() {
   const g = groupScore(d);
   const subs = subScores(d);
   const rows = branchRows(d);
+
+  // A failed roll-up must not read as a scary "0 / Grade F / Critical".
+  if (q.isError) return <BandError label="the health scorecard" onRetry={q.refetch} />;
 
   const columns = [
     { key: 'branch', header: 'Branch', render: (r) => <b className="text-ink">{r.branch}</b> },

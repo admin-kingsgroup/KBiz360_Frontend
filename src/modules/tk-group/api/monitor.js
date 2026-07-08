@@ -1,7 +1,15 @@
 import { apiGet, apiPost } from '../../../core/api';
 
-// Read-only control-plane monitoring. All fail soft to empty shapes so a dashboard can
-// never break the shell.
+// Read-only control-plane monitoring.
+//
+// Two classes of getter, on purpose:
+//  • Structural getters (overview, branches, audit, integrity/detail) fail SOFT to an
+//    empty shape — they back auxiliary panels/drill-downs where a benign empty is fine.
+//  • Roll-up getters (adoption, health, readiness, integrity, trend, scorecard) do NOT
+//    swallow — a rejection must propagate so React Query sets `isError` and the dashboard
+//    renders a real error state (BandError). Swallowing here made a backend outage read
+//    as a FALSE "all healthy / 100 / 0% / flat". The consumers all guard `q.data || {}`,
+//    so a propagated error never breaks the shell — it just flips to the error branch.
 export async function getOverview() {
   try { return (await apiGet('/api/tk/monitor/overview')) || {}; } catch { return {}; }
 }
@@ -12,27 +20,25 @@ export async function getAudit(filter = {}) {
   try { return (await apiGet('/api/tk/monitor/audit', filter)) || { items: [] }; } catch { return { items: [] }; }
 }
 export async function getAdoption() {
-  try { return (await apiGet('/api/tk/monitor/adoption')) || {}; } catch { return {}; }
+  return (await apiGet('/api/tk/monitor/adoption')) || {};
 }
 export async function getGroupHealth() {
-  try { return (await apiGet('/api/tk/monitor/health')) || {}; } catch { return {}; }
+  return (await apiGet('/api/tk/monitor/health')) || {};
 }
 export async function getSetupReadiness() {
-  try { return (await apiGet('/api/tk/monitor/readiness')) || {}; } catch { return {}; }
+  return (await apiGet('/api/tk/monitor/readiness')) || {};
 }
 export async function getIntegrity() {
-  try { return (await apiGet('/api/tk/monitor/integrity')) || {}; } catch { return {}; }
+  return (await apiGet('/api/tk/monitor/integrity')) || {};
 }
 export async function getIntegrityDetail(branch, check) {
   try { return (await apiGet('/api/tk/monitor/integrity/detail', { branch, check })) || { rows: [] }; } catch { return { rows: [] }; }
 }
 export async function getTrend() {
-  try { return (await apiGet('/api/tk/monitor/trend')) || {}; } catch { return {}; }
+  return (await apiGet('/api/tk/monitor/trend')) || {};
 }
-// NOTE: does NOT swallow errors (unlike the other getters) — the module tree must show a
-// real error state, not a false "all clean", if the roll-up fails.
 export async function getHealthScorecard() {
-  try { return (await apiGet('/api/tk/monitor/scorecard')) || {}; } catch { return {}; }
+  return (await apiGet('/api/tk/monitor/scorecard')) || {};
 }
 export async function getModules() {
   return (await apiGet('/api/tk/monitor/modules')) || {};

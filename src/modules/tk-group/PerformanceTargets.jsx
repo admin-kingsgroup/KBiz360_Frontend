@@ -50,6 +50,8 @@ export function PerformanceTargets() {
           title="Performance vs Target"
           columns={COLS}
           rows={rows}
+          loading={q.some((x) => x.isLoading)}
+          isError={q.length > 0 && q.every((x) => x.isError)}
           getRowKey={(r) => r.code}
           emptyMessage="No branches to compare."
           searchable={false}

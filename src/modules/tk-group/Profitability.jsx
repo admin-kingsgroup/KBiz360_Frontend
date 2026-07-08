@@ -43,6 +43,7 @@ export function Profitability() {
           title="Profitability"
           columns={COLS}
           rows={rows}
+          isError={q.length > 0 && q.every((x) => x.isError)}
           getRowKey={(r) => r.code}
           emptyMessage="No branch figures yet."
           searchable={false}

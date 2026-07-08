@@ -5,6 +5,7 @@ import { integrityKpis, branchCards, matrixRows, branchKeys, findingRows, status
 import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, FormField } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
+import { BandError } from './BandError';
 
 // ─── TK GROUP · FE · Close-Readiness & Integrity (SAP-style checklist) ───────
 // A branch-wise financial-close cockpit: accounting-integrity + governance gates that
@@ -95,6 +96,10 @@ export function IntegrityChecks() {
     ) },
     ...branches.map((b) => ({ key: b, header: b, align: 'center', render: (r) => <Cell status={r.byBranch[b] || 'na'} /> })),
   ];
+
+  // After all hooks above (useState/useQueryClient/useQuery/useMemo/useMutation) so
+  // hook order stays stable. A failed roll-up must not read as "all branches close-ready".
+  if (q.isError) return <BandError label="the integrity checklist" onRetry={q.refetch} />;
 
   return (
     <div className="grid gap-4">

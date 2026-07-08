@@ -4,6 +4,7 @@ import { getIntegrity } from './api/monitor';
 import { integrityKpis, branchCards, findingRows, statusTone } from './utils/integrity';
 import { ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
+import { BandError } from './BandError';
 
 // ─── TK GROUP · FE · Close-Readiness summary (compact, on the Control Tower) ──
 // A glanceable band for the Control Tower landing: group close-readiness KPIs, a
@@ -19,6 +20,9 @@ export function IntegritySummary({ setRoute } = {}) {
   const kpis = integrityKpis(d);
   const cards = branchCards(d);
   const findings = findingRows(d).slice(0, 4);
+
+  // A failed roll-up must not read as "close-ready 100 / 0 failing gates".
+  if (q.isError) return <BandError label="close-readiness" onRetry={q.refetch} />;
 
   return (
     <div className="grid gap-3">

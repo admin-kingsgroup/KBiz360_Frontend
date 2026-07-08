@@ -5,6 +5,7 @@ import { healthKpis, branchCards, issueRows, domainRows, healthTone, severityTon
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
+import { BandError } from './BandError';
 
 // ─── TK GROUP · FE · Group Health (branch-wise alerts, on the Control Tower) ──
 // Wires the live per-branch alerts engine into the Control Tower: group health score,
@@ -36,6 +37,9 @@ export function GroupHealth({ setRoute } = {}) {
   const cards = branchCards(d);
   const issues = issueRows(d);
   const domains = domainRows(d);
+
+  // A failed roll-up must not read as "score 100 / all healthy".
+  if (q.isError) return <BandError label="group health" onRetry={q.refetch} />;
 
   return (
     <div className="grid gap-4">
