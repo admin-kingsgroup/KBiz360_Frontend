@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { RULE_BOOK, ruleBookStats, RULE_GROUP_LABEL } from './utils/ruleBook.data';
+import { ruleRegime, ruleAppliesTo, REGIME_LABEL, regimeStats } from './utils/ruleBranches';
 import { ResponsiveGrid, Badge, Input } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
+import { BRANCHES } from '../../core/data';
 
 // ─── TK GROUP · FE · Rule Book (read-only enforced-rule reference) ────────────
 // Every Accounts & Operations rule the ERP actually ENFORCES in code — a guard,
@@ -19,20 +21,25 @@ const GROUP_FILTERS = [
 export function RuleBook() {
   const [q, setQ] = useState('');
   const [group, setGroup] = useState('all');
+  const [branch, setBranch] = useState('all'); // 'all' | 'common' | branch code
   const stats = useMemo(() => ruleBookStats(), []);
+  const rStats = useMemo(() => regimeStats(RULE_BOOK), []);
+  const indiaCodes = useMemo(() => BRANCHES.filter((b) => b.country === 'India').map((b) => b.code), []);
 
   const term = q.trim().toLowerCase();
   const domains = useMemo(() => {
     return RULE_BOOK
       .filter((d) => group === 'all' || d.group === group)
       .map((d) => {
-        const rules = term
+        let rules = term
           ? d.rules.filter((r) => (`${r.t} ${r.r}`).toLowerCase().includes(term))
           : d.rules;
+        if (branch === 'common') rules = rules.filter((r) => ruleRegime(r) === 'all');
+        else if (branch !== 'all') rules = rules.filter((r) => ruleAppliesTo(r, branch, indiaCodes));
         return { ...d, rules };
       })
       .filter((d) => d.rules.length > 0);
-  }, [term, group]);
+  }, [term, group, branch, indiaCodes]);
 
   const shown = domains.reduce((n, d) => n + d.rules.length, 0);
 
@@ -66,6 +73,28 @@ export function RuleBook() {
         </span>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-ink-subtle">Branch</span>
+        {[{ id: 'all', label: 'All branches' }, { id: 'common', label: 'Common only' },
+          ...BRANCHES.map((b) => ({ id: b.code, label: `${b.flag} ${b.code}` }))].map((c) => (
+          <button key={c.id} type="button" onClick={() => setBranch(c.id)}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${branch === c.id ? 'border-accent bg-accent text-white' : 'border-surface-border bg-surface text-ink-muted hover:border-accent hover:text-accent'}`}>
+            {c.label}
+          </button>
+        ))}
+        <span className="font-mono text-[11px] text-ink-subtle">
+          {rStats.all} common · {rStats.india} India-GST · {rStats.africa} Africa-VAT
+        </span>
+      </div>
+
+      {branch !== 'all' && (
+        <div className="rounded-lg border border-dashed border-accent/40 bg-accent/5 p-3 text-[12px] text-ink-muted">
+          {branch === 'common'
+            ? <>Showing only the <b className="text-ink">{shown}</b> common rules — the ones enforced identically on every branch. Branch-regime rules (India · GST and Africa · VAT) are hidden.</>
+            : <>Showing the <b className="text-ink">{shown}</b> rules in force at <b className="text-ink">{branch}</b> — every common rule plus its {indiaCodes.includes(branch) ? 'India · GST' : 'Africa · VAT'} regime rules. Rules of the other regime are hidden.</>}
+        </div>
+      )}
+
       {!domains.length ? (
         <div className="rounded-lg border border-dashed border-surface-border p-8 text-center text-sm text-ink-subtle">
           No rules match your search.
@@ -82,15 +111,21 @@ export function RuleBook() {
               </div>
               {d.blurb && <p className="mt-2 text-[12.5px] text-ink-muted">{d.blurb}</p>}
               <ol className="mt-2 grid gap-0">
-                {d.rules.map((r, i) => (
-                  <li key={i} className="grid grid-cols-[22px_1fr] gap-x-2 border-b border-surface-border/70 py-2 last:border-b-0">
-                    <span className="pt-0.5 font-mono text-[11px] text-ink-subtle">{i + 1}</span>
-                    <div>
-                      <div className="text-[13.5px] text-ink">{r.t}</div>
-                      <div className="mt-1 font-mono text-[11px] text-accent/90 break-words">{r.r}</div>
-                    </div>
-                  </li>
-                ))}
+                {d.rules.map((r, i) => {
+                  const regime = ruleRegime(r);
+                  return (
+                    <li key={i} className="grid grid-cols-[22px_1fr] gap-x-2 border-b border-surface-border/70 py-2 last:border-b-0">
+                      <span className="pt-0.5 font-mono text-[11px] text-ink-subtle">{i + 1}</span>
+                      <div>
+                        <div className="text-[13.5px] text-ink">
+                          {r.t}
+                          {regime !== 'all' && <Badge tone={regime === 'india' ? 'success' : 'info'} size="sm" className="ml-2 align-middle">{REGIME_LABEL[regime]}</Badge>}
+                        </div>
+                        <div className="mt-1 font-mono text-[11px] text-accent/90 break-words">{r.r}</div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ol>
             </section>
           ))}
