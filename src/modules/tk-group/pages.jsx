@@ -162,8 +162,13 @@ const RULES_TABS = [
   { id: 'user', label: 'User Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate per-user access rules — who may reach which branch, module or action, an approval ceiling, view-only or a login window. New rules land Inactive (Draft) until you Test the blast radius and Activate.' },
 ];
 
-export function TkRulesPage({ owner }) {
-  const [tab, setTab] = useState('erp');
+export function TkRulesPage({ owner, initialTab = 'erp' }) {
+  const [tab, setTab] = useState(RULES_TABS.some((t) => t.id === initialTab) ? initialTab : 'erp');
+  // The router renders the SAME TkRulesPage for /tk/rules and /tk/user-rules (it does
+  // not remount on route change), so sync the tab when the deep-link prop changes —
+  // otherwise clicking the other menu entry would leave the wrong tab showing. In-page
+  // tab clicks are unaffected (this only fires when initialTab actually changes).
+  React.useEffect(() => { if (RULES_TABS.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]);
   const meta = RULES_TABS.find((t) => t.id === tab) || RULES_TABS[0];
   return (
     <Page title={meta.label} subtitle={meta.subtitle}>

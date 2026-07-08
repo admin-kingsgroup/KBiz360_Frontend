@@ -113,8 +113,12 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Thresholds & Limits', href: '/tk/limits' },
       ] },
       { label: 'Rules & Requests', children: [
-        // Owner-only: the rules engine (ERP monitoring + per-user access), tabbed on one page.
-        ...(isOwner ? [{ label: 'ERP Rules Manager', href: '/tk/rules' }] : []),
+        // Owner-only: the rules engine, split into two entries — ERP monitoring rules and
+        // per-user access rules. Both open the same tabbed page on their respective tab.
+        ...(isOwner ? [
+          { label: 'ERP Rules Manager', href: '/tk/rules' },
+          { label: 'User Rules Manager', href: '/tk/user-rules' },
+        ] : []),
         { label: 'Period Locks', href: '/tk/period-locks' },
         { label: 'Targets & Budgets', href: '/tk/targets' },
         { label: 'Master Control (request)', href: '/tk/master-control' },
