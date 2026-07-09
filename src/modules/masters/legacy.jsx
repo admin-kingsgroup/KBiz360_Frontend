@@ -14,7 +14,7 @@ import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { apiPost, apiPut } from '../../core/api';
 import { fmt, fmtINR, localeOf } from '../../core/format';
 import { exportToExcel } from '../../core/exportExcel';
-import { ACM_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, _PASSPORTS, cardStyle, tabPanel } from '../../core/helpers';
+import { ACM_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, cardStyle, tabPanel } from '../../core/helpers';
 // MstrShell / MstrModal modernized (responsive header + shared Modal) — same props.
 import { MstrShell, MstrModal } from './components/mstr';
 import { useMobile } from '../../core/hooks';
@@ -1710,12 +1710,15 @@ export function PassportManager({branch}){
   const [search,setSearch]=useState("");
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [form,setForm]=useState({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});
-  const [passports,setPassports]=useState(_PASSPORTS);
+  // Live register from /api/passports (was a local-state _PASSPORTS array, so records
+  // saved here never reached the DB and the Tower's passports milestone never cleared).
+  const { data: passports = [] } = useMasterList('passports');
+  const { create } = useMasterMutations('passports');
   const TODAY=todayISO();
 
   const filtered=passports.filter(p=>(
     (!brCode||p.branch===brCode)&&
-    (!search||p.person.toLowerCase().includes(search.toLowerCase())||p.client.toLowerCase().includes(search.toLowerCase())||p.passport.includes(search))
+    (!search||(p.person||"").toLowerCase().includes(search.toLowerCase())||(p.client||"").toLowerCase().includes(search.toLowerCase())||(p.passport||"").includes(search))
   ));
 
   const daysToExpiry=d=>Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24));
@@ -1782,7 +1785,7 @@ export function PassportManager({branch}){
                 <td style={{padding:"8px 11px",color:"#5b616e",whiteSpace:"nowrap"}}>{p.issued}</td>
                 <td style={{padding:"8px 11px",color:dl<90?"#dc2626":dl<180?"#d97706":"#5b616e",fontWeight:dl<180?700:400,whiteSpace:"nowrap"}}>{p.expiry}</td>
                 <td style={{padding:"8px 11px",fontWeight:700,color:dl<0?"#dc2626":dl<90?"#d97706":"#16a34a"}}>{dl<0?`${Math.abs(dl)}d EXPIRED`:`${dl}d`}</td>
-                <td style={{padding:"8px 11px",fontSize:10,color:"#5b616e",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis"}}>{p.visas.length>0?p.visas.join(" · "):"None"}</td>
+                <td style={{padding:"8px 11px",fontSize:10,color:"#5b616e",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis"}}>{(p.visas||[]).length>0?p.visas.join(" · "):"None"}</td>
                 <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#e8f0ff",color:"#2563eb",fontWeight:700}}>{p.branch}</span></td>
                 <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[st]||"#f3f4f8",color:STATUS_CLR[st]||"#5b616e"}}>{st}</span></td>
               </tr>
@@ -1814,11 +1817,16 @@ export function PassportManager({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={()=>{
-                const id=`PP${String(passports.length+1).padStart(3,"0")}`;
-                const st=expStatus(form.expiry);
-                setPassports(p=>[{...form,id,visas:[],type:"B2C",dob:"",status:st},...p]);
-                setModal(false);
+              <button onClick={async()=>{
+                if(create.isPending) return; // ignore double-clicks while the POST is in flight
+                if(!form.person.trim()||!form.passport.trim()){
+                  await confirmDialog({title:"Missing details",message:"Person name and passport number are required.",confirmLabel:"OK",cancelLabel:"Close"});
+                  return;
+                }
+                create.mutate({...form,passport:form.passport.toUpperCase(),visas:[]},{
+                  onSuccess:()=>{setModal(false);setForm({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});},
+                  onError:(e)=>confirmDialog({title:"Save failed",message:`Could not save the passport — ${e?.message||'unknown error'}.`,confirmLabel:"OK",cancelLabel:"Close"}),
+                });
               }} style={btnG}>💾 Save Passport</button>
             </div>
           </div>

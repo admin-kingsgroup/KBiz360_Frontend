@@ -11,8 +11,9 @@ import React, { useState } from 'react';
 import { Plus, TrendingDown, Landmark, Search, ChevronDown } from 'lucide-react';
 import { fmt, localeOf } from '../../core/format';
 import { ACM_REASON_CODES } from '../../core/helpers';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAssetCategories } from '../../core/useReference';
-import { useMasterList } from '../../core/useMasters';
+import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { useAdmMemos, useCreateAdmMemo, useAcceptAdmMemo, useRejectAdmMemo, useDisputeAdmMemo } from '../../core/useAdmMemos';
 import { toast } from '../../core/ux/toast';
 import { Menu as StatusMenu } from '../../core/ux/Menu';
@@ -208,7 +209,17 @@ export function FixedAssetRegister({ branch, setRoute }) {
   const brCode = branch === 'ALL' ? null : branch?.code;
   const [catFilter, setCatFilter] = useState('ALL');
   const [statusFilter] = useState('Active');
-  const [, setShowAdd] = useState(false);
+
+  // Add Asset — persists to /api/fixed-assets (the button used to discard its own
+  // state, so nothing could ever be registered from this screen). A category can be
+  // created inline because there is no separate asset-category master screen.
+  const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const { create: createAsset } = useMasterMutations('fixed-assets');
+  const { create: createCategory } = useMasterMutations('asset-categories');
+  const NEW_CAT = '__new__';
+  const blankAsset = { name: '', code: '', purchaseDate: '', cost: 0, method: 'WDV', branch: brCode || 'BOM', newCatCode: '', newCatName: '', newCatRate: 15 };
+  const [af, setAf] = useState(blankAsset);
 
   const FIXED_ASSETS_DATA = (useMasterList('fixed-assets').data || []).map((a) => ({ ...a, id: a.assetId || a.id })); // live /api/fixed-assets
   const visible = FIXED_ASSETS_DATA.filter((a) => (!brCode || a.branch === brCode) && (catFilter === 'ALL' || a.code === catFilter) && (statusFilter === 'ALL' || a.status === statusFilter));
@@ -273,6 +284,72 @@ export function FixedAssetRegister({ branch, setRoute }) {
       <p className="mt-3.5 text-[10.5px] italic text-ink-muted">
         💡 SLM = Straight Line Method · WDV = Written Down Value · IT Act block rates apply for tax depreciation. Companies Act rates for book depreciation.
       </p>
+
+      {showAdd && (
+        <Modal title="Add Asset" onClose={() => setShowAdd(false)} maxWidth={540}
+          footer={
+            <>
+              <Button variant="secondary" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button variant="accent" size="sm" disabled={createAsset.isPending || createCategory.isPending} onClick={async () => {
+                if (!af.name.trim()) { toast('Asset description is required', 'error'); return; }
+                if (!af.code) { toast('Pick or create an asset category', 'error'); return; }
+                if (!(+af.cost > 0)) { toast('Cost must be greater than 0', 'error'); return; }
+                let code = af.code;
+                try {
+                  if (code === NEW_CAT) {
+                    if (!af.newCatCode.trim() || !af.newCatName.trim()) { toast('New category needs a code and a name', 'error'); return; }
+                    code = af.newCatCode.trim().toUpperCase();
+                    await createCategory.mutateAsync({ code, name: af.newCatName.trim(), itRate: +af.newCatRate || 0, coRate: +af.newCatRate || 0, active: true });
+                    qc.invalidateQueries({ queryKey: ['ref', 'asset-categories'] });
+                  }
+                  const n = FIXED_ASSETS_DATA.filter((a) => a.branch === af.branch).length + 1;
+                  await createAsset.mutateAsync({
+                    assetId: `FA-${af.branch}-${String(n).padStart(3, '0')}`,
+                    name: af.name.trim(), code, branch: af.branch,
+                    purchaseDate: af.purchaseDate, cost: +af.cost, method: af.method,
+                    wdv: +af.cost, salvage: 0, status: 'Active',
+                  });
+                  toast('Asset registered');
+                  setShowAdd(false); setAf(blankAsset);
+                } catch (e) { toast('Could not save — ' + (e?.message || 'unknown error'), 'error'); }
+              }}>💾 Save Asset</Button>
+            </>
+          }>
+          <div className="grid gap-3 p-4">
+            <FormField label="Description"><Input value={af.name} onChange={(e) => setAf((s) => ({ ...s, name: e.target.value }))} placeholder="e.g. Office laptop — Dell Latitude" /></FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Category (IT block)">
+                <Select value={af.code} onChange={(e) => setAf((s) => ({ ...s, code: e.target.value }))}>
+                  <option value="">Select…</option>
+                  {ASSET_CATEGORIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {c.name}</option>)}
+                  <option value={NEW_CAT}>+ New category…</option>
+                </Select>
+              </FormField>
+              <FormField label="Branch">
+                <Select value={af.branch} onChange={(e) => setAf((s) => ({ ...s, branch: e.target.value }))}>
+                  {BRANCH_CODES.map((b) => <option key={b}>{b}</option>)}
+                </Select>
+              </FormField>
+            </div>
+            {af.code === NEW_CAT && (
+              <div className="grid grid-cols-3 gap-3 rounded-md border border-surface-border bg-surface-alt/50 p-2.5">
+                <FormField label="New code"><Input value={af.newCatCode} onChange={(e) => setAf((s) => ({ ...s, newCatCode: e.target.value }))} placeholder="e.g. COMP" /></FormField>
+                <FormField label="New category name"><Input value={af.newCatName} onChange={(e) => setAf((s) => ({ ...s, newCatName: e.target.value }))} placeholder="e.g. Computers" /></FormField>
+                <FormField label="Dep. rate %"><Input type="number" value={af.newCatRate} onChange={(e) => setAf((s) => ({ ...s, newCatRate: e.target.value }))} /></FormField>
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-3">
+              <FormField label="Purchase date"><Input type="date" value={af.purchaseDate} onChange={(e) => setAf((s) => ({ ...s, purchaseDate: e.target.value }))} /></FormField>
+              <FormField label={`Cost (${cur})`}><Input type="number" value={af.cost} onChange={(e) => setAf((s) => ({ ...s, cost: e.target.value }))} /></FormField>
+              <FormField label="Method">
+                <Select value={af.method} onChange={(e) => setAf((s) => ({ ...s, method: e.target.value }))}>
+                  <option>WDV</option><option>SLM</option>
+                </Select>
+              </FormField>
+            </div>
+          </div>
+        </Modal>
+      )}
     </PageLayout>
   );
 }

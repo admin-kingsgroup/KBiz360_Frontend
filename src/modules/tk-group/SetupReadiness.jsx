@@ -42,9 +42,28 @@ function issueColumns(setRoute) {
     { key: 'status', header: 'Status', align: 'center', render: (r) => (
       <Badge tone={statusTone(r.status)} size="sm">{statusLabel(r.status)}</Badge>
     ) },
-    { key: 'detail', header: 'What is missing', render: (r) => (
-      <span className="text-[11px] text-ink-muted">{r.detail}</span>
-    ) },
+    // Each missing milestone routes to the exact screen where THAT data is entered
+    // (backend `actions`); the plain detail string stays as a fallback for older
+    // payloads. The right-hand "Set up →" remains the module's primary screen.
+    { key: 'detail', header: 'What is missing', render: (r) => {
+      const go = (link) => (setRoute ? setRoute(link) : (window.location.href = link));
+      const acts = r.actions || [];
+      if (!acts.length) return <span className="text-[11px] text-ink-muted">{r.detail}</span>;
+      return (
+        <span className="text-[11px] text-ink-muted">
+          Pending:{' '}
+          {acts.map((a, i) => (
+            <span key={`${a.label}:${a.link}`}>
+              {i > 0 && ' · '}
+              <button type="button" onClick={() => go(a.link)} className="font-medium text-info hover:underline">{a.label} →</button>
+            </span>
+          ))}
+          {(r.missing || []).filter((label) => !acts.some((a) => a.label === label)).map((label) => (
+            <span key={label}> · {label}</span>
+          ))}
+        </span>
+      );
+    } },
     { key: 'link', header: '', align: 'right', render: (r) => (r.link
       ? <button type="button" onClick={() => (setRoute ? setRoute(r.link) : (window.location.href = r.link))} className="text-[12px] font-medium text-info hover:underline">Set up →</button>
       : null) },

@@ -284,6 +284,7 @@ export const APP_ROUTES = [
   "/settings/permissions-matrix",
   "/settings/preferences",
   "/settings/users",
+  "/support/tickets",
   "/tax/audit-3cd",
   "/tax/calendar",
   "/tax/einvoice",
@@ -357,5 +358,6 @@ export const APP_ROUTE_LABELS = {
   "/finance/trial-balance": "Trial Balance",
   "/reconciliation": "Reconciliation",
   "/reconciliation/reports": "Reconciliation Reports & Pending",
-  "/reconciliation/rulebook": "Reconciliation Rule Book"
+  "/reconciliation/rulebook": "Reconciliation Rule Book",
+  "/support/tickets": "Support Tickets"
 };
