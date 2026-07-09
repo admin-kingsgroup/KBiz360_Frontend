@@ -31,7 +31,9 @@ export const IN_STATES = [
 
 // State NAMES for a picker (leading '' = "not set"). The backend derives the 2-digit
 // state code from the chosen name (gstSupplyType.stateCodeOf), so sending the name is enough.
-export const STATE_NAMES = ['', ...IN_STATES.map(([, n]) => n)];
+// 'Others' is auto-selected (see SuppliersMaster) when the party's Country isn't India —
+// a foreign party has no Indian GST state, but State is still a mandatory field.
+export const STATE_NAMES = ['', 'Others', ...IN_STATES.map(([, n]) => n)];
 
 export const MSME_STATUS = ['', 'Not Registered', 'Micro', 'Small', 'Medium'];
 export const TDS_SECTIONS = ['', '194C @ 2%', '194J @ 10%', '194I @ 10%', '194H @ 2%', '194O @ 0.1%', 'None'];
