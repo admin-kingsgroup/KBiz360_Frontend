@@ -114,11 +114,13 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   const [form, setForm] = useState(record);
   // Changing a field may invalidate a dependent one (e.g. picking a new Group makes
   // the previously-chosen Sub-Group stale). A field can declare `clears: ['subGroup']`
-  // to reset those dependents to blank whenever it changes.
+  // to reset those dependents to blank whenever it changes, or `onSet(v, next)` to
+  // derive/overwrite another field's value (e.g. Country → auto-set State to 'Others').
   const set = (k, v) => setForm((f) => {
     const next = { ...f, [k]: v };
     const fld = fields.find((x) => x.key === k);
     if (fld && Array.isArray(fld.clears)) fld.clears.forEach((c) => { next[c] = ''; });
+    if (fld && typeof fld.onSet === 'function') fld.onSet(v, next);
     return next;
   });
   // `show` / `required` may be a fn(form) so fields can react to other values (e.g.
@@ -434,22 +436,37 @@ export const SuppliersMaster = ({ branch } = {}) => {
       // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
-      { key: 'pan', label: 'PAN', type: 'text', table: false },
+      // TDS is only actually deducted on some suppliers — flag it explicitly instead of
+      // inferring from tdsSection, and only then does PAN become mandatory (needed to
+      // deduct at the correct rate instead of the higher no-PAN default).
+      { key: 'isTdsDeducted', label: 'Is TDS Deducted', type: 'bool', default: false, table: false },
+      { key: 'pan', label: 'PAN', type: 'text', table: false, required: (f) => !!f.isTdsDeducted },
+      // Address line sits before Country/State (matches the physical order on the form).
+      { key: 'addressLine', label: 'Address Line', type: 'text', required: true, table: false },
       // Country '' (the default) is treated as India downstream but does NOT force a state;
       // picking India explicitly does (it decides CGST/SGST vs IGST) — the backend derives
-      // the state code from the chosen state name.
-      { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false },
-      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false },
+      // the state code from the chosen state name. Picking any other country auto-selects
+      // State = 'Others' (a foreign party has no Indian GST state, but State stays mandatory).
+      { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false, required: true,
+        onSet: (v, next) => { next.state = (v && v !== 'India') ? 'Others' : ''; } },
+      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false, required: true },
       { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
       { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
       { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },
-      { key: 'email', label: 'Email', type: 'text', table: false },
+      { key: 'email', label: 'Email', type: 'text', table: false, required: true },
       { key: 'city', label: 'City', type: 'text', table: false },
-      { key: 'settlementCycle', label: 'Settlement Cycle', type: 'select', options: SETTLE_CYCLES, table: false },
+      { key: 'settlementCycle', label: 'Settlement Cycle', type: 'select', options: SETTLE_CYCLES, table: false, required: true },
       { key: 'paymentMethod', label: 'Payment Method', type: 'select', options: PAY_METHODS, table: false },
-      { key: 'creditDays', label: 'Credit Days', type: 'number' },
+      { key: 'creditDays', label: 'Credit Period (Days)', type: 'number', required: true },
+      { key: 'creditLimit', label: 'Credit Limit', type: 'number', required: true },
+      // Bank details are only collected when the supplier opts in — three flat fields
+      // (mirrors the Ledger party's bankName/bankAcNo/bankIfsc), required only when shown.
+      { key: 'provideBankDetails', label: 'Provide Bank Details', type: 'bool', default: false, table: false },
+      { key: 'bankName', label: 'Bank Name', type: 'text', table: false, show: (f) => !!f.provideBankDetails, required: (f) => !!f.provideBankDetails },
+      { key: 'bankAcNo', label: 'Bank A/c No.', type: 'text', table: false, show: (f) => !!f.provideBankDetails, required: (f) => !!f.provideBankDetails },
+      { key: 'bankIfsc', label: 'Bank IFSC Code', type: 'text', table: false, show: (f) => !!f.provideBankDetails, required: (f) => !!f.provideBankDetails },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
   );
