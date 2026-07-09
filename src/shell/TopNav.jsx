@@ -251,7 +251,6 @@ export function TopNav({ branch, setBranch, route, setRoute, currentUser, switch
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = FIORI_BLUE;
                   e.currentTarget.style.background = 'rgba(0, 112, 242, 0.04)';
-                  if (open !== null && hasChildren) handleOpen(i, e.currentTarget);
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = active || isOpen ? FIORI_BLUE : '#475569';
