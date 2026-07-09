@@ -66,6 +66,13 @@ export const TIERS = [
 ];
 export const tierOf = (key) => TIERS.find((t) => t.key === key) || TIERS[0];
 
+/** Tiers a role may see/work. The Branch Accountant handles the WEEKLY cycle
+ *  only — Month/Quarter/Year closings are done from TK Group Central by
+ *  AE/FM/Director/Owner (the backend enforces the same rule on writes). */
+export function visibleTiers(role) {
+  return /accountant/i.test(String(role || '')) ? TIERS.filter((t) => t.key === 'weekly') : TIERS;
+}
+
 // Certificate status → Badge tone + label.
 export const STATUS_META = {
   open:       { tone: 'neutral', label: 'Open' },
@@ -107,6 +114,18 @@ export function fmtAmt(n, branch) {
 
 /** Count of unresolved exceptions on a certificate. */
 export const openExceptions = (cert) => (cert?.exceptions || []).filter((e) => !e.resolved).length;
+
+/** Period choices for a tier's register: the CURRENT period plus every pending
+ *  backlog period of that tier (Apr/May/Jun 2026 closings, FY2025-26 / CY2025
+ *  year-end…), deduped, backlog first (oldest obligation on top). */
+export function periodOptions(tierKey, currentPeriod, pendingRows = []) {
+  const backlog = (pendingRows || [])
+    .filter((r) => r.tier === tierKey && r.period && r.period !== currentPeriod && !r.upcoming)
+    .map((r) => ({ value: r.period, label: `${r.period} — pending` }));
+  const out = [...backlog];
+  if (currentPeriod) out.push({ value: currentPeriod, label: `${currentPeriod} — current` });
+  return out.filter((o, i) => out.findIndex((x) => x.value === o.value) === i);
+}
 
 /** Pending-closings row state → badge tone + label. */
 export function pendingStateMeta(row = {}) {

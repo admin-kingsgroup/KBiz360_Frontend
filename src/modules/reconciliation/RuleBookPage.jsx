@@ -23,8 +23,10 @@ const STEPS = [
 const cellCls = 'px-3 py-2.5 text-sm border-b border-surface-border align-top';
 const headCls = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-ink-muted bg-surface-alt border-b border-surface-border whitespace-nowrap';
 
-export function RuleBookPage({ setRoute }) {
-  const { data: live } = useQuery({ queryKey: ['recon-certs', 'rulebook'], queryFn: getRulebook });
+export function RuleBookPage({ branch, setRoute }) {
+  // Periods are regime-aware: India books show FY keys, Africa books CY keys —
+  // pass the app branch so staff see THEIR current period, not another regime's.
+  const { data: live } = useQuery({ queryKey: ['recon-certs', 'rulebook', branch || ''], queryFn: () => getRulebook({ branch }) });
   const periods = live?.periods || {};
 
   return (

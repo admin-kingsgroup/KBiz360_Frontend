@@ -5,6 +5,7 @@
 // and resolves breadcrumbs to Reconciliation › <leaf>.
 import { getMenu, MENU_RECONCILIATION, MENU_ACCOUNTS } from '../menus';
 import { crumbsFor } from '../routeMeta';
+import { controlCockpitMenu } from '../../modules/tk-group/cockpit';
 
 const labels = (menu) => menu.map((m) => m.label);
 function allHrefs(node, out = []) {
@@ -39,6 +40,16 @@ describe('Reconciliation · top-level pill', () => {
     expect(allHrefs(group)).toEqual(expect.arrayContaining(['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco']));
     // and the new pill's routes don't leak into Accounts
     expect(allHrefs(MENU_ACCOUNTS)).not.toContain('/reconciliation');
+  });
+
+  test('TK Group Central cockpit carries the Reconciliation pill (branch-wise oversight)', () => {
+    const cockpit = controlCockpitMenu('', { role: 'Super Admin' });
+    const pill = cockpit.find((p) => p && p.label === 'Reconciliation');
+    expect(pill).toBeTruthy();
+    expect(allHrefs(pill)).toEqual(['/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook']);
+    // and for the other central roles too (Director / FM / Sr. AE share the cockpit)
+    const dirCockpit = controlCockpitMenu('', { role: 'Director' });
+    expect(dirCockpit.some((p) => p && p.label === 'Reconciliation')).toBe(true);
   });
 
   test('breadcrumbs resolve under the Reconciliation pill', () => {

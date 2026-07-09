@@ -91,11 +91,21 @@ describe('TK setup readiness · module map (pure)', () => {
     const agg = rollupUnits(units);
     expect(agg).toMatchObject({ health: 'partial', liveUnits: 1, totalUnits: 3, pct: 50 });
     expect(agg.missing).toEqual([
-      { label: 'Credit limits set', branches: ['AMD'] },
-      { label: 'Series defined', branches: ['Central'] },
+      { label: 'Credit limits set', branches: ['AMD'], link: '' },
+      { label: 'Series defined', branches: ['Central'], link: '' },
     ]);
     expect(rollupUnits([])).toMatchObject({ health: null, totalUnits: 0 }); // no meter ≠ green
     expect(rollupUnits(units.map((u) => ({ ...u, status: 'dormant' }))).health).toBe('dormant');
+  });
+
+  test('rollupUnits: per-milestone entry links ride the units’ actions', () => {
+    const withActions = [
+      { branch: 'BOM', scope: 'branch', status: 'partial', pct: 50, missing: ['Expense budgets set'], actions: [{ label: 'Expense budgets set', link: '/expense/budget' }] },
+      { branch: 'AMD', scope: 'branch', status: 'partial', pct: 50, missing: ['Expense budgets set'], actions: [{ label: 'Expense budgets set', link: '/expense/budget' }] },
+    ];
+    expect(rollupUnits(withActions).missing).toEqual([
+      { label: 'Expense budgets set', branches: ['BOM', 'AMD'], link: '/expense/budget' },
+    ]);
   });
 
   test('moduleHealthLabel: kind-aware when there is no live meter', () => {

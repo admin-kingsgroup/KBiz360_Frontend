@@ -3,24 +3,33 @@
    ════════════════════════════════════════════════════════════════════
    Migrated out of legacy.jsx. Budget/actual/utilisation math + filters
    unchanged (PROJECTS_DATA). KPIs → ResponsiveGrid; grid → DataTable
-   (sort/sticky/export/mobile scroll). Toolbar buttons stay placeholders.
+   (sort/sticky/export/mobile scroll). "New Project" persists via
+   /api/projects (the button was a placeholder — nothing could ever be
+   created from this screen, so the Tower's projects milestone starved).
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useState } from 'react';
 import { Upload, Plus } from 'lucide-react';
-import { useMasterList } from '../../../core/useMasters';
+import { useMasterList, useMasterMutations } from '../../../core/useMasters';
+import { BRANCH_CODES } from '../../../core/data';
+import { toast } from '../../../core/ux/toast';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { Input, Select, Button, StatusPill, ResponsiveGrid } from '../../../shell/primitives';
+import { Input, Select, Button, StatusPill, ResponsiveGrid, Modal, FormField } from '../../../shell/primitives';
 
 const STATUS_TONE = { Active: 'info', Quoted: 'warning', Booked: 'success', Completed: 'neutral', Cancelled: 'danger' };
 const k = (n) => '₹' + (n / 1000).toFixed(0) + 'K';
 
+const BLANK = { code: '', name: '', client: '', startDate: '', endDate: '', manager: '', budget: 0, branch: 'BOM', status: 'Active' };
+
 export function ProjectMaster() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState(BLANK);
   // Live project costing master (/api/projects).
   const { data: PROJECTS_DATA = [] } = useMasterList('projects');
+  const { create } = useMasterMutations('projects');
   const filtered = PROJECTS_DATA.filter((p) => {
     if (filterStatus !== 'ALL' && p.status !== filterStatus) return false;
     if (!search) return true;
@@ -29,6 +38,15 @@ export function ProjectMaster() {
   });
   const totBudget = filtered.reduce((s, p) => s + p.budget, 0);
   const totActual = filtered.reduce((s, p) => s + p.actual, 0);
+
+  const save = () => {
+    if (create.isPending) return;
+    if (!form.code.trim() || !form.name.trim()) { toast('Project code and name are required', 'error'); return; }
+    create.mutate({ ...form, code: form.code.trim().toUpperCase(), budget: +form.budget || 0, actual: 0 }, {
+      onSuccess: () => { toast(`Project ${form.code.toUpperCase()} created`); setModal(false); setForm(BLANK); },
+      onError: (e) => toast('Could not create — ' + (e?.message || 'unknown error'), 'error'),
+    });
+  };
 
   const KPIS = [
     { l: 'Active Projects', v: String(PROJECTS_DATA.filter((p) => p.status !== 'Completed' && p.status !== 'Cancelled').length) },
@@ -53,7 +71,7 @@ export function ProjectMaster() {
     <PageLayout
       title="Project / Tour Code Master"
       subtitle="Project-based costing — track budget vs actual per tour package or corporate group booking"
-      actions={<><Button size="sm" variant="secondary" icon={Upload}>Import</Button><Button size="sm" variant="accent" icon={Plus}>New Project</Button></>}
+      actions={<><Button size="sm" variant="secondary" icon={Upload}>Import</Button><Button size="sm" variant="accent" icon={Plus} onClick={() => setModal(true)}>New Project</Button></>}
       filters={
         <>
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code, project, client…" className="w-auto min-w-[200px] flex-1" />
@@ -74,6 +92,42 @@ export function ProjectMaster() {
       </ResponsiveGrid>
 
       <DataTable columns={columns} rows={filtered} getRowKey={(r) => r.code} dense exportName="projects" printTitle="Project / Tour Code Master" emptyMessage="No projects match." />
+
+      {modal && (
+        <Modal title="New Project / Tour" onClose={() => setModal(false)} maxWidth={560}
+          footer={
+            <>
+              <Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button>
+              <Button variant="accent" size="sm" disabled={create.isPending} onClick={save}>💾 Create Project</Button>
+            </>
+          }>
+          <div className="grid gap-3 p-4">
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Code" required><Input value={form.code} onChange={(e) => setForm((s) => ({ ...s, code: e.target.value }))} placeholder="e.g. TOUR-DXB-01" className="font-mono uppercase" /></FormField>
+              <FormField label="Status">
+                <Select value={form.status} onChange={(e) => setForm((s) => ({ ...s, status: e.target.value }))}>
+                  {['Active', 'Quoted', 'Booked'].map((s) => <option key={s}>{s}</option>)}
+                </Select>
+              </FormField>
+            </div>
+            <FormField label="Project / tour name" required><Input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} /></FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Client"><Input value={form.client} onChange={(e) => setForm((s) => ({ ...s, client: e.target.value }))} /></FormField>
+              <FormField label="Manager"><Input value={form.manager} onChange={(e) => setForm((s) => ({ ...s, manager: e.target.value }))} /></FormField>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <FormField label="Start date"><Input type="date" value={form.startDate} onChange={(e) => setForm((s) => ({ ...s, startDate: e.target.value }))} /></FormField>
+              <FormField label="End date"><Input type="date" value={form.endDate} onChange={(e) => setForm((s) => ({ ...s, endDate: e.target.value }))} /></FormField>
+              <FormField label="Budget (₹)"><Input type="number" value={form.budget} onChange={(e) => setForm((s) => ({ ...s, budget: e.target.value }))} /></FormField>
+            </div>
+            <FormField label="Branch">
+              <Select value={form.branch} onChange={(e) => setForm((s) => ({ ...s, branch: e.target.value }))}>
+                {BRANCH_CODES.map((b) => <option key={b}>{b}</option>)}
+              </Select>
+            </FormField>
+          </div>
+        </Modal>
+      )}
     </PageLayout>
   );
 }

@@ -36,6 +36,9 @@ function FixNarration({ row, setRoute }) {
               <li key={m.label}>
                 Enter <b className="text-ink">{m.label}</b>
                 {row.totalUnits > 1 && m.branches && m.branches.length ? <> — still missing in {m.branches.join(', ')}</> : null}
+                {m.link && (
+                  <>{' '}<button type="button" onClick={() => go(m.link)} className="font-medium text-info hover:underline">Open →</button></>
+                )}
               </li>
             ))}
             {(row.config || []).map((c) => (

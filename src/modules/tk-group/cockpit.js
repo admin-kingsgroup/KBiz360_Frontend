@@ -1,4 +1,4 @@
-import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Rocket, Calculator, ShieldCheck } from 'lucide-react';
+import { ArrowLeftRight, LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Rocket, Calculator, ShieldCheck } from 'lucide-react';
 import { FULL_SCOPE_ROLES } from '../../core/branchScope';
 import { dashboardsFor, MENU_ACCOUNTS } from '../../core/menus';
 
@@ -94,6 +94,19 @@ export function controlCockpitMenu(focus, currentUser) {
       { label: 'Raise / Govern', children: [
         { label: 'Decisions', href: '/tk/decisions' },
         { label: 'Onboarding', href: '/tk/onboarding' },
+      ] },
+    ] },
+
+    // Reconciliation — the 4-tier per-ledger certificate ladder (Weekly → Month-End →
+    // Quarterly → Year-End). The central view is oversight of the SAME module: the
+    // pages carry their own branch chips, so everything stays BRANCHWISE, never blended.
+    { label: 'Reconciliation', icon: ArrowLeftRight, children: [
+      { label: 'Reconcile & Certify', children: [
+        { label: 'Reconciliation Hub', href: '/reconciliation' },
+        { label: 'Reports & Pending', href: '/reconciliation/reports' },
+      ] },
+      { label: 'Govern', children: [
+        { label: 'Rule Book & Process', href: '/reconciliation/rulebook' },
       ] },
     ] },
 
@@ -202,7 +215,9 @@ export function controlCockpitMenu(focus, currentUser) {
 // books/registers, tax) are out of the control mode and bounce back to Control Tower.
 // '/dashboard/' covers the role-segregated dashboards surfaced in the cockpit (incl. the
 // owner-only /dashboard/owner); '/dashboards/' covers the AD Dashboards group.
-const COCKPIT_PREFIXES = ['/tk/', '/dashboard/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/'];
+const COCKPIT_PREFIXES = ['/tk/', '/dashboard/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/', '/reconciliation/'];
 export function isCockpitRoute(route) {
-  return !!route && (route === '/dashboard' || COCKPIT_PREFIXES.some((p) => route.startsWith(p)));
+  // '/reconciliation' — Month/Quarter/Year closings are DONE from TK Group Central
+  // (AE/FM/Director/Owner); the pages themselves stay branch-wise via their chips.
+  return !!route && (route === '/dashboard' || route === '/reconciliation' || COCKPIT_PREFIXES.some((p) => route.startsWith(p)));
 }

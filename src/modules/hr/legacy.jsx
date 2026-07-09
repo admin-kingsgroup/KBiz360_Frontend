@@ -32,6 +32,19 @@ export function ExpenseBudget({branch,setRoute}){
   const budgetRows=useExpenseBudgets().data;               // DB-backed (/api/expense-budgets)
   const qc=useQueryClient();
   const saveMut=useMutation({mutationFn:(payload)=>apiPut('/api/expense-budgets/bulk',payload),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','expense-budgets']})});
+  // Expense-ledger catalogue entry (/api/expense-ledgers) — the catalogue has no
+  // master screen of its own, and budgets can't be set until it has rows.
+  const ledgerMut=useMasterMutations('expense-ledgers');
+  const [ledgerModal,setLedgerModal]=useState(false); useModalEsc(()=>setLedgerModal(false),ledgerModal);
+  const [ledgerForm,setLedgerForm]=useState({code:"",name:"",group:""});
+  const saveLedger=()=>{
+    if(ledgerMut.create.isPending) return;
+    if(!ledgerForm.code.trim()||!ledgerForm.name.trim()){toast('Ledger code and name are required','error');return;}
+    ledgerMut.create.mutate({...ledgerForm,code:ledgerForm.code.trim().toUpperCase(),sortOrder:EXP_LEDGERS.length+1,active:true},{
+      onSuccess:()=>{qc.invalidateQueries({queryKey:['ref','expense-ledgers']});toast('Expense ledger added');setLedgerModal(false);setLedgerForm({code:"",name:"",group:""});},
+      onError:(e)=>toast('Could not save — '+(e?.message||'unknown error'),'error'),
+    });
+  };
   const [fy,setFy]=useState("2025-26");
   const [tab,setTab]=useState("monthly");
   const [editing,setEditing]=useState(false);
@@ -85,6 +98,7 @@ export function ExpenseBudget({branch,setRoute}){
           <select value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
             {groups.map(g=><option key={g}>{g}</option>)}
           </select>
+          <button onClick={()=>setLedgerModal(true)} style={{...btnGh,fontSize:11}}>＋ Add Ledger</button>
           {!editing
             ?<button onClick={startEdit} style={{...btnG,background:"#185FA5",fontSize:11}}>✏ Set / Edit Budget</button>
             :<><button onClick={cancelEdit} style={btnGh}>Cancel</button><button onClick={saveEdit} style={btnG}>💾 Save Budget</button></>
@@ -196,6 +210,28 @@ export function ExpenseBudget({branch,setRoute}){
               <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totY)}</td>
             </tr></tfoot>
           </table>
+        </div>
+      )}
+      {ledgerModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:440,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>Add Expense Ledger</p>
+              <button onClick={()=>setLedgerModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5b616e"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,180px),1fr))",gap:10}}>
+                <FL label="Code"><input value={ledgerForm.code} onChange={e=>setLedgerForm(f=>({...f,code:e.target.value}))} placeholder="e.g. SAL" style={{...inp,fontFamily:"monospace",textTransform:"uppercase"}}/></FL>
+                <FL label="Group"><input value={ledgerForm.group} onChange={e=>setLedgerForm(f=>({...f,group:e.target.value}))} placeholder="e.g. Staff Costs" list="exp-ledger-groups" style={inp}/></FL>
+                <datalist id="exp-ledger-groups">{groups.filter(g=>g!=="All").map(g=><option key={g} value={g}/>)}</datalist>
+              </div>
+              <FL label="Ledger name"><input value={ledgerForm.name} onChange={e=>setLedgerForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Salaries & Wages" style={inp}/></FL>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setLedgerModal(false)} style={btnGh}>Cancel</button>
+              <button onClick={saveLedger} style={btnG}>💾 Save Ledger</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

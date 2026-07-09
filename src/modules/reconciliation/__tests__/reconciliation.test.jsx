@@ -3,7 +3,7 @@
 import {
   BRANCHES, TIERS, tierOf, statusMeta, sourceMeta, tierProgress, chainProgress,
   fmtAmt, currencyOf, openExceptions, GOLDEN_RULES, ROLE_MATRIX,
-  pendingStateMeta, fmtDue,
+  pendingStateMeta, fmtDue, periodOptions, visibleTiers,
 } from '../utils';
 
 describe('reconciliation · tiers', () => {
@@ -20,6 +20,12 @@ describe('reconciliation · tiers', () => {
   });
   test('unknown tier falls back to weekly (never crashes a row)', () => {
     expect(tierOf('nope').key).toBe('weekly');
+  });
+  test('Branch Accountant sees the weekly tier ONLY; central roles see all four', () => {
+    expect(visibleTiers('Branch Accountant').map((t) => t.key)).toEqual(['weekly']);
+    ['Sr. Accounts Executive', 'Senior Finance Manager', 'Director', 'Super Admin', undefined].forEach((r) => {
+      expect(visibleTiers(r)).toHaveLength(4);
+    });
   });
 });
 
@@ -70,6 +76,18 @@ describe('reconciliation · pending board display', () => {
     expect(pendingStateMeta({ state: 'in-progress' })).toMatchObject({ tone: 'warning' });
     expect(pendingStateMeta({ state: 'not-started' })).toMatchObject({ tone: 'danger', label: 'Pending' });
     expect(pendingStateMeta({ state: 'closed' })).toMatchObject({ tone: 'navy' });
+  });
+  test('periodOptions: backlog periods first, then current; deduped; upcoming excluded', () => {
+    const rows = [
+      { tier: 'month', period: '2026-04', state: 'not-started' },
+      { tier: 'month', period: '2026-05', state: 'in-progress' },
+      { tier: 'weekly', period: '2026-W29', upcoming: true },
+      { tier: 'year', period: 'FY2025-26', state: 'not-started' },
+    ];
+    expect(periodOptions('month', '2026-07', rows).map((o) => o.value)).toEqual(['2026-04', '2026-05', '2026-07']);
+    expect(periodOptions('weekly', '2026-W28', rows).map((o) => o.value)).toEqual(['2026-W28']); // upcoming row excluded
+    expect(periodOptions('year', 'FY2026-27', rows).map((o) => o.value)).toEqual(['FY2025-26', 'FY2026-27']);
+    expect(periodOptions('month', '2026-04', [{ tier: 'month', period: '2026-04', state: 'not-started' }]).map((o) => o.value)).toEqual(['2026-04']); // dedupe vs current
   });
   test('fmtDue: weekly cycles show their Friday; upcoming is flagged', () => {
     expect(fmtDue({ tier: 'weekly', dueOn: '2026-07-17' })).toBe('Fri, 17 Jul 2026');

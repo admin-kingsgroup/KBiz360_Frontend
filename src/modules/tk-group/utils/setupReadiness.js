@@ -79,19 +79,26 @@ export function scopeUnits(units, branch) {
 }
 
 /** Aggregate scored units into one health read (mirrors the backend rollup, so
- *  the FE can re-derive it for a branch slice). null health = no live meter. */
+ *  the FE can re-derive it for a branch slice). null health = no live meter.
+ *  Each missing milestone carries its entry-screen link (from the units' per-check
+ *  `actions`) so the fix narration can route the team straight to where THAT
+ *  milestone's data is entered. */
 export function rollupUnits(units) {
   if (!units || !units.length) return { health: null, pct: null, liveUnits: 0, totalUnits: 0, missing: [] };
   const live = units.filter((u) => u.status === 'live').length;
   const dormant = units.filter((u) => u.status === 'dormant').length;
   const health = live === units.length ? 'live' : dormant === units.length ? 'dormant' : 'partial';
   const pct = Math.round(units.reduce((s, u) => s + (Number(u.pct) || 0), 0) / units.length);
+  const linkByLabel = new Map();
+  units.forEach((u) => (u.actions || []).forEach((a) => {
+    if (a.link && !linkByLabel.has(a.label)) linkByLabel.set(a.label, a.link);
+  }));
   const byLabel = new Map();
   units.forEach((u) => (u.missing || []).forEach((label) => {
     if (!byLabel.has(label)) byLabel.set(label, []);
     byLabel.get(label).push(u.branch);
   }));
-  const missing = [...byLabel.entries()].map(([label, branches]) => ({ label, branches }));
+  const missing = [...byLabel.entries()].map(([label, branches]) => ({ label, branches, link: linkByLabel.get(label) || '' }));
   return { health, pct, liveUnits: live, totalUnits: units.length, missing };
 }
 
