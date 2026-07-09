@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Circle, FileUp, ShieldCheck, AlertTriangle, Stamp } from 'lucide-react';
-import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan } from './api';
+import { CheckCircle2, Circle, FileUp, ShieldCheck, AlertTriangle, Stamp, Lock, ExternalLink } from 'lucide-react';
+import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan, getAttachmentUrl } from './api';
 import { tierOf, statusMeta, sourceMeta, chainProgress, fmtAmt, openExceptions } from './utils';
 import { Drawer, Badge, Button, Input, Select, FormField, LoadingState, EmptyState, ErrorState } from '../../shell/primitives';
 
@@ -21,17 +21,21 @@ function Row({ label, children }) {
   );
 }
 
-function SnapshotForm({ cert, onFreeze, busy, error }) {
-  const [book, setBook] = useState('');
+function SnapshotForm({ cert, books, onFreeze, busy, error }) {
   const [stmt, setStmt] = useState('');
   const [adj, setAdj] = useState('0');
+  // The BOOK side is auto-fetched from ERP Books and LOCKED — never typed.
+  const book = books ? Number(books.amount) : null;
   // Round like the backend (2dp) so floating-point sums don't show a phantom difference.
-  const diff = Math.round(((Number(stmt) || 0) + (Number(adj) || 0) - (Number(book) || 0)) * 100) / 100;
+  const diff = Math.round(((Number(stmt) || 0) + (Number(adj) || 0) - (book || 0)) * 100) / 100;
   return (
     <div className="grid gap-3">
       <div className="grid grid-cols-2 gap-3">
-        <FormField label="Balance per books" htmlFor="rc-book">
-          <Input id="rc-book" type="number" value={book} onChange={(e) => setBook(e.target.value)} placeholder="0.00" />
+        <FormField label="Balance per books" hint={books ? `Auto-fetched live from ERP Books as of ${books.asOf} — locked.` : undefined}>
+          <div className="flex h-10 items-center gap-2 rounded-brand border border-surface-border bg-surface-alt px-3 text-sm font-semibold tabular-nums text-ink" aria-readonly="true">
+            <Lock size={13} className="shrink-0 text-ink-subtle" aria-hidden="true" />
+            {books ? fmtAmt(book, cert.branch) : <span className="font-normal text-ink-subtle">fetching from Books…</span>}
+          </div>
         </FormField>
         <FormField label="Balance per statement" htmlFor="rc-stmt">
           <Input id="rc-stmt" type="number" value={stmt} onChange={(e) => setStmt(e.target.value)} placeholder="0.00" />
@@ -40,11 +44,11 @@ function SnapshotForm({ cert, onFreeze, busy, error }) {
       <FormField label="Reconciling items (net ±)" hint="Unpresented cheques, deposits in transit, charges to post — statement + adjustments must equal books.">
         <Input type="number" value={adj} onChange={(e) => setAdj(e.target.value)} />
       </FormField>
-      <div className={`rounded-brand border px-3 py-2 text-sm font-semibold tabular-nums ${diff === 0 ? 'border-success/30 bg-success-soft text-success' : 'border-warning/30 bg-warning-soft text-warning'}`}>
-        Difference after reconciling items: {fmtAmt(diff, cert.branch)} {diff === 0 ? '— ready to freeze' : '— must be zero to sign'}
+      <div className={`rounded-brand border px-3 py-2 text-sm font-semibold tabular-nums ${diff === 0 && books ? 'border-success/30 bg-success-soft text-success' : 'border-warning/30 bg-warning-soft text-warning'}`}>
+        Difference after reconciling items: {fmtAmt(diff, cert.branch)} {diff === 0 && books ? '— ready to freeze' : '— must be zero to sign'}
       </div>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
-      <Button variant="primary" loading={busy} disabled={book === '' || stmt === ''} onClick={() => onFreeze({ bookBalance: Number(book), statementBalance: Number(stmt), adjustments: Number(adj) || 0 })}>
+      <Button variant="primary" loading={busy} disabled={stmt === '' || !books} onClick={() => onFreeze({ statementBalance: Number(stmt), adjustments: Number(adj) || 0 })}>
         Freeze snapshot (Rule 02)
       </Button>
     </div>
@@ -55,12 +59,14 @@ export function CertificateDrawer({ id, branch, onClose }) {
   const qc = useQueryClient();
   const [attLabel, setAttLabel] = useState('');
   const [attSource, setAttSource] = useState('download');
+  const [attFile, setAttFile] = useState(null);
   const [exText, setExText] = useState('');
   const [err, setErr] = useState('');
 
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['recon-certs', 'cert', id], queryFn: () => getCertificate(id), enabled: !!id });
-  const cert = data?.data || data; // envelope unwrapped by the api client; /:id returns {data, chain, canSign}
+  const cert = data?.data || data; // envelope unwrapped by the api client; /:id returns {data, chain, canSign, books}
   const canSign = data?.canSign;
+  const books = data?.books; // live ERP-Books closing balance (locked book side of the snapshot)
 
   // Root invalidation — sign/scan changes ripple into the tree, summary,
   // pending board AND the Reports register; refresh them all.
@@ -120,7 +126,7 @@ export function CertificateDrawer({ id, branch, onClose }) {
             <h3 className="kbiz-section-title mb-2">Snapshot — books vs statement</h3>
             {frozen ? (
               <div className="rounded-brand border border-surface-border px-4 py-2">
-                <Row label="Balance per books">{fmtAmt(cert.snapshot.bookBalance, cert.branch)}</Row>
+                <Row label="Balance per books (auto-fetched, locked)">{fmtAmt(cert.snapshot.bookBalance, cert.branch)}</Row>
                 <Row label="Balance per statement">{fmtAmt(cert.snapshot.statementBalance, cert.branch)}</Row>
                 <Row label="Reconciling items (net)">{fmtAmt(cert.snapshot.adjustments, cert.branch)}</Row>
                 <Row label="Difference">
@@ -129,7 +135,7 @@ export function CertificateDrawer({ id, branch, onClose }) {
                 <p className="pt-2 text-xs text-ink-subtle">Frozen {new Date(cert.snapshot.frozenAt).toLocaleString()} by {cert.snapshot.frozenBy || '—'} — signatures attest to exactly these figures.</p>
               </div>
             ) : (
-              <SnapshotForm cert={cert} onFreeze={(b) => freeze.mutate(b)} busy={freeze.isPending} error={err} />
+              <SnapshotForm cert={cert} books={books} onFreeze={(b) => freeze.mutate(b)} busy={freeze.isPending} error={err} />
             )}
           </section>
 
@@ -141,27 +147,51 @@ export function CertificateDrawer({ id, branch, onClose }) {
               {cert.attachments.map((a) => (
                 <li key={a._id} className="flex items-center gap-3 rounded-brand border border-surface-border px-3 py-2 text-sm">
                   <Badge tone={sourceMeta(a.source).tone} size="sm">{sourceMeta(a.source).label}</Badge>
-                  <span className="flex-1 truncate text-ink">{a.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-ink">
+                    {a.label}
+                    {a.fileName ? <span className="ml-2 text-xs text-ink-subtle">{a.fileName}{a.size ? ` · ${Math.max(1, Math.round(a.size / 1024))} KB` : ''}</span> : null}
+                  </span>
+                  {a.fileKey && (
+                    <Button size="xs" variant="ghost" icon={ExternalLink}
+                      onClick={async () => {
+                        try { const r = await getAttachmentUrl(cert._id, a._id); if (r?.url) window.open(r.url, '_blank', 'noopener'); }
+                        catch (e) { setErr(e.message); }
+                      }}>
+                      View
+                    </Button>
+                  )}
                   <span className="font-mono text-xs text-ink-subtle">#{a.hash}</span>
                 </li>
               ))}
             </ul>
             {!signedFully && (
-              <div className="mt-3 flex flex-wrap items-end gap-2">
-                <FormField label="Statement label" className="min-w-[220px] flex-1">
-                  <Input value={attLabel} onChange={(e) => setAttLabel(e.target.value)} placeholder="e.g. ICICI statement — Jun 2026" />
+              <div className="mt-3 grid gap-2">
+                <div className="flex flex-wrap items-end gap-2">
+                  <FormField label="Statement label" className="min-w-[220px] flex-1">
+                    <Input value={attLabel} onChange={(e) => setAttLabel(e.target.value)} placeholder="e.g. ICICI statement — Jun 2026" />
+                  </FormField>
+                  <FormField label="Source">
+                    <Select value={attSource} onChange={(e) => setAttSource(e.target.value)}>
+                      <option value="download">Download (portal)</option>
+                      <option value="physical">Physical (scan)</option>
+                      <option value="feed">Bank feed</option>
+                      <option value="internal">Internal</option>
+                    </Select>
+                  </FormField>
+                  <Button icon={FileUp} loading={attachM.isPending} disabled={!attLabel.trim()}
+                    onClick={() => { attachM.mutate({ label: attLabel, source: attSource, file: attFile }); setAttLabel(''); setAttFile(null); }}>
+                    Attach
+                  </Button>
+                </div>
+                <FormField label="Statement file — PDF · CSV · image · XML (optional)"
+                  hint={attFile ? `${attFile.name} · ${Math.max(1, Math.round(attFile.size / 1024))} KB — will be stored and content-hashed.` : 'The uploaded file is stored privately and tamper-tied to its sha256.'}>
+                  <input
+                    type="file"
+                    accept=".pdf,.csv,.xml,image/*,application/pdf,text/csv,application/xml,text/xml"
+                    onChange={(e) => setAttFile(e.target.files?.[0] || null)}
+                    className="block w-full cursor-pointer text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-brand file:border file:border-surface-border file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-ink hover:file:bg-surface-alt"
+                  />
                 </FormField>
-                <FormField label="Source">
-                  <Select value={attSource} onChange={(e) => setAttSource(e.target.value)}>
-                    <option value="download">Download (portal)</option>
-                    <option value="physical">Physical (scan)</option>
-                    <option value="feed">Bank feed</option>
-                    <option value="internal">Internal</option>
-                  </Select>
-                </FormField>
-                <Button icon={FileUp} loading={attachM.isPending} disabled={!attLabel.trim()} onClick={() => { attachM.mutate({ label: attLabel, source: attSource }); setAttLabel(''); }}>
-                  Attach
-                </Button>
               </div>
             )}
           </section>

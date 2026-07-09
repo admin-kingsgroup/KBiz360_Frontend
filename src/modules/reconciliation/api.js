@@ -37,11 +37,22 @@ export async function getRulebook({ branch } = {}) {
 export function generateCertificates({ branch, tier, period, codes }) {
   return apiPost('/api/reconciliation/generate', { branch, tier, period, codes });
 }
-export function freezeSnapshot(id, { bookBalance, statementBalance, adjustments }) {
-  return apiPost(`/api/reconciliation/${id}/snapshot`, { bookBalance, statementBalance, adjustments });
+// The BOOK side is auto-fetched from ERP Books server-side and LOCKED — only
+// the statement figure and the reconciling items are ever sent.
+export function freezeSnapshot(id, { statementBalance, adjustments }) {
+  return apiPost(`/api/reconciliation/${id}/snapshot`, { statementBalance, adjustments });
 }
-export function addAttachment(id, { label, source, fileName }) {
-  return apiPost(`/api/reconciliation/${id}/attachments`, { label, source, fileName });
+// Statement attach: multipart when a file (PDF/CSV/image/XML) is chosen —
+// stored in the private S3 bucket, tamper-tied to its content sha256.
+export function addAttachment(id, { label, source, file }) {
+  const form = new FormData();
+  form.append('label', label);
+  form.append('source', source);
+  if (file) form.append('file', file, file.name);
+  return apiPost(`/api/reconciliation/${id}/attachments`, form);
+}
+export async function getAttachmentUrl(id, attId) {
+  return apiGet(`/api/reconciliation/${id}/attachments/${attId}/url`);
 }
 export function addException(id, text) {
   return apiPost(`/api/reconciliation/${id}/exceptions`, { text });
