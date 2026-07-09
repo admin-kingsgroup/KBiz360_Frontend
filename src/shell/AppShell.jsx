@@ -309,7 +309,7 @@ function DesktopNav({ menu, route, go }) {
         const active = hasChildren ? containsRoute(item, route) : route === item.href;
         const isOpen = open === i;
         return (
-          <div key={i} className="relative" onMouseEnter={(e) => hasChildren && openAt(i, e.currentTarget)}>
+          <div key={i} className="relative">
             <button
               type="button"
               onClick={(e) => { setKbNav(false); return hasChildren ? (isOpen ? closeNow() : openAt(i, e.currentTarget.parentElement)) : go(item.href); }}
