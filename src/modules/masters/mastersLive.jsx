@@ -541,14 +541,19 @@ export const LedgersMaster = ({ branch }) => {
     return out.sort();
   };
 
-  // Branch view filter. Single-branch (BOM) operation: the whole chart is owned by
-  // BOM, so default to BOM (the selected branch when one is picked; BOM when the top
-  // bar is on "All branches"/unset) rather than the org-wide "All branches" view.
-  const [branchView, setBranchView] = useState(() => {
-    if (editKey) return 'ALL';   // deep-link edit (?edit=): fetch all branches so the target ledger is in the list
-    const c = branchCode(branch);
-    return (!c || c === 'ALL') ? 'BOM' : c;
-  });
+  // Branch view filter — MIRRORS the top-bar branch. Each branch owns its own copy
+  // of the chart; which ledgers are visible in which branch is configured on the
+  // Accounts Tree ▸ TK Group Central Table (branch pills / hide / lock). Switching
+  // the top bar re-scopes this list live; the in-page picker still overrides until
+  // the next top-bar switch. "All branches" → the consolidated org-wide view.
+  const topBarView = (!branchCode(branch) || branchCode(branch) === 'ALL') ? 'ALL' : branchCode(branch);
+  const [branchView, setBranchView] = useState(() => (editKey ? 'ALL' : topBarView));   // deep-link edit (?edit=): all branches so the target is in the list
+  useEffect(() => { if (!editKey) setBranchView(topBarView); }, [topBarView]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Hidden / deactivated ledgers stay OUT by default, so this list shows exactly the
+  // branch's visible chart — the same set every picker offers. The toggle reveals
+  // them (flagged in a Visibility column) for management; a deep-link edit fetches
+  // the full list too, so its target is always findable.
+  const [showHidden, setShowHidden] = useState(() => !!editKey);
   const branchOptions = ['ALL', ...BRANCH_CODES];
 
   // A party ledger = one whose Group (or Sub-Group) is Sundry Debtors / Creditors.
@@ -589,6 +594,10 @@ export const LedgersMaster = ({ branch }) => {
           </Select></div>
         </label>
       )}
+      <label className={`${selWrap} cursor-pointer`} title="Also list ledgers hidden in this branch (Accounts Tree branch pills) and deactivated ones — flagged in a Visibility column">
+        <input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} />
+        Show hidden &amp; inactive
+      </label>
     </>
   );
 
@@ -597,11 +606,15 @@ export const LedgersMaster = ({ branch }) => {
       <MasterCrud title="Ledgers" subtitle={`Chart of Accounts — ledger accounts (live)${branchView !== 'ALL' ? ` · ${branchView} + shared` : ''}`}
         resource="ledgers"
         initialEditKey={editKey}
-        params={branchView !== 'ALL' ? { branch: branchView, includeInactive: 'true' } : { includeInactive: 'true' }}
+        // No includeInactive by default: the backend then drops hidden + deactivated
+        // ledgers, so the list is exactly the branch's visible chart (as configured
+        // on the Accounts Tree ▸ TK Group Central Table). The toggle opts back in.
+        params={{ ...(branchView !== 'ALL' ? { branch: branchView } : {}), ...(showHidden ? { includeInactive: 'true' } : {}) }}
         toolbar={toolbar}
         rowFilter={ledgerRowFilter}
         lockedRow={(r) => r.locked}
-        note="Set Group to the Primary Group / Primary Sub Group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. All ledgers are owned by the BOM branch. Ledgers marked ~* are WIRED to the posting/tax/inter-branch engine — locked (🔒) in every branch: they cannot be created, edited, deleted or deactivated from the app and change only directly in the database."
+        mapRow={showHidden ? (r) => ({ ...r, visibility: r.active === false ? 'Inactive' : r.hidden === true ? 'Hidden' : '' }) : undefined}
+        note="Set Group to the Primary Group / Primary Sub Group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. Each branch owns its own copy of the chart — which ledgers are visible in which branch is set on Chart of Accounts (Tree view) ▸ TK Group Central Table (tap a count, then the branch pills). Hidden and deactivated ledgers leave this list and every picker for that branch unless “Show hidden & inactive” is on. Ledgers marked ~* are WIRED to the posting/tax/inter-branch engine — locked (🔒) in every branch: they cannot be created, edited, deleted or deactivated from the app and change only directly in the database."
         fields={[
           // Code is server-allocated (<BRANCH>-MN-NNNN) — read-only, never typed
           // (matches the Chart-of-Accounts ledger editor). Was editable + required,
@@ -614,6 +627,9 @@ export const LedgersMaster = ({ branch }) => {
           { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
             options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
           { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: 'BOM' },
+          // Display-only flag column, shown only when hidden/inactive rows are in the
+          // list — Hidden = presence-toggled off for its branch, Inactive = deactivated.
+          ...(showHidden ? [{ key: 'visibility', label: 'Visibility', type: 'text', input: false, export: false }] : []),
           { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: 'INR' },
           { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
           { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },

@@ -7,7 +7,7 @@
    navigation preserved via setRoute.
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Upload, Plus } from 'lucide-react';
 import { useMasterList } from '../../../core/useMasters';
 import { BRANCH_CODES } from '../../../core/data';
@@ -23,6 +23,8 @@ const localeOfCcy = (ccy) => (String(ccy || '').toUpperCase() === 'INR' ? 'en-IN
 export function BankAccountMaster({ branch, setRoute }) {
   const [search, setSearch] = useState('');
   const [filterBranch, setFilterBranch] = useState(branch === 'ALL' ? 'ALL' : branch?.code || 'ALL');
+  // Follow the top-bar branch switch live (the in-page filter still overrides after).
+  useEffect(() => { setFilterBranch(branch === 'ALL' ? 'ALL' : branch?.code || 'ALL'); }, [branch]);
   // Bank accounts ARE ledgers under the Bank Accounts / Cash-in-Hand groups — fetch
   // them live and map the ledger's bank fields onto the register's columns.
   const { data: ledgers = [] } = useMasterList('ledgers');
