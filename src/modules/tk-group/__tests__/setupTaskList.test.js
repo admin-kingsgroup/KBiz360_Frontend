@@ -37,6 +37,10 @@ const D = {
     suppliers: { total: 91, incomplete: 1, capped: false, items: [
       { name: 'TRIP JACK', branch: 'ALL', missing: ['GSTIN'] },
     ] },
+    employees: { total: 7, incomplete: 2, capped: false, items: [
+      { name: 'Half Entered', branch: 'BOM', missing: ['Designation', 'Basic salary'] },
+      { name: 'New Joiner', branch: 'NBO', missing: ['Shift assigned'] },
+    ] },
   },
 };
 
@@ -119,11 +123,13 @@ describe('TK task list · branchwise scoping never mixes (pure)', () => {
     expect(branchCounts(tasks, BRANCHES, 'Owner')).toMatchObject({ ALL: 1, Central: 1, BOM: 0 });
   });
 
-  test('partyRows: branch scope keeps details separate — BOM never shows AMD customers', () => {
+  test('partyRows: branch scope keeps details separate — BOM never shows AMD customers or NBO staff', () => {
     expect(partyRows(D, 'ALL').customers.items).toHaveLength(2);
+    expect(partyRows(D, 'ALL').employees.items).toHaveLength(2);
     const bom = partyRows(D, 'BOM');
     expect(bom.customers.items.map((i) => i.name)).toEqual(['NeuIQ Technologies']);
     expect(bom.suppliers.items).toEqual([]); // branch 'ALL' supplier is central, not BOM's
+    expect(bom.employees.items.map((i) => i.name)).toEqual(['Half Entered']); // NBO joiner never mixes in
     const central = partyRows(D, 'Central');
     expect(central.suppliers.items.map((i) => i.name)).toEqual(['TRIP JACK']);
     expect(central.customers.items).toEqual([]);
@@ -146,12 +152,12 @@ describe('TK task list · ledgers + KPIs (pure)', () => {
     expect(all.map((k) => k.key)).toEqual(['pending', 'done', 'ledgers', 'details', 'progress']);
     expect(all[0].value).toBe('4');
     expect(all[2].value).toBe('64');
-    expect(all[3].value).toBe('3'); // 2 customers + 1 supplier
+    expect(all[3].value).toBe('5'); // 2 customers + 1 supplier + 2 employees
     expect(all[4].value).toBe('33%'); // 2 of 6
     const bom = taskKpis(D, tasks, 'BOM', 'ALL');
     expect(bom[0].value).toBe('1');
     expect(bom[2].value).toBe('34');
-    expect(bom[3].value).toBe('1'); // only BOM's incomplete customer
+    expect(bom[3].value).toBe('2'); // BOM's incomplete customer + employee
   });
 
   test('ledgerRows serial-numbers the drill-in items', () => {
@@ -164,6 +170,7 @@ describe('TK task list · ledgers + KPIs (pure)', () => {
     expect(branchCounts(undefined, BRANCHES)).toMatchObject({ ALL: 0, Central: 0 });
     expect(ledgerScope({}, 'ALL')).toMatchObject({ pending: 0 });
     expect(partyRows({}, 'ALL').customers.items).toEqual([]);
+    expect(partyRows({}, 'ALL').employees.items).toEqual([]);
     expect(taskKpis({}, [], 'ALL', 'ALL')[4].value).toBe('0%');
     expect(ledgerRows({})).toEqual([]);
     expect(devFindingRows(undefined, undefined)).toEqual([]);

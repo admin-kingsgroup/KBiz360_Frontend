@@ -36,6 +36,9 @@ const PAYLOAD = {
     suppliers: { total: 90, incomplete: 1, capped: false, items: [
       { name: 'IATA-BSP [Stock]', branch: 'BOM', missing: ['Contact (phone/email)'] },
     ] },
+    employees: { total: 3, incomplete: 1, capped: false, items: [
+      { name: 'Half Entered', branch: 'BOM', missing: ['Designation', 'Basic salary'] },
+    ] },
   },
 };
 
@@ -85,6 +88,9 @@ describe('SetupTaskList render (wiring smoke)', () => {
     // Party completeness drill renders with exact missing details
     expect(screen.getByText('NeuIQ Technologies Private Limited')).toBeInTheDocument();
     expect(screen.getByText('Credit limit · GST treatment')).toBeInTheDocument();
+    // Staff completeness drill renders too
+    expect(screen.getByText('Employees with missing details (1)')).toBeInTheDocument();
+    expect(screen.getByText('Designation · Basic salary')).toBeInTheDocument();
     // Ledger cards mode at ALL scope — six per-branch cards
     expect(screen.getByTestId('tk-tasks-ledgercards')).toBeInTheDocument();
   });

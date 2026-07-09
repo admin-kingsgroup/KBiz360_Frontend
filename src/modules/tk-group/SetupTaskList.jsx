@@ -218,11 +218,12 @@ export function SetupTaskList({ setRoute } = {}) {
       />
 
       {showParties && (
-        <PageSection title="Party master completeness — details to fill">
+        <PageSection title="Master completeness — details to fill">
           <p className="mb-3 text-xs text-ink-muted">
-            Entry or no entry, every client and supplier must have complete master details. Each row lists exactly which
-            details are missing; it clears the moment they are saved. Internal B2C-Ref / inter-branch accounts are
-            excluded. Scope follows the Branch bar — branchwise details never mix.
+            Entry or no entry, every client, supplier and employee must have complete master details. Each row lists
+            exactly which details are missing; it clears the moment they are saved. Inter-branch (Travkings) accounts
+            need credit limit + credit days only; B2C-Ref pools are excluded; inactive employees owe nothing.
+            Scope follows the Branch bar — branchwise details never mix.
           </p>
           <div className="grid gap-4">
             <DataTable
@@ -243,6 +244,17 @@ export function SetupTaskList({ setRoute } = {}) {
               getRowKey={(r) => `${r.branch}:${r.name}:${r.sr}`}
               loading={q.isLoading}
               emptyMessage="Every supplier in this scope has complete details. 🎉"
+              searchable
+              showDensityToggle={false}
+              zebra
+            />
+            <DataTable
+              title={`Employees with missing details (${parties.employees.items.length})${parties.employees.capped ? ' — first page' : ''}`}
+              columns={partyColumns(setRoute, '/hr/employees')}
+              rows={parties.employees.items}
+              getRowKey={(r) => `${r.branch}:${r.name}:${r.sr}`}
+              loading={q.isLoading}
+              emptyMessage="Every active employee in this scope has complete details. 🎉"
               searchable
               showDensityToggle={false}
               zebra
