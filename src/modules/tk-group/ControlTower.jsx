@@ -80,7 +80,7 @@ function LensCard({ title, onOpen, chart, legend, foot }) {
         {onOpen && <button type="button" onClick={onOpen} className="text-[11.5px] font-semibold text-accent hover:underline">Open →</button>}
       </div>
       <div className="flex items-center gap-4">
-        <div className="shrink-0">{chart}</div>
+        <div className={legend ? 'shrink-0' : 'min-w-0 flex-1'}>{chart}</div>
         {legend && <div className="min-w-0 flex-1">{legend}</div>}
       </div>
       {foot && <div className="mt-auto flex items-center justify-between gap-2 pt-3 text-xs">{foot}</div>}
@@ -151,16 +151,17 @@ function Overview({ focus, goTab }) {
 
         <DevLensCard goTab={goTab} />
 
-        <LensCard title="Controls"
-          chart={<div className="grid w-full gap-1.5">
-            {controls.length ? controls.map((c) => (
-              <div key={c.key} className="flex items-center justify-between gap-2 text-xs">
-                <span className="truncate text-ink-muted">{c.label}</span>
-                <Badge tone={c.enabled ? 'success' : 'neutral'} size="sm">{c.enabled ? 'ON' : 'off'}</Badge>
-              </div>
-            )) : <span className="text-xs text-ink-subtle">No controls configured.</span>}
-          </div>} />
       </div>
+
+      <LensCard title="Controls"
+        chart={<div className="grid w-full grid-cols-1 gap-1">
+          {controls.length ? controls.map((c) => (
+            <div key={c.key} className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1.5 text-xs odd:bg-surface-alt/50">
+              <span className="min-w-0 text-ink-muted">{c.label}</span>
+              <Badge tone={c.enabled ? 'success' : 'neutral'} size="sm">{c.enabled ? 'ON' : 'off'}</Badge>
+            </div>
+          )) : <span className="text-xs text-ink-subtle">No controls configured.</span>}
+        </div>} />
     </div>
   );
 }
