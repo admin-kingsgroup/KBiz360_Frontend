@@ -191,6 +191,9 @@ export const APP_ROUTES = [
   "/purchase/ticket-control",
   "/purchase/visa",
   "/receipts",
+  "/reconciliation",
+  "/reconciliation/reports",
+  "/reconciliation/rulebook",
   "/reports/abc-analysis",
   "/reports/audit-trail",
   "/reports/branch",
@@ -351,5 +354,8 @@ export const APP_ROUTE_LABELS = {
   "/finance/receipt-register": "Receipt Register",
   "/finance/refund-register": "Refund Register",
   "/finance/reissue-register": "Reissue Register",
-  "/finance/trial-balance": "Trial Balance"
+  "/finance/trial-balance": "Trial Balance",
+  "/reconciliation": "Reconciliation",
+  "/reconciliation/reports": "Reconciliation Reports & Pending",
+  "/reconciliation/rulebook": "Reconciliation Rule Book"
 };

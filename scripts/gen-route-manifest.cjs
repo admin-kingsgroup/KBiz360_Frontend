@@ -23,7 +23,10 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const APP_JSX = path.join(ROOT, 'src/App.jsx');
-const MIGRATED_TABLES = [path.join(ROOT, 'src/modules/finance/routes/index.jsx')];
+const MIGRATED_TABLES = [
+  path.join(ROOT, 'src/modules/finance/routes/index.jsx'),
+  path.join(ROOT, 'src/modules/reconciliation/routes/index.jsx'),
+];
 const OUT = path.join(ROOT, 'src/core/routeManifest.generated.js');
 
 // Pull every route literal + any migrated path/label out of the given sources.
