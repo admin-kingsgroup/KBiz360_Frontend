@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { getLimits, proposeLimits } from './api/limits';
-import { Button, Input, LoadingState } from '../../shell/primitives';
+import { Button, Input, LoadingState, PageSection } from '../../shell/primitives';
 
 // ─── TK GROUP CENTRAL · Thresholds & Limits (Owner-editable) ─────────────────
 // The control-model numbers in one editable place — decision escalation ceilings,
@@ -50,27 +50,45 @@ export function LimitsAdmin() {
   }, [fields, values]);
 
   return (
-    <form onSubmit={submit} aria-label="Edit thresholds and limits" className="grid max-w-[520px] gap-4">
-      {msg ? <div role="status" className="rounded-md bg-warning-soft px-3 py-1.5 text-xs text-warning">{msg}</div> : null}
-      {groups.length ? groups.map(([group, gf]) => (
-        <section key={group}>
-          <h2 className="mb-1 text-xs font-extrabold text-navy">{group}</h2>
-          {gf.map((f) => (
-            <div key={f.key} className="flex items-center justify-between gap-3 border-b border-surface-border py-1.5">
-              <label htmlFor={`lim-${f.key}`} className="text-xs text-ink-muted">{f.label}</label>
-              <span className="inline-flex items-center gap-1.5">
-                <Input id={`lim-${f.key}`} aria-label={f.label} type="number" step="any" min="0"
-                  value={values[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)}
-                  className="w-[130px] text-right tabular-nums" />
-                <span className="min-w-[26px] text-[11px] text-ink-muted">{f.unit}</span>
-              </span>
+    <div className="mx-auto max-w-[560px]">
+      <form onSubmit={submit} aria-label="Edit thresholds and limits">
+        <PageSection padded={false} className="overflow-hidden">
+          {msg && (
+            <div role="status" className="border-b border-surface-border bg-warning-soft px-4 py-2 text-xs text-warning">
+              {msg}
             </div>
-          ))}
-        </section>
-      )) : <LoadingState label="Loading limits…" />}
-      <Button type="submit" variant="success" size="sm" className="justify-self-start">
-        Submit changes for Owner approval
-      </Button>
-    </form>
+          )}
+          {groups.length ? (
+            <div className="divide-y divide-surface-border">
+              {groups.map(([group, gf]) => (
+                <section key={group} className="px-4 py-3">
+                  <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-ink-muted">{group}</h2>
+                  <div className="grid gap-2.5">
+                    {gf.map((f) => (
+                      <div key={f.key} className="flex items-center justify-between gap-3">
+                        <label htmlFor={`lim-${f.key}`} className="text-xs text-navy">{f.label}</label>
+                        <span className="inline-flex shrink-0 items-center gap-1.5">
+                          <Input id={`lim-${f.key}`} aria-label={f.label} type="number" step="any" min="0"
+                            value={values[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)}
+                            className="w-[130px] text-right tabular-nums" />
+                          <span className="min-w-[26px] text-[11px] text-ink-muted">{f.unit}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4"><LoadingState label="Loading limits…" /></div>
+          )}
+          <div className="flex justify-center border-t border-surface-border bg-surface-alt px-4 py-3">
+            <Button type="submit" variant="success" size="sm">
+              Submit changes for Owner approval
+            </Button>
+          </div>
+        </PageSection>
+      </form>
+    </div>
   );
 }
