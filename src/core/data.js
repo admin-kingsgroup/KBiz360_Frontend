@@ -21,7 +21,7 @@ function vDate(){
      India  (BOMMB/BOM/AMD): INR
      Kenya  (NBO):     USD (main) + KES
      Tanzania (DAR):   USD (main) + TZS
-     DR Congo (FBM):   USD (main) + CDF
+     DR Congo (FBM):   USD only (no secondary currency)
    `toINR` is the rate used for consolidated (Group) reporting only.
    ─────────────────────────────────────────────────────────────────── */
 export { BRANCHES, BRANCH_CODES, CURRENCY_META, FX_RATES, ACTIVE_CURRENCIES, VAT_RATE };

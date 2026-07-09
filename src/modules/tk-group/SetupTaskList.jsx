@@ -111,9 +111,9 @@ function partyColumns(setRoute, link) {
   ];
 }
 
-function ScopePill({ on, onClick, children }) {
+function ScopePill({ on, onClick, children, testId }) {
   return (
-    <button type="button" onClick={onClick}
+    <button type="button" onClick={onClick} data-testid={testId}
       className={`rounded-full border px-3 py-1 text-xs font-semibold ${on ? 'border-accent bg-accent text-white' : 'border-surface-border bg-surface text-ink-muted hover:border-accent hover:text-accent'}`}>
       {children}
     </button>
@@ -162,7 +162,7 @@ export function SetupTaskList({ setRoute } = {}) {
         <div className="flex flex-wrap items-center gap-2" data-testid="tk-tasks-branchbar">
           <span className="text-[11px] font-bold uppercase tracking-wide text-ink-subtle">Branch</span>
           {['ALL', 'Central', ...(d.branches || [])].map((b) => (
-            <ScopePill key={b} on={branch === b} onClick={() => setBranch(b)}>
+            <ScopePill key={b} on={branch === b} onClick={() => setBranch(b)} testId={`tk-tasks-branch-${b}`}>
               {b === 'ALL' ? 'All' : b} <span className="tabular-nums opacity-80">{bCounts[b] ?? 0}</span>
             </ScopePill>
           ))}
@@ -172,7 +172,7 @@ export function SetupTaskList({ setRoute } = {}) {
       <div className="flex flex-wrap items-center gap-2" data-testid="tk-tasks-userbar">
         <span className="text-[11px] font-bold uppercase tracking-wide text-ink-subtle">User</span>
         {['ALL', ...TASK_USERS].map((u) => (
-          <ScopePill key={u} on={user === u} onClick={() => setUser(u)}>
+          <ScopePill key={u} on={user === u} onClick={() => setUser(u)} testId={`tk-tasks-user-${u}`}>
             {u === 'ALL' ? 'All users' : assigneeLabel(u)} <span className="tabular-nums opacity-80">{uCounts[u] ?? 0}</span>
           </ScopePill>
         ))}
@@ -229,7 +229,7 @@ export function SetupTaskList({ setRoute } = {}) {
               title={`Customers with missing details (${parties.customers.items.length})${parties.customers.capped ? ' — first page' : ''}`}
               columns={partyColumns(setRoute, '/masters/customers')}
               rows={parties.customers.items}
-              getRowKey={(r) => `${r.branch}:${r.name}`}
+              getRowKey={(r) => `${r.branch}:${r.name}:${r.sr}`}
               loading={q.isLoading}
               emptyMessage="Every customer in this scope has complete details. 🎉"
               searchable
@@ -240,7 +240,7 @@ export function SetupTaskList({ setRoute } = {}) {
               title={`Suppliers with missing details (${parties.suppliers.items.length})${parties.suppliers.capped ? ' — first page' : ''}`}
               columns={partyColumns(setRoute, '/masters/suppliers')}
               rows={parties.suppliers.items}
-              getRowKey={(r) => `${r.branch}:${r.name}`}
+              getRowKey={(r) => `${r.branch}:${r.name}:${r.sr}`}
               loading={q.isLoading}
               emptyMessage="Every supplier in this scope has complete details. 🎉"
               searchable

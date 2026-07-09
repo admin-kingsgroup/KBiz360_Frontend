@@ -22,7 +22,7 @@ const FALLBACK_BRANCHES = [
   { code: 'AMD',  city: 'Ahmedabad',     country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
   { code: 'NBO',  city: 'Nairobi',       country: 'Kenya',    flag: '🇰🇪', currency: 'USD', currencies: ['USD', 'KES']              },
   { code: 'DAR',  city: 'Dar es Salaam', country: 'Tanzania', flag: '🇹🇿', currency: 'USD', currencies: ['USD', 'TZS']              },
-  { code: 'FBM',  city: 'Lubumbashi',    country: 'DR Congo', flag: '🇨🇩', currency: 'USD', currencies: ['USD', 'CDF']              },
+  { code: 'FBM',  city: 'Lubumbashi',    country: 'DR Congo', flag: '🇨🇩', currency: 'USD', currencies: ['USD']                     },
 ];
 const FALLBACK_CFG = { cur: '₹', curCode: 'INR', taxType: 'GST', vatRate: null, gstRates: [5, 12, 18], hasIGST: true, psOptions: [], voucherPrefix: 'BOM' };
 const FALLBACK_CFG_ALL = { cur: '₹', curCode: 'INR', taxType: 'MULTI', vatRate: null, gstRates: [5, 12, 18], hasIGST: true, psOptions: [], voucherPrefix: 'BOMMB' };
@@ -79,6 +79,13 @@ export function setBranches(arr) {
   }
 }
 export function getBranches() { return BRANCHES; }
+/** Allowed currency codes for a branch CODE (main first); [] when unknown. A length
+ *  of 1 means single-currency (India ₹, or the USD-only FBM) — no FX chip / local print. */
+export function branchCurrenciesOf(code) {
+  const b = BRANCHES.find((x) => x.code === code);
+  if (!b) return [];
+  return (b.currencies && b.currencies.length) ? b.currencies : (b.currency ? [b.currency] : []);
+}
 
 /* ── Per-branch config (from company-profile) ── */
 // Resolve a currency CODE → display symbol: prefer the live currency metadata,

@@ -9,6 +9,7 @@ import { apiGet } from './api';
 import { buildBookingInvoice } from './invoiceHtml';
 import { isVatBranch } from './voucherSpecs';
 import { branchCode } from './useAccounting';
+import { branchCurrenciesOf } from './referenceCache';
 import { openPrintPreview } from './PrintPreview';
 
 export async function printBookingInvoice({ booking, side, branch, master = {}, title }) {
@@ -16,12 +17,20 @@ export async function printBookingInvoice({ booking, side, branch, master = {}, 
   const ttl = title || `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${booking.bookingNo || booking.linkNo || ''}`;
   const code = branchCode(branch) || String(booking.branch || '').toUpperCase();
 
-  // India / non-dual-currency branch → single (₹) invoice, no toggle.
-  if (!isVatBranch(code)) { openPrintPreview({ title: ttl, recommend: 'portrait', html: usd }); return; }
+  // India / single-currency branch → one invoice, no toggle. FBM is VAT but USD-only
+  // (no secondary currency), so its invoices print straight in USD like India's in ₹.
+  if (!isVatBranch(code) || branchCurrenciesOf(code).length < 2) {
+    openPrintPreview({ title: ttl, recommend: 'portrait', html: usd });
+    return;
+  }
 
-  // Africa branch → offer a USD / local-currency toggle from today's daily branch FX rate.
+  // Dual-currency Africa branch → offer a USD / local-currency toggle from today's
+  // daily branch FX rate.
   let fx = null;
   try { fx = await apiGet(`/api/forex-rates/branch/${code}`); } catch { fx = null; }
+  // `applicable:false` = the backend says this branch has no local currency (stale
+  // branch cache on our side) → plain USD invoice, no toggle.
+  if (fx && fx.applicable === false) { openPrintPreview({ title: ttl, recommend: 'portrait', html: usd }); return; }
   const to = (fx && fx.to) || 'Local';
   const variants = [{ label: 'USD', html: usd }];
   if (fx && fx.set && Number(fx.rate) > 0) {
