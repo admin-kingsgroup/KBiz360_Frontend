@@ -135,7 +135,7 @@ export function partyRows(d, branch = 'ALL') {
     const items = ((m || {}).items || []).filter((i) => inPartyScope(i, branch)).map((r, i) => ({ ...r, sr: i + 1 }));
     return { total: (m || {}).total || 0, incomplete: (m || {}).incomplete || 0, capped: !!(m || {}).capped, items };
   };
-  return { customers: shape(p.customers), suppliers: shape(p.suppliers) };
+  return { customers: shape(p.customers), suppliers: shape(p.suppliers), employees: shape(p.employees) };
 }
 
 /** KPI tiles for the current scope. Progress is scoped too — a branch's tile
@@ -144,7 +144,7 @@ export function taskKpis(d, tasks, branch = 'ALL', user = 'ALL') {
   const { pending, done } = taskRows(tasks, branch, user);
   const lg = ledgerScope(d, branch);
   const parties = partyRows(d, branch);
-  const details = parties.customers.items.length + parties.suppliers.items.length;
+  const details = parties.customers.items.length + parties.suppliers.items.length + parties.employees.items.length;
   const total = pending.length + done.length;
   const pct = total ? Math.round((100 * done.length) / total) : 0;
   return [
