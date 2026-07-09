@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, LifeBuoy, Lock, Scale, Settings, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
+import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, LifeBuoy, Lock, Rocket, Scale, Settings, ShieldCheck, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
@@ -460,6 +460,167 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
 // group's only central-control plane (the old static-prototype "HO Control" pill
 // was removed). Dormant-safe — every page shows an empty / read-only state until
 // core.policy_guard is switched on at go-live.
+
+// The next two exports mirror individual dropdowns of the TK Group Central cockpit
+// nav (modules/tk-group/cockpit.js → controlCockpitMenu) so Page Visibility Control
+// can toggle their pages under the SAME sub-groups the live dropdown renders —
+// instead of buried in the flat MENU_TK_GROUP list below (its leaves are de-duped by
+// href, so whichever of these claims a route first — they're all listed ahead of
+// MENU_TK_GROUP in pageCatalog.js's PREFERRED_SECTIONS — wins; see build()).
+
+// "Approvals" dropdown. Decisions (/tk/decisions) is ALSO the MENU_DECISIONS
+// top-level pill every branch role relies on to raise requests — toggling it off here
+// only hides it from the cockpit dropdown, never from the branch pill (see
+// pageCatalog.js's CATALOG_PILL_EXEMPT + applyHidden's per-render pill protection).
+export const MENU_TK_APPROVALS = {label:"Approvals", icon:CheckSquare, children:[
+  {label:"Approve", children:[
+    {label:"Approvals — Vouchers", href:"/tk/voucher-approvals"},
+    {label:"Admin Approval", href:"/tk/approvals"},
+  ]},
+  {label:"Raise / Govern", children:[
+    {label:"Decisions", href:"/tk/decisions"},
+    {label:"Onboarding", href:"/tk/onboarding"},
+  ]},
+]};
+
+// "Control & Configuration" dropdown. ERP Rules Manager / User Control Center are
+// owner-gated in the live cockpit nav (the isOwner check in cockpit.js), but stay
+// listed here unconditionally like every other page — Page Visibility Control
+// manages what EVERY user can see, not just owners.
+export const MENU_TK_CONTROL = {label:"Control & Configuration", icon:Lock, children:[
+  {label:"Control Tower", children:[
+    {label:"Control Tower", href:"/tk/control-tower"},
+    {label:"ERP Health Scorecard", href:"/tk/health-scorecard"},
+    {label:"Control Tower — by Module", href:"/tk/modules"},
+    {label:"ERP Adoption", href:"/tk/adoption"},
+    {label:"Close Readiness & Integrity", href:"/tk/integrity"},
+  ]},
+  {label:"Power Console", children:[
+    {label:"Control Panel", href:"/tk/control-panel"},
+    {label:"Control Flags", href:"/tk/controls"},
+    {label:"Thresholds & Limits", href:"/tk/limits"},
+  ]},
+  {label:"Rules & Requests", children:[
+    {label:"ERP Rules Manager", href:"/tk/rules"},
+    {label:"User Control Center", href:"/tk/user-rules"},
+    {label:"Period Locks", href:"/tk/period-locks"},
+    {label:"Targets & Budgets", href:"/tk/targets"},
+    {label:"Master Control (request)", href:"/tk/master-control"},
+  ]},
+  {label:"Monitoring", children:[
+    {label:"Branch Cockpit", href:"/tk/branch-cockpit"},
+    {label:"Audit Trail", href:"/tk/audit"},
+  ]},
+]};
+
+// "Administration" dropdown. Every route here is ALSO already toggleable under the
+// branch-side "Admin" section's nested "Settings" group — claimed first here (listed
+// ahead of MENU_ADMIN / MENU_MASTERS in pageCatalog.js's PREFERRED_SECTIONS) so the
+// admin manages them grouped like the live cockpit dropdown (Users & Access /
+// Organisation & Config / Templates & Integrations) instead of one flat "Settings"
+// list. Users & Access is owner-gated in the live cockpit nav (the isOwner check in
+// cockpit.js's administration()) but stays listed here unconditionally, same as every
+// other page. Page Visibility Control's own route (/settings/page-access) is dropped
+// automatically — it's in pageCatalog.js's ALWAYS_VISIBLE and can never be toggled.
+// "App Access" is the same route as "Users & Roles" (mirrors cockpit.js verbatim), so
+// only one toggle shows for it.
+export const MENU_TK_ADMIN = {label:"Administration", icon:ShieldCheck, children:[
+  {label:"Users & Access", children:[
+    {label:"Users & Roles", href:"/settings/users"},
+    {label:"App Access", href:"/settings/users"},
+    {label:"Bulk User Operations", href:"/settings/bulk-users"},
+    {label:"Page Visibility Control", href:"/settings/page-access"},
+    {label:"Permissions Matrix", href:"/settings/permissions-matrix"},
+    {label:"Field-Level Access", href:"/settings/field-access"},
+    {label:"Approval Matrix Builder", href:"/settings/approval-matrix-builder"},
+  ]},
+  {label:"Organisation & Config", children:[
+    {label:"Branches", href:"/settings/branches"},
+    {label:"Numbering Series", href:"/masters/numbering"},
+    {label:"Custom Fields", href:"/settings/custom-fields"},
+    {label:"Vacation Delegations", href:"/settings/delegations"},
+    {label:"Approval Workflow", href:"/settings/approval-workflow"},
+    {label:"Master Change Queue", href:"/settings/master-change-queue"},
+    {label:"Statutory Filing Register", href:"/settings/filing-register"},
+  ]},
+  {label:"Templates & Integrations", children:[
+    {label:"Document Templates", href:"/settings/doc-templates"},
+    {label:"Email / SMS Templates", href:"/settings/email-templates"},
+    {label:"Branding", href:"/settings/branding"},
+    {label:"Banking API", href:"/settings/banking-api"},
+    {label:"GSP / IRP E-Invoice", href:"/settings/gsp-irp"},
+    {label:"API & Integrations", href:"/settings/integrations"},
+    {label:"Audit Log", href:"/settings/audit"},
+  ]},
+]};
+
+// "Masters & Ledger" dropdown. Every route here is ALSO already toggleable under the
+// branch-side "Accounts" (Accounts Master) and "Masters" (Client/Supplier Master)
+// sections — this section deliberately claims them first (it's listed ahead of
+// MENU_ACCOUNTS / MENU_MASTERS in pageCatalog.js's PREFERRED_SECTIONS) so the admin
+// manages them grouped exactly like the live cockpit dropdown instead of hunting
+// through the much larger Accounts/Masters lists. Same toggle, same effect either way.
+export const MENU_TK_MASTERS = {label:"Masters & Ledger", icon:Database, children:[
+  {label:"Chart & Ledgers", children:[
+    {label:"Chart of Accounts", href:"/masters/accounts-tree"},
+    {label:"Ledger Masters", href:"/masters/ledgers"},
+    {label:"Account Groups", href:"/masters/groups"},
+  ]},
+  {label:"Party Masters", children:[
+    {label:"Customers", href:"/masters/customers"},
+    {label:"Suppliers", href:"/masters/suppliers"},
+  ]},
+]};
+
+// "Performance & Oversight" dropdown — every route is /tk/*-only (no branch-side
+// equivalent), so this is a clean claim ahead of the flat MENU_TK_GROUP fallback.
+export const MENU_TK_PERFORMANCE = {label:"Performance & Oversight", icon:BarChart2, children:[
+  {label:"Performance", children:[
+    {label:"Branch Scorecard", href:"/tk/scorecard"},
+    {label:"Performance vs Target", href:"/tk/performance"},
+    {label:"Profitability", href:"/tk/profitability"},
+  ]},
+  {label:"Capital & Assets", children:[
+    {label:"Investment & Capital", href:"/tk/investment"},
+    {label:"Assets Central", href:"/tk/assets"},
+    {label:"Receivables & Payables", href:"/tk/receivables-payables"},
+  ]},
+  {label:"Risk & Close", children:[
+    {label:"Exceptions & Risk", href:"/tk/exceptions"},
+    {label:"Compliance & Close", href:"/tk/compliance"},
+    {label:"Central Tax Desk", href:"/tk/tax-desk"},
+  ]},
+]};
+
+// "HR Control" dropdown. Governance (HR Requests) is /tk/*-only and new; HR Screens
+// reuses the same branch-side HR routes as MENU_HR (Employee Master / Payroll /
+// HR Reports groups) — claimed first here for the same grouped-like-the-dropdown
+// reason as Masters & Ledger above (listed ahead of MENU_HR in PREFERRED_SECTIONS).
+export const MENU_TK_HR = {label:"HR Control", icon:Users, children:[
+  {label:"Governance", children:[
+    {label:"HR Requests", href:"/tk/hr-control"},
+  ]},
+  {label:"HR Screens", children:[
+    {label:"Employees", href:"/hr/employees"},
+    {label:"Payroll", href:"/hr/payroll"},
+    {label:"Attrition", href:"/hr/attrition"},
+    {label:"Recruitment", href:"/hr/recruitment"},
+  ]},
+]};
+
+// "Setup & Roles" dropdown — every route is /tk/*-only, same clean-claim reasoning as
+// Performance & Oversight above.
+export const MENU_TK_SETUP = {label:"Setup & Roles", icon:Rocket, children:[
+  {label:"Setup", children:[
+    {label:"Configuration Readiness", href:"/tk/readiness"},
+    {label:"Go-Live", href:"/tk/go-live"},
+  ]},
+  {label:"Roles", children:[
+    {label:"My Role", href:"/tk/my-role"},
+    {label:"Roles & Responsibilities", href:"/tk/roles"},
+  ]},
+]};
+
 export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"My Role", href:"/tk/my-role"},
   {label:"Roles & Responsibilities", href:"/tk/roles"},
@@ -655,7 +816,7 @@ function pruneNode(node, hiddenSet){
   return node;
 }
 
-function applyHidden(menus, currentUser){
+export function applyHidden(menus, currentUser){
   const hidden=new Set(Array.isArray(currentUser?.hidden)?currentUser.hidden:[]);
   hidden.delete('/dashboard'); // landing page is never hideable (avoids lockout)
   // The visibility-control link is admin-only: hide it from everyone else, and
