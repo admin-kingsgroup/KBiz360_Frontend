@@ -1527,8 +1527,12 @@ export const TDS_SECTIONS_TABLE = [
    1. BANK BALANCE DASHBOARD
    ════════════════════════════════════════════════════════════════════ */
 
-export function BankBalanceDashboard(){
-  const [filterBranch,setFilterBranch]=useState("ALL");
+export function BankBalanceDashboard({ branch }={}){
+  // Follows the top-bar branch: a specific branch pins the dashboard to it (no
+  // "All branches" override); the full cross-branch list lives under ALL.
+  const shellCode = branch && branch !== "ALL" ? (branch.code || branch) : "ALL";
+  const [filterBranch,setFilterBranch]=useState(shellCode);
+  useEffect(()=>{ setFilterBranch(shellCode); },[shellCode]);
   const branchArg = filterBranch==="ALL" ? "ALL" : { code: filterBranch };
   const tb = useTrialBalance(branchArg, {}).data || {};
   const rows = (tb.rows||[]).filter(r=>/cash|bank/i.test(r.group||""));
@@ -1540,9 +1544,9 @@ export function BankBalanceDashboard(){
   return(
     <PHASE2_Page title="Bank Balance Dashboard"
       subtitle="Live cash & bank balances from the books · shows 0 until entries are posted"
-      toolbar={<select value={filterBranch} onChange={e=>setFilterBranch(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>
-        <option value="ALL">All branches</option>
-        {BRANCH_CODES.map(b=><option key={b}>{b}</option>)}
+      toolbar={<select value={filterBranch} disabled={shellCode!=="ALL"} title={shellCode!=="ALL"?"Scoped by the top-bar branch — switch it there":undefined} onChange={e=>setFilterBranch(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>
+        {shellCode==="ALL" && <option value="ALL">All branches</option>}
+        {(shellCode==="ALL"?BRANCH_CODES:[shellCode]).map(b=><option key={b}>{b}</option>)}
       </select>}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12,marginBottom:14}}>
         {kpi("Total Liquid (INR)",total,`${rows.length} cash/bank ledger${rows.length===1?"":"s"}`,total<0?"#A32D2D":"#22c55e")}

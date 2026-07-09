@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getModules, getIntegrityDetail } from './api/monitor';
 import { statusTone, countLabel, sevTone, sevLabel, heads as headsOf, moduleKpis, issuesFor } from './utils/modules';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { isFocused } from './utils/cockpitFocus';
 import { ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { BRANCHES } from '../../core/referenceCache';
@@ -79,10 +81,20 @@ function Issue({ issue, showMod, open, onToggle, setRoute }) {
 }
 
 export function ModuleTower({ setRoute } = {}) {
+  const focus = useCockpitFocus();
+  const focused = isFocused(focus) ? focus : null;
   const q = useQuery({ queryKey: ['tk', 'monitor', 'modules'], queryFn: getModules, staleTime: 60_000 });
   const d = q.data || {};
   const heads = headsOf(d);
-  const kpis = moduleKpis(d);
+  // Focus spotlight → severity KPIs recount only that branch's issues (module/
+  // dormant counts are the org-wide registry — structural, no branch dimension).
+  const kpis = useMemo(() => {
+    const base = moduleKpis(d);
+    if (!focused) return base;
+    const mine = issuesFor(d, null).filter((i) => i.br === focused);
+    const n = (sev) => mine.filter((i) => i.sev === sev).length;
+    return { ...base, errors: n('error'), warnings: n('warn'), info: n('info') };
+  }, [d, focused]);
   const [openHeads, setOpenHeads] = useState({});
   // Selection is stored by ID (head name + module id), resolved against the LIVE data each
   // render — so a background refetch (new object identities) never drops the highlight or
@@ -93,7 +105,8 @@ export function ModuleTower({ setRoute } = {}) {
   const selMod = selHead && sel.module ? (selHead.modules || []).find((m) => m.id === sel.module) : null;
   const resolvedSel = selHead ? { head: selHead, module: selMod } : null;
 
-  const rows = useMemo(() => issuesFor(d, resolvedSel), [d, resolvedSel]);
+  // Focus spotlight → only that branch's issues appear in the panel.
+  const rows = useMemo(() => issuesFor(d, resolvedSel).filter((i) => !focused || i.br === focused), [d, resolvedSel, focused]);
   const toggleIssue = (k) => setOpenIssue((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const crumb = selMod ? selHead.head : selHead ? 'Head module' : 'Overview';
   const title = selMod ? selMod.name : selHead ? selHead.head : `All open issues · ${kpis.modules || 75} modules`;

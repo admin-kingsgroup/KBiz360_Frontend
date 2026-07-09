@@ -118,14 +118,21 @@ const spark = (vals, color, w = 300, h = 46) => {
 const HK = ({ l, v, c }) => <div className="hk"><div className="hk-l">{l}</div><div className="hk-v mono" style={c ? { color: c } : undefined}>{v}</div></div>;
 const Panel = ({ title, sub, children }) => <div className="panel"><div className="ph">{title}<span>{sub}</span></div>{children}</div>;
 
-export function AdCockpitPage({ setRoute }) {
+export function AdCockpitPage({ setRoute, branch }) {
+  // A specific top-bar branch lands the cockpit on THAT branch's drill (the
+  // owner can still navigate up — this is the owner-only group cockpit).
+  const shellCode = branch && branch !== 'ALL' ? (branch.code || branch) : '';
   const [preset, setPreset] = useState('all');
-  const [scope, setScope] = useState('group');   // group | region | branch
+  const [scope, setScope] = useState(shellCode ? 'branch' : 'group');   // group | region | branch
   const [region, setRegion] = useState(null);     // currency code
-  const [branchSel, setBranchSel] = useState(null); // branch code
+  const [branchSel, setBranchSel] = useState(shellCode || null); // branch code
   const [section, setSection] = useState('pulse');
   const [drawer, setDrawer] = useState(null);
   const openDrawer = (d) => setDrawer(d);
+  useEffect(() => {
+    if (shellCode) { setScope('branch'); setBranchSel(shellCode); }
+    else { setScope('group'); setBranchSel(null); setRegion(null); }
+  }, [shellCode]);
   useEffect(() => { const k = (e) => { if (e.key === 'Escape') setDrawer(null); }; document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k); }, []);
 
   const range = useMemo(() => periodRange(preset), [preset]);

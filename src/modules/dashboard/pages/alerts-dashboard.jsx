@@ -219,7 +219,10 @@ export function AlertsDashboard({ branch, setRoute }) {
   const renderOverview = () => {
     const trend = trendQ.data || { weeks: [], avgFixHrs: 0, openNow: 0, fixedTotal: 0 };
     const tmax = Math.max(1, ...trend.weeks.flatMap((w) => [w.opened, w.fixed]));
-    const branches = (branchesQ.data || []).slice();
+    // Scoped to the selected branch — the cross-branch comparison rows would
+    // leak other branches' issue counts/exposure (this page always runs with a
+    // specific branch; the org-wide table belongs to a group view).
+    const branches = (branchesQ.data || []).filter((b) => !code || b.branch === code);
     const dc = an.dataCapture || {};
     const CAP = [
       ['Cannot post', dc.unposted, ['needs-attention']],

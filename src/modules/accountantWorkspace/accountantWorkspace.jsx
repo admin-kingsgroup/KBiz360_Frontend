@@ -2452,7 +2452,22 @@ export function ClientReco({ branch, setRoute }) {
 export function InterBranchReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const q = useInterBranchReco();
-  const data = q.data || { pairs: [], totals: {} };
+  const raw = q.data || { pairs: [], totals: {} };
+  // A specific top-bar branch scopes the reco to pairs INVOLVING that branch;
+  // unrelated pairs (and their totals) only show in the ALL view.
+  const code = branch && branch !== 'ALL' ? (branch.code || branch) : '';
+  const pairs = (raw.pairs || []).filter((p) => !code || p.branchA === code || p.branchB === code);
+  const data = code
+    ? {
+      pairs,
+      totals: {
+        pairs: pairs.length,
+        matched: pairs.filter((p) => p.matched).length,
+        mismatched: pairs.filter((p) => !p.matched).length,
+        totalDifference: pairs.reduce((s, p) => s + Math.abs(Number(p.difference) || 0), 0),
+      },
+    }
+    : raw;
   return (
     <Shell title="Inter-branch Reconciliation" sub="every branch pair's two directional current accounts — they should net to zero"
       right={<div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: data.totals?.mismatched ? C.red : C.green }}>{data.totals?.mismatched || 0} mismatched · {data.totals?.matched || 0} matched</div>}>

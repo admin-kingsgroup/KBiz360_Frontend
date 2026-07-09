@@ -12,7 +12,7 @@
    Restricted to Super Admin.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { confirmDialog } from '../../core/ux/confirm';
 import { useCostCenters, useCreateCostCenter, useUpdateCostCenter, useDeleteCostCenter, useBackfillCostCenters } from '../../core/useAccounting';
 import { useBranches } from '../../core/useReference';
@@ -23,12 +23,15 @@ const isSuperAdmin = (u) => /super\s*admin/i.test(u?.role || '');
 const inp = { padding: '7px 10px', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12.5, outline: 'none' };
 const btn = (bg, fg) => ({ padding: '6px 12px', background: bg, color: fg, border: 'none', borderRadius: 6, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' });
 
-export function CostCenterMasterLive({ currentUser }) {
+export function CostCenterMasterLive({ currentUser, shellBranch }) {
   const branchesQ = useBranches();
   const branches = branchesQ.data || [];
   const [branch, setBranch] = useState('');
-  // Default to the user's branch, else the first available branch.
-  const activeBranch = branch || currentUser?.branch || branches[0]?.code || '';
+  // A specific top-bar branch pins this master to it; under ALL the in-page pick
+  // (else the user's branch, else the first available) decides.
+  const shellCode = shellBranch && shellBranch !== 'ALL' ? (shellBranch.code || shellBranch) : '';
+  useEffect(() => { if (shellCode) setBranch(shellCode); }, [shellCode]);
+  const activeBranch = shellCode || branch || currentUser?.branch || branches[0]?.code || '';
 
   const q = useCostCenters(activeBranch, { includeInactive: true });
   const createCc = useCreateCostCenter();
@@ -105,8 +108,8 @@ export function CostCenterMasterLive({ currentUser }) {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ fontSize: 11, fontWeight: 700, color: DIM }}>Branch&nbsp;
-            <select value={activeBranch} onChange={(e) => setBranch(e.target.value)} className="max-tablet:min-h-[44px]" style={{ ...inp, padding: '5px 8px' }}>
-              {branches.map((b) => <option key={b.code} value={b.code}>{b.code}{b.city ? ` — ${b.city}` : ''}</option>)}
+            <select value={activeBranch} disabled={!!shellCode} title={shellCode ? 'Scoped by the top-bar branch — switch it there' : undefined} onChange={(e) => setBranch(e.target.value)} className="max-tablet:min-h-[44px]" style={{ ...inp, padding: '5px 8px' }}>
+              {(shellCode ? branches.filter((b) => b.code === shellCode) : branches).map((b) => <option key={b.code} value={b.code}>{b.code}{b.city ? ` — ${b.city}` : ''}</option>)}
             </select>
           </label>
           <span style={{ padding: '4px 10px', background: '#fff7e6', color: '#8a6300', border: '1px solid #f0dca6', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>{centers.length} centres</span>

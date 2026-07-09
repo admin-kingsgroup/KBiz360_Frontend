@@ -7,7 +7,7 @@
    Excel export, mobile horizontal scroll). Numbering stays read-only.
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, ChevronDown } from 'lucide-react';
 import { useNumberingSeries } from '../../../core/useReference';
 import { BRANCH_CODES } from '../../../core/data';
@@ -19,7 +19,10 @@ import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 const STD = [['BKG', 'Booking'], ['LK', 'Link No'], ['SF', 'Sales (SO)'], ['PF', 'Purchase (PO)'], ['RV', 'Receipt'], ['PMT', 'Payment'], ['JV', 'Journal'], ['CV', 'Contra'], ['SDN', 'Debit Note'], ['PXP', 'Purchase Expense'], ['RF', 'Refund'], ['RI', 'Reissue']];
 
 export function NumberingSeriesMaster({ branch }) {
-  const [filterBranch, setFilterBranch] = useState(branch === 'ALL' ? 'BOM' : branch?.code || 'BOM');
+  const shellCode = branch === 'ALL' ? '' : branch?.code || '';
+  const [filterBranch, setFilterBranch] = useState(shellCode || 'BOM');
+  // Follow the top-bar branch live; a specific branch pins the in-page menu to it.
+  useEffect(() => { if (shellCode) setFilterBranch(shellCode); }, [shellCode]);
   const [search, setSearch] = useState('');
   const nq = useNumberingSeries();
   const series = nq.data || [];
@@ -63,10 +66,12 @@ export function NumberingSeriesMaster({ branch }) {
             ariaLabel="Branch"
             menuRole="listbox"
             width={220}
-            items={[
-              { key: 'ALL', label: 'All branches', selected: filterBranch === 'ALL', onSelect: () => setFilterBranch('ALL') },
-              ...BRANCH_CODES.map((b) => ({ key: b, label: b, selected: filterBranch === b, onSelect: () => setFilterBranch(b) })),
-            ]}
+            items={shellCode
+              ? [{ key: shellCode, label: shellCode, selected: true, onSelect: () => {} }]
+              : [
+                { key: 'ALL', label: 'All branches', selected: filterBranch === 'ALL', onSelect: () => setFilterBranch('ALL') },
+                ...BRANCH_CODES.map((b) => ({ key: b, label: b, selected: filterBranch === b, onSelect: () => setFilterBranch(b) })),
+              ]}
             renderTrigger={({ ref, toggle, triggerProps }) => (
               <button
                 ref={ref}

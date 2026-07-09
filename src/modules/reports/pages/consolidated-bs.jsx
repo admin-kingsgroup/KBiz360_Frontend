@@ -79,9 +79,9 @@ const Panel = ({ title, color, children }) => (
   </div>
 );
 
-export function ConsolidatedBS({ setRoute }) {
-  const qBS = useBalanceSheet('ALL', { to: '' });
-  const qGP = useGpBills('ALL', {});
+export function ConsolidatedBS({ setRoute, branch = 'ALL' }) {
+  const qBS = useBalanceSheet(branch, { to: '' });
+  const qGP = useGpBills(branch, {});
   // Consolidated lines aggregate the branch Balance Sheets → drill to the detailed BS.
   const onDrill = setRoute ? () => setRoute('/reports/bs') : undefined;
   const bsData = qBS.data;
@@ -89,9 +89,9 @@ export function ConsolidatedBS({ setRoute }) {
   const loading = qBS.isLoading;
   const errored = qBS.isError;
 
-  // Consolidated = all-branches scope: render each branch as its own Balance Sheet
-  // section in its OWN currency — never a merged cross-currency total.
-  const branch = 'ALL';
+  // ALL = consolidated: one Balance Sheet section per branch, each in its OWN
+  // currency — never a merged cross-currency total. A specific shell branch
+  // renders only that branch's statement (the single-branch path below).
   const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
 
   // ONE branch's (or the single merged) statement — Assets/Liabilities panels +
@@ -159,7 +159,9 @@ export function ConsolidatedBS({ setRoute }) {
     : !!bsData && Math.abs(r2(bsData.totalAssets)) > 0.01;
 
   return (
-    <RptShell title="Consolidated Balance Sheet" subtitle={`All branches · each in its own currency · no cross-currency total · as at ${fmtDate(todayISO())}`}>
+    <RptShell title="Consolidated Balance Sheet" subtitle={isAll
+      ? `All branches · each in its own currency · no cross-currency total · as at ${fmtDate(todayISO())}`
+      : `${branch?.code || branch} · in its own currency · as at ${fmtDate(todayISO())}`}>
       {loading && <LoadingState label="Loading live books…" />}
       {!loading && errored && <ErrorState message="Could not load accounting data." onRetry={() => { qBS.refetch(); qGP.refetch(); }} />}
       {!loading && !errored && !hasData && (

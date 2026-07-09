@@ -351,18 +351,22 @@ export const CostCategoriesMaster = () => (
     ]} />
 );
 
-export const BudgetsMaster = () => (
+export const BudgetsMaster = ({ branch } = {}) => {
+  const brc = branchCode(branch);
+  return (
   <MasterCrud title="Budgets" subtitle="Budget targets by period" resource="budgets"
+    rowFilter={(r) => !brc || !r.branch || r.branch === 'ALL' || r.branch === brc}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
-      { key: 'branch', label: 'Branch', type: 'text', default: 'ALL' },
+      { key: 'branch', label: 'Branch', type: 'text', default: brc || 'ALL' },
       { key: 'fromDate', label: 'From', type: 'date' },
       { key: 'toDate', label: 'To', type: 'date' },
       { key: 'amount', label: 'Amount', type: 'number' },
       { key: 'notes', label: 'Notes', type: 'text', table: false },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
-);
+  );
+};
 
 export const ScenariosMaster = () => (
   <MasterCrud title="Scenarios" subtitle="What-if views (actuals + provisional vouchers)" resource="scenarios"
@@ -377,8 +381,20 @@ export const ScenariosMaster = () => (
 );
 
 /* ── Parties (live, backend-connected) ──────────────────────────────────── */
-export const CustomersMaster = () => (
+// Party lists follow the TOP-BAR branch: a specific branch shows ITS parties plus
+// the Common ('ALL') ones — never another branch's — and new records default to
+// that branch (Common stays offered; other branches only under the ALL view).
+const partyScope = (brc) => ({
+  rowFilter: (r) => !brc || !r.branch || r.branch === 'ALL' || r.branch === brc,
+  branchOptions: brc ? ['ALL', brc] : ['ALL', ...BRANCH_CODES],
+  branchDefault: brc || 'ALL',
+});
+
+export const CustomersMaster = ({ branch } = {}) => {
+  const scope = partyScope(branchCode(branch));
+  return (
   <MasterCrud title="Customers" subtitle="Clients (Sundry Debtors) — live from the backend" resource="customers"
+    rowFilter={scope.rowFilter}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       // Dropdowns are fed from core/partyEnums (the same picklists the 12-tab master uses),
@@ -386,8 +402,8 @@ export const CustomersMaster = () => (
       { key: 'customerType', label: 'Customer Type', type: 'select', options: CUST_TYPES, table: false },
       { key: 'source', label: 'Source', type: 'select', options: CUST_SOURCES, table: false },
       // Branch must be a real code (not a free-text/blank field) — a blank branch creates
-      // an unscoped party. Default 'ALL' matches how auto-created party ledgers are scoped.
-      { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
+      // an unscoped party. Scoped to the top-bar branch when one is selected.
+      { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
       { key: 'pan', label: 'PAN', type: 'text', table: false },
       { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
@@ -402,17 +418,21 @@ export const CustomersMaster = () => (
       { key: 'creditLimit', label: 'Credit Limit', type: 'number' },
       { key: 'creditDays', label: 'Credit Days', type: 'number' },
     ]} />
-);
+  );
+};
 
-export const SuppliersMaster = () => (
+export const SuppliersMaster = ({ branch } = {}) => {
+  const scope = partyScope(branchCode(branch));
+  return (
   <MasterCrud title="Suppliers" subtitle="Vendors (Sundry Creditors) — live from the backend" resource="suppliers"
+    rowFilter={scope.rowFilter}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       // Category is the one picklist the backend validates (VALID_CATS) — a dropdown
       // guarantees a valid value. The rest mirror the 12-tab master via core/partyEnums.
       { key: 'category', label: 'Category', type: 'select', options: SUPPLIER_CATS },
       // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
-      { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
+      { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
       { key: 'pan', label: 'PAN', type: 'text', table: false },
       // Country '' (the default) is treated as India downstream but does NOT force a state;
@@ -432,7 +452,8 @@ export const SuppliersMaster = () => (
       { key: 'creditDays', label: 'Credit Days', type: 'number' },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
-);
+  );
+};
 
 /* ── Credit Facilities & Limits (live, backend-connected) ────────────────────
    Supplier / BSP / bank credit lines with a sanctioned limit. `drawdownLedgers`
@@ -441,13 +462,16 @@ export const SuppliersMaster = () => (
    entered here; it's read live from those ledgers by /api/credit-facilities/capacity
    and surfaced on the Capital vs Investment dashboard. */
 const FACILITY_TYPES = ['Supplier Trade Credit', 'BSP-BG', 'Bank Card', 'Bank OD'];
-export const CreditFacilitiesMaster = () => (
+export const CreditFacilitiesMaster = ({ branch } = {}) => {
+  const scope = partyScope(branchCode(branch));
+  return (
   <MasterCrud title="Credit Facilities & Limits" subtitle="Supplier / BSP / card credit lines — drawn is read live from the ledgers" resource="credit-facilities"
+    rowFilter={scope.rowFilter}
     fields={[
       { key: 'name', label: 'Facility', type: 'text', required: true },
       { key: 'counterparty', label: 'Counterparty', type: 'text' },
       { key: 'type', label: 'Type', type: 'select', options: FACILITY_TYPES, default: 'Supplier Trade Credit' },
-      { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
+      { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       { key: 'currency', label: 'Currency', type: 'select', options: ['INR', 'USD'], default: 'INR', table: false },
       { key: 'limit', label: 'Limit', type: 'number' },
       // Maps the facility to a supplier's ledger(s): one facility → many drawdown ledgers.
@@ -459,7 +483,8 @@ export const CreditFacilitiesMaster = () => (
       { key: 'reviewDate', label: 'Review Date', type: 'date', table: false },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
-);
+  );
+};
 
 /* ── Chart of Accounts: Groups & Ledgers (live, backend-connected) ───────── */
 // The 28 fixed backbone groups are LOCKED & non-editable (system:true → the
@@ -547,14 +572,17 @@ export const LedgersMaster = ({ branch }) => {
   // the top bar re-scopes this list live; the in-page picker still overrides until
   // the next top-bar switch. "All branches" → the consolidated org-wide view.
   const topBarView = (!branchCode(branch) || branchCode(branch) === 'ALL') ? 'ALL' : branchCode(branch);
-  const [branchView, setBranchView] = useState(() => (editKey ? 'ALL' : topBarView));   // deep-link edit (?edit=): all branches so the target is in the list
-  useEffect(() => { if (!editKey) setBranchView(topBarView); }, [topBarView]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A specific top-bar branch LOCKS this list to it — no in-page override to other
+  // branches / consolidated (deep-link edits stay findable: drills are branch-scoped too).
+  const shellLocked = topBarView !== 'ALL';
+  const [branchView, setBranchView] = useState(() => (editKey && !shellLocked ? 'ALL' : topBarView));   // deep-link edit (?edit=): all branches so the target is in the list
+  useEffect(() => { if (!editKey || shellLocked) setBranchView(topBarView); }, [topBarView]); // eslint-disable-line react-hooks/exhaustive-deps
   // Hidden / deactivated ledgers stay OUT by default, so this list shows exactly the
   // branch's visible chart — the same set every picker offers. The toggle reveals
   // them (flagged in a Visibility column) for management; a deep-link edit fetches
   // the full list too, so its target is always findable.
   const [showHidden, setShowHidden] = useState(() => !!editKey);
-  const branchOptions = ['ALL', ...BRANCH_CODES];
+  const branchOptions = shellLocked ? ['ALL', topBarView] : ['ALL', ...BRANCH_CODES];
 
   // A party ledger = one whose Group (or Sub-Group) is Sundry Debtors / Creditors.
   // The GSTIN / credit-terms / contact / bank fields apply only to these.
@@ -574,10 +602,10 @@ export const LedgersMaster = ({ branch }) => {
   const selWrap = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted';
   const toolbar = (
     <>
-      <label className={selWrap}>Branch
-        <div className="w-28"><Select value={branchView} onChange={(e) => setBranchView(e.target.value)}>
-          <option value="ALL">All branches</option>
-          {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
+      <label className={selWrap} title={shellLocked ? 'Scoped by the top-bar branch — switch it there' : undefined}>Branch
+        <div className="w-28"><Select value={branchView} disabled={shellLocked} onChange={(e) => setBranchView(e.target.value)}>
+          {!shellLocked && <option value="ALL">All branches</option>}
+          {(shellLocked ? [topBarView] : BRANCH_CODES).map((b) => <option key={b} value={b}>{b}</option>)}
         </Select></div>
       </label>
       <label className={selWrap}>Group
@@ -626,7 +654,7 @@ export const LedgersMaster = ({ branch }) => {
           { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true, clears: ['subGroup'] },
           { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
             options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
-          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: 'BOM' },
+          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: shellLocked ? topBarView : 'BOM' },
           // Display-only flag column, shown only when hidden/inactive rows are in the
           // list — Hidden = presence-toggled off for its branch, Inactive = deactivated.
           ...(showHidden ? [{ key: 'visibility', label: 'Visibility', type: 'text', input: false, export: false }] : []),
