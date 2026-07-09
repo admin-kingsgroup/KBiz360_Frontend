@@ -373,9 +373,12 @@ export function ReceivablesPayablesDash({ branch, go }) {
 // Per-branch P&L + capital in each branch's native currency, then a Group subtotal
 // per currency (the "combined" report) — respecting that branches in different
 // currencies can't be summed without forex.
-export function BranchPerformanceDash({ go }) {
+export function BranchPerformanceDash({ go, branch }) {
   const p = usePeriod('all'); const range = p.range;
-  const BR = branchList(); // live branches (code + currency)
+  // A specific top-bar branch scopes the league table to that branch's row only
+  // (its currency-group subtotal follows); the full comparison lives under ALL.
+  const shellCode = branch && branch !== 'ALL' ? (branch.code || branch) : '';
+  const BR = branchList().filter((b) => !shellCode || b.code === shellCode); // live branches (code + currency)
   // Two parallel fan-outs per branch: P&L (module-pl) and capital (capital-analysis).
   const plQ = useQueries({
     queries: BR.map((b) => ({
@@ -1146,7 +1149,7 @@ export function DirectorDash({ which, branch, setRoute }) {
   if (which === 'profitability') return <ProfitabilityDash branch={branch} go={go} />;
   if (which === 'cash') return <CashLiquidityDash branch={branch} go={go} />;
   if (which === 'arap') return <ReceivablesPayablesDash branch={branch} go={go} />;
-  if (which === 'branch') return <BranchPerformanceDash go={go} />;
+  if (which === 'branch') return <BranchPerformanceDash go={go} branch={branch} />;
   if (which === 'balance-sheet') return <BalanceSheetDash branch={branch} go={go} />;
   if (which === 'module-gp') return <ModuleGpDash branch={branch} go={go} />;
   if (which === 'sales') return <SalesBookingsDash branch={branch} go={go} />;

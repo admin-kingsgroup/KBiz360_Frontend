@@ -10,7 +10,7 @@
 
 import React, { useMemo } from 'react';
 import { Inbox } from 'lucide-react';
-import { useGpBills } from '../../../core/useAccounting';
+import { useGpBills, branchCode } from '../../../core/useAccounting';
 import { fmt, compactAmt } from '../../../core/format';
 import { bc } from '../../../core/styleTokens';
 import { DataTable } from '../../../shell/DataTable';
@@ -19,10 +19,14 @@ import { RptShell } from '../components/scaffold';
 
 const PALETTE = ['#2563eb', '#d97706', '#16a34a', '#dc2626', '#5B21B6', '#0d7a6b'];
 
-export function ReportBranch() {
+export function ReportBranch({ branch }) {
   // LIVE — one row per booking file, grouped by branch. Empty books → empty state.
-  const q = useGpBills('ALL', {});
-  const bills = q.data || [];
+  // A specific shell branch scopes the comparison to that branch alone; the full
+  // branch-vs-branch view lives under the ALL view.
+  const brc = branchCode(branch);
+  const q = useGpBills(branch || 'ALL', {});
+  const bills = (q.data || []).filter((b) => !brc || b.branch === brc);
+  const subtitle = brc ? `${brc} · live from the books` : 'All branches · live from the books';
 
   const BR_D = useMemo(() => {
     const m = {};
@@ -49,11 +53,11 @@ export function ReportBranch() {
   const totalCell = (rs, key) => (oneCur ? compactAmt(rs.reduce((s, r) => s + r[key], 0), { currency: curs[0] || '₹' }) : '—');
 
   if (q.isLoading) {
-    return <RptShell title="Branch Comparison" subtitle="All branches · live double-entry"><LoadingState label="Loading live data…" /></RptShell>;
+    return <RptShell title="Branch Comparison" subtitle={brc ? `${brc} · live double-entry` : "All branches · live double-entry"}><LoadingState label="Loading live data…" /></RptShell>;
   }
   if (!hasData) {
     return (
-      <RptShell title="Branch Comparison" subtitle="All branches · live double-entry">
+      <RptShell title="Branch Comparison" subtitle={brc ? `${brc} · live double-entry` : "All branches · live double-entry"}>
         <PageSection>
           <EmptyState icon={Inbox} title="No transactions found" hint="Branch revenue and gross profit appear here once sale/purchase vouchers are posted." />
         </PageSection>
@@ -78,7 +82,7 @@ export function ReportBranch() {
   ];
 
   return (
-    <RptShell title="Branch Comparison" subtitle="All branches · live from the books">
+    <RptShell title="Branch Comparison" subtitle={subtitle}>
       <ResponsiveGrid min="130px" gap="md" className="mb-4">
         {BR_D.map((b, i) => (
           <div key={i} className="rounded-brand border border-t-[3px] border-surface-border bg-surface-alt px-3.5 py-3" style={{ borderTopColor: b.color }}>

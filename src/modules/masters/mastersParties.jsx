@@ -20,6 +20,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
+import { branchCode } from '../../core/useAccounting';
 import { apiGet, getAuthToken } from '../../core/api';
 import { bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
@@ -98,10 +99,12 @@ function useOpenBills(party, side) {
 }
 
 // One hook drives both masters: list + selection + editable form + save.
-function usePartyMaster(resource, side) {
+// `brc` (a specific top-bar branch code) narrows the record list to that
+// branch's parties + the Common ('ALL') ones — never another branch's.
+function usePartyMaster(resource, side, brc) {
   const list = useMasterList(resource);
   const { update } = useMasterMutations(resource);
-  const rows = list.data || [];
+  const rows = (list.data || []).filter((r) => !brc || !r.branch || r.branch === 'ALL' || r.branch === brc);
 
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(null);
@@ -453,12 +456,13 @@ const CUST_TABS = [
   { id: 'outstanding', label: '11. Outstanding' }, { id: 'custom', label: '12. Custom Fields' },
 ];
 
-export function CustomerMasterTabbed() {
-  const m = usePartyMaster('customers', 'customer');
+export function CustomerMasterTabbed({ branch } = {}) {
+  const brc = branchCode(branch);
+  const m = usePartyMaster('customers', 'customer', brc);
   const [tab, setTab] = useState('basic');
   const f = m.form || {};
   const set = m.setField;
-  const branchOpts = ['', ...BRANCH_CODES];
+  const branchOpts = brc ? ['', 'ALL', brc] : ['', ...BRANCH_CODES];
   const available = Math.max(0, (Number(f.creditLimit) || 0) - numOf(f.out));
 
   return (
@@ -562,12 +566,13 @@ const SUPP_TABS = [
   { id: 'outstanding', label: '11. Outstanding' }, { id: 'custom', label: '12. Custom Fields' },
 ];
 
-export function SupplierMasterTabbed() {
-  const m = usePartyMaster('suppliers', 'supplier');
+export function SupplierMasterTabbed({ branch } = {}) {
+  const brc = branchCode(branch);
+  const m = usePartyMaster('suppliers', 'supplier', brc);
   const [tab, setTab] = useState('basic');
   const f = m.form || {};
   const set = m.setField;
-  const branchOpts = ['ALL', ...BRANCH_CODES];
+  const branchOpts = brc ? ['ALL', brc] : ['ALL', ...BRANCH_CODES];
 
   return (
     <PartyShell title="Supplier Master" subtitle="Vendors (Sundry Creditors) — live" m={m} tabs={SUPP_TABS} tab={tab} setTab={setTab}>

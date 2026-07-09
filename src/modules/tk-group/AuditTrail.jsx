@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAudit } from './api/monitor';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { isFocused } from './utils/cockpitFocus';
 import { actorName } from './utils/monitor';
 import { Button, FormField, Input } from '../../shell/primitives';
 import { DataTable } from '../../shell/DataTable';
@@ -17,19 +19,29 @@ const AUDIT_COLS = [
 ];
 
 export function AuditTrail() {
-  const [branch, setBranch] = useState('');
+  // Focus spotlight → the log is pre-filtered (and pinned) to that branch; the
+  // free-text branch filter is only editable in the ALL view.
+  const focus = useCockpitFocus();
+  const focused = isFocused(focus) ? focus : null;
+  const [branch, setBranch] = useState(focused || '');
   const [action, setAction] = useState('');
-  const [applied, setApplied] = useState({});
+  const [applied, setApplied] = useState(() => (focused ? { branch: focused } : {}));
+  useEffect(() => {
+    setBranch(focused || '');
+    setApplied((a) => { const { branch: _b, ...rest } = a; return focused ? { ...rest, branch: focused } : rest; });
+  }, [focused]);
   const q = useQuery({ queryKey: ['tk', 'monitor', 'audit', applied], queryFn: () => getAudit(applied), staleTime: 15_000 });
   const rows = (q.data && q.data.items) || [];
 
-  const apply = (e) => { e.preventDefault(); setApplied({ ...(branch ? { branch } : {}), ...(action ? { action } : {}) }); };
+  const apply = (e) => { e.preventDefault(); setApplied({ ...((focused || branch) ? { branch: focused || branch } : {}), ...(action ? { action } : {}) }); };
 
   return (
     <div className="grid gap-3">
       <form onSubmit={apply} aria-label="Filter audit trail" className="flex flex-wrap items-end gap-2">
         <FormField label="Branch" htmlFor="au-branch" className="w-[150px]">
-          <Input id="au-branch" aria-label="Branch" placeholder="Branch (e.g. BOM)" value={branch} onChange={(e) => setBranch(e.target.value)} />
+          <Input id="au-branch" aria-label="Branch" placeholder="Branch (e.g. BOM)" value={branch} disabled={!!focused}
+            title={focused ? 'Pinned to the spotlighted branch — clear the Focus to search all branches' : undefined}
+            onChange={(e) => setBranch(e.target.value)} />
         </FormField>
         <FormField label="Action" htmlFor="au-action" className="w-[220px]">
           <Input id="au-action" aria-label="Action" placeholder="Action (e.g. approval.approve)" value={action} onChange={(e) => setAction(e.target.value)} />

@@ -51,8 +51,10 @@ describe('Scrutiny Dashboard', () => {
     expect(screen.getByText('Data-capture completeness')).toBeInTheDocument();
     expect(screen.getByText(/Issues opened vs fixed/)).toBeInTheDocument();
     expect(screen.getByText('Open issues by branch')).toBeInTheDocument();
-    // branch comparison shows both branches
-    expect(screen.getByText('AMD')).toBeInTheDocument();
+    // branch comparison is scoped to the SELECTED branch only — other branches'
+    // issue counts must not leak into a BOM view
+    expect(screen.getAllByText(/BOM ·/).length).toBeGreaterThan(0);
+    expect(screen.queryByText('AMD')).not.toBeInTheDocument();
     // the open issue list is NOT shown on Overview
     expect(screen.queryByText('Trial Balance not balanced')).not.toBeInTheDocument();
   });

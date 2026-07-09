@@ -77,9 +77,10 @@ export function BankAccountMaster({ branch, setRoute }) {
       filters={
         <div className="flex w-full items-center justify-between gap-2">
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search bank / account / IFSC…" className="w-auto min-w-[220px]" />
-          <Select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="w-auto">
-            <option value="ALL">All branches</option>
-            {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
+          {/* A specific top-bar branch pins the filter — no cross-branch override. */}
+          <Select value={filterBranch} disabled={branch !== 'ALL' && !!branch?.code} title={branch !== 'ALL' && branch?.code ? 'Scoped by the top-bar branch — switch it there' : undefined} onChange={(e) => setFilterBranch(e.target.value)} className="w-auto">
+            {(branch === 'ALL' || !branch?.code) && <option value="ALL">All branches</option>}
+            {((branch === 'ALL' || !branch?.code) ? BRANCH_CODES : [branch.code]).map((b) => <option key={b} value={b}>{b}</option>)}
           </Select>
         </div>
       }

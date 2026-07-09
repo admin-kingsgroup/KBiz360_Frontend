@@ -1,6 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getHealthScorecard } from './api/monitor';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { isFocused } from './utils/cockpitFocus';
 import { scoreColor, gradeTone, verdict, subScores, branchRows, groupScore } from './utils/healthScore';
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
@@ -28,11 +30,24 @@ function Ring({ score, size = 120 }) {
 const cell = (v, suffix = '') => <span className="tabular-nums font-semibold" style={{ color: scoreColor(v) }}>{v}{suffix}</span>;
 
 export function HealthScorecard() {
+  const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'scorecard'], queryFn: getHealthScorecard, staleTime: 60_000 });
   const d = q.data || {};
-  const g = groupScore(d);
-  const subs = subScores(d);
-  const rows = branchRows(d);
+  const allRows = branchRows(d);
+  // Focus spotlight → only that branch: its own composite becomes the hero
+  // (never the group blend) and the table holds just its row.
+  const focused = isFocused(focus) ? allRows.find((r) => r.branch === focus) : null;
+  const rows = focused ? [focused] : allRows;
+  const g = focused
+    ? { composite: focused.composite, grade: focused.grade }
+    : groupScore(d);
+  const subs = focused
+    ? [
+        { key: 'health', label: 'Health', value: focused.health, suffix: '', weight: '50%', hint: 'books correctness' },
+        { key: 'close', label: 'Close-Readiness', value: focused.close, suffix: '', weight: '30%', hint: 'period close hygiene' },
+        { key: 'adoption', label: 'Adoption', value: focused.adoption, suffix: '%', weight: '20%', hint: 'module usage' },
+      ]
+    : subScores(d);
 
   // A failed roll-up must not read as a scary "0 / Grade F / Critical".
   if (q.isError) return <BandError label="the health scorecard" onRetry={q.refetch} />;
@@ -55,7 +70,7 @@ export function HealthScorecard() {
         <Ring score={g.composite} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-extrabold text-ink">Group ERP Health</h2>
+            <h2 className="text-xl font-extrabold text-ink">{focused ? `${focused.branch} ERP Health` : 'Group ERP Health'}</h2>
             <Badge tone={gradeTone(g.grade)} size="md">Grade {g.grade}</Badge>
             <span className="text-sm font-semibold" style={{ color: scoreColor(g.composite) }}>{verdict(g.composite)}</span>
           </div>
