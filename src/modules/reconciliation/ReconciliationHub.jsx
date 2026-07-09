@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock } from 'lucide-react';
-import { getTree, getSummary, generateCertificates } from './api';
-import { BRANCHES, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf } from './utils';
-import { PageSection, Badge, Button, EmptyState, LoadingState } from '../../shell/primitives';
+import { getTree, getSummary, getPending, generateCertificates } from './api';
+import { BRANCHES, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers } from './utils';
+import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { CertificateDrawer } from './CertificateDrawer';
 
 // ─── Reconciliation Hub — the module's home ─────────────────────────────────
@@ -34,23 +34,43 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
   const [branch, setBranch] = useState(BRANCHES.includes(appBranch) ? appBranch : 'BOM');
   const [tierKey, setTierKey] = useState('weekly');
   const [openId, setOpenId] = useState(null);
+  // Per-(branch,tier) period override — '' means "the current period". Lets the
+  // team work the BACKLOG (Apr/May/Jun 2026 month-ends, FY2025-26 / CY2025
+  // year-end) from the same register, not just the running period.
+  const [periodSel, setPeriodSel] = useState({});
   const qc = useQueryClient();
   const tier = tierOf(tierKey);
 
+  // Follow the app-wide branch selector — the module must never show a
+  // different branch than the rest of the ERP (branch-isolation convention).
+  useEffect(() => { if (BRANCHES.includes(appBranch)) setBranch(appBranch); }, [appBranch]);
+
+  // Branch Accountant works the WEEKLY cycle only (Month/Quarter/Year are done
+  // from TK Group Central by AE/FM/Director/Owner — backend enforces it too).
+  const tiers = visibleTiers(currentUser?.role);
+  useEffect(() => {
+    if (!tiers.some((t) => t.key === tierKey)) setTierKey('weekly');
+  }, [tiers, tierKey]);
+
   const { data: summary } = useQuery({ queryKey: ['recon-certs', 'summary', branch], queryFn: () => getSummary({ branch }) });
-  const period = summary?.periods?.[tierKey];
-  const { data: treeData, isLoading } = useQuery({
+  const { data: pendingData } = useQuery({ queryKey: ['recon-certs', 'pending', branch], queryFn: () => getPending({ branch }) });
+  const currentPeriod = summary?.periods?.[tierKey];
+  const options = periodOptions(tierKey, currentPeriod, pendingData?.rows);
+  const period = periodSel[`${branch}:${tierKey}`] || currentPeriod;
+  const setPeriod = (p) => setPeriodSel((s) => ({ ...s, [`${branch}:${tierKey}`]: p }));
+
+  const { data: treeData, isLoading, isError, refetch } = useQuery({
     queryKey: ['recon-certs', 'tree', branch, tierKey, period || ''],
     queryFn: () => getTree({ branch, tier: tierKey, period }),
+    enabled: !!period,
   });
   const groups = treeData?.groups || [];
-  const empty = !isLoading && groups.length === 0;
+  const empty = !isLoading && !isError && groups.length === 0;
 
   const gen = useMutation({
     mutationFn: () => generateCertificates({ branch, tier: tierKey, period }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recon-certs', 'tree'] });
-      qc.invalidateQueries({ queryKey: ['recon-certs', 'summary'] });
+      qc.invalidateQueries({ queryKey: ['recon-certs'] });
     },
   });
 
@@ -82,20 +102,36 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
         <span className="ml-auto text-xs italic text-ink-subtle">Branch-wise — data is never mixed across branches</span>
       </div>
 
-      {/* tier cards */}
-      <div className="grid grid-cols-2 gap-3 desktop:grid-cols-4">
-        {TIERS.map((t) => (
+      {/* tier cards — role-scoped: Branch Accountant sees the weekly cycle only */}
+      <div className={`grid gap-3 ${tiers.length > 1 ? 'grid-cols-2 desktop:grid-cols-4' : 'grid-cols-1 tablet:max-w-sm'}`}>
+        {tiers.map((t) => (
           <TierCard key={t.key} tier={t} active={tierKey === t.key}
             counts={summary?.tiers?.[t.key]} period={summary?.periods?.[t.key]}
             onClick={() => setTierKey(t.key)} />
         ))}
       </div>
+      {tiers.length === 1 && (
+        <p className="text-xs text-ink-subtle">Month-End, Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner.</p>
+      )}
 
       {/* register */}
       <PageSection
         title={`${tier.label} — ${branch} · ${period || ''}`}
-        subtitle={`${tier.scope} · Signers: ${tier.chain.map((s) => s.role).join(' → ')}`}>
+        subtitle={`${tier.scope} · Signers: ${tier.chain.map((s) => s.role).join(' → ')}`}
+        actions={options.length > 1 && (
+          <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+            Period
+            <Select value={period || ''} onChange={(e) => setPeriod(e.target.value)} aria-label="Register period">
+              {options.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </Select>
+          </label>
+        )}>
+        {gen.isError && <p className="mb-3 text-sm text-danger">Couldn’t generate certificates: {gen.error?.message}</p>}
+        {gen.isSuccess && gen.data && <p className="mb-3 text-sm text-success">Generated {gen.data.created ?? 0} new certificate{(gen.data.created ?? 0) === 1 ? '' : 's'} ({gen.data.total ?? 0} in scope).</p>}
         {isLoading && <LoadingState label="Loading register…" />}
+        {isError && <ErrorState title="Couldn’t load the register" message="The reconciliation service didn’t respond. Check the connection and retry." onRetry={() => refetch()} />}
         {empty && (
           <EmptyState title={`No ${tier.short} certificates for ${branch} · ${period || 'this period'}`}
             hint="Generate the period's certificates — one per ledger in this tier's scope."

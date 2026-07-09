@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Circle, FileUp, ShieldCheck, AlertTriangle, Stamp } from 'lucide-react';
 import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan } from './api';
 import { tierOf, statusMeta, sourceMeta, chainProgress, fmtAmt, openExceptions } from './utils';
-import { Drawer, Badge, Button, Input, Select, FormField, LoadingState, EmptyState } from '../../shell/primitives';
+import { Drawer, Badge, Button, Input, Select, FormField, LoadingState, EmptyState, ErrorState } from '../../shell/primitives';
 
 // ─── Certificate Drawer — one ledger, one certificate ───────────────────────
 // The working face of a Reconciliation Certificate: freeze the snapshot
@@ -25,7 +25,8 @@ function SnapshotForm({ cert, onFreeze, busy, error }) {
   const [book, setBook] = useState('');
   const [stmt, setStmt] = useState('');
   const [adj, setAdj] = useState('0');
-  const diff = (Number(stmt) || 0) + (Number(adj) || 0) - (Number(book) || 0);
+  // Round like the backend (2dp) so floating-point sums don't show a phantom difference.
+  const diff = Math.round(((Number(stmt) || 0) + (Number(adj) || 0) - (Number(book) || 0)) * 100) / 100;
   return (
     <div className="grid gap-3">
       <div className="grid grid-cols-2 gap-3">
@@ -57,15 +58,13 @@ export function CertificateDrawer({ id, branch, onClose }) {
   const [exText, setExText] = useState('');
   const [err, setErr] = useState('');
 
-  const { data, isLoading } = useQuery({ queryKey: ['recon-certs', 'cert', id], queryFn: () => getCertificate(id), enabled: !!id });
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['recon-certs', 'cert', id], queryFn: () => getCertificate(id), enabled: !!id });
   const cert = data?.data || data; // envelope unwrapped by the api client; /:id returns {data, chain, canSign}
   const canSign = data?.canSign;
 
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['recon-certs', 'cert', id] });
-    qc.invalidateQueries({ queryKey: ['recon-certs', 'tree'] });
-    qc.invalidateQueries({ queryKey: ['recon-certs', 'summary'] });
-  };
+  // Root invalidation — sign/scan changes ripple into the tree, summary,
+  // pending board AND the Reports register; refresh them all.
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['recon-certs'] });
   // eslint-disable-next-line react-hooks/rules-of-hooks -- called unconditionally, fixed order
   const useAction = (fn) => useMutation({ mutationFn: fn, onSuccess: () => { setErr(''); invalidate(); }, onError: (e) => setErr(e.message) });
   const freeze = useAction((body) => freezeSnapshot(id, body));
@@ -103,7 +102,9 @@ export function CertificateDrawer({ id, branch, onClose }) {
           </div>
         </div>
       )}>
-      {isLoading || !cert ? <LoadingState label="Loading certificate…" /> : (
+      {isError ? (
+        <ErrorState title="Couldn’t load this certificate" message="It may have been removed, or the reconciliation service didn’t respond." onRetry={() => refetch()} />
+      ) : isLoading || !cert ? <LoadingState label="Loading certificate…" /> : (
         <div className="grid gap-5 p-4">
 
           {/* identity */}
