@@ -7,7 +7,7 @@
    navigation preserved via setRoute.
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Upload, Plus } from 'lucide-react';
 import { useMasterList } from '../../../core/useMasters';
 import { BRANCH_CODES } from '../../../core/data';
@@ -23,6 +23,8 @@ const localeOfCcy = (ccy) => (String(ccy || '').toUpperCase() === 'INR' ? 'en-IN
 export function BankAccountMaster({ branch, setRoute }) {
   const [search, setSearch] = useState('');
   const [filterBranch, setFilterBranch] = useState(branch === 'ALL' ? 'ALL' : branch?.code || 'ALL');
+  // Follow the top-bar branch switch live (the in-page filter still overrides after).
+  useEffect(() => { setFilterBranch(branch === 'ALL' ? 'ALL' : branch?.code || 'ALL'); }, [branch]);
   // Bank accounts ARE ledgers under the Bank Accounts / Cash-in-Hand groups — fetch
   // them live and map the ledger's bank fields onto the register's columns.
   const { data: ledgers = [] } = useMasterList('ledgers');
@@ -75,9 +77,10 @@ export function BankAccountMaster({ branch, setRoute }) {
       filters={
         <div className="flex w-full items-center justify-between gap-2">
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search bank / account / IFSC…" className="w-auto min-w-[220px]" />
-          <Select value={filterBranch} onChange={(e) => setFilterBranch(e.target.value)} className="w-auto">
-            <option value="ALL">All branches</option>
-            {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
+          {/* A specific top-bar branch pins the filter — no cross-branch override. */}
+          <Select value={filterBranch} disabled={branch !== 'ALL' && !!branch?.code} title={branch !== 'ALL' && branch?.code ? 'Scoped by the top-bar branch — switch it there' : undefined} onChange={(e) => setFilterBranch(e.target.value)} className="w-auto">
+            {(branch === 'ALL' || !branch?.code) && <option value="ALL">All branches</option>}
+            {((branch === 'ALL' || !branch?.code) ? BRANCH_CODES : [branch.code]).map((b) => <option key={b} value={b}>{b}</option>)}
           </Select>
         </div>
       }

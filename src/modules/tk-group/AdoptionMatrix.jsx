@@ -1,6 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAdoption } from './api/monitor';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { isFocused } from './utils/cockpitFocus';
 import { adoptionKpis, adoptionTone, badgeTone, branchKeys, matrixRows, cellFor, centralCell, adoptionVerdict } from './utils/adoption';
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
@@ -27,11 +29,15 @@ function Cell({ pct, tone }) {
 }
 
 export function AdoptionMatrix() {
+  const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'adoption'], queryFn: getAdoption, staleTime: 60_000, refetchInterval: 300_000 });
   const d = q.data || {};
-  const kpis = adoptionKpis(d);
+  // Focus spotlight → only that branch's KPI tile and matrix column (the group
+  // blend and other branches' columns stay in the ALL view).
+  const focused = isFocused(focus) ? focus : null;
+  const kpis = adoptionKpis(d).filter((k) => !focused || k.key === focused);
   const central = d.central || {};
-  const branches = branchKeys(d);
+  const branches = branchKeys(d).filter((b) => !focused || b === focused);
   const rows = matrixRows(d);
 
   // A failed roll-up must not read as honest "0% everywhere" adoption.

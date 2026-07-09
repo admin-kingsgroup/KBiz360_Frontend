@@ -38,8 +38,10 @@ describe('PageAccessControl renders without runtime errors', () => {
     expect(screen.getByText('Branch access')).toBeInTheDocument();
 
     // Sections start COLLAPSED (clean + fast), so the Masters section header shows
-    // but its sub-group "Client Master" is NOT mounted yet.
-    const mastersHeader = screen.getByRole('button', { name: /^Masters/ });
+    // but its sub-group "Client Master" is NOT mounted yet. (Negative lookahead
+    // excludes the separate "Masters & Ledger" section, which also starts with
+    // "Masters".)
+    const mastersHeader = screen.getByRole('button', { name: /^Masters(?!\s*&)/ });
     expect(screen.queryByText('Client Master')).toBeNull();
 
     // One click expands it → the nav sub-group header renders (groupItems ran).

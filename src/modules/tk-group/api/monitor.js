@@ -47,3 +47,11 @@ export async function getFindingStatus() {
   try { return (await apiGet('/api/tk/finding-status'))?.items || []; } catch { return []; }
 }
 export function saveFindingStatus(row) { return apiPost('/api/tk/finding-status', row); }
+
+// Dev Control tracking rows (owner/status/due per registry item) — feeds the
+// Control Tower's Development lens. Same endpoint Dev Control itself uses, so a
+// fix marked Done in /dev/control clears the Tower finding on the next read
+// (and instantly in-session via the shared ['dev-control','status'] query key).
+export async function getDevFindings() {
+  try { return (await apiGet('/api/dev-control'))?.items || []; } catch { return []; }
+}

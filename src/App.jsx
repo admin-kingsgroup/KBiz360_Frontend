@@ -49,7 +49,7 @@ import { reconciliationRoutes } from './modules/reconciliation/routes';
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes, ...reconciliationRoutes];
-const { BankingApiSettings, DelegationsManager, GroupDashboard, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
+const { BankingApiSettings, DelegationsManager, GroupDashboard, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/masters/mastersParties'));
@@ -460,8 +460,8 @@ export default function KB360App(){
        crashing on an undefined component. */
 
     /* Standardized Tabbed Screens */
-    if(route==="/masters/customer-tabs")  return <CustomerMasterTabbed/>;
-    if(route==="/masters/supplier-tabs")  return <SupplierMasterTabbed/>;
+    if(route==="/masters/customer-tabs")  return <CustomerMasterTabbed branch={branch}/>;
+    if(route==="/masters/supplier-tabs")  return <SupplierMasterTabbed branch={branch}/>;
     if(route==="/transactions/voucher-tabs") return <VoucherEntryTabbed/>;
     if(route==="/reports/viewer")         return <ReportViewerTabbed/>;
     if(route==="/hr/employee-tabs")       return <EmployeeMasterTabbed/>;
@@ -563,7 +563,7 @@ export default function KB360App(){
     if(route==="/reports/saved-views")  return <SavedReportViews/>;
     if(route==="/reports/scheduled")    return <ScheduledReports/>;
     if(route==="/reports/meta-demo")    return <ReportsMetaDemo/>;
-    if(route==="/finance/bank-balance")  return <BankBalanceDashboard/>;
+    if(route==="/finance/bank-balance")  return <BankBalanceDashboard branch={branch}/>;
     if(route==="/finance/tds-calculator")return <TDSCalculator/>;
     if(route==="/finance/interest-calc") return <InterestCalculator/>;
     if(route==="/finance/recon-status")  return <ReconStatusPage/>;
@@ -583,7 +583,7 @@ export default function KB360App(){
     if(route==="/masters/merge")                return <MergeRecordsUtility/>;
     if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch} setRoute={navigate}/>;
     if(route==="/masters/currency")       return <CurrencyMaster setRoute={navigate}/>;
-    if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser}/>;
+    if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser} shellBranch={branch}/>;
     if(route==="/masters/projects")       return <ProjectMaster/>;
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
@@ -617,7 +617,7 @@ export default function KB360App(){
     // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
     // role + email required). Non-owners hitting the URL get a "not available" card.
     if(route==="/dashboard/cockpit") return isOwnerDashboardUser(currentUser)
-      ? <AdCockpit setRoute={navigate}/>
+      ? <AdCockpit setRoute={navigate} branch={branch}/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>AD Cockpit</h2>
@@ -679,11 +679,13 @@ export default function KB360App(){
     if(route==="/finance/cash-book")  return <CashBookLive branch={branch}/>;
     if(route==="/ledger")             return <LedgerAcLive branch={branch}/>;
     if(route==="/trial-balance")      return <TrialBalanceLive branch={branch}/>;
-    if(route==="/tax/gstr1")          return <TaxGstr1/>;
-    if(route==="/tax/gstr3b")         return <TaxGstr3b/>;
-    if(route==="/tax/tds")            return <TaxTdsTcs/>;
-    if(route==="/tax/rcm")            return <TaxRcm/>;
-    if(route==="/tax/vat")            return <TaxVat/>;
+    // GST/VAT return prep is per-branch GSTIN — without `branch` these
+    // aggregated every branch's tax for full-scope users.
+    if(route==="/tax/gstr1")          return <TaxGstr1 branch={branch}/>;
+    if(route==="/tax/gstr3b")         return <TaxGstr3b branch={branch}/>;
+    if(route==="/tax/tds")            return <TaxTdsTcs branch={branch}/>;
+    if(route==="/tax/rcm")            return <TaxRcm branch={branch}/>;
+    if(route==="/tax/vat")            return <TaxVat branch={branch}/>;
     if(route==="/tax/einvoice")       return <TaxEInvoice/>;
     if(route==="/reports/gp")        return <ReportGP branch={branch} setRoute={navigate}/>;
     // Unified statements: one P&L screen and one BS screen, view-switched
@@ -702,7 +704,7 @@ export default function KB360App(){
     if(route==="/reports/inb-preg")   return <RegisterLive branch={branch} initial="purchase" inbOnly/>;
     if(route==="/reports/invoice-gp") return <InvoiceGPLive branch={branch}/>;
     if(route==="/reports/sales-gp-analytics") return <SalesGpAnalytics branch={branch}/>;
-    if(route==="/reports/branch")     return <ReportBranch/>;
+    if(route==="/reports/branch")     return <ReportBranch branch={branch}/>;
     if(route==="/reports/pkg")        return <ReportPackagePnL/>;
     if(route==="/sales/cancellation")   return <SalesCancellation branch={branch} setRoute={navigate}/>;
     if(route==="/purchase/refunds")     return <PurchaseRefunds branch={branch} setRoute={navigate}/>;
@@ -719,7 +721,7 @@ export default function KB360App(){
     if(route==="/settings/preferences")  return <UxPreferences/>;
     if(route==="/reports/mis")            return <MisReport branch={branch}/>;
     if(route==="/reports/concentration")  return <ClientConcentration branch={branch}/>;
-    if(route==="/reports/consolidated-bs")return <ConsolidatedBS setRoute={navigate}/>;
+    if(route==="/reports/consolidated-bs")return <ConsolidatedBS setRoute={navigate} branch={branch}/>;
     if(route==="/reports/cashflow-forecast")return <CashFlowForecast branch={branch}/>;
     if(route==="/reports/supplier-360")   return <Supplier360 branch={branch}/>;
     if(route==="/reports/customer-360")   return <Customer360 branch={branch}/>;
@@ -755,10 +757,10 @@ export default function KB360App(){
     if(route==="/masters/accounts-tree" || route==="/masters/chart-builder") return <AccountsTreeView branch={branch} setRoute={navigate} setBranch={setBranch}/>;  // Chart of Accounts (Display): Primary Group ▸ Group ▸ Sub-Group ▸ Ledger tree
     if(route==="/masters/voucher-types")   return <VoucherTypesMaster/>;
     if(route==="/masters/cost-categories") return <CostCategoriesMaster/>;
-    if(route==="/masters/budgets")         return <BudgetsMaster/>;
+    if(route==="/masters/budgets")         return <BudgetsMaster branch={branch}/>;
     if(route==="/masters/scenarios")       return <ScenariosMaster/>;
-    if(route==="/masters/customers")  return <CustomersMaster/>;
-    if(route==="/masters/suppliers")  return <SuppliersMaster/>;
+    if(route==="/masters/customers")  return <CustomersMaster branch={branch}/>;
+    if(route==="/masters/suppliers")  return <SuppliersMaster branch={branch}/>;
     if(route==="/masters/credit-facilities") return <CreditFacilitiesMaster branch={branch}/>;
     if(route==="/masters/airlines")   return <MastersAirlines/>;
     if(route==="/masters/hotels")     return <MastersHotels/>;
@@ -798,7 +800,9 @@ export default function KB360App(){
         if(route==="/reports/cf-direct")               return <CashFlowDirect branch={branch} setRoute={navigate}/>;
         if(route==="/reports/msme-aging")              return <MsmeTracker branch={branch} setRoute={navigate}/>;
         if(route==="/hr/loans-advances")               return <EmployeeAdvances branch={branch} setRoute={navigate}/>;
-        if(route==="/settings/period-lock")            return <PeriodLocking branch={branch} setRoute={navigate}/>;
+        // The old PeriodLocking screen was a dead second lock UI (empty data, inert
+        // buttons) — this route now serves the real TK period-lock admin instead.
+        if(route==="/settings/period-lock")            return <TkPeriodLockPage/>;
         if(route==="/settings/approval-workflow")      return <ApprovalWorkflow branch={branch} setRoute={navigate}/>;
         if(route==="/approvals")                       return <PendingApprovals branch={branch} setRoute={navigate}/>;
         if(route==="/settings/banking-api")            return <BankingApiSettings branch={branch} setRoute={navigate}/>;

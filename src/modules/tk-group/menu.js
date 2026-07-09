@@ -1,4 +1,4 @@
-import { getMenu } from '../../core/menus';
+import { getMenu, applyHidden } from '../../core/menus';
 import { gateMenuForGroup, isGroupMode } from './utils/groupMode';
 import { gateStatements } from './utils/statements';
 import { gateCentralRoutes } from './utils/gateCentralRoutes';
@@ -14,7 +14,12 @@ import { controlCockpitMenu, isCentralRole } from './cockpit';
 // getMenu() itself is left untouched (pure; still used by Page Visibility Control
 // and every menu test); the mode logic lives here, at the shell's call site.
 export function getVisibleMenu(branch, currentUser, focus) {
-  if (isGroupMode(branch) && isCentralRole(currentUser)) return controlCockpitMenu(focus, currentUser);
+  // The cockpit tree bypasses getMenu(), so it needs the SAME hidden-deny-list pruning
+  // applied here — otherwise a page toggled off in Page Visibility Control (e.g. the
+  // Approvals dropdown's Admin Approval / Onboarding) would still show as a link in
+  // the cockpit nav and only fail once clicked (App.jsx's route guard is generic and
+  // already blocks it either way).
+  if (isGroupMode(branch) && isCentralRole(currentUser)) return applyHidden(controlCockpitMenu(focus, currentUser), currentUser);
   const base = gateMenuForGroup(getMenu(branch, currentUser), branch);
   // Relocate central screens off the branch surface (dormant until the flag is on) —
   // then apply the hide-statements control. Both fail-safe: false → unchanged.

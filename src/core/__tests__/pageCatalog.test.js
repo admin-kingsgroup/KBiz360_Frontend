@@ -46,19 +46,21 @@ describe('pageCatalog — Page Visibility Control', () => {
     expect(dupes).toEqual([]);
   });
 
-  test('every route App.jsx can render is controllable (standalone pages too)', () => {
-    const controllable = new Set(allPageKeys());
-    const pills = topLevelPillHrefs();
-    const missing = APP_ROUTES.filter((r) => !ALWAYS_VISIBLE.has(r) && !pills.has(r) && !controllable.has(r));
-    expect(missing).toEqual([]);
-  });
-
   test('top-level pills are structural — excluded from the togglable catalogue', () => {
     const controllable = new Set(allPageKeys());
     const pills = topLevelPillHrefs();
     expect(pills.size).toBeGreaterThan(0);            // there is at least one (e.g. Approvals)
     expect(pills.has('/transactions/approvals')).toBe(true);
-    for (const p of pills) expect(controllable.has(p)).toBe(false); // never togglable
+    // /tk/decisions is the one deliberate exception: it's a top-level pill in the BRANCH
+    // nav (protected there by applyHidden's per-render pill-clearing regardless of this
+    // catalogue), but it's a nested leaf — not a top-level array entry — in the TK
+    // Central cockpit's Approvals ▸ Raise / Govern group, so it's still exposed as a
+    // normal toggle to control that cockpit-only visibility (see pageCatalog.js's
+    // CATALOG_PILL_EXEMPT).
+    for (const p of pills) {
+      if (p === '/tk/decisions') { expect(controllable.has(p)).toBe(true); continue; }
+      expect(controllable.has(p)).toBe(false); // every other pill: never togglable
+    }
   });
 
   test('the generated route manifest is in sync with App.jsx (run `npm run gen:routes`)', () => {

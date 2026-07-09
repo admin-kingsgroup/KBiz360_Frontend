@@ -454,12 +454,19 @@ export function PageAccessControl({ currentUser, setRoute, embedded = false }) {
                     </div>
                     {!isCollapsed && (
                       <div>
-                        {groupItems(s.items).map((grp) => (
+                        {groupItems(s.items).map((grp) => {
+                          const grpAllOn = grp.items.every((i) => isVisible(i.key));
+                          return (
                           <div key={grp.name || '__nogroup'}>
-                            {/* Sub-header (nav sub-group) with its own All / None shortcut. */}
+                            {/* Sub-header (nav sub-group) — a master Switch (styled like every other
+                                toggle on this page, e.g. Branch access) plus the precise All / None
+                                shortcuts for when the group is only partly visible. */}
                             {grp.name && (
                               <div className="flex items-center justify-between gap-2 border-b border-surface-alt bg-surface-alt/50 px-3.5 py-1.5">
-                                <span className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{grp.name}</span>
+                                <label className="flex cursor-pointer items-center gap-2.5">
+                                  <Switch on={grpAllOn} onChange={() => setKeys(grp.items.map((i) => i.key), !grpAllOn)} />
+                                  <span className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{grp.name} <span className="normal-case text-ink-subtle">(All)</span></span>
+                                </label>
                                 <span className="flex items-center gap-1.5">
                                   <button onClick={() => setKeys(grp.items.map((i) => i.key), true)}
                                     className="text-[10px] font-semibold text-ink-subtle hover:text-[#27963c]">All</button>
@@ -488,7 +495,8 @@ export function PageAccessControl({ currentUser, setRoute, embedded = false }) {
                               );
                             })}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

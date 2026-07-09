@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getOverview, getGroupHealth, getIntegrity, getTrend, getSetupReadiness } from './api/monitor';
+import { getOverview, getGroupHealth, getIntegrity, getTrend, getSetupReadiness, getDevFindings } from './api/monitor';
 import { overviewKpis, streamRows, actorName } from './utils/monitor';
 import { scopeHealth, scopeSetup, scopeGates, scopeTrend, seriesMax } from './utils/controlTower';
 import { SemiGauge, StackedBar, GateDots, DualLine, MiniBars, SEM } from './SummaryCharts';
@@ -13,6 +13,11 @@ import { GroupHealth } from './GroupHealth';
 import { SetupReadiness } from './SetupReadiness';
 import { IntegritySummary } from './IntegritySummary';
 import { ScrutinyTrend } from './ScrutinyTrend';
+// Development findings share the Dev Control registry + tracking rows — the SAME
+// clearing rule (registry row live, or tracked done/won't-do). Fixing an item in
+// /dev/control clears its finding here automatically; the shared react-query key
+// ['dev-control','status'] keeps both screens on one cache.
+import { ALL_ITEMS as DEV_ITEMS, STATUS_META as DEV_STATUS_META, moduleRollup, VERDICT_META, isCleared as devCleared } from '../devControl/registry';
 
 // ─── TK GROUP · FE · Control Tower (container) ───────────────────────────────
 // "Is the control layer healthy?" — split into SECTIONS via a tab bar (the same
@@ -29,8 +34,22 @@ const TABS = [
   { id: 'setup', label: 'Setup Readiness' },
   { id: 'close', label: 'Close & Integrity' },
   { id: 'trend', label: 'Scrutiny Trend' },
+  { id: 'dev', label: 'Development' },
   { id: 'gov', label: 'Governance' },
 ];
+
+// ── Development findings — Dev Control's open items surfaced as a Tower lens ──
+function useDevFindings() {
+  const trackQ = useQuery({
+    queryKey: ['dev-control', 'status'], // same key as /dev/control → one cache
+    queryFn: getDevFindings,
+    staleTime: 30_000,
+  });
+  const trackMap = {};
+  (trackQ.data || []).forEach((r) => { trackMap[r.itemId] = r; });
+  const open = DEV_ITEMS.filter((i) => !devCleared(i, trackMap[i.id]));
+  return { open, trackMap, isLoading: trackQ.isLoading };
+}
 
 const EVENT_COLS = [
   { key: 'action', header: 'Action' },
@@ -128,6 +147,8 @@ function Overview({ focus, goTab }) {
           chart={<div className="w-[150px]"><MiniBars items={streams.map((s) => ({ label: s.label, value: s.value, color: SEM.accent }))} /></div>}
           foot={<><span className="text-ink-subtle">approvals waiting</span><Badge tone={o.pendingTotal ? 'info' : 'neutral'} size="sm">{o.pendingTotal || 0} pending</Badge></>} />
 
+        <DevLensCard goTab={goTab} />
+
         <LensCard title="Controls"
           chart={<div className="grid w-full gap-1.5">
             {controls.length ? controls.map((c) => (
@@ -138,6 +159,85 @@ function Overview({ focus, goTab }) {
             )) : <span className="text-xs text-ink-subtle">No controls configured.</span>}
           </div>} />
       </div>
+    </div>
+  );
+}
+
+// ── Development lens card (Overview) — is dev work blocking the ERP? ──
+function DevLensCard({ goTab }) {
+  const { open } = useDevFindings();
+  const broken = open.filter((i) => i.status === 'stub' || i.status === 'pending').length;
+  const gaps = open.filter((i) => i.status === 'partial' || i.status === 'audit').length;
+  const dormant = open.filter((i) => i.status === 'dormant').length;
+  return (
+    <LensCard title="Development" onOpen={() => goTab('dev')}
+      chart={<div className="w-[130px]"><StackedBar segments={[{ value: broken, color: SEM.err }, { value: gaps, color: SEM.warn }, { value: dormant, color: SEM.info }]} /></div>}
+      legend={<Legend items={[{ label: 'Not working', value: broken, color: SEM.err }, { label: 'Working, gaps', value: gaps, color: SEM.warn }, { label: 'Dormant by design', value: dormant, color: SEM.info }]} />}
+      foot={<><span className="text-ink-subtle">from the developer registry</span><Badge tone={broken ? 'danger' : open.length ? 'warning' : 'success'} size="sm">{open.length ? `${open.length} findings open` : 'clear'}</Badge></>} />
+  );
+}
+
+// ── Development tab: module verdicts + every open dev finding with its fix remark.
+//    Read-only mirror of /dev/control — fix and mark Done THERE; it clears here. ──
+const DEV_COLS = [
+  { key: 'status', header: 'Status', render: (r) => {
+    const m = DEV_STATUS_META[r.status] || DEV_STATUS_META.audit;
+    return <span style={{ display: 'inline-block', padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', color: m.color, background: m.bg }}>{m.label}</span>;
+  } },
+  { key: 'name', header: 'Feature', render: (r) => <div><div className="font-medium text-ink">{r.name}</div><div className="text-[11px] text-ink-subtle">{r.area}</div></div> },
+  { key: 'note', header: "What's wrong", render: (r) => <span className="text-ink-muted">{r.note || '—'}</span> },
+  { key: 'remark', header: 'How to fix (remark)', render: (r) => <span className="text-ink">{r.remark || '—'}</span> },
+  { key: 'owner', header: 'Owner / progress', render: (r) => r._tracked
+    ? <span className="text-[11px] text-ink-muted">{r._tracked.owner || 'unassigned'}{r._tracked.status && r._tracked.status !== 'open' ? ` · ${r._tracked.status}` : ''}{r._tracked.dueDate ? ` · due ${r._tracked.dueDate}` : ''}</span>
+    : <span className="text-[11px] text-ink-subtle">unassigned</span> },
+];
+
+function DevelopmentLens({ setRoute }) {
+  const { open, trackMap, isLoading } = useDevFindings();
+  const rollup = moduleRollup(trackMap);
+  const rows = open.map((i) => ({ ...i, _tracked: trackMap[i.id] }));
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
+        <span>
+          Development findings come from the developer registry + Dev Control tracking. Fix an item and mark it
+          <b> Done</b> in Developer Control (or flip its registry row to <b>live</b>) — the finding clears here automatically.
+        </span>
+        {setRoute && (
+          <button type="button" onClick={() => setRoute('/dev/control')} className="whitespace-nowrap text-[11.5px] font-semibold text-accent hover:underline">
+            Open Developer Control →
+          </button>
+        )}
+      </div>
+
+      <ResponsiveGrid min="190px" gap="md">
+        {rollup.map((m) => {
+          const vm = VERDICT_META[m.verdict];
+          return (
+            <div key={m.area} className="rounded-lg border border-surface-border bg-surface p-3" style={{ borderLeft: `4px solid ${vm.color}` }}>
+              <div className="flex items-baseline justify-between gap-2">
+                <b className="text-[12.5px] leading-tight text-ink">{m.area}</b>
+                <span className="tabular-nums text-[11px] text-ink-subtle">{m.cleared}/{m.total}</span>
+              </div>
+              <div className="mt-1.5 text-[11px]">
+                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 999, fontSize: 10.5, fontWeight: 700, color: vm.color, background: vm.bg }}>{vm.label}</span>
+              </div>
+            </div>
+          );
+        })}
+      </ResponsiveGrid>
+
+      <DataTable
+        title={`Open development findings (${rows.length})`}
+        columns={DEV_COLS}
+        rows={rows}
+        getRowKey={(r) => r.id}
+        loading={isLoading}
+        emptyMessage="No development findings open — every tracked feature is wired or cleared. 🎉"
+        searchable
+        showDensityToggle={false}
+        zebra
+      />
     </div>
   );
 }
@@ -213,6 +313,7 @@ export function ControlTower({ setRoute } = {}) {
       {tab === 'setup' && <SetupReadiness setRoute={setRoute} />}
       {tab === 'close' && <IntegritySummary setRoute={setRoute} />}
       {tab === 'trend' && <ScrutinyTrend />}
+      {tab === 'dev' && <DevelopmentLens setRoute={setRoute} />}
       {tab === 'gov' && <Governance />}
     </div>
   );

@@ -48,12 +48,16 @@ function Row({ nm, ds, st, flag, on, crit, onPropose, right, applied, guarded, p
     : planned ? <Badge tone="neutral" size="sm">Planned</Badge>
     : <Off />;
   const state = flag ? (on ? 'On' : 'Off') : applied ? 'Active now' : guarded ? 'Engages with the master guard' : declined ? 'Owner decided — not adopted' : planned ? 'Not built yet' : 'Off';
+  const engaged = flag ? on : applied;
+  const accentColor = engaged ? (crit ? '#dc2626' : '#16a34a') : '#cdd1d8';
   return (
-    <div className="flex items-start gap-3 rounded-brand border border-surface-border bg-surface p-3.5">
+    <div className="flex items-start gap-3 rounded-brand border border-l-4 border-surface-border bg-surface p-3.5 shadow-sm transition-colors" style={{ borderLeftColor: accentColor }}>
       <div className="min-w-0 flex-1">
         <div className="text-[13.5px] font-semibold text-ink">{nm}</div>
         {ds && <div className="mt-0.5 text-[11.5px] text-ink-muted">{ds}</div>}
-        <div className="mt-1.5 font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">{state}{st ? ' · ' + st : ''}{flag ? ' · proposes to Owner' : ''}</div>
+        <div className={`mt-2 inline-block rounded-full px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-wide ${engaged ? (crit ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success') : 'bg-surface-alt text-ink-subtle'}`}>
+          {state}{st ? ' · ' + st : ''}{flag ? ' · proposes to Owner' : ''}
+        </div>
       </div>
       {control}
     </div>
@@ -62,11 +66,18 @@ function Row({ nm, ds, st, flag, on, crit, onPropose, right, applied, guarded, p
 const ControlList = ({ items, isOn = () => false, onPropose = () => {} }) => (
   <div className="grid gap-2.5 tablet:grid-cols-2">{items.map((c, i) => <Row key={i} {...c} on={c.flag ? isOn(c.flag) : false} onPropose={onPropose} />)}</div>
 );
-function ChainCard({ k, r, w }) {
+// Check → Verify → Approve reads as a pipeline, so each level gets its own accent
+// (blue → amber → green) rather than three identical white boxes.
+const CHAIN_COLORS = ['#2563eb', '#d97706', '#16a34a'];
+function ChainCard({ k, r, w, n }) {
+  const color = CHAIN_COLORS[(n - 1) % CHAIN_COLORS.length] || '#5b616e';
   return (
-    <div className="min-w-[170px] flex-1 rounded-brand border border-surface-border bg-surface p-3.5">
-      <div className="font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">{k}</div>
-      <div className="mt-1 text-[15px] font-semibold text-ink">{r}</div>
+    <div className="min-w-[170px] flex-1 rounded-brand border border-t-4 border-surface-border bg-surface p-3.5 shadow-sm" style={{ borderTopColor: color }}>
+      <div className="flex items-center gap-1.5">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: color }}>{n}</span>
+        <div className="font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">{k}</div>
+      </div>
+      <div className="mt-1.5 text-[15px] font-semibold text-ink">{r}</div>
       <div className="truncate text-[11px] text-ink-muted">{w}</div>
     </div>
   );
@@ -115,8 +126,12 @@ export function ControlPanel({ setRoute }) {
             <div className="flex flex-wrap items-stretch gap-2">
               {v.levels.map((l, i) => (
                 <React.Fragment key={l.n}>
-                  <ChainCard k={`Level ${l.n} · ${l.name}`} r={l.role} w={l.who} />
-                  {i < v.levels.length - 1 && <div className="flex items-center text-ink-subtle" aria-hidden>→</div>}
+                  <ChainCard k={`Level ${l.n} · ${l.name}`} r={l.role} w={l.who} n={l.n} />
+                  {i < v.levels.length - 1 && (
+                    <div className="flex items-center text-ink-subtle" aria-hidden>
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-alt text-[13px]">→</span>
+                    </div>
+                  )}
                 </React.Fragment>
               ))}
             </div>
@@ -130,7 +145,7 @@ export function ControlPanel({ setRoute }) {
             <H3>Who is under control</H3>
             <div className="grid gap-3 tablet:grid-cols-2">
               {v.people.map((p) => (
-                <div key={p.key} className={`rounded-brand border bg-surface p-4 ${p.independent ? 'border-warning/40' : 'border-surface-border'}`}>
+                <div key={p.key} className={`rounded-brand border border-l-4 p-4 shadow-sm ${p.independent ? 'border-warning/40 bg-warning-soft/40' : 'border-success/40 bg-success-soft/40'}`} style={{ borderLeftColor: p.independent ? '#d97706' : '#16a34a' }}>
                   <div className="flex items-center justify-between gap-2">
                     <div><div className="text-[16px] font-semibold text-ink">{p.name}</div><div className="text-[11px] text-ink-muted">{p.role} · {p.duty}</div></div>
                     {p.independent ? <Badge tone="warning" size="sm">Independent · no approval</Badge> : <Badge tone="success" size="sm">Under control</Badge>}
@@ -312,9 +327,9 @@ export function ControlPanel({ setRoute }) {
               <div className="px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-ink-subtle">{grp.group}</div>
               {grp.items.map((it) => (
                 <button key={it.key} onClick={() => setScreen(it.key)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors ${screen === it.key ? 'bg-navy/5 font-semibold text-navy' : 'text-ink-muted hover:bg-navy/5 hover:text-navy'}`}>
+                  className={`flex w-full items-center justify-between gap-2 rounded-lg border-l-[3px] px-2.5 py-2 text-left text-[12.5px] transition-colors ${screen === it.key ? 'border-l-gold bg-navy/5 font-semibold text-navy' : 'border-l-transparent text-ink-muted hover:bg-navy/5 hover:text-navy'}`}>
                   <span className="truncate">{it.label}</span>
-                  <span className="font-mono text-[8px] font-bold uppercase text-ink-subtle">off</span>
+                  <span className="rounded-full bg-surface-alt px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase text-ink-subtle">off</span>
                 </button>
               ))}
             </div>
@@ -322,7 +337,7 @@ export function ControlPanel({ setRoute }) {
         </nav>
 
         {/* active screen */}
-        <section>
+        <section className="rounded-brand border border-surface-border bg-surface p-5 shadow-sm">
           <h2 className="text-[22px] font-semibold text-ink">{activeLabel}</h2>
           {screenBody()}
         </section>

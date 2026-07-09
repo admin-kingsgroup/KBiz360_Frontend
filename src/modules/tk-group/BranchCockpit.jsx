@@ -1,6 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getBranchCockpit } from './api/monitor';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { isFocused } from './utils/cockpitFocus';
 import { DataTable } from '../../shell/DataTable';
 
 // ─── TK GROUP · FE · Branch Cockpit (container) ──────────────────────────────
@@ -20,8 +22,11 @@ const COCKPIT_COLS = [
 ];
 
 export function BranchCockpit() {
+  const focus = useCockpitFocus();
   const q = useQuery({ queryKey: ['tk', 'monitor', 'branches'], queryFn: getBranchCockpit, staleTime: 30_000, refetchInterval: 60_000 });
-  const rows = (q.data && q.data.items) || [];
+  const all = (q.data && q.data.items) || [];
+  // Focus spotlight → only that branch's posture row (matches ComplianceClose).
+  const rows = isFocused(focus) ? all.filter((r) => r.branch === focus) : all;
 
   return (
     <div data-testid="tk-cockpit">

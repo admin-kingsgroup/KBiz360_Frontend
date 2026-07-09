@@ -135,6 +135,9 @@ const countNote = (leds) => {
 export function AccountsTreeView({ branch, setRoute, setBranch }) {
   const brc = branchCode(branch);                    // undefined for ALL → shows all
   const [branchView, setBranchView] = useState(() => brc || 'ALL'); // in-page branch picker
+  // Follow the TOP-BAR branch: switching it re-scopes this page live (the in-page
+  // picker still overrides within that view until the next top-bar switch).
+  useEffect(() => { setBranchView(brc || 'ALL'); }, [brc]);
   // Default to the branch's OWN ledgers in a specific branch view; 'all' when consolidated.
   const [scope, setScope] = useState(() => defaultScopeFor(brc || 'ALL')); // 'all' | 'common' | 'branch'
   const groupsQ = useMasterList('groups');           // groups/sub-groups are SHARED across branches
@@ -442,9 +445,13 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 10 }}>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
           Branch view
-          <select value={branchView} onChange={(e) => setBranchView(e.target.value)} style={{ padding: '6px 9px', borderRadius: 6, border: '1px solid #cdd1d8', fontSize: 12, minWidth: 150 }}>
-            <option value="ALL">{CONSOLIDATED_LABEL}</option>
-            {BRANCH_CODES.map((b) => <option key={b} value={b}>{b}</option>)}
+          {/* A specific TOP-BAR branch scopes this page to that branch only — the
+              in-page picker locks to it (no other branch's data is reachable).
+              Consolidated + all branches are offered only under the ALL view. */}
+          <select value={branchView} disabled={!!brc} title={brc ? 'Scoped by the top-bar branch — switch it there' : undefined}
+            onChange={(e) => setBranchView(e.target.value)} style={{ padding: '6px 9px', borderRadius: 6, border: '1px solid #cdd1d8', fontSize: 12, minWidth: 150 }}>
+            {!brc && <option value="ALL">{CONSOLIDATED_LABEL}</option>}
+            {(brc ? [brc] : BRANCH_CODES).map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
         </label>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: DIM }}>
@@ -465,7 +472,9 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #cdd1d8', marginBottom: 12 }}>
-        {tabBtn('tree', 'Tree View')}{tabBtn('side', 'Side-by-Side')}{tabBtn('parity', 'TK Group Central View')}{tabBtn('paritytable', 'TK Group Central Table')}{tabBtn('inactive', `Inactive (${inactiveLedgers.length})`)}
+        {/* Retired tabs (Side-by-Side, TK Group Central View, Inactive) removed per user
+            2026-07-08 — their renderers stay below for the exported/tested pure helpers. */}
+        {tabBtn('tree', 'Tree View')}{tabBtn('paritytable', 'TK Group Central Table')}
         {tab === 'tree' && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 6, padding: '4px 0' }}>
             <button onClick={() => setAll(true)} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, border: `1px solid ${DARK}`, borderRadius: 5, background: '#fff', color: DARK, cursor: 'pointer' }}>⊞ Expand all</button>
@@ -479,7 +488,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
           {Array.from({ length: 7 }).map((_, r) => <div key={r} className="kb-skeleton" style={{ height: 16, borderRadius: 6, marginBottom: 8, opacity: Math.max(0.4, 1 - r * 0.1) }} />)}
         </div>
       )}
-      {tab === 'tree' ? treeView() : tab === 'side' ? sideView() : tab === 'parity' ? <TravkingsGroupView /> : tab === 'paritytable' ? <TravkingsGroupTableView setRoute={setRoute} setBranch={setBranch} /> : inactiveView()}
+      {tab === 'paritytable' ? <TravkingsGroupTableView setRoute={setRoute} setBranch={setBranch} shellBranch={brc} /> : treeView()}
     </div>
   );
 }
@@ -684,7 +693,7 @@ const SIGN_CLR = { fixed: P_GREEN, own: BLUE, ll: '#7c3aed', wired: P_AMBER, nf:
 const P_CUR = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 const sameScope = (a, b) => !!a && !!b && a.tier === b.tier && a.branch === b.branch && a.cat === b.cat;
 
-function TravkingsGroupTableView({ setRoute, setBranch }) {
+function TravkingsGroupTableView({ setRoute, setBranch, shellBranch }) {
   const q = useBranchParitySummary();
   const [drill, setDrill] = useState(null);   // { tier, branch, cat, label }
   const [dq, setDq] = useState('');
@@ -692,10 +701,17 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
   const d = q.data || {};
   const branches = d.branches || [];
   const grp = d.groups || {};
-  const rows = d.ledgers || [];
+  // The summary is org-wide; a specific top-bar branch scopes the table to that
+  // branch's row only (the ALL view keeps the full branch-by-branch comparison).
+  const rows = (d.ledgers || []).filter((r) => !shellBranch || r.branch === shellBranch);
   const tot = d.ledgerTotals || { fixed: 0, core: 0, own: 0, wired: 0, nf: 0, deactivated: 0, total: 0 };
 
   const openDrill = (scope) => { setDq(''); setDrill((cur) => (sameScope(cur, scope) ? null : scope)); };
+  // Top-bar branch switched while a drill was open → drop a drill that belongs
+  // to another branch (its data would leak the previous branch's ledgers).
+  useEffect(() => {
+    if (shellBranch) setDrill((cur) => (cur && cur.branch && cur.branch !== shellBranch ? null : cur));
+  }, [shellBranch]);
   // Jumps (branch-scoped). Master reuses the existing ?edit=<code> deep-link;
   // Statement switches the shell branch (so the balance matches) then navigates.
   const openMaster = (code) => { if (setRoute && code) setRoute('/masters/ledgers?edit=' + encodeURIComponent(code)); };
@@ -795,7 +811,8 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               </tr>
             ))}
           </tbody>
-          <tfoot>
+          {/* The "All" footer aggregates every branch — shown only in the ALL view. */}
+          {!shellBranch && <tfoot>
             <tr style={{ background: '#f6faf8' }}>
               <td style={{ padding: '11px 10px', fontWeight: 700, color: DARK, borderTop: '2px solid #cdd1d8', position: 'sticky', left: 0, zIndex: 2, background: '#f6faf8', boxShadow: '1px 0 0 #eef1f5' }}>All</td>
               {[['parent', 'fixed'], ['parent', 'wired'], ['parent', 'nf'], ['group', 'fixed'], ['group', 'wired'], ['group', 'nf'], ['sub', 'fixed'], ['sub', 'wired'], ['sub', 'nf']].map(([t, c], i) => (
@@ -809,11 +826,11 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.hidden, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.hidden ?? 0)}</td>
               <td style={{ padding: '11px 10px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: SIGN_CLR.deact, fontWeight: 700, borderTop: '2px solid #cdd1d8' }}>{num(tot.deactivated)}</td>
             </tr>
-          </tfoot>
+          </tfoot>}
         </table>
       </div>
 
-      {drill && <DrillPanel scope={drill} q={drillQ} dq={dq} setDq={setDq} onClose={() => setDrill(null)} money={money} num={num} openMaster={openMaster} openStatement={openStatement} />}
+      {drill && <DrillPanel scope={drill} q={drillQ} dq={dq} setDq={setDq} onClose={() => setDrill(null)} money={money} num={num} openMaster={openMaster} openStatement={openStatement} shellBranch={shellBranch} />}
 
       <div style={{ marginTop: 12, fontSize: 11.5, color: DIM, background: '#f7f9fc', border: '1px solid #cdd1d8', borderLeft: `3px solid ${P_GREEN}`, borderRadius: 8, padding: '10px 13px' }}>
         <b style={{ color: DARK }}>Tap a count to drill in.</b> Group cells list the group names; ledger cells list that branch’s ledgers with <b>postings</b> &amp; <b>closing balance</b>. In the list: tap a <b>name</b> → Master detail, tap a <b>balance</b> → Ledger Statement (scoped to that branch). Groups are global (identical every branch); ledgers vary. <b>OL</b> (Open Ledgers) = the branch's open chart — shared org-wide, equal across branches by design; <b>LL</b> (Lock Ledgers) = ledgers you locked via the 🔓 toggle (tap the count, then 🔒, to unlock back to OL); <b>~*🔒</b> = module-wired + tax statutory heads (GST/VAT sets, control heads — ERP-managed, never under OL/LL). <b>Total = OL + LL + ~*</b> (all active ledgers — equal across branches). <b>Not used</b> is an indicator of untouched open ledgers (0 entries, 0 balance) — they drop off automatically on their first entry. <b>Hidden</b> = presence-toggled off (tap the count, then the branch pill, to restore); <b>Deact</b> is separate; neither counts in Total.
@@ -827,7 +844,7 @@ function TravkingsGroupTableView({ setRoute, setBranch }) {
 // Tap: ON adds (reactivate / clone from a donor branch); OFF is the SMART remove
 // (0 entries → delete, has entries → deactivate). Locked (wired/tax) heads are
 // ERP-managed — shown with a lock, not tappable.
-function PresenceToggles({ item, num }) {
+function PresenceToggles({ item, num, shellBranch }) {
   const qc = useQueryClient();
   const refresh = () => { qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['master', 'ledgers'] }); };
   const m = useMutation({
@@ -846,7 +863,30 @@ function PresenceToggles({ item, num }) {
     onSuccess: (res, vars) => { toastSuccess(`${item.name} — ${vars.locked ? 'locked → moved to LL' : 'unlocked → back to OL'}`); refresh(); },
     onError: (e) => toastError((e && e.message) || 'Could not change the lock'),
   });
+  // Org-wide deactivate/restore: parks a not-needed head in Deact (every
+  // branch), or brings it back. Blocked for statutory + LL-locked heads.
+  const deactM = useMutation({
+    mutationFn: (body) => apiPost('/api/ledgers/active', body),
+    onSuccess: (res, vars) => { toastSuccess(`${item.name} — ${vars.active ? 'restored from Deact' : 'moved to Deact'}`); refresh(); },
+    onError: (e) => toastError((e && e.message) || 'Could not change activation'),
+  });
   const headLocked = (item.presence || []).some((p) => p.locked);
+  const anyLive = (item.presence || []).some((p) => p.state === 'active' || p.state === 'hidden');
+  const anyInactive = (item.presence || []).some((p) => p.state === 'inactive');
+  const flipActive = async () => {
+    if (item.statutory || headLocked || deactM.isPending) return;
+    const toDeact = anyLive;
+    const totalPosts = (item.presence || []).reduce((s, p) => s + (p.posts || 0), 0);
+    if (toDeact && totalPosts > 0) {   // posted head → confirm; untouched → instant
+      const { confirmed } = await confirmDialog({
+        title: `Deactivate “${item.name}”?`,
+        message: `It holds ${num(totalPosts)} posted entr${totalPosts === 1 ? 'y' : 'ies'} across branches — the entries stay untouched, but the ledger moves to the Deact column in every branch and can no longer be posted to. Restore it anytime from the Deact drill.`,
+        danger: true, confirmLabel: 'Deactivate',
+      });
+      if (!confirmed) return;
+    }
+    deactM.mutate({ name: item.name, active: !toDeact });
+  };
   const flipLock = async () => {
     if (item.statutory || lockM.isPending) return;
     const toLock = !headLocked;
@@ -893,7 +933,9 @@ function PresenceToggles({ item, num }) {
     : 'tap to add to this branch';
   return (
     <span style={{ display: 'inline-flex', gap: 3, flexWrap: 'nowrap', alignItems: 'center' }}>
-      {(item.presence || []).map((p) => (
+      {/* A specific top-bar branch shows only ITS presence pill — other branches'
+          presence is managed from the ALL view. Org-wide lock/deact stay (actions). */}
+      {(item.presence || []).filter((p) => !shellBranch || p.br === shellBranch).map((p) => (
         <button key={p.br} type="button" disabled={p.locked || m.isPending} onClick={() => flip(p)} style={pill(p)}
           title={`${p.br} · ${p.state}${p.posts ? ` · ${num(p.posts)} entries` : ''} · ${hint(p)}`}>
           {p.br}{p.locked ? '🔒' : ''}
@@ -908,6 +950,13 @@ function PresenceToggles({ item, num }) {
             {headLocked ? '🔒' : '🔓'}
           </button>
         )}
+      {!item.statutory && !headLocked && (anyLive || anyInactive) && (
+        <button type="button" disabled={deactM.isPending} onClick={flipActive}
+          title={anyLive ? 'Deactivate (org-wide) — moves to the Deact column; restorable' : 'Restore (org-wide) — brings it back from Deact'}
+          style={{ appearance: 'none', border: `1px solid ${anyLive ? '#f3c1bb' : '#bcd8ce'}`, background: anyLive ? '#fef2f2' : '#effaf5', color: anyLive ? '#b23c2b' : '#14795f', borderRadius: 5, padding: '2px 5px', fontSize: 11, fontWeight: 800, cursor: 'pointer', marginLeft: 2, opacity: deactM.isPending ? 0.5 : 1 }}>
+          {anyLive ? '⊘' : '↺'}
+        </button>
+      )}
     </span>
   );
 }
@@ -918,7 +967,7 @@ function PresenceToggles({ item, num }) {
 // and per-branch presence toggles (add / smart-remove a head branch by branch).
 // Ledger drills offer TWO layouts: Tree (default — Parent Group ▸ Group ▸ Sub-Group
 // ▸ Ledger with collapse/expand, mirrors the Accounts Tree filing) and Flat.
-function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, openStatement }) {
+function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, openStatement, shellBranch }) {
   const data = q.data || {};
   const all = data.items || [];
   const isLedger = scope.tier === 'ledger';
@@ -1000,7 +1049,7 @@ function DrillPanel({ scope, q, dq, setDq, onClose, money, num, openMaster, open
                   </td>
                   <td style={{ padding: '11px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: '#eef0f4', color: '#556' }}>{l.kind || 'Other'}</span></td>
                   {!treeMode && <td style={{ padding: '11px 12px', color: DIM, fontSize: 12.5, borderBottom: '1px solid #eef1f5' }}>{l.group}{l.subGroup ? <span style={{ color: '#9aa2c0' }}> ▸ {l.subGroup}</span> : null}</td>}
-                  {rich && <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><PresenceToggles item={l} num={num} /></td>}
+                  {rich && <td style={{ padding: '8px 12px', borderBottom: '1px solid #eef1f5', whiteSpace: 'nowrap' }}><PresenceToggles item={l} num={num} shellBranch={shellBranch} /></td>}
                   <td style={{ padding: '11px 12px', textAlign: 'right', fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums', color: DIM, borderBottom: '1px solid #eef1f5' }}>{num(l.count)}</td>
                   <td style={{ padding: 0, borderBottom: '1px solid #eef1f5' }}>
                     <button type="button" onClick={() => openStatement(l.name, scope.branch)} title="Open Ledger Statement"

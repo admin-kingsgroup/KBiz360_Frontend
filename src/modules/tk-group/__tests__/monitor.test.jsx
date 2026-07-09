@@ -10,6 +10,7 @@ jest.mock('../api/monitor', () => ({
   getOverview: jest.fn(), getBranchCockpit: jest.fn(), getAudit: jest.fn(),
   getGroupHealth: jest.fn().mockResolvedValue({}), getIntegrity: jest.fn().mockResolvedValue({}),
   getTrend: jest.fn().mockResolvedValue({}), getSetupReadiness: jest.fn().mockResolvedValue({}),
+  getDevFindings: jest.fn().mockResolvedValue([]),
 }));
 // eslint-disable-next-line import/first
 import { getOverview, getBranchCockpit, getAudit } from '../api/monitor';
@@ -45,8 +46,12 @@ describe('ControlTower', () => {
     expect(await screen.findByText('Master')).toBeInTheDocument();
     expect(screen.getByTestId('tk-kpis')).toHaveTextContent('9');
     // Sectioned into tabs (like the ERP Rules Manager), Overview default.
-    ['Overview', 'Group Health', 'Setup Readiness', 'Close & Integrity', 'Scrutiny Trend', 'Governance']
+    ['Overview', 'Group Health', 'Setup Readiness', 'Close & Integrity', 'Scrutiny Trend', 'Development', 'Governance']
       .forEach((t) => expect(screen.getByRole('button', { name: t })).toBeInTheDocument());
+    // Development lens card renders on the Overview (tab button + lens card title),
+    // fed by the Dev Control registry + tracking rows.
+    expect(screen.getAllByText('Development').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/findings open|clear/)).toBeInTheDocument();
   });
 });
 

@@ -15,7 +15,18 @@ export function InterBranchMatrix({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const q = useInbMatrix({});
   const data = q.data || { branches: [], rows: [], totals: {} };
-  const { branches = [], rows = [], totals = {} } = data;
+  // A specific top-bar branch scopes the matrix to pairs INVOLVING that branch
+  // (its sales + its purchases); unrelated pairs (e.g. BOM↔AMD under NBO) only
+  // show in the ALL view.
+  const code = branch && branch !== 'ALL' ? (branch.code || branch) : '';
+  const rows = (data.rows || []).filter((r) => !code || r.fromBranch === code || r.toBranch === code);
+  const branches = code
+    ? (data.branches || []).filter((b) => rows.some((r) => r.fromBranch === b || r.toBranch === b))
+    : (data.branches || []);
+  const sum = (k) => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+  const totals = code
+    ? { count: sum('count'), total: sum('total'), fares: sum('fares'), svf: sum('svf'), discount: sum('discount'), margin: sum('margin') }
+    : (data.totals || {});
 
   // pivot rows → cell[seller][buyer] = total, + row/col totals
   const cell = {}; const rowTot = {}; const colTot = {};
