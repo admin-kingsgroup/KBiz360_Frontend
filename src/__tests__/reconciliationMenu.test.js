@@ -1,10 +1,9 @@
-// Verifies the dedicated "Reconciliation" head under Accounts: it consolidates
-// every reconciliation screen, split into Client · Bank · Supplier · Tax sections,
-// that the moved items aren't duplicated in their old groups, that breadcrumbs
-// point at the new location, that the GST recon screens are also grouped under a
-// "Reconciliation" divider in the Taxation pill, and that the Accounts-side Tax
-// pointer is regime-aware (India keeps GST links; pure VAT branches don't).
-import { MENU_ACCOUNTS, getMenu } from '../core/menus';
+// Verifies the reconciliation menu placement: EVERY non-tax reconciliation
+// screen (client · bank · supplier · inter-branch · Tally matching + the
+// certificate ladder) lives under the TOP-LEVEL Reconciliation pill — the
+// Accounts pill carries none of them anymore. Tax/GST reconciliation stays
+// grouped under the regime-aware Taxation pill, exactly as before.
+import { MENU_ACCOUNTS, MENU_RECONCILIATION, getMenu } from '../core/menus';
 import { TAX_INDIA } from '../core/data';
 import { crumbsFor } from '../core/routeMeta';
 
@@ -18,63 +17,49 @@ function allHrefs(node, out = []) {
   return out;
 }
 
-describe('Accounts ▸ Reconciliation head', () => {
-  const recon = groupByLabel(MENU_ACCOUNTS, 'Reconciliation');
+const MATCHING = ['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco', '/finance/reco-queue', '/accounts/interbranch-reco', '/accounts/tally-reco'];
 
-  test('the Reconciliation group exists under Accounts', () => {
-    expect(recon).toBeTruthy();
-    expect(Array.isArray(recon.children)).toBe(true);
+describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', () => {
+  const matching = groupByLabel(MENU_RECONCILIATION, 'Statement Matching');
+
+  test('the Statement Matching group exists under the Reconciliation pill', () => {
+    expect(matching).toBeTruthy();
+    expect(hrefs(matching)).toEqual(expect.arrayContaining(MATCHING));
   });
 
-  test('it contains client, bank, supplier and queue reconciliation', () => {
-    expect(hrefs(recon)).toEqual(
-      expect.arrayContaining(['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco', '/finance/reco-queue']),
-    );
+  test('the certificate ladder keeps its own group', () => {
+    const certs = groupByLabel(MENU_RECONCILIATION, 'Certificates & Closing');
+    expect(hrefs(certs)).toEqual(['/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook']);
   });
 
-  test('it is split into Client / Bank / Supplier sections (dividers)', () => {
-    const dividers = recon.children.filter((c) => c.divider).map((c) => c.label);
-    expect(dividers).toEqual(expect.arrayContaining(['Client', 'Bank', 'Supplier']));
-  });
-
-  test('no tax/GST reconciliation links remain under the Accounts pill', () => {
+  test('the Accounts pill carries NO reconciliation screens anymore', () => {
     const all = allHrefs(MENU_ACCOUNTS);
-    ['/tax/reconciliation', '/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c'].forEach((h) => {
-      expect(all).not.toContain(h);
-    });
+    MATCHING.forEach((h) => expect(all).not.toContain(h));
+    expect(groupByLabel(MENU_ACCOUNTS, 'Reconciliation')).toBeUndefined();
   });
 
-  test('moved items are not duplicated in their old groups', () => {
-    expect(hrefs(groupByLabel(MENU_ACCOUNTS, 'Cash & Bank'))).not.toContain('/bank-reco');
-    expect(hrefs(groupByLabel(MENU_ACCOUNTS, 'Cash & Bank'))).not.toContain('/finance/reco-queue');
-    expect(hrefs(groupByLabel(MENU_ACCOUNTS, 'Payables & Suppliers'))).not.toContain('/accounts/supplier-reco');
+  test('each recon route appears exactly once in the Reconciliation pill', () => {
+    const all = allHrefs(MENU_RECONCILIATION);
+    MATCHING.forEach((h) => expect(all.filter((x) => x === h)).toHaveLength(1));
   });
 
-  test('each non-tax recon route appears exactly once in the Accounts pill', () => {
-    const all = allHrefs(MENU_ACCOUNTS);
-    ['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco', '/finance/reco-queue'].forEach((h) => {
-      expect(all.filter((x) => x === h)).toHaveLength(1);
-    });
-  });
-
-  test('breadcrumbs resolve to Accounts › Reconciliation › <leaf>', () => {
+  test('breadcrumbs resolve to Reconciliation › Statement Matching › <leaf>', () => {
     expect(crumbsFor('/accounts/client-reco').map((c) => c.label)).toEqual(
-      ['Accounts', 'Reconciliation', 'Client Reconciliation'],
+      ['Reconciliation', 'Statement Matching', 'Client Reconciliation'],
     );
     expect(crumbsFor('/bank-reco').map((c) => c.label)).toEqual(
-      ['Accounts', 'Reconciliation', 'Bank Reconciliation'],
+      ['Reconciliation', 'Statement Matching', 'Bank Reconciliation'],
     );
-    expect(crumbsFor('/accounts/supplier-reco').map((c) => c.label)).toEqual(
-      ['Accounts', 'Reconciliation', 'Supplier Reconciliation'],
+    expect(crumbsFor('/accounts/interbranch-reco').map((c) => c.label)).toEqual(
+      ['Reconciliation', 'Statement Matching', 'Inter-Branch Reconciliation'],
     );
   });
 });
 
-describe('Accounts ▸ Reconciliation carries NO tax links in any regime (getMenu)', () => {
-  const accountsRecon = (branch) => {
+describe('the Reconciliation pill carries the matching screens in every regime (getMenu)', () => {
+  const reconPill = (branch) => {
     const menu = getMenu(branch, { role: 'Super Admin' });
-    const accounts = menu.find((m) => m.label === 'Accounts');
-    return hrefs(groupByLabel(accounts, 'Reconciliation'));
+    return allHrefs(menu.find((m) => m.label === 'Reconciliation'));
   };
   const GST = ['/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c', '/tax/reconciliation'];
 
@@ -82,15 +67,20 @@ describe('Accounts ▸ Reconciliation carries NO tax links in any regime (getMen
     ['India branch (BOM)', { code: 'BOM' }],
     ['consolidated ("ALL")', 'ALL'],
     ['pure VAT branch (NBO)', { code: 'NBO' }],
-  ])('%s shows only non-tax recons under Accounts', (_name, branch) => {
-    const h = accountsRecon(branch);
+  ])('%s: matching screens present, no tax links', (_name, branch) => {
+    const h = reconPill(branch);
     GST.forEach((g) => expect(h).not.toContain(g));
-    // the non-tax recons are still there
-    expect(h).toEqual(expect.arrayContaining(['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco']));
+    expect(h).toEqual(expect.arrayContaining(MATCHING));
+  });
+
+  test('Branch Accountant gets the pill (weekly matching is their prep work)', () => {
+    const menu = getMenu({ code: 'BOM' }, { role: 'Branch Accountant' });
+    const h = allHrefs(menu.find((m) => m.label === 'Reconciliation'));
+    expect(h).toEqual(expect.arrayContaining(['/bank-reco', '/reconciliation']));
   });
 });
 
-describe('Taxation ▸ Reconciliation (GST, India regime)', () => {
+describe('Taxation ▸ Reconciliation (GST, India regime) — unchanged', () => {
   function itemsUnderDivider(menu, dividerLabel) {
     const kids = menu.children;
     const start = kids.findIndex((c) => c.divider && c.label === dividerLabel);
@@ -103,7 +93,7 @@ describe('Taxation ▸ Reconciliation (GST, India regime)', () => {
     return out;
   }
 
-  test('GST recon screens are grouped under a Reconciliation divider', () => {
+  test('GST recon screens stay grouped under a Reconciliation divider', () => {
     expect(itemsUnderDivider(TAX_INDIA, 'Reconciliation')).toEqual(
       expect.arrayContaining(['/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c']),
     );

@@ -16,9 +16,13 @@ function allHrefs(node, out = []) {
 }
 
 describe('Reconciliation · top-level pill', () => {
-  test('pill exists with the Hub, Reports & Pending and Rule Book leaves', () => {
+  test('pill has the certificate ladder AND the moved statement-matching screens', () => {
     expect(MENU_RECONCILIATION.label).toBe('Reconciliation');
-    expect(allHrefs(MENU_RECONCILIATION)).toEqual(['/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook']);
+    expect(allHrefs(MENU_RECONCILIATION)).toEqual([
+      '/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook',
+      '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
+      '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+    ]);
   });
 
   test('shows for Super Admin, between Accounts and Reports', () => {
@@ -34,12 +38,11 @@ describe('Reconciliation · top-level pill', () => {
     expect(labels(getMenu('BOM', { role: 'Branch Accountant' }))).toContain('Reconciliation');
   });
 
-  test('does not disturb the Accounts ▸ Reconciliation statement-matching group', () => {
-    const group = MENU_ACCOUNTS.children.find((c) => c.label === 'Reconciliation');
-    expect(group).toBeTruthy();
-    expect(allHrefs(group)).toEqual(expect.arrayContaining(['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco']));
-    // and the new pill's routes don't leak into Accounts
-    expect(allHrefs(MENU_ACCOUNTS)).not.toContain('/reconciliation');
+  test('the Accounts pill no longer carries ANY reconciliation screens', () => {
+    expect(MENU_ACCOUNTS.children.find((c) => c.label === 'Reconciliation')).toBeUndefined();
+    const all = allHrefs(MENU_ACCOUNTS);
+    ['/reconciliation', '/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco', '/finance/reco-queue', '/accounts/interbranch-reco', '/accounts/tally-reco']
+      .forEach((h) => expect(all).not.toContain(h));
   });
 
   test('TK Group Central cockpit carries the Reconciliation pill (branch-wise oversight)', () => {
@@ -53,8 +56,8 @@ describe('Reconciliation · top-level pill', () => {
   });
 
   test('breadcrumbs resolve under the Reconciliation pill', () => {
-    expect(crumbsFor('/reconciliation').map((c) => c.label)).toEqual(['Reconciliation', 'Reconciliation Hub']);
-    expect(crumbsFor('/reconciliation/reports').map((c) => c.label)).toEqual(['Reconciliation', 'Reports & Pending']);
-    expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Rule Book & Process']);
+    expect(crumbsFor('/reconciliation').map((c) => c.label)).toEqual(['Reconciliation', 'Certificates & Closing', 'Reconciliation Hub']);
+    expect(crumbsFor('/reconciliation/reports').map((c) => c.label)).toEqual(['Reconciliation', 'Certificates & Closing', 'Reports & Pending']);
+    expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Certificates & Closing', 'Rule Book & Process']);
   });
 });

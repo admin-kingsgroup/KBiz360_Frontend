@@ -362,22 +362,10 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Contra Register",      href:"/finance/contra-register"},
     // Bank Reconciliation + Reconciliation Queue moved to the "Reconciliation" head below.
   ]},
-  // Dedicated Reconciliation head — gathers EVERY non-tax reconciliation screen in
-  // one place (was previously scattered across Cash & Bank + Payables), split into
-  // Client · Bank · Supplier · Inter-branch · Tally sections. Tax/GST reconciliation
-  // (Tax Reco / GSTR-2B/2A/9C) lives ONLY under the regime-aware Taxation pill now —
-  // it was removed from this Accounts head to avoid duplicating taxation screens.
-  {label:"Reconciliation", children:[
-    {divider:true, label:"Client"},
-    {label:"Client Reconciliation",    href:"/accounts/client-reco"},
-    {divider:true, label:"Bank"},
-    {label:"Bank Reconciliation",      href:"/bank-reco"},
-    {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
-    {divider:true, label:"Supplier"},
-    {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
-    {divider:true, label:"Tally"},
-    {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
-  ]},
+  // Reconciliation moved OUT of Accounts entirely — every reconciliation screen
+  // (client / bank / supplier / inter-branch / Tally matching + the certificate
+  // ladder) now lives under the top-level Reconciliation pill (MENU_RECONCILIATION).
+  // Tax/GST reconciliation stays ONLY under the regime-aware Taxation pill.
 
   /* ── 4 · BOOKS & REPORTING ───────────────────────────────── */
   {label:"Books & Scrutiny", children:[
@@ -403,7 +391,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Counterparty Ledger",       href:"/accounts/inb-counterparty"},
     {label:"INB Sales Register",        href:"/reports/inb-sreg"},
     {label:"INB Purchase Register",     href:"/reports/inb-preg"},
-    {label:"Reconciliation",            href:"/accounts/interbranch-reco"},
+    // Inter-branch RECONCILIATION moved to the top-level Reconciliation pill.
     {label:"INB SPG Approvals",         href:"/transactions/inb-approvals"},
   ]},
 
@@ -664,9 +652,23 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
 // matching screens stay under Accounts ▸ Reconciliation — this module is the
 // certificate/sign-off layer above them.
 export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight, children:[
-  {label:"Reconciliation Hub", href:"/reconciliation"},
-  {label:"Reports & Pending", href:"/reconciliation/reports"},
-  {label:"Rule Book & Process", href:"/reconciliation/rulebook"},
+  // The certificate ladder (4 tiers, one certificate per ledger).
+  {label:"Certificates & Closing", children:[
+    {label:"Reconciliation Hub", href:"/reconciliation"},
+    {label:"Reports & Pending", href:"/reconciliation/reports"},
+    {label:"Rule Book & Process", href:"/reconciliation/rulebook"},
+  ]},
+  // Statement matching — MOVED here from the Accounts pill: all line-level
+  // import/match screens live under Reconciliation now (tax recon stays under
+  // the regime-aware Taxation pill).
+  {label:"Statement Matching", children:[
+    {label:"Client Reconciliation",    href:"/accounts/client-reco"},
+    {label:"Bank Reconciliation",      href:"/bank-reco"},
+    {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
+    {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
+    {label:"Inter-Branch Reconciliation", href:"/accounts/interbranch-reco"},
+    {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
+  ]},
 ]};
 
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).

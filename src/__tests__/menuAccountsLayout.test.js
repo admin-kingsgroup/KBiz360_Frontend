@@ -26,7 +26,7 @@ describe('Accounts pill — reorganized layout', () => {
       'Receivables & Clients',
       'Payables & Suppliers',
       'Cash & Bank',
-      'Reconciliation',
+      // Reconciliation moved to the top-level Reconciliation pill.
       'Books & Scrutiny',
       'Branch MIS',
       'Inter Branch',
