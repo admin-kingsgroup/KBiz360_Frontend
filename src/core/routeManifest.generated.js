@@ -192,6 +192,7 @@ export const APP_ROUTES = [
   "/purchase/visa",
   "/receipts",
   "/reconciliation",
+  "/reconciliation/match-guide",
   "/reconciliation/reports",
   "/reconciliation/rulebook",
   "/reports/abc-analysis",
@@ -357,6 +358,7 @@ export const APP_ROUTE_LABELS = {
   "/finance/reissue-register": "Reissue Register",
   "/finance/trial-balance": "Trial Balance",
   "/reconciliation": "Reconciliation",
+  "/reconciliation/match-guide": "Statement Match Guide",
   "/reconciliation/reports": "Reconciliation Reports & Pending",
   "/reconciliation/rulebook": "Reconciliation Rule Book",
   "/support/tickets": "Support Tickets"
