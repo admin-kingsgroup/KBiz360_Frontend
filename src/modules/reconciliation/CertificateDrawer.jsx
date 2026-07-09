@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Circle, FileUp, ShieldCheck, AlertTriangle, Stamp, Lock, ExternalLink } from 'lucide-react';
-import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan, getAttachmentUrl } from './api';
+import { CheckCircle2, Circle, FileUp, ShieldCheck, AlertTriangle, Stamp, Lock, ExternalLink, SearchCheck } from 'lucide-react';
+import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan, getAttachmentUrl, scrutinizeStatement } from './api';
+import { parseStatementFile } from './statementParse';
+import { ScrutinyView } from './ScrutinyView';
 import { tierOf, statusMeta, sourceMeta, chainProgress, fmtAmt, openExceptions } from './utils';
 import { Drawer, Badge, Button, Input, Select, FormField, LoadingState, EmptyState, ErrorState } from '../../shell/primitives';
 
@@ -24,6 +26,13 @@ function Row({ label, children }) {
 function SnapshotForm({ cert, books, onFreeze, busy, error }) {
   const [stmt, setStmt] = useState('');
   const [adj, setAdj] = useState('0');
+  // Scrutiny hand-off: adopt the parsed statement closing + the classified
+  // reconciling items as the snapshot figures — explicit, never silent.
+  const scr = cert.scrutiny?.summary;
+  const useScrutiny = () => {
+    if (cert.scrutiny?.statementClosing != null) setStmt(String(cert.scrutiny.statementClosing));
+    if (scr?.suggestedAdjustments != null) setAdj(String(scr.suggestedAdjustments));
+  };
   // The BOOK side is auto-fetched from ERP Books and LOCKED — never typed.
   const book = books ? Number(books.amount) : null;
   // Round like the backend (2dp) so floating-point sums don't show a phantom difference.
@@ -48,9 +57,18 @@ function SnapshotForm({ cert, books, onFreeze, busy, error }) {
         Difference after reconciling items: {fmtAmt(diff, cert.branch)} {diff === 0 && books ? '— ready to freeze' : '— must be zero to sign'}
       </div>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
-      <Button variant="primary" loading={busy} disabled={stmt === '' || !books} onClick={() => onFreeze({ statementBalance: Number(stmt), adjustments: Number(adj) || 0 })}>
-        Freeze snapshot (Rule 02)
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="primary" loading={busy} disabled={stmt === '' || !books} onClick={() => onFreeze({ statementBalance: Number(stmt), adjustments: Number(adj) || 0 })}>
+          Freeze snapshot (Rule 02)
+        </Button>
+        {scr && (
+          <Button variant="secondary" icon={SearchCheck} onClick={useScrutiny}
+            disabled={scr.unresolved > 0}
+            title={scr.unresolved > 0 ? `${scr.unresolved} scrutiny lines still need action` : undefined}>
+            Use scrutiny figures{scr.unresolved > 0 ? ` (${scr.unresolved} unresolved)` : ''}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -62,6 +80,8 @@ export function CertificateDrawer({ id, branch, onClose }) {
   const [attFile, setAttFile] = useState(null);
   const [exText, setExText] = useState('');
   const [err, setErr] = useState('');
+  const [parseNote, setParseNote] = useState('');
+  const [showScrutiny, setShowScrutiny] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ['recon-certs', 'cert', id], queryFn: () => getCertificate(id), enabled: !!id });
   const cert = data?.data || data; // envelope unwrapped by the api client; /:id returns {data, chain, canSign, books}
@@ -74,7 +94,31 @@ export function CertificateDrawer({ id, branch, onClose }) {
   // eslint-disable-next-line react-hooks/rules-of-hooks -- called unconditionally, fixed order
   const useAction = (fn) => useMutation({ mutationFn: fn, onSuccess: () => { setErr(''); invalidate(); }, onError: (e) => setErr(e.message) });
   const freeze = useAction((body) => freezeSnapshot(id, body));
-  const attachM = useAction((body) => addAttachment(id, body));
+  // Attach = evidence upload + (when the file is HTML/TXT/CSV/Excel) client-side
+  // parse → server-side entry-to-entry scrutiny in one step. PDF stays evidence.
+  const attachM = useAction(async ({ label, source, file }) => {
+    let parsed = null;
+    if (file && /\.(csv|txt|xlsx?|xlsm|html?|htm)$/i.test(file.name)) parsed = await parseStatementFile(file);
+    const res = await addAttachment(id, { label, source, file });
+    if (parsed?.rows?.length) {
+      const fresh = res?.data || res;
+      const att = fresh?.attachments?.[(fresh.attachments?.length || 1) - 1];
+      await scrutinizeStatement(id, {
+        attachmentId: att?._id ? String(att._id) : '',
+        fileName: file.name,
+        rows: parsed.rows,
+        statementClosing: parsed.statementClosing,
+      });
+      setParseNote(`Scrutinized ${parsed.rows.length} statement lines against the ledger.`);
+    } else if (file && /\.pdf$/i.test(file.name)) {
+      setParseNote('PDF stored as evidence — upload the HTML/TXT/Excel version for line-by-line scrutiny.');
+    } else if (parsed?.error) {
+      setParseNote(`Attached; line scrutiny skipped — ${parsed.error}`);
+    } else {
+      setParseNote('');
+    }
+    return res;
+  });
   const exAdd = useAction((text) => addException(id, text));
   const exResolve = useAction((exId) => resolveException(id, exId));
   const signM = useAction(() => signCertificate(id));
@@ -183,18 +227,38 @@ export function CertificateDrawer({ id, branch, onClose }) {
                     Attach
                   </Button>
                 </div>
-                <FormField label="Statement file — PDF · CSV · image · XML (optional)"
-                  hint={attFile ? `${attFile.name} · ${Math.max(1, Math.round(attFile.size / 1024))} KB — will be stored and content-hashed.` : 'The uploaded file is stored privately and tamper-tied to its sha256.'}>
+                <FormField label="Statement file — Excel · HTML · TXT · CSV parse line-by-line; PDF/image = evidence (optional)"
+                  hint={attFile ? `${attFile.name} · ${Math.max(1, Math.round(attFile.size / 1024))} KB — stored, content-hashed${/\.(csv|txt|xlsx?|xlsm|html?|htm)$/i.test(attFile.name) ? ', and scrutinized entry-to-entry against the ledger' : ''}.` : 'Parseable statements are matched entry-to-entry against the ERP ledger on upload.'}>
                   <input
                     type="file"
-                    accept=".pdf,.csv,.xml,image/*,application/pdf,text/csv,application/xml,text/xml"
+                    accept=".pdf,.csv,.txt,.xml,.html,.htm,.xls,.xlsx,image/*,application/pdf,text/csv,text/plain,text/html,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     onChange={(e) => setAttFile(e.target.files?.[0] || null)}
                     className="block w-full cursor-pointer text-sm text-ink-muted file:mr-3 file:cursor-pointer file:rounded-brand file:border file:border-surface-border file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-ink hover:file:bg-surface-alt"
                   />
                 </FormField>
+                {parseNote ? <p className="text-xs text-ink-muted">{parseNote}</p> : null}
               </div>
             )}
           </section>
+
+          {/* statement scrutiny */}
+          {cert.scrutiny && (
+            <section>
+              <h3 className="kbiz-section-title mb-2">Statement Scrutiny — entry-to-entry</h3>
+              <div className="flex flex-wrap items-center gap-2 rounded-brand border border-surface-border bg-surface-alt/50 px-3 py-2.5">
+                <Badge tone="success" size="sm" dot>{cert.scrutiny.summary?.matched ?? 0} matched</Badge>
+                <Badge tone="warning" size="sm" dot>{cert.scrutiny.summary?.probable ?? 0} probable</Badge>
+                <Badge tone="info" size="sm" dot>{cert.scrutiny.summary?.stmtOnly ?? 0} stmt-only</Badge>
+                <Badge tone="danger" size="sm" dot>{cert.scrutiny.summary?.bookOnly ?? 0} book-only</Badge>
+                {cert.scrutiny.summary?.unresolved > 0
+                  ? <span className="text-xs font-semibold text-warning">{cert.scrutiny.summary.unresolved} need action</span>
+                  : <span className="text-xs font-semibold text-success">every line matched or classified ✓</span>}
+                <Button size="xs" variant="secondary" icon={SearchCheck} className="ml-auto" onClick={() => setShowScrutiny(true)}>
+                  Open scrutiny report
+                </Button>
+              </div>
+            </section>
+          )}
 
           {/* exceptions */}
           <section>
@@ -252,6 +316,7 @@ export function CertificateDrawer({ id, branch, onClose }) {
 
         </div>
       )}
+      {showScrutiny && cert?.scrutiny && <ScrutinyView cert={cert} onClose={() => setShowScrutiny(false)} />}
     </Drawer>
   );
 }
