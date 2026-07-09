@@ -1,0 +1,171 @@
+import {
+  TASK_USERS, assigneeLabel, assigneeTone, taskStatusTone, taskStatusLabel,
+  devFindingRows, combineTasks, inBranchScope, taskRows, userCounts, branchCounts,
+  ledgerScope, partyRows, taskKpis, ledgerRows,
+} from '../utils/setupTaskList';
+import { ALL_ITEMS, isCleared } from '../../devControl/registry';
+
+// Pure shaping for the Control Tower Task List — config statuses arrive resolved
+// from the backend's live DB checks; development issues come from the dev
+// registry. The FE only merges, scopes, splits and numbers.
+
+const BRANCHES = ['BOM', 'BOMMB', 'AMD', 'NBO', 'DAR', 'FBM'];
+const D = {
+  branches: BRANCHES,
+  tasks: [
+    { id: 'credit-facilities', branch: 'Central', assignee: 'FM', status: 'pending', link: '/masters/credit-facilities' },
+    { id: 'opening-balances-BOM', branch: 'BOM', assignee: 'FM', status: 'pending', link: '/masters/ledgers' },
+    { id: 'opening-balances-AMD', branch: 'AMD', assignee: 'FM', status: 'pending', link: '/masters/ledgers' },
+    { id: 'voucher-types', branch: 'Central', assignee: 'FM', status: 'done', link: '/masters/voucher-types' },
+    { id: 'rule-CUS-01', branch: 'Central', assignee: 'Owner', status: 'pending', link: '/tk/rules' },
+    { id: 'core-rules', branch: 'Central', assignee: 'Owner', status: 'done', link: '/tk/rules' },
+  ],
+  ledgers: {
+    byBranch: [
+      { branch: 'BOM', pending: 34, total: 34, entered: 0 },
+      { branch: 'BOMMB', pending: 30, total: 34, entered: 4 },
+    ],
+    branch: 'BOM',
+    items: [{ code: 'L1156', name: 'Round Off', group: 'Variable Expenses', subGroup: 'Office Expenses' }],
+    capped: false,
+  },
+  parties: {
+    customers: { total: 5, incomplete: 2, capped: false, items: [
+      { name: 'NeuIQ Technologies', branch: 'BOM', missing: ['Credit limit', 'GST treatment'] },
+      { name: 'Sea Hook Engineering', branch: 'AMD', missing: ['Contact (phone/email)'] },
+    ] },
+    suppliers: { total: 91, incomplete: 1, capped: false, items: [
+      { name: 'TRIP JACK', branch: 'ALL', missing: ['GSTIN'] },
+    ] },
+  },
+};
+
+describe('TK task list · labels and tones', () => {
+  test('assignee labels name the actual people', () => {
+    expect(assigneeLabel('FM')).toBe('FM · Faiz');
+    expect(assigneeLabel('Owner')).toBe('Owner · Afshin');
+    expect(assigneeLabel('Developer')).toBe('Developer');
+    expect(TASK_USERS).toEqual(['FM', 'Developer', 'Owner']);
+  });
+
+  test('status tones/labels: pending=warning, done=success', () => {
+    expect(taskStatusTone('pending')).toBe('warning');
+    expect(taskStatusTone('done')).toBe('success');
+    expect(taskStatusLabel('done')).toBe('Configured');
+    expect(taskStatusLabel('pending')).toBe('Pending');
+    expect(assigneeTone('FM')).toBe('info');
+  });
+});
+
+describe('TK task list · development issues from the registry (pure)', () => {
+  test('ALL non-live registry findings land under Developer with their remark', () => {
+    const rows = devFindingRows(ALL_ITEMS, {});
+    const openCount = ALL_ITEMS.filter((i) => i.status !== 'live' && !isCleared(i, undefined)).length;
+    expect(rows.filter((r) => r.status === 'pending')).toHaveLength(openCount);
+    rows.forEach((r) => {
+      expect(r.assignee).toBe('Developer');
+      expect(r.branch).toBe('Central');
+      expect(r.id).toMatch(/^dev:/);
+      expect(r.remark).toBeTruthy();      // proper remark, always
+      expect(r.link).toBe('/dev/control');
+      expect(r.check).toContain('dev registry = ');
+    });
+  });
+
+  test('live registry rows are not issues; a tracked done item MOVES to Configured', () => {
+    const items = [
+      { id: 'a', name: 'A', area: 'X', status: 'live', note: 'n' },
+      { id: 'b', name: 'B', area: 'X', status: 'stub', remark: 'fix b' },
+      { id: 'c', name: 'C', area: 'X', status: 'pending', note: 'build c' },
+    ];
+    const rows = devFindingRows(items, { b: { status: 'done' } });
+    expect(rows.map((r) => r.id)).toEqual(['dev:b', 'dev:c']); // 'a' never appears
+    expect(rows.find((r) => r.id === 'dev:b').status).toBe('done'); // moved, not vanished
+    expect(rows.find((r) => r.id === 'dev:b').check).toContain('· done');
+    expect(rows.find((r) => r.id === 'dev:c')).toMatchObject({ status: 'pending', remark: 'build c' });
+  });
+
+  test('combineTasks merges backend config tasks with dev rows', () => {
+    const merged = combineTasks(D, [{ id: 'dev:x', branch: 'Central', assignee: 'Developer', status: 'pending' }]);
+    expect(merged).toHaveLength(D.tasks.length + 1);
+    expect(combineTasks(undefined, [])).toEqual([]);
+  });
+});
+
+describe('TK task list · branchwise scoping never mixes (pure)', () => {
+  const tasks = combineTasks(D, [{ id: 'dev:x', branch: 'Central', assignee: 'Developer', status: 'pending' }]);
+
+  test('inBranchScope: ALL sees everything; a branch sees only its rows; Central only central', () => {
+    expect(inBranchScope({ branch: 'Central' }, 'ALL')).toBe(true);
+    expect(inBranchScope({ branch: 'BOM' }, 'BOM')).toBe(true);
+    expect(inBranchScope({ branch: 'Central' }, 'BOM')).toBe(false);
+    expect(inBranchScope({ branch: 'BOM' }, 'Central')).toBe(false);
+    expect(inBranchScope({ branch: 'AMD' }, 'BOM')).toBe(false); // branches never see each other
+  });
+
+  test('taskRows: splits pending vs done and serial-numbers each; scopes compose', () => {
+    const all = taskRows(tasks, 'ALL', 'ALL');
+    expect(all.pending.map((r) => r.sr)).toEqual([1, 2, 3, 4, 5]);
+    expect(all.done.map((r) => r.id)).toEqual(['voucher-types', 'core-rules']);
+    expect(taskRows(tasks, 'BOM', 'ALL').pending.map((r) => r.id)).toEqual(['opening-balances-BOM']);
+    expect(taskRows(tasks, 'Central', 'Owner').pending.map((r) => r.id)).toEqual(['rule-CUS-01']);
+    expect(taskRows(tasks, 'Central', 'Developer').pending.map((r) => r.id)).toEqual(['dev:x']);
+  });
+
+  test('userCounts / branchCounts: pending-only pills that follow the other scope', () => {
+    expect(userCounts(tasks, 'ALL')).toMatchObject({ ALL: 5, FM: 3, Developer: 1, Owner: 1 });
+    expect(userCounts(tasks, 'BOM')).toMatchObject({ ALL: 1, FM: 1, Developer: 0 });
+    expect(branchCounts(tasks, BRANCHES, 'ALL')).toMatchObject({ ALL: 5, Central: 3, BOM: 1, AMD: 1, NBO: 0 });
+    expect(branchCounts(tasks, BRANCHES, 'Owner')).toMatchObject({ ALL: 1, Central: 1, BOM: 0 });
+  });
+
+  test('partyRows: branch scope keeps details separate — BOM never shows AMD customers', () => {
+    expect(partyRows(D, 'ALL').customers.items).toHaveLength(2);
+    const bom = partyRows(D, 'BOM');
+    expect(bom.customers.items.map((i) => i.name)).toEqual(['NeuIQ Technologies']);
+    expect(bom.suppliers.items).toEqual([]); // branch 'ALL' supplier is central, not BOM's
+    const central = partyRows(D, 'Central');
+    expect(central.suppliers.items.map((i) => i.name)).toEqual(['TRIP JACK']);
+    expect(central.customers.items).toEqual([]);
+    expect(partyRows(D, 'AMD').customers.items[0]).toMatchObject({ name: 'Sea Hook Engineering', sr: 1 });
+  });
+});
+
+describe('TK task list · ledgers + KPIs (pure)', () => {
+  test('ledgerScope: ALL sums branches, a branch reads its meter, Central has none', () => {
+    expect(ledgerScope(D, 'ALL')).toMatchObject({ mode: 'all', pending: 64 });
+    expect(ledgerScope(D, 'BOM')).toMatchObject({ mode: 'branch', pending: 34 });
+    expect(ledgerScope(D, 'BOMMB').row).toMatchObject({ entered: 4 });
+    expect(ledgerScope(D, 'Central')).toMatchObject({ mode: 'central', pending: 0 });
+    expect(ledgerScope(D, 'NBO')).toMatchObject({ mode: 'branch', pending: 0 }); // absent branch → zero, honest
+  });
+
+  test('taskKpis: five scoped tiles — a branch tile never shows the group total', () => {
+    const tasks = D.tasks;
+    const all = taskKpis(D, tasks, 'ALL', 'ALL');
+    expect(all.map((k) => k.key)).toEqual(['pending', 'done', 'ledgers', 'details', 'progress']);
+    expect(all[0].value).toBe('4');
+    expect(all[2].value).toBe('64');
+    expect(all[3].value).toBe('3'); // 2 customers + 1 supplier
+    expect(all[4].value).toBe('33%'); // 2 of 6
+    const bom = taskKpis(D, tasks, 'BOM', 'ALL');
+    expect(bom[0].value).toBe('1');
+    expect(bom[2].value).toBe('34');
+    expect(bom[3].value).toBe('1'); // only BOM's incomplete customer
+  });
+
+  test('ledgerRows serial-numbers the drill-in items', () => {
+    expect(ledgerRows(D)).toEqual([{ code: 'L1156', name: 'Round Off', group: 'Variable Expenses', subGroup: 'Office Expenses', sr: 1 }]);
+  });
+
+  test('fail-soft on empty payload — never a false all-configured', () => {
+    expect(taskRows(undefined).pending).toEqual([]);
+    expect(userCounts([])).toMatchObject({ ALL: 0 });
+    expect(branchCounts(undefined, BRANCHES)).toMatchObject({ ALL: 0, Central: 0 });
+    expect(ledgerScope({}, 'ALL')).toMatchObject({ pending: 0 });
+    expect(partyRows({}, 'ALL').customers.items).toEqual([]);
+    expect(taskKpis({}, [], 'ALL', 'ALL')[4].value).toBe('0%');
+    expect(ledgerRows({})).toEqual([]);
+    expect(devFindingRows(undefined, undefined)).toEqual([]);
+  });
+});
