@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CalendarClock, AlertTriangle } from 'lucide-react';
 import { getPending, getList, generateCertificates } from './api';
-import { BRANCHES, tierOf, statusMeta, currencyOf, fmtAmt, chainProgress, pendingStateMeta, fmtDue, visibleTiers } from './utils';
-import { PageSection, Badge, Button, EmptyState, LoadingState, Select, FormField } from '../../shell/primitives';
+import { BRANCHES, branchCodeOf, tierOf, statusMeta, currencyOf, fmtAmt, chainProgress, pendingStateMeta, fmtDue, visibleTiers } from './utils';
+import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select, FormField } from '../../shell/primitives';
 
 // ─── Reconciliation · Reports & Pending ──────────────────────────────────────
 // Lives ONLY under the Reconciliation header. Three reports, all branch-wise:
@@ -17,12 +17,13 @@ const cellCls = 'px-3 py-2.5 text-sm border-b border-surface-border align-middle
 const headCls = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-ink-muted bg-surface-alt border-b border-surface-border whitespace-nowrap';
 
 export function ReconReportsPage({ branch: appBranch, setRoute, currentUser }) {
-  const [branch, setBranch] = useState(BRANCHES.includes(appBranch) ? appBranch : 'BOM');
+  const appCode = branchCodeOf(appBranch); // app passes a branch OBJECT (or 'ALL')
+  const [branch, setBranch] = useState(appCode || 'BOM');
   const [tierFilter, setTierFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
   // Follow the app-wide branch selector (branch-isolation convention).
-  React.useEffect(() => { if (BRANCHES.includes(appBranch)) setBranch(appBranch); }, [appBranch]);
+  React.useEffect(() => { if (appCode) setBranch(appCode); }, [appCode]);
 
   // Branch Accountant sees the weekly cycle only — Month/Quarter/Year closings
   // are worked from TK Group Central by AE/FM/Director/Owner.
@@ -30,10 +31,10 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser }) {
   const tierKeys = tiers.map((t) => t.key);
 
   const qc = useQueryClient();
-  const { data: pendingData, isLoading: pendingLoading } = useQuery({
+  const { data: pendingData, isLoading: pendingLoading, isError: pendingError, refetch: refetchPending } = useQuery({
     queryKey: ['recon-certs', 'pending', branch], queryFn: () => getPending({ branch }),
   });
-  const { data: certs = [], isLoading: certsLoading } = useQuery({
+  const { data: certs = [], isLoading: certsLoading, isError: certsError, refetch: refetchCerts } = useQuery({
     queryKey: ['recon-certs', 'register', branch], queryFn: () => getList({ branch }),
   });
   // "Generate" on a not-started closing spawns that period's per-ledger
@@ -74,8 +75,9 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser }) {
         {gen.isError && <p className="mb-3 text-sm text-danger">Couldn’t generate certificates: {gen.error?.message}</p>}
         {gen.isSuccess && gen.data && <p className="mb-3 text-sm text-success">Generated {gen.data.created ?? 0} certificate{(gen.data.created ?? 0) === 1 ? '' : 's'} for {gen.variables?.period} — open the Hub to reconcile them.</p>}
         {pendingLoading && <LoadingState label="Loading pending closings…" />}
-        {!pendingLoading && pendingRows.length === 0 && <EmptyState title="Nothing pending" hint="Every scheduled closing is complete for this branch." />}
-        {pendingRows.length > 0 && (
+        {pendingError && <ErrorState title="Couldn’t load the pending closings" message="The reconciliation service didn’t respond — this board may NOT be complete. Retry before relying on it." onRetry={() => refetchPending()} />}
+        {!pendingLoading && !pendingError && pendingRows.length === 0 && <EmptyState title="Nothing pending" hint="Every scheduled closing is complete for this branch." />}
+        {!pendingError && pendingRows.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse">
               <thead><tr>
@@ -133,8 +135,9 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser }) {
           <span className="mb-2 ml-auto text-xs text-ink-subtle tabular-nums">{registerRows.length} certificate{registerRows.length === 1 ? '' : 's'}</span>
         </div>
         {certsLoading && <LoadingState label="Loading register…" />}
-        {!certsLoading && registerRows.length === 0 && <EmptyState title="No certificates match" hint="Generate certificates from the Reconciliation Hub, or clear the filters." />}
-        {registerRows.length > 0 && (
+        {certsError && <ErrorState title="Couldn’t load the register" message="The reconciliation service didn’t respond. Check the connection and retry." onRetry={() => refetchCerts()} />}
+        {!certsLoading && !certsError && registerRows.length === 0 && <EmptyState title="No certificates match" hint="Generate certificates from the Reconciliation Hub, or clear the filters." />}
+        {!certsError && registerRows.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] border-collapse">
               <thead><tr>

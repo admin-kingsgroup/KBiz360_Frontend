@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Snowflake, FileUp, Scale, PenLine, LockKeyhole, ListChecks } from 'lucide-react';
 import { getRulebook } from './api';
-import { TIERS, GOLDEN_RULES, ROLE_MATRIX } from './utils';
+import { TIERS, GOLDEN_RULES, ROLE_MATRIX, branchCodeOf } from './utils';
 import { PageSection, Badge, Button } from '../../shell/primitives';
 
 // ─── Reconciliation Rule Book ────────────────────────────────────────────────
@@ -25,8 +25,10 @@ const headCls = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider 
 
 export function RuleBookPage({ branch, setRoute }) {
   // Periods are regime-aware: India books show FY keys, Africa books CY keys —
-  // pass the app branch so staff see THEIR current period, not another regime's.
-  const { data: live } = useQuery({ queryKey: ['recon-certs', 'rulebook', branch || ''], queryFn: () => getRulebook({ branch }) });
+  // pass the app branch CODE (the prop is a branch object) so staff see THEIR
+  // current period, not another regime's.
+  const code = branchCodeOf(branch);
+  const { data: live } = useQuery({ queryKey: ['recon-certs', 'rulebook', code], queryFn: () => getRulebook({ branch: code || undefined }) });
   const periods = live?.periods || {};
 
   return (

@@ -5,6 +5,13 @@
 
 export const BRANCHES = ['BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
 
+/** The app passes `branch` as either a code string OR a branch OBJECT
+ *  ({code, city…}) — and 'ALL' in group mode. Normalize to a valid code or ''. */
+export function branchCodeOf(branch) {
+  const code = typeof branch === 'object' && branch !== null ? branch.code : branch;
+  return BRANCHES.includes(code) ? code : '';
+}
+
 // FE currency map (mirrors branch books; FE-wide fmt is not branch-aware yet).
 export const BRANCH_CURRENCY = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: 'KES', DAR: 'TZS', FBM: '$' };
 export const currencyOf = (branch) => BRANCH_CURRENCY[branch] || '₹';

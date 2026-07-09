@@ -4,14 +4,24 @@ import { apiGet, apiPost } from '../../core/api';
 // Thin wrappers over /api/reconciliation. Reads fail soft (lists → [] / null)
 // so the hub renders without a backend; writes propagate errors for toasts.
 
-// The register tree and single certificate THROW on failure so the pages can
-// show a real error state (a dead backend must not read as "no data").
+// Data the user ACTS on (register tree, certificate, pending board, register
+// list) THROWS on failure so the pages show a real error state — a dead backend
+// must never read as "no data" / "nothing pending" on a compliance board.
+// Purely decorative reads (summary cards, rulebook periods) stay fail-soft.
 export function getTree({ branch, tier, period } = {}) {
   return apiGet('/api/reconciliation/tree', { branch, tier, period });
 }
 
 export function getCertificate(id) {
   return apiGet(`/api/reconciliation/${id}`);
+}
+
+export async function getPending({ branch } = {}) {
+  return (await apiGet('/api/reconciliation/pending', { branch })) || { rows: [] };
+}
+
+export async function getList({ branch, tier, period } = {}) {
+  return (await apiGet('/api/reconciliation', { branch, tier, period }))?.items || [];
 }
 
 export async function getSummary({ branch } = {}) {
@@ -22,16 +32,6 @@ export async function getSummary({ branch } = {}) {
 export async function getRulebook({ branch } = {}) {
   try { return (await apiGet('/api/reconciliation/rulebook', { branch })) || null; }
   catch { return null; }
-}
-
-export async function getPending({ branch } = {}) {
-  try { return (await apiGet('/api/reconciliation/pending', { branch })) || { rows: [] }; }
-  catch { return { rows: [] }; }
-}
-
-export async function getList({ branch, tier, period } = {}) {
-  try { return (await apiGet('/api/reconciliation', { branch, tier, period }))?.items || []; }
-  catch { return []; }
 }
 
 export function generateCertificates({ branch, tier, period, codes }) {

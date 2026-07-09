@@ -94,7 +94,7 @@ export function CertificateDrawer({ id, branch, onClose }) {
                 Sign — {prog.next?.role} · {prog.next?.action}
               </Button>
             )}
-            {tier?.mode === 'physical' && signedFully && cert.status !== 'locked' && (
+            {tier?.mode === 'physical' && signedFully && cert.status !== 'locked' && openExceptions(cert) === 0 && (
               <Button variant="success" icon={ShieldCheck} loading={scanM.isPending} onClick={() => scanM.mutate('')}>
                 Upload signed scan → Lock (Rule 05)
               </Button>
@@ -176,7 +176,7 @@ export function CertificateDrawer({ id, branch, onClose }) {
                     ? <CheckCircle2 size={16} className="shrink-0 text-success" aria-hidden="true" />
                     : <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />}
                   <span className={`flex-1 ${e.resolved ? 'text-ink-subtle line-through' : 'text-ink'}`}>{e.text}</span>
-                  {!e.resolved && <Button size="xs" variant="ghost" loading={exResolve.isPending} onClick={() => exResolve.mutate(e._id)}>Resolve</Button>}
+                  {!e.resolved && cert.status !== 'locked' && <Button size="xs" variant="ghost" loading={exResolve.isPending} onClick={() => exResolve.mutate(e._id)}>Resolve</Button>}
                 </li>
               ))}
             </ul>

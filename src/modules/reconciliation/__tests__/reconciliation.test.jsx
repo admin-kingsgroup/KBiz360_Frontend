@@ -3,7 +3,7 @@
 import {
   BRANCHES, TIERS, tierOf, statusMeta, sourceMeta, tierProgress, chainProgress,
   fmtAmt, currencyOf, openExceptions, GOLDEN_RULES, ROLE_MATRIX,
-  pendingStateMeta, fmtDue, periodOptions, visibleTiers,
+  pendingStateMeta, fmtDue, periodOptions, visibleTiers, branchCodeOf,
 } from '../utils';
 
 describe('reconciliation · tiers', () => {
@@ -39,6 +39,13 @@ describe('reconciliation · tones & formatting', () => {
     expect(sourceMeta('physical').tone).toBe('warning');
     expect(sourceMeta('feed').tone).toBe('success');
     expect(sourceMeta(undefined).label).toBe('Download');
+  });
+  test('branchCodeOf: handles the app’s branch OBJECT, plain codes, ALL and junk', () => {
+    expect(branchCodeOf({ code: 'AMD', city: 'Ahmedabad' })).toBe('AMD');
+    expect(branchCodeOf('NBO')).toBe('NBO');
+    expect(branchCodeOf('ALL')).toBe('');       // group mode → no single branch
+    expect(branchCodeOf(null)).toBe('');
+    expect(branchCodeOf({ code: 'ZZZ' })).toBe('');
   });
   test('branch currency: ₹ for India books, local for Africa', () => {
     expect(currencyOf('BOM')).toBe('₹');

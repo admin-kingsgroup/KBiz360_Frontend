@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock } from 'lucide-react';
 import { getTree, getSummary, getPending, generateCertificates } from './api';
-import { BRANCHES, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers } from './utils';
+import { BRANCHES, branchCodeOf, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { CertificateDrawer } from './CertificateDrawer';
 
@@ -31,7 +31,8 @@ function TierCard({ tier, counts, period, active, onClick }) {
 }
 
 export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) {
-  const [branch, setBranch] = useState(BRANCHES.includes(appBranch) ? appBranch : 'BOM');
+  const appCode = branchCodeOf(appBranch); // app passes a branch OBJECT (or 'ALL')
+  const [branch, setBranch] = useState(appCode || 'BOM');
   const [tierKey, setTierKey] = useState('weekly');
   const [openId, setOpenId] = useState(null);
   // Per-(branch,tier) period override — '' means "the current period". Lets the
@@ -43,7 +44,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
 
   // Follow the app-wide branch selector — the module must never show a
   // different branch than the rest of the ERP (branch-isolation convention).
-  useEffect(() => { if (BRANCHES.includes(appBranch)) setBranch(appBranch); }, [appBranch]);
+  useEffect(() => { if (appCode) setBranch(appCode); }, [appCode]);
 
   // Branch Accountant works the WEEKLY cycle only (Month/Quarter/Year are done
   // from TK Group Central by AE/FM/Director/Owner — backend enforces it too).
