@@ -3,7 +3,7 @@
    Auto-generated from KBiz360_v2.jsx · 361 lines · 11 declarations
    ════════════════════════════════════════════════════════════════════ */
 
-import { BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, LifeBuoy, Lock, Rocket, Scale, Settings, ShieldCheck, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
+import { ArrowLeftRight, BarChart2, Calculator, Calendar, CheckSquare, Database, Download, LayoutDashboard, LifeBuoy, Lock, Rocket, Scale, Settings, ShieldCheck, Upload, User, Users, Wallet, Wrench } from 'lucide-react';
 import { TAX_AFRICA, TAX_ALL, TAX_INDIA } from './data';
 import { PERM_MODULES } from './permissions';
 import { getRole } from './referenceCache';
@@ -658,6 +658,17 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"Audit Trail", href:"/tk/audit"},
 ]};
 
+// Reconciliation — its own top-level module (the most important control in the
+// business): 4-tier per-ledger certificates (Weekly digital · Month/Quarter/Year
+// physical) + the staff Rule Book. Branch-wise throughout; existing statement-
+// matching screens stay under Accounts ▸ Reconciliation — this module is the
+// certificate/sign-off layer above them.
+export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight, children:[
+  {label:"Reconciliation Hub", href:"/reconciliation"},
+  {label:"Reports & Pending", href:"/reconciliation/reports"},
+  {label:"Rule Book & Process", href:"/reconciliation/rulebook"},
+]};
+
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
 export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/transactions/approvals"};
 
@@ -872,7 +883,7 @@ export function fullMenuRoots(branch, currentUser){
   // branch pill so branches can RAISE credit/funds/onboarding/investment requests.
   // Dev Control is a Super-Admin-only pill — every other role never sees it
   // (and App.jsx blocks the route for them even by direct URL).
-  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
+  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
     ...(role === 'Super Admin' ? [MENU_DEV_CONTROL] : [])];
 }
 
@@ -883,7 +894,9 @@ export function roleMenuRoots(branch, currentUser){
   // Branch Accountant → their self-contained Accounts workspace PLUS Approvals,
   // Decisions (they raise credit/funds/onboarding requests), Taxation and Support.
   // Branch scope is still enforced by the top-right switcher.
-  return [MENU_ACCOUNTS, MENU_APPROVALS, MENU_DECISIONS, taxSectionFor(branch), MENU_SUPPORT];
+  // Reconciliation: the Branch Accountant PREPARES the weekly certificates, so
+  // the module pill is part of their workspace too (AE/FM/Director sign above).
+  return [MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_APPROVALS, MENU_DECISIONS, taxSectionFor(branch), MENU_SUPPORT];
 }
 
 // Keep ONLY the leaves whose href is in `keep`; drop everything else (containers with

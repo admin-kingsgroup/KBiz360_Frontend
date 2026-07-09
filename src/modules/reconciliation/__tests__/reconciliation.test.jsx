@@ -1,0 +1,94 @@
+// Reconciliation module · pure helpers — tier metadata, status/source tones,
+// progress math, branch currency and the Rule Book content the page renders.
+import {
+  BRANCHES, TIERS, tierOf, statusMeta, sourceMeta, tierProgress, chainProgress,
+  fmtAmt, currencyOf, openExceptions, GOLDEN_RULES, ROLE_MATRIX,
+  pendingStateMeta, fmtDue,
+} from '../utils';
+
+describe('reconciliation · tiers', () => {
+  test('four tiers in ladder order with the designed chains', () => {
+    expect(TIERS.map((t) => t.key)).toEqual(['weekly', 'month', 'quarter', 'year']);
+    expect(tierOf('weekly').chain.map((s) => s.role)).toEqual(['Branch Accountant', 'AE', 'FM', 'Director']);
+    expect(tierOf('month').chain.map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner']);
+    expect(tierOf('quarter').chain.map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner', 'Statutory']);
+    expect(tierOf('year').chain.map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner', 'Auditor', 'Owner']);
+  });
+  test('weekly is digital; the three closing tiers are physical', () => {
+    expect(tierOf('weekly').mode).toBe('digital');
+    ['month', 'quarter', 'year'].forEach((k) => expect(tierOf(k).mode).toBe('physical'));
+  });
+  test('unknown tier falls back to weekly (never crashes a row)', () => {
+    expect(tierOf('nope').key).toBe('weekly');
+  });
+});
+
+describe('reconciliation · tones & formatting', () => {
+  test('status → badge tone', () => {
+    expect(statusMeta('locked')).toMatchObject({ tone: 'navy', label: 'Locked' });
+    expect(statusMeta('signed').tone).toBe('success');
+    expect(statusMeta('bogus').label).toBe('Open');
+  });
+  test('attachment source → tone', () => {
+    expect(sourceMeta('physical').tone).toBe('warning');
+    expect(sourceMeta('feed').tone).toBe('success');
+    expect(sourceMeta(undefined).label).toBe('Download');
+  });
+  test('branch currency: ₹ for India books, local for Africa', () => {
+    expect(currencyOf('BOM')).toBe('₹');
+    expect(currencyOf('NBO')).toBe('KES');
+    expect(currencyOf('FBM')).toBe('$');
+    expect(BRANCHES).toHaveLength(6);
+  });
+  test('fmtAmt formats en-IN with the branch symbol, — for empty', () => {
+    expect(fmtAmt(125000, 'BOM')).toBe('₹ 1,25,000');
+    expect(fmtAmt(null, 'BOM')).toBe('—');
+  });
+});
+
+describe('reconciliation · progress math', () => {
+  test('tierProgress: done = signed + locked', () => {
+    expect(tierProgress({ total: 10, signed: 3, locked: 5 })).toEqual({ total: 10, done: 8, pct: 80 });
+    expect(tierProgress({})).toEqual({ total: 0, done: 0, pct: 0 });
+  });
+  test('chainProgress names the next signer', () => {
+    const cert = { tier: 'month', signatures: [{ role: 'AE' }, { role: 'FM' }] };
+    const p = chainProgress(cert);
+    expect(p).toMatchObject({ done: 2, total: 4 });
+    expect(p.next.role).toBe('Director');
+    expect(chainProgress({ tier: 'month', signatures: [1, 2, 3, 4] }).next).toBeNull();
+  });
+  test('openExceptions counts only unresolved', () => {
+    expect(openExceptions({ exceptions: [{ resolved: true }, { resolved: false }, {}] })).toBe(2);
+    expect(openExceptions(null)).toBe(0);
+  });
+});
+
+describe('reconciliation · pending board display', () => {
+  test('pendingStateMeta: upcoming/in-progress/pending/closed tones', () => {
+    expect(pendingStateMeta({ upcoming: true })).toMatchObject({ tone: 'info', label: 'Upcoming' });
+    expect(pendingStateMeta({ state: 'in-progress' })).toMatchObject({ tone: 'warning' });
+    expect(pendingStateMeta({ state: 'not-started' })).toMatchObject({ tone: 'danger', label: 'Pending' });
+    expect(pendingStateMeta({ state: 'closed' })).toMatchObject({ tone: 'navy' });
+  });
+  test('fmtDue: weekly cycles show their Friday; upcoming is flagged', () => {
+    expect(fmtDue({ tier: 'weekly', dueOn: '2026-07-17' })).toBe('Fri, 17 Jul 2026');
+    expect(fmtDue({ tier: 'weekly', dueOn: '2026-07-17', upcoming: true })).toBe('Fri, 17 Jul 2026 (upcoming)');
+    expect(fmtDue({ tier: 'month' })).toBe('—');
+    expect(fmtDue({ tier: 'weekly' })).toBe('Friday');
+  });
+});
+
+describe('reconciliation · rule book content', () => {
+  test('eight golden rules, numbered 01–08', () => {
+    expect(GOLDEN_RULES).toHaveLength(8);
+    expect(GOLDEN_RULES.map((r) => r.n)).toEqual(['01', '02', '03', '04', '05', '06', '07', '08']);
+  });
+  test('role matrix: Branch Accountant is weekly-only; Owner locks the month', () => {
+    const ba = ROLE_MATRIX.find((r) => r.role === 'Branch Accountant');
+    expect(ba.weekly).toBe('Prepare');
+    expect([ba.month, ba.quarter, ba.year]).toEqual(['—', '—', '—']);
+    expect(ROLE_MATRIX.find((r) => r.role === 'Owner').month).toBe('Lock');
+    expect(ROLE_MATRIX.find((r) => r.role === 'Auditor').year).toBe('Attest');
+  });
+});
