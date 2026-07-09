@@ -30,6 +30,7 @@ export const PAGE_ACCESS_ADMIN_EMAIL = 'afshin.dhanani@kingsgroupco.com';
 export const PAGE_ACCESS_ADMIN_EMAILS = new Set([
   PAGE_ACCESS_ADMIN_EMAIL,
   'developer@kingsgroupco.com',   // full-access developer account (for proper development)
+  'test@kingsgroupco.com',        // test account (Super Admin) — may manage page visibility
 ]);
 
 export function isPageAccessAdmin(user) {
