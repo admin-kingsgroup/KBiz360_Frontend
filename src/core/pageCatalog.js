@@ -18,10 +18,6 @@
 // initialised (TDZ).
 import * as MENUS from './menus';
 import * as DATA from './data';
-// Complete list of routes App.jsx can render — AUTO-GENERATED from App.jsx by
-// scripts/gen-route-manifest.cjs (runs on predev/prebuild/pretest). Lets the
-// catalogue expose EVERY page, including standalone routes not in any nav menu.
-import { APP_ROUTES, APP_ROUTE_LABELS } from './routeManifest.generated';
 
 // Who may open Page Visibility Control: the group admin (afshin) plus the internal
 // developer account — gated by email, no role grants it. Mirrors the backend gate in
@@ -106,31 +102,11 @@ function collectLeaves(node, trail, out) {
   (node.children || []).forEach((c) => collectLeaves(c, here, out));
 }
 
-// Friendly section name for a standalone route (one not found in any menu),
-// grouped by its first path segment so related extras sit together.
-const PREFIX_SECTION = {
-  finance: 'Finance', reports: 'Reports', hr: 'HR & Payroll',
-  tax: 'Taxation', masters: 'Masters', settings: 'Settings', accounts: 'Accounts',
-  accounting: 'Accounting', assets: 'Assets', sales: 'Sales', purchase: 'Purchase',
-  'purchase-expense': 'Purchase', dashboards: 'Dashboards', dashboard: 'Dashboards',
-  bookings: 'Bookings', transactions: 'Transactions', expense: 'Expense',
-};
-const titleCase = (s) => String(s || '').split(/[-_]/).filter(Boolean)
-  .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
-const routeSection = (route) => {
-  const seg = route.replace(/^\//, '').split('/');
-  return seg.length < 2 ? 'Other · General' : `Other · ${PREFIX_SECTION[seg[0]] || titleCase(seg[0])}`;
-};
-const routeLabel = (route) =>
-  APP_ROUTE_LABELS[route] || titleCase(route.replace(/^\//, '').split('/').pop());
-
 // Build the catalogue once (menus are static module-level data). Each section
 // lists its leaves de-duplicated by href; a href that appears in several
 // sections is shown only under the first section it occurs in, so toggling it
 // once has one obvious home (it still hides everywhere, since `hidden` is keyed
-// by href). ALWAYS_VISIBLE keys are dropped. After the menu sections we fold in
-// EVERY remaining App route (from the generated manifest) under "Other · …"
-// groups, so the admin can hide ANY page — not just nav links.
+// by href). ALWAYS_VISIBLE keys are dropped.
 // Top-level PILL hrefs — the direct-link pills that sit at the very top of the nav
 // (e.g. Approvals → /transactions/approvals). These are structural: the visibility
 // deny-list may hide a pill's INNER sub-pages but never the pill itself, so they are
@@ -162,18 +138,6 @@ function build() {
       items.push({ key: lf.key, label: lf.label, group });
     }
     if (items.length) sections.push({ section: root.label, icon: root.icon || null, items });
-  }
-  // Standalone routes not surfaced by any menu, grouped under "Other · …".
-  const extra = new Map();
-  for (const route of APP_ROUTES) {
-    if (skip(route) || seen.has(route)) continue;
-    seen.add(route);
-    const sec = routeSection(route);
-    if (!extra.has(sec)) extra.set(sec, []);
-    extra.get(sec).push({ key: route, label: routeLabel(route), group: '' });
-  }
-  for (const sec of [...extra.keys()].sort()) {
-    sections.push({ section: sec, icon: null, items: extra.get(sec).sort((a, b) => a.label.localeCompare(b.label)) });
   }
   return sections;
 }

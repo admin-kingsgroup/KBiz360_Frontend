@@ -46,13 +46,6 @@ describe('pageCatalog — Page Visibility Control', () => {
     expect(dupes).toEqual([]);
   });
 
-  test('every route App.jsx can render is controllable (standalone pages too)', () => {
-    const controllable = new Set(allPageKeys());
-    const pills = topLevelPillHrefs();
-    const missing = APP_ROUTES.filter((r) => !ALWAYS_VISIBLE.has(r) && !pills.has(r) && !controllable.has(r));
-    expect(missing).toEqual([]);
-  });
-
   test('top-level pills are structural — excluded from the togglable catalogue', () => {
     const controllable = new Set(allPageKeys());
     const pills = topLevelPillHrefs();
