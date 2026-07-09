@@ -13,6 +13,7 @@
 export { BranchDashboardPage as Dashboard, BranchDashboardPage } from './pages/branch-dashboard';
 export { DirectorDashboardPage as DirectorDashboard, DirectorDashboardPage } from './pages/director-dashboard';
 export { OwnerDashboardPage as OwnerDashboard, OwnerDashboardPage } from './pages/owner-dashboard';
+export { AdCockpitPage as AdCockpit, AdCockpitPage } from './pages/ad-cockpit';
 export { SrFmDashboardPage as SrFmDashboard, SrFmDashboardPage } from './pages/sr-fm-dashboard';
 export { SrAeDashboardPage as SrAeDashboard, SrAeDashboardPage } from './pages/sr-ae-dashboard';
 export { AcctsExecDashboardPage as AcctsExecDashboard, AcctsExecDashboardPage } from './pages/accts-exec-dashboard';

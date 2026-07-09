@@ -4,7 +4,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { overviewKpis, streamRows, actorName } from '../utils/monitor';
 
 // api/monitor pulls core/api (import.meta) → mock for the container smoke tests.
-jest.mock('../api/monitor', () => ({ getOverview: jest.fn(), getBranchCockpit: jest.fn(), getAudit: jest.fn() }));
+// The Control Tower Overview also reads the health/integrity/trend/readiness summaries;
+// stub them to empty so the summary charts render (zeros) without a network.
+jest.mock('../api/monitor', () => ({
+  getOverview: jest.fn(), getBranchCockpit: jest.fn(), getAudit: jest.fn(),
+  getGroupHealth: jest.fn().mockResolvedValue({}), getIntegrity: jest.fn().mockResolvedValue({}),
+  getTrend: jest.fn().mockResolvedValue({}), getSetupReadiness: jest.fn().mockResolvedValue({}),
+  getDevFindings: jest.fn().mockResolvedValue([]),
+}));
 // eslint-disable-next-line import/first
 import { getOverview, getBranchCockpit, getAudit } from '../api/monitor';
 // eslint-disable-next-line import/first
@@ -38,6 +45,13 @@ describe('ControlTower', () => {
     renderWith(<ControlTower />);
     expect(await screen.findByText('Master')).toBeInTheDocument();
     expect(screen.getByTestId('tk-kpis')).toHaveTextContent('9');
+    // Sectioned into tabs (like the ERP Rules Manager), Overview default.
+    ['Overview', 'Group Health', 'Setup Readiness', 'Close & Integrity', 'Scrutiny Trend', 'Development', 'Governance']
+      .forEach((t) => expect(screen.getByRole('button', { name: t })).toBeInTheDocument());
+    // Development lens card renders on the Overview (tab button + lens card title),
+    // fed by the Dev Control registry + tracking rows.
+    expect(screen.getAllByText('Development').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText(/findings open|clear/)).toBeInTheDocument();
   });
 });
 

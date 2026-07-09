@@ -420,11 +420,17 @@ function AppAccessTab({ rows, search, setSearch, onToggle, loaded }){
   );
 }
 
-export function SettingsUsers(){
+/* Props (all optional — the standalone /settings/users route passes none):
+   `embedded` hides the screen's own header + tab bar so a host page (TK User
+   Control Center) can supply its own; `tab` + `onTabChange` then control which
+   of users | roles | access renders. */
+export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
   const usersLive=useUsersAdmin().data;                          // DB-backed (/api/auth/users)
   const [users,setUsers]=useState([]);
   useEffect(()=>{ if(usersLive) setUsers(usersLive); },[usersLive]);
-  const [tab,setTab]=useState("users"); // users | roles | access
+  const [tabState,setTabState]=useState("users"); // users | roles | access
+  const tab=tabProp||tabState;
+  const setTab=(t)=>{ if(onTabChange) onTabChange(t); else setTabState(t); };
   // App Access tab: EVERY CRM + ERP user with their per-app login toggles (/api/user-access).
   const accessLive=useUserAccess().data;
   const [accessRows,setAccessRows]=useState([]);
@@ -845,7 +851,8 @@ export function SettingsUsers(){
   );
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={embedded?undefined:{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+      {!embedded&&(
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FCEBEB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔐</div>
@@ -860,6 +867,7 @@ export function SettingsUsers(){
           <button onClick={()=>setTab("users")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="users"?700:500,background:tab==="users"?"#fff":"transparent",borderRadius:6}}>👥 Users</button><button onClick={()=>setTab("roles")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="roles"?700:500,background:tab==="roles"?"#fff":"transparent",borderRadius:6}}>🎭 Role Templates</button><button onClick={()=>setTab("access")} style={{flex:1,padding:"8px 12px",border:"none",cursor:"pointer",fontWeight:tab==="access"?700:500,background:tab==="access"?"#fff":"transparent",borderRadius:6}}>🔐 App Access</button>
         </div>
       </div>
+      )}
 
       {/* Summary KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>
@@ -984,8 +992,8 @@ export function DocTemplateEditor(){
   const [color,setColor]=useState("#0d1326");
   const docs=["Tax Invoice","Payment Voucher","Receipt Voucher","Quotation","Hotel Voucher","Transfer Voucher","Visa Cover Letter"];
   return(
-    <PHASE2_Page title="Document Template Editor" subtitle="Customise invoice and voucher layouts · header · footer · logo · colours · font"
-      toolbar={<><select value={selDoc} onChange={e=>setSelDoc(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{docs.map(d=><option key={d}>{d}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Reset to Default</button></>}>
+    <PHASE2_Page title="Document Template Editor" subtitle="Preview — layout options are not persisted to the server yet (invoice printing uses core/invoiceHtml.js)"
+      toolbar={<><select value={selDoc} onChange={e=>setSelDoc(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{docs.map(d=><option key={d}>{d}</option>)}</select><button disabled title="Template persistence isn’t wired to the server yet — preview only" style={{padding:"7px 14px",background:"#eef0f6",color:"#9aa3bd",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,fontWeight:700,cursor:"not-allowed"}}>💾 Save Template</button><button disabled title="Preview only" style={{padding:"7px 12px",background:"#eef0f6",border:"1px solid #cdd1d8",color:"#9aa3bd",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"not-allowed"}}>Reset to Default</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:14}}>
         {/* Controls */}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -1063,20 +1071,34 @@ export function DocTemplateEditor(){
 export function EmailSMSTemplates(){
   // Live email/SMS templates (GET /api/email-templates). Was hardcoded EMAIL_TEMPLATES_DATA.
   const templates=useEmailTemplates().data||[];
+  const qc=useQueryClient();
   const [sel,setSel]=useState(0);
-  const [editBody,setEditBody]=useState("");
+  const [edit,setEdit]=useState({name:"",trigger:"",channel:"Email",subject:"",active:true,body:""});
   const t=templates[sel]||templates[0]||{name:"",body:"",channel:"Email",trigger:"",subject:"",active:true};
-  useEffect(()=>{ if(templates[sel]) setEditBody(templates[sel].body||""); },[sel,templates.length]);
+  useEffect(()=>{ const cur=templates[sel]; if(cur) setEdit({name:cur.name||"",trigger:cur.trigger||"",channel:cur.channel||"Email",subject:cur.subject||"",active:cur.active!==false,body:cur.body||""}); },[sel,templates.length]);
+  const refetch=()=>qc.invalidateQueries({queryKey:["ref","email-templates"]});
+  const save=async()=>{
+    if(!t.dbId){toast("Nothing to save yet — create a template first","error");return;}
+    try{ await apiPut(`/api/email-templates/${t.dbId}`,{name:edit.name,trigger:edit.trigger,channel:edit.channel,subject:edit.subject,active:edit.active,body:edit.body}); toast(`Saved ${edit.name||t.id}`); refetch(); }
+    catch(e){ toast(e.message||"Save failed","error"); }
+  };
+  const addNew=async()=>{
+    // etId is the required unique display code — allocate the next ET-### slot.
+    const next=Math.max(0,...templates.map(x=>parseInt(String(x.id).replace(/\D/g,""),10)||0))+1;
+    const etId=`ET-${String(next).padStart(3,"0")}`;
+    try{ await apiPost("/api/email-templates",{etId,name:`New Template ${next}`,channel:"Email",active:true}); toast(`Created ${etId}`); refetch(); setSel(0); }
+    catch(e){ toast(e.message||"Create failed","error"); }
+  };
   const tokens=["{CustomerName}","{BookingRef}","{TripName}","{Amount}","{DueDate}","{VoucherNo}","{ConsultantName}","{BranchPhone}","{InvoiceNo}","{Date}"];
   return(
     <PHASE2_Page title="Email / SMS Template Editor" subtitle="Customise communication templates · token substitution · channel-specific"
-      toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>Send Test</button></>}>
+      toolbar={<><button onClick={save} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button disabled title="Test sending isn’t wired to a mail provider yet" style={{padding:"7px 12px",background:"#eef0f6",border:"1px solid #cdd1d8",color:"#9aa3bd",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"not-allowed"}}>Send Test</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:14}}>
         {/* Template list */}
         <div style={cardStyle} onKeyDown={listKeyNav()}>
           <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Templates ({templates.length})</p>
           {templates.map((tmpl,i)=>(
-            <div key={tmpl.id} {...clickable(()=>{setSel(i);setEditBody(tmpl.body);},{role:'option'})} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #cdd1d8",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
+            <div key={tmpl.id} {...clickable(()=>setSel(i),{role:'option'})} style={{padding:"9px 10px",border:sel===i?"2px solid #d4a437":"1px solid #cdd1d8",borderRadius:6,marginBottom:6,cursor:"pointer",background:sel===i?"#fff8e8":"#fff"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <p style={{margin:0,fontSize:11.5,fontWeight:700,color:"#0d1326"}}>{tmpl.name}</p>
                 <span style={{padding:"1px 6px",background:tmpl.channel==="SMS"?"#fff3cd":"#cfe2ff",color:tmpl.channel==="SMS"?"#856404":"#004085",borderRadius:3,fontSize:9.5,fontWeight:700}}>{tmpl.channel}</span>
@@ -1084,25 +1106,26 @@ export function EmailSMSTemplates(){
               <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>{tmpl.trigger}</p>
             </div>
           ))}
-          <button style={{width:"100%",padding:"7px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer",marginTop:6}}>+ New Template</button>
+          <button onClick={addNew} style={{width:"100%",padding:"7px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer",marginTop:6}}>+ New Template</button>
         </div>
         {/* Editor */}
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={cardStyle}>
             <p style={{margin:"0 0 12px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Edit — {t.name}</p>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:12}}>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Trigger</label><input defaultValue={t.trigger} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Channel</label><select defaultValue={t.channel} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}><option>Email</option><option>SMS</option><option>Both</option></select></div>
-              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Status</label><select defaultValue={t.active?"Active":"Inactive"} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}><option>Active</option><option>Inactive</option></select></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:10,marginBottom:12}}>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Name</label><input value={edit.name} onChange={e=>setEdit(x=>({...x,name:e.target.value}))} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Trigger</label><input value={edit.trigger} onChange={e=>setEdit(x=>({...x,trigger:e.target.value}))} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Channel</label><select value={edit.channel} onChange={e=>setEdit(x=>({...x,channel:e.target.value}))} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}><option>Email</option><option>SMS</option><option>Both</option></select></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Status</label><select value={edit.active?"Active":"Inactive"} onChange={e=>setEdit(x=>({...x,active:e.target.value==="Active"}))} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}><option>Active</option><option>Inactive</option></select></div>
             </div>
-            {t.channel==="Email"&&<div style={{marginBottom:10}}><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Subject</label><input defaultValue={t.subject} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>}
-            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Body {t.channel==="SMS"&&<span style={{fontWeight:400,color:"#5a6691"}}>({editBody.length}/160 chars)</span>}</label><textarea value={editBody} onChange={e=>setEditBody(e.target.value)} rows={8} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",fontFamily:"monospace",resize:"vertical"}}/></div>
+            {edit.channel!=="SMS"&&<div style={{marginBottom:10}}><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Subject</label><input value={edit.subject} onChange={e=>setEdit(x=>({...x,subject:e.target.value}))} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>}
+            <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Body {edit.channel==="SMS"&&<span style={{fontWeight:400,color:"#5a6691"}}>({edit.body.length}/160 chars)</span>}</label><textarea value={edit.body} onChange={e=>setEdit(x=>({...x,body:e.target.value}))} rows={8} style={{padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%",fontFamily:"monospace",resize:"vertical"}}/></div>
           </div>
           <div style={cardStyle}>
             <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Available Tokens</p>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
               {tokens.map(tok=>(
-                <button key={tok} onClick={()=>setEditBody(b=>b+tok)} style={{padding:"4px 9px",background:"#e6e8f1",border:"none",borderRadius:4,fontSize:11,fontFamily:"monospace",cursor:"pointer",color:"#0d1326",fontWeight:600}}>{tok}</button>
+                <button key={tok} onClick={()=>setEdit(x=>({...x,body:x.body+tok}))} style={{padding:"4px 9px",background:"#e6e8f1",border:"none",borderRadius:4,fontSize:11,fontFamily:"monospace",cursor:"pointer",color:"#0d1326",fontWeight:600}}>{tok}</button>
               ))}
             </div>
           </div>
@@ -1179,12 +1202,33 @@ export function ApprovalMatrixBuilder(){
 export function CustomFieldsManager(){
   // Live custom fields (GET /api/custom-fields). Was hardcoded CUSTOM_FIELDS_DATA.
   const all=useCustomFields().data||[];
+  const qc=useQueryClient();
   const [master,setMaster]=useState("ALL");
+  const [modal,setModal]=useState(null); // null | {dbId?, master, label, type, options, required, active}
   const masters=["ALL","Customer","Supplier","Employee"];
   const filtered=master==="ALL"?all:all.filter(f=>f.master===master);
+  const refetch=()=>qc.invalidateQueries({queryKey:["ref","custom-fields"]});
+  const openNew=()=>setModal({master:master==="ALL"?"Customer":master,label:"",type:"Text",options:"",required:false,active:true});
+  const saveModal=async()=>{
+    if(!modal.label.trim()){toast("Field label is required","error");return;}
+    try{
+      if(modal.dbId){ await apiPut(`/api/custom-fields/${modal.dbId}`,{master:modal.master,label:modal.label,type:modal.type,options:modal.options,required:modal.required,active:modal.active}); toast(`Saved ${modal.label}`); }
+      else{
+        const next=Math.max(0,...all.map(x=>parseInt(String(x.id).replace(/\D/g,""),10)||0))+1;
+        await apiPost("/api/custom-fields",{cfId:`CF-${String(next).padStart(3,"0")}`,master:modal.master,label:modal.label,type:modal.type,options:modal.options,required:modal.required,active:modal.active});
+        toast(`Added ${modal.label}`);
+      }
+      setModal(null); refetch();
+    }catch(e){ toast(e.message||"Save failed","error"); }
+  };
+  const toggleActive=async(f)=>{
+    try{ await apiPut(`/api/custom-fields/${f.dbId}`,{active:!f.active}); refetch(); }
+    catch(e){ toast(e.message||"Update failed","error"); }
+  };
+  const mInp={padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"};
   return(
     <PHASE2_Page title="Custom Fields Manager" subtitle="Add fields to any master without code changes · applies across all branches"
-      toolbar={<><select value={master} onChange={e=>setMaster(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{masters.map(m=><option key={m}>{m}</option>)}</select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Field</button></>}>
+      toolbar={<><select value={master} onChange={e=>setMaster(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{masters.map(m=><option key={m}>{m}</option>)}</select><button onClick={openNew} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Add Field</button></>}>
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Master</th><th style={RPT_thStyle}>Field Label</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Options / Format</th><th style={{...RPT_thStyle,textAlign:"center"}}>Required</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th><th style={{...RPT_thStyle,textAlign:"center"}}>Action</th></tr></thead>
@@ -1198,14 +1242,35 @@ export function CustomFieldsManager(){
               <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:3,fontSize:10,fontWeight:700,background:f.active?"#d4edda":"#e2e3e5",color:f.active?"#155724":"#383d41"}}>{f.active?"Active":"Inactive"}</span></td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}>
                 <div style={{display:"flex",gap:4,justifyContent:"center"}}>
-                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Edit</button>
-                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>↕</button>
+                  <button onClick={()=>setModal({dbId:f.dbId,master:f.master,label:f.label,type:f.type,options:f.options||"",required:!!f.required,active:f.active!==false})} style={{padding:"3px 8px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Edit</button>
+                  <button onClick={()=>toggleActive(f)} title={f.active?"Deactivate":"Activate"} style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>{f.active?"Off":"On"}</button>
                 </div>
               </td>
             </tr>
           ))}</tbody>
         </table>
       </div>
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(13,19,38,0.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}} onClick={()=>setModal(null)}>
+          <div style={{background:"#fff",borderRadius:10,padding:18,width:400,maxWidth:"92vw"}} onClick={e=>e.stopPropagation()}>
+            <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>{modal.dbId?"Edit Field":"Add Field"}</p>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Master</label><select value={modal.master} onChange={e=>setModal(m=>({...m,master:e.target.value}))} style={mInp}><option>Customer</option><option>Supplier</option><option>Employee</option></select></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Field Label</label><input value={modal.label} onChange={e=>setModal(m=>({...m,label:e.target.value}))} style={mInp}/></div>
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Type</label><select value={modal.type} onChange={e=>setModal(m=>({...m,type:e.target.value}))} style={mInp}><option>Text</option><option>Number</option><option>Date</option><option>Dropdown</option><option>Checkbox</option></select></div>
+              {modal.type==="Dropdown"&&<div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>Options (comma-separated)</label><input value={modal.options} onChange={e=>setModal(m=>({...m,options:e.target.value}))} style={mInp}/></div>}
+              <div style={{display:"flex",gap:16}}>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,cursor:"pointer"}}><input type="checkbox" checked={modal.required} onChange={e=>setModal(m=>({...m,required:e.target.checked}))}/>Required</label>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:12,cursor:"pointer"}}><input type="checkbox" checked={modal.active} onChange={e=>setModal(m=>({...m,active:e.target.checked}))}/>Active</label>
+              </div>
+              <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:4}}>
+                <button onClick={()=>setModal(null)} style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+                <button onClick={saveModal} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </PHASE2_Page>
   );
 }
@@ -1219,6 +1284,20 @@ export function FieldAccessControl(){
   const PERM_ROLES=(useRoles().data||[]).map(r=>r.name);   // DB-backed role names
   // Live field-access rules (GET /api/field-access). Was hardcoded FIELD_ACCESS_DATA.
   const accessRows=useFieldAccess().data||[];
+  const qc=useQueryClient();
+  // Unsaved edits keyed by rule id → { roleName: access } (merged over row.roles on save).
+  const [draft,setDraft]=useState({});
+  const dirtyCount=Object.keys(draft).length;
+  const save=async()=>{
+    try{
+      for(const [id,roles] of Object.entries(draft)){
+        const row=accessRows.find(r=>r.id===id); if(!row) continue;
+        await apiPut(`/api/field-access/${id}`,{roles:{...row.roles,...roles}});
+      }
+      toast(`Saved ${dirtyCount} rule${dirtyCount!==1?"s":""}`); setDraft({});
+      qc.invalidateQueries({queryKey:["ref","field-access"]});
+    }catch(e){ toast(e.message||"Save failed","error"); }
+  };
   return(
     <PHASE2_Page title="Field-Level Access Control" subtitle="Control which fields each role can view or edit · per module · per field">
       <div style={cardStyle}>
@@ -1232,15 +1311,15 @@ export function FieldAccessControl(){
               </tr>
             </thead>
             <tbody>
-              {accessRows.map((row,i)=>(
-                <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
+              {accessRows.map((row)=>(
+                <tr key={row.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                   <td style={{...RPT_tdStyle,fontWeight:700}}>{row.field}</td>
                   <td style={{...RPT_tdStyle,color:"#5a6691"}}>{row.module}</td>
                   {PERM_ROLES.map(r=>{
-                    const access=row.roles[r]||"Hidden";
+                    const access=(draft[row.id]&&draft[row.id][r])||row.roles[r]||"Hidden";
                     return(
                       <td key={r} style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
-                        <select defaultValue={access} style={{padding:"3px 6px",border:"1px solid "+(accessColor[access]||"#e1e3ec"),borderRadius:4,fontSize:10.5,background:"#fff",color:accessColor[access]||"#5a6691",fontWeight:700,cursor:"pointer"}}>
+                        <select value={access} onChange={e=>setDraft(d=>({...d,[row.id]:{...(d[row.id]||{}),[r]:e.target.value}}))} style={{padding:"3px 6px",border:"1px solid "+(accessColor[access]||"#e1e3ec"),borderRadius:4,fontSize:10.5,background:"#fff",color:accessColor[access]||"#5a6691",fontWeight:700,cursor:"pointer"}}>
                           <option>View+Edit</option><option>View Only</option><option>Hidden</option>
                         </select>
                       </td>
@@ -1251,8 +1330,9 @@ export function FieldAccessControl(){
             </tbody>
           </table>
         </div>
-        <div style={{marginTop:12,display:"flex",justifyContent:"flex-end"}}>
-          <button style={{padding:"8px 18px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Access Rules</button>
+        <div style={{marginTop:12,display:"flex",justifyContent:"flex-end",alignItems:"center",gap:10}}>
+          {dirtyCount>0&&<span style={{fontSize:11.5,color:"#9a6700",fontWeight:600}}>{dirtyCount} unsaved rule{dirtyCount!==1?"s":""}</span>}
+          <button onClick={save} disabled={!dirtyCount} style={{padding:"8px 18px",background:dirtyCount?"#d4a437":"#eef0f6",color:dirtyCount?"#0d1326":"#9aa3bd",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:dirtyCount?"pointer":"not-allowed"}}>💾 Save Access Rules</button>
         </div>
       </div>
     </PHASE2_Page>
@@ -1265,20 +1345,42 @@ export function FieldAccessControl(){
 
 export function BulkUserOperations(){
   const [selected,setSelected]=useState({});
+  const [role,setRole]=useState("");
   const _USERS_DATA=useUsersAdmin().data||[];   // DB-backed (/api/auth/users)
+  const roles=(useRoles().data||[]).map(r=>r.name);
+  const qc=useQueryClient();
   const toggle=id=>setSelected(s=>({...s,[id]:!s[id]}));
   const allSelected=_USERS_DATA.every(u=>selected[u.id]);
   const toggleAll=()=>{if(allSelected)setSelected({});else setSelected(Object.fromEntries(_USERS_DATA.map(u=>[u.id,true])));};
   const selCount=Object.values(selected).filter(Boolean).length;
+  // Bootstrap fallback accounts have id = email (no DB record) — PUT /users/:id
+  // needs a Mongo id, so they are skipped and reported.
+  const isDbId=id=>/^[0-9a-f]{24}$/i.test(String(id));
+  const apply=async(label,body)=>{
+    const ids=Object.keys(selected).filter(id=>selected[id]);
+    const dbIds=ids.filter(isDbId), skipped=ids.length-dbIds.length;
+    if(!dbIds.length){toast("Selected accounts are bootstrap fallbacks — manage them in Users & Roles","error");return;}
+    let ok=0,failed=0;
+    for(const id of dbIds){ try{ await apiPut(`/api/auth/users/${id}`,body); ok++; }catch(e){ failed++; } }
+    toast(`${label}: ${ok} updated${failed?`, ${failed} failed`:""}${skipped?`, ${skipped} skipped (no DB record)`:""}`,failed?"error":undefined);
+    setSelected({}); qc.invalidateQueries({queryKey:["ref","users"]});
+  };
+  const disabledBtn={padding:"7px 14px",background:"#e1e3ec",color:"#5a6691",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"not-allowed"};
+  const actBtn=(bg,t)=>({padding:"7px 14px",background:selCount>0?bg:"#e1e3ec",color:selCount>0?t:"#5a6691",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:selCount>0?"pointer":"not-allowed"});
   return(
-    <PHASE2_Page title="Bulk User Operations" subtitle="Select multiple users · apply role change · reset password · activate / deactivate">
+    <PHASE2_Page title="Bulk User Operations" subtitle="Select multiple users · apply role change · activate / deactivate">
       {/* Action bar */}
       <div style={{padding:"10px 14px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,marginBottom:12,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
         <span style={{fontSize:12,fontWeight:700,color:"#0d1326"}}>{selCount} user{selCount!==1?"s":""} selected</span>
         <div style={{flex:1}}/>
-        {[{l:"Change Role",c:"#0d1326",t:"#d4a437"},{l:"Activate",c:"#22c55e",t:"#fff"},{l:"Deactivate",c:"#f97316",t:"#fff"},{l:"Reset Password",c:"#3b82f6",t:"#fff"},{l:"Change Branch",c:"#6B4C8B",t:"#fff"}].map(btn=>(
-          <button key={btn.l} style={{padding:"7px 14px",background:selCount>0?btn.c:"#e1e3ec",color:selCount>0?btn.t:"#5a6691",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:selCount>0?"pointer":"not-allowed"}}>{btn.l}</button>
-        ))}
+        <select value={role} onChange={e=>setRole(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,background:"#fff"}}>
+          <option value="">— pick role —</option>{roles.map(r=><option key={r}>{r}</option>)}
+        </select>
+        <button onClick={()=>role?apply("Change Role",{role}):toast("Pick a role first","error")} disabled={!selCount} style={actBtn("#0d1326","#d4a437")}>Change Role</button>
+        <button onClick={()=>apply("Activate",{active:true})} disabled={!selCount} style={actBtn("#22c55e","#fff")}>Activate</button>
+        <button onClick={()=>apply("Deactivate",{active:false})} disabled={!selCount} style={actBtn("#f97316","#fff")}>Deactivate</button>
+        <button disabled title="Per-user only — use Settings → Users & Roles (admin password reset)" style={disabledBtn}>Reset Password</button>
+        <button disabled title="Branch scope is managed per-user in Settings → Users & Roles / Page Visibility" style={disabledBtn}>Change Branch</button>
       </div>
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
@@ -1370,8 +1472,8 @@ export function BrandingSettings(){
   const upd=k=>e=>setBrand(b=>({...b,[k]:e.target.value}));
   const inp={padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:"100%"};
   return(
-    <PHASE2_Page title="Branding Settings" subtitle="Logo · brand colours · company name · contact details · used across all documents and emails"
-      toolbar={<button style={{padding:"8px 18px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Branding</button>}>
+    <PHASE2_Page title="Branding Settings" subtitle="Preview — branding is not persisted to the server yet (app branding comes from core/brand.js)"
+      toolbar={<button disabled title="Branding persistence isn’t wired to the server yet — preview only" style={{padding:"8px 18px",background:"#eef0f6",color:"#9aa3bd",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,fontWeight:700,cursor:"not-allowed"}}>💾 Save Branding</button>}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={cardStyle}>
@@ -1401,7 +1503,7 @@ export function BrandingSettings(){
             <div style={{padding:20,border:"2px dashed #cbd0dc",borderRadius:6,textAlign:"center"}}>
               <div style={{width:80,height:80,background:brand.primaryColor,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",color:brand.accentColor,fontSize:22,fontWeight:700}}>TK</div>
               <p style={{margin:"0 0 8px",fontSize:12,color:"#5a6691"}}>Current logo placeholder</p>
-              <button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>📤 Upload Logo (PNG/SVG)</button>
+              <button disabled title="Logo upload isn’t wired to the server yet" style={{padding:"7px 14px",background:"#eef0f6",color:"#9aa3bd",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"not-allowed"}}>📤 Upload Logo (PNG/SVG)</button>
               <p style={{margin:"6px 0 0",fontSize:10,color:"#5a6691"}}>Recommended: 300×80px · transparent background</p>
             </div>
           </div>

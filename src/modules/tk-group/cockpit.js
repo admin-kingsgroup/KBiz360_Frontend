@@ -1,4 +1,4 @@
-import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Activity, Rocket, Calculator, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Rocket, Calculator, ShieldCheck } from 'lucide-react';
 import { FULL_SCOPE_ROLES } from '../../core/branchScope';
 import { dashboardsFor, MENU_ACCOUNTS } from '../../core/menus';
 
@@ -38,7 +38,7 @@ function branchWorkspace(focus) {
 // surface. The sensitive Users & Access column shows ONLY for the Owner / Super Admin;
 // a Director/FM in the cockpit sees org-config + integrations but not user creation.
 function administration(currentUser) {
-  const isOwner = (currentUser && currentUser.role) === 'Super Admin';
+  const isOwner = ['Super Admin', 'super_admin'].includes(currentUser && currentUser.role);
   const usersAccess = isOwner ? [{ label: 'Users & Access', children: [
     { label: 'Users & Roles', href: '/settings/users' },
     { label: 'App Access', href: '/settings/users' },
@@ -47,7 +47,6 @@ function administration(currentUser) {
     { label: 'Permissions Matrix', href: '/settings/permissions-matrix' },
     { label: 'Field-Level Access', href: '/settings/field-access' },
     { label: 'Approval Matrix Builder', href: '/settings/approval-matrix-builder' },
-    { label: 'Authority Configuration', href: '/settings/authority-config' },
   ] }] : [];
   return { label: 'Administration', icon: ShieldCheck, children: [
     ...usersAccess,
@@ -58,6 +57,7 @@ function administration(currentUser) {
       { label: 'Vacation Delegations', href: '/settings/delegations' },
       { label: 'Approval Workflow', href: '/settings/approval-workflow' },
       { label: 'Master Change Queue', href: '/settings/master-change-queue' },
+      { label: 'Statutory Filing Register', href: '/settings/filing-register' },
     ] },
     { label: 'Templates & Integrations', children: [
       { label: 'Document Templates', href: '/settings/doc-templates' },
@@ -73,10 +73,8 @@ function administration(currentUser) {
 }
 
 export function controlCockpitMenu(focus, currentUser) {
+  const isOwner = ['Super Admin', 'super_admin'].includes(currentUser && currentUser.role);
   return [
-    // Overview — the cockpit landing.
-    { label: 'Control Tower', icon: LayoutDashboard, href: '/tk/control-tower' },
-
     // Dashboards — all dashboards in one place, segregated by role. The AD Dashboards
     // (and the owner-only AD Dashboard All) are folded in ONLY for the Owner / Super
     // Admin; other central roles get the role-appropriate set (dashboardsFor decides).
@@ -99,19 +97,40 @@ export function controlCockpitMenu(focus, currentUser) {
       ] },
     ] },
 
-    // Control & Configuration — the Power Console + the rules it governs.
+    // Control & Configuration — the Control Tower (+ its lenses), the Power Console,
+    // and the rules it governs. The Control Tower now lives here as the first column.
     { label: 'Control & Configuration', icon: Lock, children: [
+      { label: 'Control Tower', children: [
+        { label: 'Control Tower', href: '/tk/control-tower' },
+        { label: 'ERP Health Scorecard', href: '/tk/health-scorecard' },
+        { label: 'Control Tower — by Module', href: '/tk/modules' },
+        { label: 'ERP Adoption', href: '/tk/adoption' },
+        { label: 'Close Readiness & Integrity', href: '/tk/integrity' },
+      ] },
       { label: 'Power Console', children: [
         { label: 'Control Panel', href: '/tk/control-panel' },
         { label: 'Control Flags', href: '/tk/controls' },
         { label: 'Thresholds & Limits', href: '/tk/limits' },
       ] },
       { label: 'Rules & Requests', children: [
+        // Owner-only: the rules engine, split into two entries — ERP monitoring rules and
+        // per-user access rules. Both open the same tabbed page on their respective tab.
+        ...(isOwner ? [
+          { label: 'ERP Rules Manager', href: '/tk/rules' },
+          { label: 'User Control Center', href: '/tk/user-rules' },
+        ] : []),
         { label: 'Period Locks', href: '/tk/period-locks' },
         { label: 'Targets & Budgets', href: '/tk/targets' },
         { label: 'Master Control (request)', href: '/tk/master-control' },
       ] },
+      { label: 'Monitoring', children: [
+        { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
+        { label: 'Audit Trail', href: '/tk/audit' },
+      ] },
     ] },
+
+    // (The Rules Manager now lives INSIDE Control & Configuration → Rules & Requests,
+    // as "ERP Rules Manager" — a tabbed page holding ERP Rules + User Rules.)
 
     // Administration — the org-wide admin panel (users / roles / access / config /
     // integrations). Central by nature; the branch surface no longer carries it.
@@ -159,14 +178,6 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Payroll', href: '/hr/payroll' },
         { label: 'Attrition', href: '/hr/attrition' },
         { label: 'Recruitment', href: '/hr/recruitment' },
-      ] },
-    ] },
-
-    // Monitoring — live drill-downs.
-    { label: 'Monitoring', icon: Activity, children: [
-      { label: 'Live Drill-downs', children: [
-        { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
-        { label: 'Audit Trail', href: '/tk/audit' },
       ] },
     ] },
 

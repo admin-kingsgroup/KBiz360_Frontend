@@ -7,6 +7,8 @@ import { money } from '../../core/format';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { aggregateApprovals, stageFunnel, STAGE_LABELS, STAGE_ORDER } from './utils/approvalPipeline';
+import { branchLoadState } from './utils/branchLoad';
+import { BranchLoadNotice } from './BranchLoadNotice';
 
 // ─── TK GROUP CENTRAL · Approvals overview (branchwise) ──────────────────────
 // The "one central queue across all branches" summary: how many vouchers are Pending
@@ -36,17 +38,22 @@ export function ApprovalsOverview() {
       staleTime: 30_000,
     })),
   });
-  const perBranch = view.map((b, i) => ({
-    code: b.code, flag: b.flag, cur: curSym(b),
+  // Same partial-failure rule as the other branchwise dashboards: a branch whose query
+  // errored is DROPPED (never counted as pending.n=0, which would understate the backlog
+  // and skew the pooled total) and named in the notice; whole-table error only when all fail.
+  const load = branchLoadState(q, view);
+  const okIdx = view.map((_, i) => i).filter((i) => !(q[i] && q[i].isError));
+  const perBranch = okIdx.map((i) => ({
+    code: view[i].code, flag: view[i].flag, cur: curSym(view[i]),
     counts: (q[i] && q[i].data && q[i].data.counts) || {},
   }));
   const agg = aggregateApprovals(perBranch);
-  // aggregate keeps code+cur; graft the flag back (same order as view, no sort).
+  // aggregate keeps code+cur; graft the flag back (same order as perBranch, no sort).
   const rows = agg.byBranch.map((r, i) => ({ ...r, flag: perBranch[i] && perBranch[i].flag }));
   const curLine = Object.entries(agg.pendingByCurrency).map(([c, a]) => money(a, c)).join(' · ') || '—';
   // Pipeline funnel from the REAL per-voucher stage (Check → Verify · Sughra → Approve
-  // · Faiz), pooled across the focused branches — "pending under whom".
-  const allEntries = view.flatMap((b, i) => ((q[i] && q[i].data && q[i].data.entries) || []));
+  // · Faiz), pooled across the LOADED branches — "pending under whom".
+  const allEntries = okIdx.flatMap((i) => ((q[i] && q[i].data && q[i].data.entries) || []));
   const funnel = stageFunnel(allEntries);
 
   return (
@@ -63,11 +70,14 @@ export function ApprovalsOverview() {
           </div>
         ))}
       </div>
+      <BranchLoadNotice load={load} onRetry={() => q.forEach((x) => x.refetch())} />
       <div data-testid="tk-approvals-overview">
         <DataTable
           title="Pending approvals — by branch"
           columns={COLS}
           rows={rows}
+          loading={load.loading}
+          isError={load.allFailed}
           getRowKey={(r) => r.code}
           emptyMessage="Nothing pending."
           searchable={false}

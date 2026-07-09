@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { MyRole } from './MyRole';
 import { ApprovalsInbox } from './ApprovalsInbox';
 import { FlagAdmin } from './FlagAdmin';
 import { PeriodLockAdmin } from './PeriodLockAdmin';
 import { DecisionsBoard } from './DecisionsBoard';
 import { ControlTower } from './ControlTower';
+import { AdoptionMatrix } from './AdoptionMatrix';
+import { IntegrityChecks } from './IntegrityChecks';
+import { ModuleTower } from './ModuleTower';
+import { HealthScorecard } from './HealthScorecard';
+import { RulesManager } from './RulesManager';
+import { UserRulesManager } from './UserRulesManager';
+import { RuleBook } from './RuleBook';
 import { BranchCockpit } from './BranchCockpit';
 import { AuditTrail } from './AuditTrail';
 import { TargetsBudgets } from './TargetsBudgets';
@@ -28,6 +35,8 @@ import { AssetsCentral } from './AssetsCentral';
 import { LimitsAdmin } from './LimitsAdmin';
 import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
+import { SettingsUsers } from '../settings/legacy';
+import { PageAccessControl } from '../settings/pageAccess';
 
 const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
 
@@ -125,10 +134,111 @@ export function TkDecisionsPage() {
   );
 }
 
-export function TkControlTowerPage() {
+export function TkControlTowerPage({ setRoute }) {
   return (
     <Page title="Control Tower" subtitle="Is the control layer healthy? Pending approvals, how long they've waited, locked periods, which controls are live, and the latest control events.">
-      <ControlTower />
+      <ControlTower setRoute={setRoute} />
+    </Page>
+  );
+}
+
+export function TkAdoptionPage() {
+  return (
+    <Page title="ERP Adoption" subtitle="How much of the ERP each branch actually uses — capability-milestone scoring across every module, branchwise, with a Central column for shared config. Live: the score moves as branches enter data and fix issues.">
+      <AdoptionMatrix />
+    </Page>
+  );
+}
+
+export function TkIntegrityPage() {
+  return (
+    <Page title="Close Readiness & Integrity" subtitle="SAP-style close checklist, branchwise: journal drift, orphan journals, self-approvals, duplicate numbers/masters, suspense, sub-ledger↔GL, FX revaluation, depreciation, accruals & GSTR-2B. Live — a fix clears the gate on refresh.">
+      <IntegrityChecks />
+    </Page>
+  );
+}
+
+// Two surfaces under one route: ERP Rules (Control-Tower monitoring) + Rule Book
+// (read-only reference of the rules enforced in code). Tabbed so they sit together
+// under Control & Configuration. User Rules Manager is its own separate entry under
+// Rules & Requests (/tk/user-rules → TkUserRulesPage), so it is no longer a tab here.
+const RULES_TABS = [
+  { id: 'erp', label: 'ERP Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate the rules the Control Tower monitors. New rules land Inactive (Draft) and do nothing until you Test them on live data and Activate. System rules (🔒) are enforced in code and read-only.' },
+  { id: 'book', label: 'Rule Book', subtitle: 'Read-only reference of every Accounts & Operations rule the ERP enforces in code — searchable, filterable by Accounts / Operations, each citing the file that enforces it. Documentation only; nothing here is evaluated on live data.' },
+];
+
+export function TkRulesPage({ owner, initialTab = 'erp' }) {
+  const [tab, setTab] = useState(RULES_TABS.some((t) => t.id === initialTab) ? initialTab : 'erp');
+  // Deep-links may target a specific tab; sync when the prop changes (the page does not
+  // remount on route change). In-page tab clicks are unaffected.
+  React.useEffect(() => { if (RULES_TABS.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]);
+  const meta = RULES_TABS.find((t) => t.id === tab) || RULES_TABS[0];
+  return (
+    <Page title={meta.label} subtitle={meta.subtitle}>
+      <div className="mb-4 flex gap-1 border-b border-surface-border">
+        {RULES_TABS.map((t) => (
+          <button key={t.id} type="button" onClick={() => setTab(t.id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${tab === t.id ? 'border-accent text-accent' : 'border-transparent text-ink-muted hover:text-ink'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'erp' ? <RulesManager canManage={!!owner} /> : <RuleBook />}
+    </Page>
+  );
+}
+
+// User Control Center — ONE owner-only hub for everything user-related: the user
+// list & creation, role templates, per-app login access, per-user page visibility
+// and the per-user access rules. Users / Roles / App Access are the SAME component
+// as Settings → Users & Roles (SettingsUsers, embedded with a controlled tab) and
+// Page Visibility is Settings → Page Visibility Control (PageAccessControl,
+// embedded) — both routes keep working; this page just centralises them.
+const USER_TABS = [
+  { id: 'users', label: 'Users', subtitle: 'Every user with a Books login — add users, set role & branch access, edit the permission matrix, activate / deactivate.' },
+  { id: 'roles', label: 'Role Templates', subtitle: 'The ERP role templates — what each role can reach, its special access toggles and how many users hold it.' },
+  { id: 'access', label: 'App Access', subtitle: 'Per-app login toggles for CRM, ERP (Books) and Smart Connect. Off = login blocked; open sessions end within ~1 min.' },
+  { id: 'pages', label: 'Page Visibility', subtitle: 'Per-user page & report visibility plus branch scope — toggle exactly which screens each user sees, grant out-of-role pages, reset passwords.' },
+  { id: 'rules', label: 'User Rules', subtitle: 'Add, verify and activate per-user access rules — who may reach which branch, module or action, an approval ceiling, view-only or a login window. New rules land Inactive (Draft) until you Test the blast radius and Activate.' },
+];
+
+export function TkUserRulesPage({ owner, currentUser, setRoute, initialTab = 'users' }) {
+  const [tab, setTab] = useState(USER_TABS.some((t) => t.id === initialTab) ? initialTab : 'users');
+  // Deep-links may target a specific tab; sync when the prop changes (the page does
+  // not remount on route change). In-page tab clicks are unaffected.
+  React.useEffect(() => { if (USER_TABS.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]);
+  const meta = USER_TABS.find((t) => t.id === tab) || USER_TABS[0];
+  return (
+    <Page title="User Control Center" subtitle={`OWNER ONLY. ${meta.subtitle}`}>
+      <div className="mb-4 flex flex-wrap gap-1 border-b border-surface-border">
+        {USER_TABS.map((t) => (
+          <button key={t.id} type="button" onClick={() => setTab(t.id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${tab === t.id ? 'border-accent text-accent' : 'border-transparent text-ink-muted hover:text-ink'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {!owner ? (
+        <div className="rounded-lg border border-dashed border-warning p-8 text-center text-sm text-warning">This screen is for the Owner (Super Admin) only. Ask the Owner to manage users and access.</div>
+      ) : tab === 'rules' ? <UserRulesManager canManage />
+        : tab === 'pages' ? <PageAccessControl embedded currentUser={currentUser} setRoute={setRoute} />
+          : <SettingsUsers embedded tab={tab} onTabChange={setTab} />}
+    </Page>
+  );
+}
+
+export function TkHealthScorecardPage() {
+  return (
+    <Page title="ERP Health Scorecard" subtitle="One composite health % and letter grade per branch — a weighted blend of Health (50%), Close-Readiness (30%) and Adoption (20%). Branchwise; the group figure is the mean of the branches.">
+      <HealthScorecard />
+    </Page>
+  );
+}
+
+export function TkModulesPage({ setRoute }) {
+  return (
+    <Page title="Control Tower — by Module" subtitle="Every one of the 75 ERP modules, grouped by head module, each with a live issue count (Health · Integrity · Adoption, branchwise). Click a module, then a problem, to drill to the exact ledgers / parties / vouchers.">
+      <ModuleTower setRoute={setRoute} />
     </Page>
   );
 }

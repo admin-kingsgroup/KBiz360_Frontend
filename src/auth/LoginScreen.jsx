@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { Lock, Plane, Users } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
 import { useMobile } from '../core/hooks';
+import { withCanonicalRole } from '../core/branchScope';
 
 const API_BASE = import.meta.env.VITE_KBIZ_API_BASE || 'http://localhost:9090';
 
@@ -38,7 +39,10 @@ export function LoginScreen({ onSignIn }) {
       const data = json && 'data' in json ? json.data : json;
       if (!data?.user) throw new Error('Unexpected response from server.');
       // Role + branches come straight from the DB user record (returned by the API).
-      const mergedUser = data.user;
+      // Canonicalise the Owner alias ('super_admin' → 'Super Admin') at the source so
+      // BOTH the stored session AND any code that reads kb360-user straight from
+      // localStorage (approvalChain, support.service) see the title-case Owner role.
+      const mergedUser = withCanonicalRole(data.user);
 
       // Persist token + user so a page refresh keeps the session (see App.jsx restore).
       try {

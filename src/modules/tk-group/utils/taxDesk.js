@@ -5,6 +5,22 @@
 //   • a BRANCHWISE filing-status matrix from /api/tax-reconciliation/filing-board.
 // Pure & testable; the screen pulls the raw API data.
 
+import { curSym } from './currency';
+
+/** Due value split by currency — "₹… · $…", never blended. Reads `totals.dueByCurrency`
+ *  ({INR: n, USD: n}); falls back to the legacy single `dueValue` as ₹ for old payloads.
+ *  Returns [{ code, sym, amount }] (empty when nothing is due). */
+export function dueValueParts(totals) {
+  const by = (totals && totals.dueByCurrency) || null;
+  if (by && Object.keys(by).length) {
+    return Object.entries(by)
+      .filter(([, v]) => Number(v))
+      .map(([code, v]) => ({ code, sym: curSym(code), amount: Number(v) || 0 }));
+  }
+  const v = Number(totals && totals.dueValue) || 0;
+  return v ? [{ code: 'INR', sym: '₹', amount: v }] : [];
+}
+
 /** Chip tone for a statutory-due status. */
 export function dueTone(status) {
   switch (status) {

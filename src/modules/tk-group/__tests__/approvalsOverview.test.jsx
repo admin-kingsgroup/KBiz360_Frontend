@@ -27,10 +27,11 @@ function renderWith(ui) {
 describe('ApprovalsOverview', () => {
   test('shows the branchwise pending backlog and a currency-split total (never blended)', async () => {
     renderWith(<ApprovalsOverview />);
-    const table = await screen.findByTestId('tk-approvals-overview');
-    // both branches render
-    expect(table.textContent).toMatch(/BOM/);
-    expect(table.textContent).toMatch(/NBO/);
+    await screen.findByTestId('tk-approvals-overview');
+    // both branches render (awaited — the table shows a loading state until the
+    // per-branch queries resolve, so a real outage no longer reads as "0 pending")
+    expect(await screen.findByText(/BOM/)).toBeInTheDocument();
+    expect(await screen.findByText(/NBO/)).toBeInTheDocument();
     // total pending = 4 + 4 across the two branches
     expect(await screen.findByText(/8/)).toBeInTheDocument();
     // states the branchwise / no-blend rule

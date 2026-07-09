@@ -4,6 +4,8 @@ import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { fyRange } from './utils/scorecard';
 import { profitabilityRow } from './utils/profitability';
+import { branchLoadState } from './utils/branchLoad';
+import { BranchLoadNotice } from './BranchLoadNotice';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { DataTable } from '../../shell/DataTable';
@@ -33,16 +35,19 @@ export function Profitability() {
   const focus = useCockpitFocus();
   const view = focusedBranches(focus, BRANCHES);
   const q = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'pl', b.code, from, to], queryFn: () => apiGet('/api/accounting/profit-and-loss', { branch: b.code, from, to }), staleTime: 60_000 })) });
-  const rows = view.map((b, i) => profitabilityRow(b, q[i] && q[i].data));
+  const load = branchLoadState(q, view);
+  const rows = view.map((b, i) => (q[i] && q[i].isError) ? null : profitabilityRow(b, q[i] && q[i].data)).filter(Boolean);
 
   return (
     <div className="grid gap-4">
       <p className="text-xs text-ink-muted">FY {from} → {to} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>} — {isFocused(focus) ? 'this branch, in its own currency.' : 'each branch in its own currency, never consolidated.'}</p>
+      <BranchLoadNotice load={load} onRetry={() => q.forEach((x) => x.refetch())} />
       <div data-testid="tk-profitability">
         <DataTable
           title="Profitability"
           columns={COLS}
           rows={rows}
+          isError={load.allFailed}
           getRowKey={(r) => r.code}
           emptyMessage="No branch figures yet."
           searchable={false}

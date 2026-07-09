@@ -17,7 +17,7 @@ function renderWith(ui) {
 
 describe('perfTarget utils', () => {
   test('perfTargetRow computes achievement + variance branchwise', () => {
-    const r = perfTargetRow({ code: 'BOM', currency: 'INR' }, { target: 1000, actual: 900 });
+    const r = perfTargetRow({ code: 'BOM', currency: 'INR' }, { totals: { target: 1000, actual: 900 } });
     expect(r).toMatchObject({ code: 'BOM', cur: '₹', target: 1000, actual: 900, variance: -100, achievement: 90 });
   });
   test('no target → achievement 0, never divide-by-zero', () => {
@@ -31,7 +31,9 @@ describe('perfTarget utils', () => {
 
 describe('investment utils', () => {
   test('investmentRow pulls capital fields, defensive to missing', () => {
-    expect(investmentRow({ code: 'BOM', currency: 'INR' }, { capitalInvested: 5000, investments: 2000, loans: 1000, capitalEmployed: 8000, profit: 500 }))
+    // Real capital-analysis shape: scalars under `.totals`; the row remaps
+    // capitalBlocked→investments, quasiCapital→loans, netProfit→profit.
+    expect(investmentRow({ code: 'BOM', currency: 'INR' }, { totals: { capitalInvested: 5000, capitalBlocked: 2000, quasiCapital: 1000, capitalEmployed: 8000, netProfit: 500 } }))
       .toMatchObject({ capitalInvested: 5000, investments: 2000, loans: 1000, capitalEmployed: 8000, profit: 500 });
     expect(investmentRow({ code: 'X' }, null)).toMatchObject({ capitalInvested: 0, profit: 0 });
   });

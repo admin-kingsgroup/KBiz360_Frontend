@@ -434,6 +434,33 @@ export const SuppliersMaster = () => (
     ]} />
 );
 
+/* ── Credit Facilities & Limits (live, backend-connected) ────────────────────
+   Supplier / BSP / bank credit lines with a sanctioned limit. `drawdownLedgers`
+   is the mapping to a supplier — one facility → many ledgers, so a vendor kept
+   under several module-split ledgers rolls up under one limit. "Drawn" is never
+   entered here; it's read live from those ledgers by /api/credit-facilities/capacity
+   and surfaced on the Capital vs Investment dashboard. */
+const FACILITY_TYPES = ['Supplier Trade Credit', 'BSP-BG', 'Bank Card', 'Bank OD'];
+export const CreditFacilitiesMaster = () => (
+  <MasterCrud title="Credit Facilities & Limits" subtitle="Supplier / BSP / card credit lines — drawn is read live from the ledgers" resource="credit-facilities"
+    fields={[
+      { key: 'name', label: 'Facility', type: 'text', required: true },
+      { key: 'counterparty', label: 'Counterparty', type: 'text' },
+      { key: 'type', label: 'Type', type: 'select', options: FACILITY_TYPES, default: 'Supplier Trade Credit' },
+      { key: 'branch', label: 'Branch', type: 'select', options: ['ALL', ...BRANCH_CODES], default: 'ALL', required: true },
+      { key: 'currency', label: 'Currency', type: 'select', options: ['INR', 'USD'], default: 'INR', table: false },
+      { key: 'limit', label: 'Limit', type: 'number' },
+      // Maps the facility to a supplier's ledger(s): one facility → many drawdown ledgers.
+      { key: 'drawdownLedgers', label: 'Drawdown Ledgers', type: 'tags' },
+      { key: 'secured', label: 'Secured (FD-backed)', type: 'bool', default: false, table: false },
+      { key: 'securityLedger', label: 'Security Ledger (FD)', type: 'text', table: false },
+      { key: 'securityAmount', label: 'Security / BG Amount', type: 'number', table: false },
+      { key: 'cycle', label: 'Settlement Cycle', type: 'text', table: false },
+      { key: 'reviewDate', label: 'Review Date', type: 'date', table: false },
+      { key: 'active', label: 'Active', type: 'bool', default: true },
+    ]} />
+);
+
 /* ── Chart of Accounts: Groups & Ledgers (live, backend-connected) ───────── */
 // The 28 fixed backbone groups are LOCKED & non-editable (system:true → the
 // backend rejects any edit/delete with 423, and /api/groups is read-only). They

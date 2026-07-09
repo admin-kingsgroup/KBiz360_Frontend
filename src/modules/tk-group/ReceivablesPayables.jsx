@@ -3,6 +3,8 @@ import { useQueries } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { arapRow } from './utils/arap';
+import { branchLoadState } from './utils/branchLoad';
+import { BranchLoadNotice } from './BranchLoadNotice';
 import { DataTable } from '../../shell/DataTable';
 import { money } from '../../core/format';
 import { useCockpitFocus } from '../../store/cockpitFocus';
@@ -27,16 +29,19 @@ export function ReceivablesPayables() {
   const focus = useCockpitFocus();
   const view = focusedBranches(focus, BRANCHES);
   const q = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'arap', b.code], queryFn: () => apiGet('/api/accounting/ageing', { branch: b.code }), staleTime: 60_000 })) });
-  const rows = view.map((b, i) => arapRow(b, q[i] && q[i].data));
+  const load = branchLoadState(q, view);
+  const rows = view.map((b, i) => (q[i] && q[i].isError) ? null : arapRow(b, q[i] && q[i].data)).filter(Boolean);
 
   return (
     <div className="grid gap-4">
       <p className="text-xs text-ink-muted">{isFocused(focus) ? <b>{focus} — focused</b> : <b>Branchwise</b>} — each branch's outstanding in its own currency, never consolidated.</p>
+      <BranchLoadNotice load={load} onRetry={() => q.forEach((x) => x.refetch())} />
       <div data-testid="tk-arap">
         <DataTable
           title="Receivables & Payables"
           columns={COLS}
           rows={rows}
+          isError={load.allFailed}
           getRowKey={(r) => r.code}
           emptyMessage="No outstanding balances."
           searchable={false}

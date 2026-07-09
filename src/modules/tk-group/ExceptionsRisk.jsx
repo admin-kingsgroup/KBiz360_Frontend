@@ -4,6 +4,8 @@ import { apiGet } from '../../core/api';
 import { BRANCHES } from '../../core/referenceCache';
 import { scorecardRow, fyRange } from './utils/scorecard';
 import { branchExceptions, riskScore } from './utils/exceptions';
+import { branchLoadState } from './utils/branchLoad';
+import { BranchLoadNotice } from './BranchLoadNotice';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
 import { Badge } from '../../shell/primitives';
@@ -38,11 +40,13 @@ export function ExceptionsRisk() {
   const pnl = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'ex', 'pnl', b.code, from, to], queryFn: () => apiGet('/api/accounting/profit-and-loss', { branch: b.code, from, to }), staleTime: 60_000 })) });
   const inv = useQueries({ queries: view.map((b) => ({ queryKey: ['tk', 'ex', 'inv', b.code, from, to], queryFn: () => apiGet('/api/accounting/invoice-gp', { branch: b.code, from, to }), staleTime: 60_000 })) });
 
+  const load = branchLoadState(pnl, view, inv);
   const rows = view.map((b, i) => {
+    if ((pnl[i] && pnl[i].isError) || (inv[i] && inv[i].isError)) return null; // dropped → named in the notice, not a fake ₹0 row
     const sc = scorecardRow(b, pnl[i] && pnl[i].data, inv[i] && inv[i].data);
     const flags = branchExceptions(sc);
     return { ...sc, flags, score: riskScore(flags) };
-  }).sort((a, b) => b.score - a.score);
+  }).filter(Boolean).sort((a, b) => b.score - a.score);
   const clean = rows.every((r) => !r.flags.length);
 
   return (
@@ -50,11 +54,13 @@ export function ExceptionsRisk() {
       <p className="text-xs text-ink-muted">
         FY {from} → {to} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>} — each branch judged on its own figures, worst first.
       </p>
+      <BranchLoadNotice load={load} onRetry={() => { pnl.forEach((x) => x.refetch()); inv.forEach((x) => x.refetch()); }} />
       <div data-testid="tk-exceptions">
         <DataTable
           title="Exceptions & Risk"
           columns={COLS}
           rows={rows}
+          isError={load.allFailed}
           getRowKey={(r) => r.code}
           emptyMessage="No branches to assess."
           searchable={false}

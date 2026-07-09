@@ -68,17 +68,17 @@ describe('pageCatalog — Page Visibility Control', () => {
     expect(committed).toEqual([...fresh].sort());
   });
 
-  test('Admin sub-menus (Assets / HO Control / Settings / Import-Export) nest under one "Admin" section', () => {
+  test('Admin sub-menus (Assets / Settings / Import-Export) nest under one "Admin" section', () => {
     const catalog = buildPageCatalog();
     const admin = catalog.find((s) => s.section === 'Admin');
     expect(admin).toBeTruthy();                                   // there is a single "Admin" section
     // …and NOT as separate top-level sections (they moved under Admin, like the top nav).
-    for (const s of ['Assets', 'HO Control', 'Settings', 'Import / Export Data']) {
+    for (const s of ['Assets', 'Settings', 'Import / Export Data']) {
       expect(catalog.some((sec) => sec.section === s)).toBe(false);
     }
     // The Admin section carries those as its sub-groups.
     const groups = new Set(admin.items.map((i) => i.group));
-    for (const g of ['Assets', 'HO Control', 'Settings', 'Import / Export Data']) {
+    for (const g of ['Assets', 'Settings', 'Import / Export Data']) {
       expect(groups.has(g)).toBe(true);
     }
   });

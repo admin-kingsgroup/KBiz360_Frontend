@@ -299,7 +299,7 @@ const Empty = ({ txt }) => <div className="emptyrow">{txt}</div>;
 
 const NAV = [
   ['ov', 'Overview', '◆'], ['s1', 'Capital Employed', '①'], ['s2', 'Capital Blocked', '②'],
-  ['s3', 'In-Flow Capital', '③'], ['s4', 'Performance', '④'], ['s5', 'Balance Sheet', '⑤'], ['s6', 'Profit & Loss', '⑥'],
+  ['s3', 'In-Flow Capital', '③'], ['cl', 'Credit Lines', '◈'], ['s4', 'Performance', '④'], ['s5', 'Balance Sheet', '⑤'], ['s6', 'Profit & Loss', '⑥'],
 ];
 const PRESETS = [['all', 'All'], ['mtd', 'MTD'], ['qtd', 'QTD'], ['cfy', 'CFY'], ['lfy', 'LFY']];
 
@@ -314,6 +314,12 @@ export function CapitalVsInvestmentLive({ branch }) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['capital-analysis', brCodeOf(branch), range.from, range.to],
     queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to }),
+  });
+  // Credit Lines & Capacity — facilities master + live "drawn" from the ledgers.
+  // Own In-Flow inside the payload agrees with the capital-analysis figure above.
+  const { data: creditData } = useQuery({
+    queryKey: ['credit-capacity', brCodeOf(branch), range.from, range.to],
+    queryFn: () => apiGet('/api/credit-facilities/capacity', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to }),
   });
 
   const t = data?.totals || {};
@@ -549,6 +555,61 @@ export function CapitalVsInvestmentLive({ branch }) {
                 <TotRow label="COMPOSITION TOTAL (CURRENT ASSETS)" val={flowComp} fmt={inr} />
               </Stmt>
             </div>
+
+            {/* Credit Lines & Capacity — own In-Flow geared with cycle-credit.
+                "Drawn" is read live from each facility's ledgers by /api/credit-facilities/capacity;
+                Trading Capacity = own In-Flow + total undrawn credit. */}
+            {(() => {
+              const cd = creditData || {};
+              const facs = cd.facilities || [];
+              const undrawn = (cd.totals || {}).available || 0;
+              const utilCol = (u) => (u >= 90 ? 'var(--red)' : u >= 70 ? 'var(--amber)' : 'var(--primary-d)');
+              // Format each row in its OWN facility currency (so a consolidated view never
+              // prints a $ line with a ₹ symbol); the capacity/own-In-Flow figures stay in
+              // the selected branch's currency via cr().
+              const fc = (f, n) => fmtShort(f.currency === 'USD' ? '$' : (f.currency === '₹' || f.currency === 'INR' ? '₹' : cur), n);
+              const cell = { padding: '8px 10px', borderBottom: '1px solid var(--line2)' };
+              const numCell = { ...cell, textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
+              return (
+                <div className="card section" id="cvd-cl">
+                  <div className="sec-hd"><span className="no teal">◈</span><div><div className="tt">Credit Lines &amp; Capacity</div><div className="ds">Own In-Flow geared with cycle-credit — “drawn” read live from the ledgers</div></div><span className="right num" style={{ color: 'var(--primary-d)' }}>{cr(cd.tradingCapacity || 0)}</span></div>
+                  <div className="pad">
+                    <div className="formula">
+                      <div className="cell"><div className="l">Own In-Flow Capital</div><div className="v num">{cr(cd.ownInflow || 0)}</div></div>
+                      <div className="op">+</div>
+                      <div className="cell"><div className="l">Undrawn Credit</div><div className="v num">{cr(undrawn)}</div></div>
+                      <div className="op">=</div>
+                      <div className="cell res"><div className="l">Trading Capacity</div><div className="v num">{cr(cd.tradingCapacity || 0)}</div></div>
+                    </div>
+                    {facs.length ? (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                          <thead><tr>
+                            {['Facility', 'Type', 'Limit', 'Drawn', 'Available', 'Util'].map((h, i) => (
+                              <th key={h} style={{ textAlign: i < 2 ? 'left' : 'right', padding: '8px 10px', fontSize: 10, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--dim)', borderBottom: '1px solid var(--line)' }}>{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody>
+                            {facs.map((f) => (
+                              <tr key={f.id}>
+                                <td style={{ ...cell, fontWeight: 700 }}>{f.name}{f.secured ? <span className="tag bs" style={{ marginLeft: 6 }}>FD</span> : null}</td>
+                                <td style={{ ...cell, color: 'var(--dim)' }}>{f.type}</td>
+                                <td style={numCell}>{fc(f, f.limit)}</td>
+                                <td style={numCell}>{fc(f, f.drawn)}</td>
+                                <td style={{ ...numCell, fontWeight: 700, color: f.overLimit ? 'var(--red)' : 'var(--primary-d)' }}>{f.overLimit ? `over ${fc(f, f.drawn - f.limit)}` : fc(f, f.available)}</td>
+                                <td style={{ ...numCell, fontWeight: 700, color: utilCol(f.utilisation) }}>{f.utilisation}%</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="recon">No credit facilities set for this branch. Add them in <b>Masters ▸ Supplier Master ▸ Credit Facilities &amp; Limits</b> — “drawn” then reads live from each facility’s ledgers.</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Section 4 · Performance */}
             <div className="card section" id="cvd-s4">

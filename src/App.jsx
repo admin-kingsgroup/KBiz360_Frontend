@@ -10,7 +10,7 @@ import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
 import { ErrorBoundary } from './shell/ErrorBoundary';
-import { pickBranchForUser } from './core/branchScope';
+import { pickBranchForUser, withCanonicalRole } from './core/branchScope';
 import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
@@ -31,7 +31,7 @@ const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RP
 const { RPT_InterbranchElim, InterBranchRegister, InterBranchMatrix, InterBranchCounterpartyLedger } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/reports/salesGpAnalytics'));
 const { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } = lazyModule(() => import('./modules/assets'));
-const { Dashboard, AlertsDashboard, OwnerDashboard, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
+const { Dashboard, AlertsDashboard, OwnerDashboard, AdCockpit, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
 const { DirectorDash, TargetsMaster } = lazyModule(() => import('./modules/directorDashboards'));
 const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } = lazyModule(() => import('./modules/finance'));
 
@@ -47,7 +47,7 @@ import { supportRoutes } from './modules/support/routes';
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes];
-const { AuthorityConfigCenter, BankingApiSettings, CentralAuditQueue, DelegationsManager, GroupDashboard, GroupMonthlyDashboard, HOAssetProcurement, HOBankingControl, HOVendorMasterLock, PeriodLockControl, PeriodLocking, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
+const { BankingApiSettings, DelegationsManager, GroupDashboard, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/masters/mastersParties'));
@@ -63,11 +63,13 @@ const { ModuleRegister } = lazyModule(() => import('./modules/reports/moduleRegi
 const { AccountsTreeView } = lazyModule(() => import('./modules/masters/chartBuilder'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/reportsFinancial/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/reportsFinancial/balanceSheetTally'));
+const { ReconStatusPage } = lazyModule(() => import('./modules/recon-status'));
+const { Gstr2bPage } = lazyModule(() => import('./modules/gstr2b'));
 const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFinancial/capitalVsInvestment'));
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkAdoptionPage, TkIntegrityPage, TkModulesPage, TkHealthScorecardPage, TkRulesPage, TkUserRulesPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
@@ -80,8 +82,9 @@ const { ProfitAndLossUnified, BalanceSheetUnified } = lazyModule(() => import('.
 const { NotesToFinancials } = lazyModule(() => import('./modules/reportsFinancial/reportsNotes'));
 const { Statistics } = lazyModule(() => import('./modules/reports/statistics'));
 const { CostCenterMasterLive } = lazyModule(() => import('./modules/masters/costCentersLive'));
-const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, GroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/masters/mastersLive'));
+const { VoucherTypesMaster, CostCategoriesMaster, BudgetsMaster, ScenariosMaster, CustomersMaster, SuppliersMaster, CreditFacilitiesMaster, GroupsMaster, LedgersMaster } = lazyModule(() => import('./modules/masters/mastersLive'));
 const { DataImportPage } = lazyModule(() => import('./modules/dataImport'));
+const { DevControlPage } = lazyModule(() => import('./modules/devControl'));
 import { GlobalSearch } from './shell/GlobalSearch';
 import { Placeholder } from './shell/Placeholder';
 import { SideNav } from './shell/SideNav';
@@ -117,7 +120,9 @@ export default function KB360App(){
   /* ── Restore the session from localStorage so a refresh keeps the user
      signed in (the JWT lives under 'kb360-token', the user under 'kb360-user'). */
   const restoredUser = (() => {
-    try { if(localStorage.getItem("kb360-token")) return JSON.parse(localStorage.getItem("kb360-user")||"null"); }
+    // Canonicalise the role on restore too — a session saved with 'super_admin' must
+    // come back as the title-case Owner every owner gate recognises.
+    try { if(localStorage.getItem("kb360-token")) return withCanonicalRole(JSON.parse(localStorage.getItem("kb360-user")||"null")); }
     catch { /* ignore */ }
     return null;
   })();
@@ -230,7 +235,10 @@ export default function KB360App(){
      refresh-time initializer uses). This is the fix for "some pages show failed
      to fetch until I refresh": login left the branch at a stale/out-of-scope
      value, which the server-side branch scoping then rejected with 403s. */
-  const switchUser = (newUser) => {
+  const switchUser = (rawUser) => {
+    // Canonicalise 'super_admin' → 'Super Admin' so the Owner gets full scope + the
+    // central cockpit + every owner-only surface, not a half-owner.
+    const newUser = withCanonicalRole(rawUser);
     setCurrentUser(newUser);
     setBranch(pickBranchForUser(newUser));
     // Redirect on user switch (current route may be forbidden). Accountants land on
@@ -248,7 +256,7 @@ export default function KB360App(){
       // Drop any minimized/parked (branch-scoped) items so they never leak to the next session.
       try{ window.dispatchEvent(new CustomEvent("kbiz:logout")); }catch{ /* ignore */ }
     }
-    setCurrentUser(u);
+    setCurrentUser(withCanonicalRole(u));
   };
 
   /* ── Auto-renew the JWT so an open session never reaches the token expiry.
@@ -374,7 +382,7 @@ export default function KB360App(){
     /* ── Hard route-level lockout for restricted roles ───────────────────────
        A Branch Accountant's nav is limited to their Accounts workspace, but the
        nav filter alone doesn't stop a direct URL. canReachRoute() blocks the
-       out-of-scope admin areas (HR, Settings, HO Control, Group dashboard) by
+       out-of-scope admin areas (HR, Settings, Group dashboard) by
        direct link too. Full-menu roles (Super Admin/Director/…) reach everything;
        finer per-page control stays with the `hidden` deny-list above. ── */
     if(!canReachRoute(route, currentUser)){
@@ -478,18 +486,10 @@ export default function KB360App(){
     if(route==="/reports/tax-board")      return <RPT_TaxFilingBoard branch={branch}/>;
     if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure branch={branch}/>;
                         /* HR Self-Service */
-        /* HO Control Center */
-        /* Authority Configuration */
-    if(route==="/settings/authority-config")  return <AuthorityConfigCenter/>;
+        /* Settings — Authority & Compliance (HO Control Center prototype removed; no Head Office in TK Group model) */
     if(route==="/settings/delegations")       return <DelegationsManager/>;
     if(route==="/settings/master-change-queue")return <MasterChangeQueue/>;
-    if(route==="/ho/asset-procurement")  return <HOAssetProcurement/>;
-    if(route==="/ho/vendor-master-lock") return <HOVendorMasterLock/>;
-    if(route==="/ho/banking-control")    return <HOBankingControl/>;
-    if(route==="/ho/group-dashboard")    return <GroupMonthlyDashboard/>;
-    if(route==="/ho/filing-register")    return <StatutoryFilingRegister/>;
-    if(route==="/ho/period-lock")        return <PeriodLockControl/>;
-    if(route==="/ho/audit-queue")        return <CentralAuditQueue/>;
+    if(route==="/settings/filing-register")   return <StatutoryFilingRegister/>;
     /* TK Group — central control (real /api/tk/* pages; dormant until core.policy_guard on) */
     if(route==="/tk/my-role")            return <TkMyRolePage/>;
     if(route==="/tk/approvals")          return <TkApprovalsPage/>;
@@ -509,7 +509,13 @@ export default function KB360App(){
     if(route==="/tk/controls")           return <TkControlsPage/>;
     if(route==="/tk/period-locks")       return <TkPeriodLockPage/>;
     if(route==="/tk/decisions")          return <TkDecisionsPage/>;
-    if(route==="/tk/control-tower")      return <TkControlTowerPage/>;
+    if(route==="/tk/control-tower")      return <TkControlTowerPage setRoute={navigate}/>;
+    if(route==="/tk/adoption")           return <TkAdoptionPage/>;
+    if(route==="/tk/integrity")          return <TkIntegrityPage/>;
+    if(route==="/tk/modules")            return <TkModulesPage setRoute={navigate}/>;
+    if(route==="/tk/health-scorecard")   return <TkHealthScorecardPage/>;
+    if(route==="/tk/rules")              return <TkRulesPage owner={['Super Admin','super_admin'].includes(currentUser?.role)}/>;
+    if(route==="/tk/user-rules")         return <TkUserRulesPage owner={['Super Admin','super_admin'].includes(currentUser?.role)} currentUser={currentUser} setRoute={navigate}/>;
     if(route==="/tk/branch-cockpit")     return <TkBranchCockpitPage/>;
     if(route==="/tk/audit")              return <TkAuditTrailPage/>;
     if(route==="/tk/targets")            return <TkTargetsPage/>;
@@ -558,6 +564,8 @@ export default function KB360App(){
     if(route==="/finance/bank-balance")  return <BankBalanceDashboard/>;
     if(route==="/finance/tds-calculator")return <TDSCalculator/>;
     if(route==="/finance/interest-calc") return <InterestCalculator/>;
+    if(route==="/finance/recon-status")  return <ReconStatusPage/>;
+    if(route==="/tax/gstr2b-itc")        return <Gstr2bPage/>;
     if(route==="/finance/investments")   return <InvestmentRegister branch={branch}/>;
     if(route==="/finance/loan-amort")    return <LoanAmortization/>;
     if(route==="/finance/reco-queue")    return <ReconciliationQueue branch={branch} setRoute={navigate}/>;
@@ -606,6 +614,14 @@ export default function KB360App(){
     // Owner Dashboard — consolidated whole-company view. Restricted to the group
     // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
     // role + email required). Non-owners hitting the URL get a "not available" card.
+    if(route==="/dashboard/cockpit") return isOwnerDashboardUser(currentUser)
+      ? <AdCockpit setRoute={navigate}/>
+      : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>AD Cockpit</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This consolidated all-branch cockpit is restricted to the group owner.</p>
+          <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
+        </div>;
     if(route==="/dashboard/owner")    return isOwnerDashboardUser(currentUser)
       ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
@@ -741,6 +757,7 @@ export default function KB360App(){
     if(route==="/masters/scenarios")       return <ScenariosMaster/>;
     if(route==="/masters/customers")  return <CustomersMaster/>;
     if(route==="/masters/suppliers")  return <SuppliersMaster/>;
+    if(route==="/masters/credit-facilities") return <CreditFacilitiesMaster branch={branch}/>;
     if(route==="/masters/airlines")   return <MastersAirlines/>;
     if(route==="/masters/hotels")     return <MastersHotels/>;
     if(route==="/masters/tax")        return <MastersTaxRates/>;
@@ -779,12 +796,26 @@ export default function KB360App(){
         if(route==="/reports/cf-direct")               return <CashFlowDirect branch={branch} setRoute={navigate}/>;
         if(route==="/reports/msme-aging")              return <MsmeTracker branch={branch} setRoute={navigate}/>;
         if(route==="/hr/loans-advances")               return <EmployeeAdvances branch={branch} setRoute={navigate}/>;
-        if(route==="/settings/period-lock")            return <PeriodLocking branch={branch} setRoute={navigate}/>;
+        // The old PeriodLocking screen was a dead second lock UI (empty data, inert
+        // buttons) — this route now serves the real TK period-lock admin instead.
+        if(route==="/settings/period-lock")            return <TkPeriodLockPage/>;
         if(route==="/settings/approval-workflow")      return <ApprovalWorkflow branch={branch} setRoute={navigate}/>;
         if(route==="/approvals")                       return <PendingApprovals branch={branch} setRoute={navigate}/>;
         if(route==="/settings/banking-api")            return <BankingApiSettings branch={branch} setRoute={navigate}/>;
         if(route==="/settings/gsp-irp")                return <GspIrpSettings branch={branch} setRoute={navigate}/>;
         if(route==="/settings/page-access")            return <PageAccessControl currentUser={currentUser} setRoute={navigate}/>;
+    // Developer Control — the engineering status console (what's wired / partial /
+    // stub / dormant / pending across the whole ERP). SUPER-ADMIN ONLY: the menu
+    // entry is role-gated in menus.js, and this route blocks everyone else even by
+    // direct URL (the component re-checks the role too, as defense in depth).
+    if(route==="/dev/control") return ['Super Admin','super_admin'].includes(currentUser?.role||'')
+      ? <DevControlPage setRoute={navigate} currentUser={currentUser}/>
+      : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Developer Control</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This engineering console is restricted to the Super Admin.</p>
+          <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
+        </div>;
     return <Placeholder route={route} setRoute={navigate}/>;
   }
 

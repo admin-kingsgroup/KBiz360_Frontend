@@ -2,7 +2,7 @@
    login and refresh must resolve to a branch the user can actually access, or
    the server-side branch scoping (auth.middleware enforceBranchScope) 403s every
    branch-scoped read. pickBranchForUser is the single picker both paths use. */
-import { pickBranchForUser, isFullScope, hasNoAssignedBranch } from '../branchScope';
+import { pickBranchForUser, isFullScope, hasNoAssignedBranch, canonicalRole, withCanonicalRole } from '../branchScope';
 import { BRANCHES } from '../data';
 
 beforeEach(() => { try { localStorage.removeItem('kb360-branch'); } catch { /* ignore */ } });
@@ -87,5 +87,33 @@ describe('isFullScope', () => {
   test('a branch accountant / accounts executive is NOT full scope', () => {
     expect(isFullScope({ role: 'Branch Accountant' })).toBe(false);
     expect(isFullScope({ role: 'Accounts Executive' })).toBe(false);
+  });
+});
+
+describe('role canonicalisation (super_admin ⇒ Super Admin at ingest)', () => {
+  test('canonicalRole folds only the lowercase Owner alias', () => {
+    expect(canonicalRole('super_admin')).toBe('Super Admin');
+    expect(canonicalRole('Super Admin')).toBe('Super Admin');
+    expect(canonicalRole('Director')).toBe('Director'); // untouched
+    expect(canonicalRole(undefined)).toBe(undefined);
+  });
+
+  test('withCanonicalRole rewrites the role (new object) but preserves the rest', () => {
+    const raw = { role: 'super_admin', email: 'x@y.com', branches: ['BOM'] };
+    const out = withCanonicalRole(raw);
+    expect(out).not.toBe(raw); // new object, no mutation
+    expect(out).toEqual({ role: 'Super Admin', email: 'x@y.com', branches: ['BOM'] });
+    expect(raw.role).toBe('super_admin'); // original untouched
+  });
+
+  test('withCanonicalRole is a pass-through when nothing changes', () => {
+    const admin = { role: 'Super Admin' };
+    expect(withCanonicalRole(admin)).toBe(admin); // same reference — no needless re-render
+    expect(withCanonicalRole(null)).toBe(null);
+    expect(withCanonicalRole({ email: 'x' })).toEqual({ email: 'x' }); // no role → unchanged
+  });
+
+  test('a canonicalised super_admin is full scope + treated as the four central roles', () => {
+    expect(isFullScope(withCanonicalRole({ role: 'super_admin' }))).toBe(true);
   });
 });
