@@ -238,7 +238,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
   );
 }
 
-export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false }) {
+export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false, poOnly = false }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
   // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
@@ -717,6 +717,109 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     );
   };
 
+  // The Purchase Order section — extracted so it can render either inline (step ② of
+  // the full form) or alone inside the poOnly modal below, with no duplicated JSX.
+  const poSection = !isNoSupp && (
+    <Section n="2" badge="PO" name="Purchase Order" sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
+      {!editing && (openInbQ.data || []).length > 0 && (
+        <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
+          <select value="" onChange={(e) => { const l = (openInbQ.data || []).find((x) => x.inbLinkNo === e.target.value); if (l) fetchInb(l); }}
+            style={{ padding: '5px 8px', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
+            <option value="">Inter-branch legs sent to {brCode}…</option>
+            {(openInbQ.data || []).map((l) => <option key={l.inbLinkNo} value={l.inbLinkNo}>{l.inbLinkNo} · from {l.fromBranch} · {l.passenger || '—'} · {fmt(l.total)}</option>)}
+          </select>
+          {inbLinkNo && <span style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>✓ {inbLinkNo} — fares & Service Fee pre-filled (IGST)</span>}
+        </div>
+      )}
+      <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960, tableLayout: 'fixed' }}>
+          <thead><tr style={{ borderBottom: '2px solid ' + PO_BAR }}>
+            <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[0].label}</th>
+            <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[1].label}</th>
+            {refKeys.map((c) => <th key={c.key} style={{ ...poHdrL, width: 120 }}>{c.label}</th>)}
+            {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
+            <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge</th>
+            {pkg
+              ? <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge {taxLabel} ({activeRate}%)</th>
+              : <th style={{ ...poHdr, width: 95, whiteSpace: 'normal', background: '#FBF3DE', color: GOLD_DEEP }}>{taxLabel} ({activeRate}%)</th>}
+            <th style={{ ...poHdr, width: 100, whiteSpace: 'normal' }}>Supp Comm/Inc Rcvd</th>
+            <th style={{ ...poHdr, width: 85 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
+            <th style={{ ...poHdr, width: 110 }}>Total</th>
+          </tr></thead>
+          <tbody>
+            {lines.map((l, i) => {
+              const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
+              return (
+                <React.Fragment key={i}>
+                <tr className="transition hover:bg-[#fdf7f9]">
+                  <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} placeholder={spec.idCols[0].label} style={cellTxt} /></td>
+                  <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} placeholder={spec.idCols[1].label} style={cellTxt} /></td>
+                  {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{l[col.key] || '—'}</td>)}
+                  {spec.fareCols.map((col) => <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
+                  <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
+                  {pkg
+                    ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
+                    : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
+                  <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
+                  <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
+                  <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
+                </tr>
+                {spec.sectors && sectorBlock(l, i, false, poCols)}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+          <tfoot><tr>
+            <td style={{ ...poTf, textAlign: 'left' }}>TOTAL</td>
+            <td style={poTf} />
+            {refKeys.map((c) => <td key={c.key} style={poTf} />)}
+            {spec.fareCols.map((c) => <td key={c.key} style={poTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+            <td style={poTf}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
+            <td style={poTf}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
+            <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
+            <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
+            <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </Section>
+  );
+
+  // poOnly: a compact modal (used from the approvals queue's Edit button) showing
+  // ONLY the Purchase Order fields — not the full multi-section entry page. Reuses the
+  // SAME state/save() as the full form (so GST/TDS/TCS/GP computation and the save
+  // payload are byte-identical), it just renders a smaller view. Customer, supplier,
+  // Sales Order markup/Service Fee and everything else stay exactly as loaded from
+  // editBooking — untouched here, so they save back unchanged.
+  if (poOnly) {
+    const close = () => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'));
+    return (
+      <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,19,38,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: 'min(1180px, 96vw)', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(13,19,38,.28)', padding: '18px 20px', fontFamily: HELV }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 15, color: DARK, display: 'flex', alignItems: 'center', gap: 7 }}><Pencil size={15} style={{ color: PO_BAR }} /> Edit Purchase Order · {editBooking.bookingNo}</h3>
+              <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#5b616e' }}>{spec.icon} {spec.name} · Link <b style={{ fontFamily: 'monospace' }}>{editBooking.linkNo}</b> · saving returns this voucher to Pending for re-approval.</p>
+            </div>
+            <button onClick={close} style={{ ...btnGh, padding: '4px 10px' }}>✕</button>
+          </div>
+          {isNoSupp ? (
+            <div style={{ padding: 18, fontSize: 12, color: '#9197a3' }}>This voucher has no purchase leg (no-supplier sale) — nothing to edit here.</div>
+          ) : poSection}
+          {error && <div style={{ margin: '10px 0', padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 9, justifyContent: 'flex-end', marginTop: 14 }}>
+            <button onClick={close} disabled={saving} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
+            <button disabled={!canSave || isNoSupp || saving} onClick={() => save()} className="max-tablet:min-h-[44px]"
+              style={{ ...btnG, background: (canSave && !isNoSupp) ? DARK : '#9ca3af', cursor: (canSave && !isNoSupp) ? 'pointer' : 'not-allowed', opacity: (canSave && !isNoSupp) ? 1 : 0.7 }}>
+              {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : 'Save changes (Pending)'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
       {/* Header */}
@@ -1013,72 +1116,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       </Section>
 
       {/* ② Purchase Order — hidden in no-supplier mode (there's no cost leg). */}
-      {!isNoSupp && (
-      <Section n="2" badge="PO" name="Purchase Order" sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
-        {!editing && (openInbQ.data || []).length > 0 && (
-          <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
-            <select value="" onChange={(e) => { const l = (openInbQ.data || []).find((x) => x.inbLinkNo === e.target.value); if (l) fetchInb(l); }}
-              style={{ padding: '5px 8px', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
-              <option value="">Inter-branch legs sent to {brCode}…</option>
-              {(openInbQ.data || []).map((l) => <option key={l.inbLinkNo} value={l.inbLinkNo}>{l.inbLinkNo} · from {l.fromBranch} · {l.passenger || '—'} · {fmt(l.total)}</option>)}
-            </select>
-            {inbLinkNo && <span style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>✓ {inbLinkNo} — fares & Service Fee pre-filled (IGST)</span>}
-          </div>
-        )}
-        <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960, tableLayout: 'fixed' }}>
-            <thead><tr style={{ borderBottom: '2px solid ' + PO_BAR }}>
-              <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[0].label}</th>
-              <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[1].label}</th>
-              {refKeys.map((c) => <th key={c.key} style={{ ...poHdrL, width: 120 }}>{c.label}</th>)}
-              {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
-              <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge</th>
-              {pkg
-                ? <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge {taxLabel} ({activeRate}%)</th>
-                : <th style={{ ...poHdr, width: 95, whiteSpace: 'normal', background: '#FBF3DE', color: GOLD_DEEP }}>{taxLabel} ({activeRate}%)</th>}
-              <th style={{ ...poHdr, width: 100, whiteSpace: 'normal' }}>Supp Comm/Inc Rcvd</th>
-              <th style={{ ...poHdr, width: 85 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
-              <th style={{ ...poHdr, width: 110 }}>Total</th>
-            </tr></thead>
-            <tbody>
-              {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
-                return (
-                  <React.Fragment key={i}>
-                  <tr className="transition hover:bg-[#fdf7f9]">
-                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} placeholder={spec.idCols[0].label} style={cellTxt} /></td>
-                    <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} placeholder={spec.idCols[1].label} style={cellTxt} /></td>
-                    {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{l[col.key] || '—'}</td>)}
-                    {spec.fareCols.map((col) => <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
-                    <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
-                    {pkg
-                      ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
-                      : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
-                    <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
-                    <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
-                    <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
-                  </tr>
-                  {spec.sectors && sectorBlock(l, i, false, poCols)}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-            <tfoot><tr>
-              <td style={{ ...poTf, textAlign: 'left' }}>TOTAL</td>
-              <td style={poTf} />
-              {refKeys.map((c) => <td key={c.key} style={poTf} />)}
-              {spec.fareCols.map((c) => <td key={c.key} style={poTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              <td style={poTf}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
-              <td style={poTf}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
-              <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
-              <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
-              <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}</td>
-            </tr></tfoot>
-          </table>
-        </div>
-      </Section>
-      )}
+      {poSection}
 
       {/* N-PO: additional purchase legs (Flight +Misc / Holiday components) */}
       {!isNoSupp && ALLOWED_LEG_MODULES[moduleCode] && (
@@ -2118,11 +2156,6 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
   React.useEffect(() => { setSel(new Set()); }, [status, brCode]);
 
-  if (editing) {
-    return <SoPoGpVoucherEntry branch={branch} setRoute={setRoute} editBooking={editing}
-      onDone={() => { setEditing(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }} />;
-  }
-
   const onApprove = async (b) => {
     setBusyId(b.id); setMsg('');
     try { const res = await apiPost('/api/booking-orders/' + b.id + '/approve'); setMsg(res.noSupplier ? `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} (no purchase leg).` : `✓ Approved ${b.bookingNo}. Posted Sales ${res.saleVno} + Purchase ${res.purchaseVno}.`); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
@@ -2214,6 +2247,13 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
             <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
             <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
           </>}
+      {/* Edit — a compact modal scoped to the Purchase Order fields only (fares,
+          Supplier Service Charge, Supp Comm/Inc Rcvd, TDS, sectors), not the full
+          SO/PO/GP entry page. Reuses SoPoGpVoucherEntry's own state/save logic. */}
+      {editing && (
+        <SoPoGpVoucherEntry poOnly branch={branch} setRoute={setRoute} editBooking={editing}
+          onDone={() => { setEditing(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }} />
+      )}
     </div>
   );
 }
