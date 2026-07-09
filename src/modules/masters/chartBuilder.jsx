@@ -135,6 +135,9 @@ const countNote = (leds) => {
 export function AccountsTreeView({ branch, setRoute, setBranch }) {
   const brc = branchCode(branch);                    // undefined for ALL → shows all
   const [branchView, setBranchView] = useState(() => brc || 'ALL'); // in-page branch picker
+  // Follow the TOP-BAR branch: switching it re-scopes this page live (the in-page
+  // picker still overrides within that view until the next top-bar switch).
+  useEffect(() => { setBranchView(brc || 'ALL'); }, [brc]);
   // Default to the branch's OWN ledgers in a specific branch view; 'all' when consolidated.
   const [scope, setScope] = useState(() => defaultScopeFor(brc || 'ALL')); // 'all' | 'common' | 'branch'
   const groupsQ = useMasterList('groups');           // groups/sub-groups are SHARED across branches

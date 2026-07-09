@@ -148,7 +148,7 @@ export const RULE_BOOK = [
     { t: 'ensureLedgers reuses an existing master when a casing/spacing/punctuation variant of the name already exists rather than minting an AUTO- duplicate; dedupes within a run by name|branch.', r: 'accounting.service.js:399,407' },
     { t: "The posting engine auto-creates missing ledgers as <branch>-AUTO-<name>, source 'auto', defaulting group to Suspense Account.", r: 'accounting.service.js:413' },
     { t: "Duplicate-key (11000) races during auto-creation are swallowed so concurrent posts don't fail.", r: 'accounting.service.js:427' },
-    { t: 'Ledger lists default to active-only; the Masters screen passes includeInactive=true and an explicit active= filter wins.', r: 'ledgers.service.js:35' },
+    { t: 'Ledger lists default to active-only AND drop presence-hidden ledgers; the Masters screen reveals both only via its "Show hidden & inactive" toggle (includeInactive=true) and an explicit active= filter wins.', r: 'ledgers.service.js:35' },
     { t: 'The branch-presence toggle HIDES a ledger (hidden:true) rather than deactivating it, leaving accounting history untouched; enabling unhides, else reactivates, else clones from a donor branch (BOM preferred) with opening 0.', r: 'ledgers.service.js:146,154' },
     { t: "The org-wide 'ALL' pool has no presence toggle (422 — a specific branch must be chosen).", r: 'ledgers.service.js:138' },
     { t: 'Only structural skeleton ledgers (SKELETON_GROUPS) are replicated to other branches; named parties/banks/capital are skipped.', r: 'chartReplicator.js:60' },
