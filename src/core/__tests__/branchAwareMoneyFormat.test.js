@@ -72,6 +72,7 @@ describe('guard — fixed screens stay branch-currency aware', () => {
     'modules/approvals/voucherApprovals.jsx',
     'modules/masters/mastersParties.jsx',
     'modules/reportsFinancial/notesEngine.js',
+    'modules/reconciliation/utils.js',
     'core/voucher/VoucherShell.jsx',
     'core/voucher/fields/RefundReissueFields.jsx',
     'core/AuditTrail.jsx',

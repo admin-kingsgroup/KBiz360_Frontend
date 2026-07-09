@@ -105,6 +105,16 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Reconciliation Hub', href: '/reconciliation' },
         { label: 'Reports & Pending', href: '/reconciliation/reports' },
       ] },
+      // Statement matching moved OUT of the Accounts pill — Central must still
+      // reach it (Month/Quarter/Year closings are worked from here).
+      { label: 'Statement Matching', children: [
+        { label: 'Client Reconciliation', href: '/accounts/client-reco' },
+        { label: 'Bank Reconciliation', href: '/bank-reco' },
+        { label: 'Reconciliation Queue', href: '/finance/reco-queue' },
+        { label: 'Supplier Reconciliation', href: '/accounts/supplier-reco' },
+        { label: 'Inter-Branch Reconciliation', href: '/accounts/interbranch-reco' },
+        { label: 'Tally Reconciliation', href: '/accounts/tally-reco' },
+      ] },
       { label: 'Govern', children: [
         { label: 'Rule Book & Process', href: '/reconciliation/rulebook' },
       ] },
@@ -216,8 +226,16 @@ export function controlCockpitMenu(focus, currentUser) {
 // '/dashboard/' covers the role-segregated dashboards surfaced in the cockpit (incl. the
 // owner-only /dashboard/owner); '/dashboards/' covers the AD Dashboards group.
 const COCKPIT_PREFIXES = ['/tk/', '/dashboard/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/', '/reconciliation/'];
+// Statement-matching screens (moved out of the Accounts pill) — reachable from
+// Central because Month/Quarter/Year closings are worked here; each page stays
+// branch-wise via its own selectors.
+const COCKPIT_EXACT = new Set([
+  '/dashboard', '/reconciliation',
+  '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
+  '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+]);
 export function isCockpitRoute(route) {
   // '/reconciliation' — Month/Quarter/Year closings are DONE from TK Group Central
   // (AE/FM/Director/Owner); the pages themselves stay branch-wise via their chips.
-  return !!route && (route === '/dashboard' || route === '/reconciliation' || COCKPIT_PREFIXES.some((p) => route.startsWith(p)));
+  return !!route && (COCKPIT_EXACT.has(route) || COCKPIT_PREFIXES.some((p) => route.startsWith(p)));
 }

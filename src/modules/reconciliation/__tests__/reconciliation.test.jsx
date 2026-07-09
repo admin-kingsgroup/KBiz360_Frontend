@@ -47,14 +47,17 @@ describe('reconciliation · tones & formatting', () => {
     expect(branchCodeOf(null)).toBe('');
     expect(branchCodeOf({ code: 'ZZZ' })).toBe('');
   });
-  test('branch currency: ₹ for India books, local for Africa', () => {
+  test('branch currency mirrors the BOOKS: ₹ for India, $ for ALL Africa (USD books)', () => {
     expect(currencyOf('BOM')).toBe('₹');
-    expect(currencyOf('NBO')).toBe('KES');
-    expect(currencyOf('FBM')).toBe('$');
+    expect(currencyOf('NBO')).toBe('$');   // books are USD — KES is print-only secondary
+    expect(currencyOf('DAR')).toBe('$');   // books are USD — TZS is print-only secondary
+    expect(currencyOf('FBM')).toBe('$');   // USD-only branch
     expect(BRANCHES).toHaveLength(6);
   });
-  test('fmtAmt formats en-IN with the branch symbol, — for empty', () => {
+  test('fmtAmt groups by currency: lakh/crore for ₹, thousands for $, — for empty', () => {
     expect(fmtAmt(125000, 'BOM')).toBe('₹ 1,25,000');
+    expect(fmtAmt(125000, 'NBO')).toBe('$ 125,000'); // NOT $ 1,25,000
+    expect(fmtAmt(125000, 'FBM')).toBe('$ 125,000');
     expect(fmtAmt(null, 'BOM')).toBe('—');
   });
 });

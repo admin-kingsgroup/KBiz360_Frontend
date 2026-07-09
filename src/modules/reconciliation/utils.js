@@ -2,6 +2,7 @@
 // Tier metadata (labels, signer chains, colors), status→tone mapping, currency
 // per branch and progress math. Everything here is pure and unit-tested — the
 // components stay thin over these.
+import { localeOf } from '../../core/format';
 
 export const BRANCHES = ['BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
 
@@ -12,8 +13,10 @@ export function branchCodeOf(branch) {
   return BRANCHES.includes(code) ? code : '';
 }
 
-// FE currency map (mirrors branch books; FE-wide fmt is not branch-aware yet).
-export const BRANCH_CURRENCY = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: 'KES', DAR: 'TZS', FBM: '$' };
+// FE currency map — mirrors the BOOKS currency. ALL 3 Africa branches keep their
+// books in USD ($); KES/TZS are print-only secondary currencies (NBO/DAR local
+// invoice printing), never a books/report currency. FBM is USD-only.
+export const BRANCH_CURRENCY = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 export const currencyOf = (branch) => BRANCH_CURRENCY[branch] || '₹';
 
 // The four tiers — kept in ladder order. `chain` mirrors the backend service
@@ -113,10 +116,13 @@ export function chainProgress(cert) {
   return { done, total: chain.length, next };
 }
 
-/** en-IN formatted amount with the branch currency symbol ('' for null). */
+/** Formatted amount with the branch currency symbol ('' for null). Grouping follows
+ *  the currency — Indian lakh/crore for ₹, Western thousands for the USD branches
+ *  (never `$ 1,25,000`) — via the shared core/format localeOf resolver. */
 export function fmtAmt(n, branch) {
   if (n === null || n === undefined || n === '' || Number.isNaN(Number(n))) return '—';
-  return `${currencyOf(branch)} ${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  const cur = currencyOf(branch);
+  return `${cur} ${Number(n).toLocaleString(localeOf(cur), { maximumFractionDigits: 2 })}`;
 }
 
 /** Count of unresolved exceptions on a certificate. */

@@ -45,11 +45,16 @@ describe('Reconciliation · top-level pill', () => {
       .forEach((h) => expect(all).not.toContain(h));
   });
 
-  test('TK Group Central cockpit carries the Reconciliation pill (branch-wise oversight)', () => {
+  test('TK Group Central cockpit carries the FULL Reconciliation pill (certs + statement matching)', () => {
     const cockpit = controlCockpitMenu('', { role: 'Super Admin' });
     const pill = cockpit.find((p) => p && p.label === 'Reconciliation');
     expect(pill).toBeTruthy();
-    expect(allHrefs(pill)).toEqual(['/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook']);
+    expect(allHrefs(pill)).toEqual([
+      '/reconciliation', '/reconciliation/reports',
+      '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
+      '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+      '/reconciliation/rulebook',
+    ]);
     // and for the other central roles too (Director / FM / Sr. AE share the cockpit)
     const dirCockpit = controlCockpitMenu('', { role: 'Director' });
     expect(dirCockpit.some((p) => p && p.label === 'Reconciliation')).toBe(true);
