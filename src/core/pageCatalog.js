@@ -59,10 +59,19 @@ function isMenuNode(v) {
 // Curated order for the sections we already know — gives the nicest grouping and
 // nav-order on the control screen. Listed by EXPORT NAME so they resolve from the
 // live namespaces below.
+// NOTE: MENU_TK_ADMIN, MENU_TK_MASTERS and MENU_TK_HR reuse branch-side hrefs
+// (Settings screens, Numbering Series, Chart of Accounts / Ledgers / Groups /
+// Customers / Suppliers / Employees / Payroll / Attrition / Recruitment) that also
+// live under MENU_ADMIN / MENU_ACCOUNTS / MENU_MASTERS / MENU_HR. They are listed
+// BEFORE those sections deliberately, so they claim those hrefs first (see build()'s
+// de-dupe-by-href) and the admin manages them grouped like the live TK Central
+// cockpit dropdowns instead of buried in the much larger Admin/Accounts/Masters/HR
+// lists. Reordering this array would silently move those toggles back.
 const PREFERRED_SECTIONS = [
-  'MENU_DASHBOARDS', 'MENU_FINANCE', 'MENU_APPROVALS', 'MENU_ACCOUNTS', 'MENU_REPORTS',
+  'MENU_DASHBOARDS', 'MENU_FINANCE', 'MENU_APPROVALS', 'MENU_TK_APPROVALS', 'MENU_TK_CONTROL',
+  'MENU_TK_ADMIN', 'MENU_TK_MASTERS', 'MENU_ACCOUNTS', 'MENU_REPORTS',
   'TAX_ALL', 'TAX_INDIA', 'TAX_AFRICA', 'MENU_MASTERS', 'MENU_TRANSACTIONS',
-  'MENU_HR', 'MENU_ADMIN',
+  'MENU_TK_HR', 'MENU_HR', 'MENU_TK_PERFORMANCE', 'MENU_TK_SETUP', 'MENU_ADMIN',
 ];
 // Exports skipped when auto-appending. MENU_COMMON_TOP is an array of pills already
 // covered elsewhere. MENU_ADMIN is the section root that NESTS Assets / Settings /
@@ -118,10 +127,20 @@ export function topLevelPillHrefs() {
   return _pillCache;
 }
 
+// /tk/decisions (MENU_DECISIONS) is a top-level pill in the BRANCH nav — every role
+// including Branch Accountant needs it to raise credit/funds/onboarding requests, so
+// it stays in topLevelPillHrefs() above (App.jsx's route guard must never block it).
+// But in the TK Central cockpit it's nested under Approvals ▸ Raise / Govern (see
+// MENU_TK_APPROVALS), not a top-level array entry there — so it's exempted here so it
+// still gets a normal catalogue toggle. applyHidden's per-render pill-clearing (see
+// menus.js) means the toggle only ever prunes it from the cockpit dropdown; the branch
+// pill is re-protected on every branch render regardless of this setting.
+const CATALOG_PILL_EXEMPT = new Set(['/tk/decisions']);
+
 function build() {
   const sections = [];
   const pills = topLevelPillHrefs();
-  const skip = (k) => ALWAYS_VISIBLE.has(k) || pills.has(k);
+  const skip = (k) => ALWAYS_VISIBLE.has(k) || (pills.has(k) && !CATALOG_PILL_EXEMPT.has(k));
   const seen = new Set();
   for (const root of sectionRoots()) {
     const leaves = [];
