@@ -54,6 +54,14 @@ export function addAttachment(id, { label, source, file }) {
 export async function getAttachmentUrl(id, attId) {
   return apiGet(`/api/reconciliation/${id}/attachments/${attId}/url`);
 }
+// Statement Scrutiny: parsed rows (HTML/TXT/CSV/Excel are read client-side) →
+// entry-to-entry match against the ledger, stored on the certificate.
+export function scrutinizeStatement(id, { attachmentId, fileName, rows, statementClosing }) {
+  return apiPost(`/api/reconciliation/${id}/scrutinize`, { attachmentId, fileName, rows, statementClosing });
+}
+export function scrutinyEntryAction(id, entryId, { action, classification }) {
+  return apiPost(`/api/reconciliation/${id}/scrutiny/entries/${entryId}`, { action, classification });
+}
 export function addException(id, text) {
   return apiPost(`/api/reconciliation/${id}/exceptions`, { text });
 }
