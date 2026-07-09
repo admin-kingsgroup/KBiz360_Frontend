@@ -10,4 +10,5 @@ export const reconciliationRoutes = [
   { path: '/reconciliation', title: 'Reconciliation', moduleName: 'Reconciliation', Element: lazyEl(() => import('../index'), 'ReconciliationHub') },
   { path: '/reconciliation/reports', title: 'Reconciliation Reports & Pending', moduleName: 'Reconciliation', Element: lazyEl(() => import('../index'), 'ReconReportsPage') },
   { path: '/reconciliation/rulebook', title: 'Reconciliation Rule Book', moduleName: 'Reconciliation', Element: lazyEl(() => import('../index'), 'RuleBookPage') },
+  { path: '/reconciliation/match-guide', title: 'Statement Match Guide', moduleName: 'Reconciliation', Element: lazyEl(() => import('../index'), 'MatchGuidePage') },
 ];

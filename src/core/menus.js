@@ -668,6 +668,7 @@ export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight,
     {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
     {label:"Inter-Branch Reconciliation", href:"/accounts/interbranch-reco"},
     {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
+    {label:"Match Guide",              href:"/reconciliation/match-guide"},
   ]},
 ]};
 

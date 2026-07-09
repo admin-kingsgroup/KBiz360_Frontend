@@ -22,6 +22,7 @@ describe('Reconciliation · top-level pill', () => {
       '/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook',
       '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
       '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+      '/reconciliation/match-guide', // the staff Match Guide — LAST under Statement Matching
     ]);
   });
 
@@ -53,6 +54,7 @@ describe('Reconciliation · top-level pill', () => {
       '/reconciliation', '/reconciliation/reports',
       '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
       '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+      '/reconciliation/match-guide',
       '/reconciliation/rulebook',
     ]);
     // and for the other central roles too (Director / FM / Sr. AE share the cockpit)

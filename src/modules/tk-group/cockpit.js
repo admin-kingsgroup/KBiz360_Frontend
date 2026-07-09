@@ -114,6 +114,7 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Supplier Reconciliation', href: '/accounts/supplier-reco' },
         { label: 'Inter-Branch Reconciliation', href: '/accounts/interbranch-reco' },
         { label: 'Tally Reconciliation', href: '/accounts/tally-reco' },
+        { label: 'Match Guide', href: '/reconciliation/match-guide' },
       ] },
       { label: 'Govern', children: [
         { label: 'Rule Book & Process', href: '/reconciliation/rulebook' },
