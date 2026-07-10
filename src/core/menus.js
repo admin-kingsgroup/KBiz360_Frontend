@@ -349,7 +349,9 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   ]},
   {label:"Payables & Suppliers", children:[
     {label:"Payables (Ageing + Settle)",  href:"/reports/pay"},
-    {label:"Payment Run / Batch Pay",     href:"/accounts/payment-run"},
+    // Payment Run / Batch Pay removed — bulk supplier payment is disabled by
+    // policy; enter payments individually (Daily Entry ▸ Payment). The screen
+    // (modules/payments/paymentRun.jsx) + BE endpoint are kept for re-enable.
     {label:"Vendor Advances",             href:"/accounting/vendor-advances"},
     {label:"Payment Register",            href:"/finance/payment-register"},
     {label:"Supplier 360 View",              href:"/reports/supplier-360"},

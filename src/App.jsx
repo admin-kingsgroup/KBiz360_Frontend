@@ -60,7 +60,7 @@ const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3B
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/approvals'));
-const { PaymentVerificationLive, PaymentRun } = lazyModule(() => import('./modules/payments'));
+const { PaymentVerificationLive } = lazyModule(() => import('./modules/payments'));
 const { ModuleRegister } = lazyModule(() => import('./modules/reports/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/masters/chartBuilder'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/reportsFinancial/pnlTally'));
@@ -606,7 +606,8 @@ export default function KB360App(){
     if(route==="/accounts/inb-matrix")     return <InterBranchMatrix branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-counterparty") return <InterBranchCounterpartyLedger branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/tally-reco")    return <TallyReco branch={branch} setRoute={navigate}/>;
-    if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
+    // Payment Run / Batch Pay route removed — bulk supplier payment disabled by
+    // policy (component kept in modules/payments; a direct URL now falls through).
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
     // The owner's home IS the Owner Dashboard — the role-scoped My Dashboard is retired for
