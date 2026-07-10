@@ -38,7 +38,7 @@ export function RuleBookPage({ branch, setRoute }) {
           <h1 className="kbiz-page-title">Reconciliation Rule Book</h1>
           <p className="text-sm text-ink-muted">Who reconciles what, when, and who signs — the single source of truth for staff. Branch-wise, never mixed.</p>
         </div>
-        <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Weekly Reconciliation</Button>
+        <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Weekly Certification</Button>
       </div>
 
       {/* 1 · tiers */}

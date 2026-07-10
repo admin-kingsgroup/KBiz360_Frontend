@@ -654,12 +654,12 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
 export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight, children:[
   // The certificate ladder — ONE menu entry per tier (the menu IS the tier
   // switch; each page renders tier-locked and branch-wise, never mixed).
-  {label:"Reconcile & Certify", children:[
-    {label:"Weekly Reconciliation",    href:"/reconciliation/weekly"},
-    {label:"Monthly Reconciliation",   href:"/reconciliation/monthly"},
-    {label:"Quarterly Reconciliation", href:"/reconciliation/quarterly"},
-    {label:"Yearly Reconciliation",    href:"/reconciliation/yearly"},
-    {label:"Rule Book & Process",      href:"/reconciliation/rulebook"},
+  {label:"Certification", children:[
+    {label:"Weekly Certification",    href:"/reconciliation/weekly"},
+    {label:"Monthly Certification",   href:"/reconciliation/monthly"},
+    {label:"Quarterly Certification", href:"/reconciliation/quarterly"},
+    {label:"Yearly Certification",    href:"/reconciliation/yearly"},
+    {label:"Rule Book & Process",     href:"/reconciliation/rulebook"},
   ]},
   // One report per tier — that tier's pending closings, certificate register
   // and open exceptions.

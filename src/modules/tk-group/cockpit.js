@@ -102,11 +102,11 @@ export function controlCockpitMenu(focus, currentUser) {
     // pages carry their own branch chips, so everything stays BRANCHWISE, never blended.
     { label: 'Reconciliation', icon: ArrowLeftRight, children: [
       // One entry per tier — the menu is the tier switch (pages are tier-locked).
-      { label: 'Reconcile & Certify', children: [
-        { label: 'Weekly Reconciliation', href: '/reconciliation/weekly' },
-        { label: 'Monthly Reconciliation', href: '/reconciliation/monthly' },
-        { label: 'Quarterly Reconciliation', href: '/reconciliation/quarterly' },
-        { label: 'Yearly Reconciliation', href: '/reconciliation/yearly' },
+      { label: 'Certification', children: [
+        { label: 'Weekly Certification', href: '/reconciliation/weekly' },
+        { label: 'Monthly Certification', href: '/reconciliation/monthly' },
+        { label: 'Quarterly Certification', href: '/reconciliation/quarterly' },
+        { label: 'Yearly Certification', href: '/reconciliation/yearly' },
       ] },
       { label: 'Reports', children: [
         { label: 'Weekly Report', href: '/reconciliation/reports/weekly' },

@@ -8,7 +8,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { clickable } from '../../core/ux/clickable';
 import { confirmDialog } from '../../core/ux/confirm';
-import { matchVarianceGroup } from '../../core/matchVariance';
+import { matchVarianceSigned } from '../../core/matchVariance';
 import { usePager, Pager } from '../../core/ux/pager';
 import { bc } from '../../core/styles';
 import { apiGet } from '../../core/api';
@@ -63,16 +63,18 @@ const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString((cur =
 // Builds a match from ONE OR MORE book legs (N:1 split): pick legs from the dropdown,
 // see the running sum tie out (or the residual), then Match. 1 leg → onManual, N → onGroup.
 // A non-tying selection warns before saving a partial, so a split never silently looks done.
-function ReconMatchCell({ line, book, cur, onManual, onGroup, onUnmatch, onDispute, onDelete }) {
+function ReconMatchCell({ line, book, cur, bookSign = 1, onManual, onGroup, onUnmatch, onDispute, onDelete }) {
   const [legs, setLegs] = useState([]);
   if (line.status === 'reconciled' || line.status === 'partial') {
     return <td style={{ ...td, whiteSpace: 'nowrap' }}><button onClick={onUnmatch} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button></td>;
   }
   const chosen = new Set(legs.map((l) => l.bookKey));
   const available = book.filter((b) => !chosen.has(b.bookKey));
-  const amt = (b) => Math.abs((Number(b.debit) || 0) - (Number(b.credit) || 0)); // sign-agnostic (works for debtor & creditor books)
+  const amt = (b) => Math.abs((Number(b.debit) || 0) - (Number(b.credit) || 0)); // magnitude, for the running Σ display
   const sum = legs.reduce((t, b) => t + amt(b), 0);
-  const variance = matchVarianceGroup(line, legs);
+  // Signed variance per this module's convention (bookSign): so wrong-DIRECTION legs
+  // never read as a tie even when their magnitudes add up to the line.
+  const variance = matchVarianceSigned(line, legs, bookSign);
   const tie = Math.abs(variance) <= 0.01;
   const addLeg = (bookKey) => { const b = book.find((x) => x.bookKey === bookKey); if (b) setLegs((p) => [...p, b]); };
   const commit = async () => {
@@ -2208,7 +2210,7 @@ export function SupplierReco({ branch, setRoute }) {
                   <td style={{ ...td, ...rnum }}>{s.debit ? money(cur, s.debit) : '—'}</td>
                   <td style={{ ...td, ...rnum }}>{s.credit ? money(cur, s.credit) : '—'}</td>
                   <td style={td}><span style={recoBadge(s.status)}>{s.status}{s.variance ? ` · Δ${money(cur, Math.abs(s.variance))}` : ''}</span>{s.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{s.matchedVno}</div> : null}</td>
-                  <ReconMatchCell line={s} book={unreconciledBook} cur={cur}
+                  <ReconMatchCell line={s} book={unreconciledBook} cur={cur} bookSign={-1}
                     onManual={(leg) => manual.mutate({ id: s.id, bookKey: leg.bookKey, vno: leg.vno, bookDebit: leg.debit, bookCredit: leg.credit })}
                     onGroup={(legs) => group.mutate({ id: s.id, books: legs.map((b) => ({ bookKey: b.bookKey, vno: b.vno, debit: b.debit, credit: b.credit })) })}
                     onUnmatch={() => unmatch.mutate({ id: s.id })}

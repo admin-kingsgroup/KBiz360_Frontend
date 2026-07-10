@@ -76,7 +76,7 @@ export const TIERS = [
 ];
 export const tierOf = (key) => TIERS.find((t) => t.key === key) || TIERS[0];
 
-// Each tier is its OWN menu entry + page pair now (Reconcile & Certify ▸ the
+// Each tier is its OWN menu entry + page pair now (Certification ▸ the
 // four tier pages · Reports ▸ the four tier reports) — the tier is chosen from
 // the menu, never from tabs inside a page.
 export const TIER_PATHS = { weekly: 'weekly', month: 'monthly', quarter: 'quarterly', year: 'yearly' };
