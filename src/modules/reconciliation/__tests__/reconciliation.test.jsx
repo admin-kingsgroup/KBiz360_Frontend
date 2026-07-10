@@ -3,7 +3,8 @@
 import {
   BRANCHES, TIERS, tierOf, statusMeta, sourceMeta, tierProgress, chainProgress,
   fmtAmt, currencyOf, openExceptions, GOLDEN_RULES, ROLE_MATRIX,
-  pendingStateMeta, fmtDue, periodOptions, visibleTiers,
+  pendingStateMeta, fmtDue, periodOptions, visibleTiers, canEditCycleConfig, branchCodeOf,
+  classifyOptionsFor, classificationLabel, MATCH_TYPE_LABELS, BANK_CLASSIFY, PARTY_CLASSIFY,
 } from '../utils';
 
 describe('reconciliation · tiers', () => {
@@ -27,6 +28,14 @@ describe('reconciliation · tiers', () => {
       expect(visibleTiers(r)).toHaveLength(4);
     });
   });
+  test('cycle CONFIG is FM/Director/Owner only — AE and Branch Accountant cannot reshape the scope', () => {
+    ['Senior Finance Manager', 'FM', 'Director', 'Owner', 'Super Admin', 'super_admin'].forEach((r) => {
+      expect(canEditCycleConfig(r)).toBe(true);
+    });
+    ['Sr. Accounts Executive', 'AE', 'Branch Accountant', '', undefined].forEach((r) => {
+      expect(canEditCycleConfig(r)).toBe(false);
+    });
+  });
 });
 
 describe('reconciliation · tones & formatting', () => {
@@ -40,14 +49,24 @@ describe('reconciliation · tones & formatting', () => {
     expect(sourceMeta('feed').tone).toBe('success');
     expect(sourceMeta(undefined).label).toBe('Download');
   });
-  test('branch currency: ₹ for India books, local for Africa', () => {
+  test('branchCodeOf: handles the app’s branch OBJECT, plain codes, ALL and junk', () => {
+    expect(branchCodeOf({ code: 'AMD', city: 'Ahmedabad' })).toBe('AMD');
+    expect(branchCodeOf('NBO')).toBe('NBO');
+    expect(branchCodeOf('ALL')).toBe('');       // group mode → no single branch
+    expect(branchCodeOf(null)).toBe('');
+    expect(branchCodeOf({ code: 'ZZZ' })).toBe('');
+  });
+  test('branch currency mirrors the BOOKS: ₹ for India, $ for ALL Africa (USD books)', () => {
     expect(currencyOf('BOM')).toBe('₹');
-    expect(currencyOf('NBO')).toBe('KES');
-    expect(currencyOf('FBM')).toBe('$');
+    expect(currencyOf('NBO')).toBe('$');   // books are USD — KES is print-only secondary
+    expect(currencyOf('DAR')).toBe('$');   // books are USD — TZS is print-only secondary
+    expect(currencyOf('FBM')).toBe('$');   // USD-only branch
     expect(BRANCHES).toHaveLength(6);
   });
-  test('fmtAmt formats en-IN with the branch symbol, — for empty', () => {
+  test('fmtAmt groups by currency: lakh/crore for ₹, thousands for $, — for empty', () => {
     expect(fmtAmt(125000, 'BOM')).toBe('₹ 1,25,000');
+    expect(fmtAmt(125000, 'NBO')).toBe('$ 125,000'); // NOT $ 1,25,000
+    expect(fmtAmt(125000, 'FBM')).toBe('$ 125,000');
     expect(fmtAmt(null, 'BOM')).toBe('—');
   });
 });
@@ -94,6 +113,23 @@ describe('reconciliation · pending board display', () => {
     expect(fmtDue({ tier: 'weekly', dueOn: '2026-07-17', upcoming: true })).toBe('Fri, 17 Jul 2026 (upcoming)');
     expect(fmtDue({ tier: 'month' })).toBe('—');
     expect(fmtDue({ tier: 'weekly' })).toBe('Friday');
+  });
+});
+
+describe('reconciliation · scrutiny classification vocabularies', () => {
+  test('bank vs party (SOA) lists — the perspective switches the vocabulary', () => {
+    expect(classifyOptionsFor('bank')).toBe(BANK_CLASSIFY);
+    expect(classifyOptionsFor('party')).toBe(PARTY_CLASSIFY);
+    expect(classifyOptionsFor(undefined)).toBe(BANK_CLASSIFY);
+    expect(BANK_CLASSIFY.map((c) => c.value)).toEqual(['unpresented', 'in-transit', 'to-post', 'other']);
+    expect(PARTY_CLASSIFY.map((c) => c.value)).toEqual(['invoice-not-received', 'payment-in-transit', 'tds-deduction', 'credit-note-pending', 'disputed', 'rate-difference', 'other']);
+  });
+  test('labels resolve across both vocabularies; match-type chips named', () => {
+    expect(classificationLabel('unpresented')).toBe('Unpresented cheque');
+    expect(classificationLabel('credit-note-pending')).toBe('Credit note / ADM pending');
+    expect(MATCH_TYPE_LABELS['ref:amount-differs']).toBe('rate difference');
+    expect(MATCH_TYPE_LABELS['carry-cleared']).toBe('carried · cleared');
+    expect(MATCH_TYPE_LABELS.learned).toBe('learned');
   });
 });
 

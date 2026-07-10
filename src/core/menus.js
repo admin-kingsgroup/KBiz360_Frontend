@@ -349,7 +349,9 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   ]},
   {label:"Payables & Suppliers", children:[
     {label:"Payables (Ageing + Settle)",  href:"/reports/pay"},
-    {label:"Payment Run / Batch Pay",     href:"/accounts/payment-run"},
+    // Payment Run / Batch Pay removed — bulk supplier payment is disabled by
+    // policy; enter payments individually (Daily Entry ▸ Payment). The screen
+    // (modules/payments/paymentRun.jsx) + BE endpoint are kept for re-enable.
     {label:"Vendor Advances",             href:"/accounting/vendor-advances"},
     {label:"Payment Register",            href:"/finance/payment-register"},
     {label:"Supplier 360 View",              href:"/reports/supplier-360"},
@@ -362,22 +364,10 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Contra Register",      href:"/finance/contra-register"},
     // Bank Reconciliation + Reconciliation Queue moved to the "Reconciliation" head below.
   ]},
-  // Dedicated Reconciliation head — gathers EVERY non-tax reconciliation screen in
-  // one place (was previously scattered across Cash & Bank + Payables), split into
-  // Client · Bank · Supplier · Inter-branch · Tally sections. Tax/GST reconciliation
-  // (Tax Reco / GSTR-2B/2A/9C) lives ONLY under the regime-aware Taxation pill now —
-  // it was removed from this Accounts head to avoid duplicating taxation screens.
-  {label:"Reconciliation", children:[
-    {divider:true, label:"Client"},
-    {label:"Client Reconciliation",    href:"/accounts/client-reco"},
-    {divider:true, label:"Bank"},
-    {label:"Bank Reconciliation",      href:"/bank-reco"},
-    {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
-    {divider:true, label:"Supplier"},
-    {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
-    {divider:true, label:"Tally"},
-    {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
-  ]},
+  // Reconciliation moved OUT of Accounts entirely — every reconciliation screen
+  // (client / bank / supplier / inter-branch / Tally matching + the certificate
+  // ladder) now lives under the top-level Reconciliation pill (MENU_RECONCILIATION).
+  // Tax/GST reconciliation stays ONLY under the regime-aware Taxation pill.
 
   /* ── 4 · BOOKS & REPORTING ───────────────────────────────── */
   {label:"Books & Scrutiny", children:[
@@ -403,7 +393,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Counterparty Ledger",       href:"/accounts/inb-counterparty"},
     {label:"INB Sales Register",        href:"/reports/inb-sreg"},
     {label:"INB Purchase Register",     href:"/reports/inb-preg"},
-    {label:"Reconciliation",            href:"/accounts/interbranch-reco"},
+    // Inter-branch RECONCILIATION moved to the top-level Reconciliation pill.
     {label:"INB SPG Approvals",         href:"/transactions/inb-approvals"},
   ]},
 
@@ -664,10 +654,50 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
 // matching screens stay under Accounts ▸ Reconciliation — this module is the
 // certificate/sign-off layer above them.
 export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight, children:[
-  {label:"Reconciliation Hub", href:"/reconciliation"},
-  {label:"Reports & Pending", href:"/reconciliation/reports"},
-  {label:"Rule Book & Process", href:"/reconciliation/rulebook"},
+  // The certificate ladder — ONE menu entry per tier (the menu IS the tier
+  // switch; each page renders tier-locked and branch-wise, never mixed).
+  {label:"Certification", children:[
+    {label:"Weekly Certification",    href:"/reconciliation/weekly"},
+    {label:"Monthly Certification",   href:"/reconciliation/monthly"},
+    {label:"Quarterly Certification", href:"/reconciliation/quarterly"},
+    {label:"Yearly Certification",    href:"/reconciliation/yearly"},
+    {label:"Rule Book & Process",     href:"/reconciliation/rulebook"},
+  ]},
+  // One report per tier — that tier's pending closings, certificate register
+  // and open exceptions.
+  {label:"Reports", children:[
+    {label:"Weekly Report",    href:"/reconciliation/reports/weekly"},
+    {label:"Monthly Report",   href:"/reconciliation/reports/monthly"},
+    {label:"Quarterly Report", href:"/reconciliation/reports/quarterly"},
+    {label:"Yearly Report",    href:"/reconciliation/reports/yearly"},
+  ]},
+  // Statement matching — MOVED here from the Accounts pill: all line-level
+  // import/match screens live under Reconciliation now (tax recon stays under
+  // the regime-aware Taxation pill).
+  {label:"Statement Matching", children:[
+    {label:"Client Reconciliation",    href:"/accounts/client-reco"},
+    {label:"Bank Reconciliation",      href:"/bank-reco"},
+    {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
+    {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
+    {label:"Inter-Branch Reconciliation", href:"/accounts/interbranch-reco"},
+    {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
+    {label:"Match Guide",              href:"/reconciliation/match-guide"},
+  ]},
 ]};
+
+// Branch-Accountant view of the pill: they PREPARE the weekly certificates
+// only — Month/Quarter/Year entries are hidden (those closings are worked from
+// TK Group Central by AE/FM/Director/Owner; the pages also self-guard).
+const BA_RECON_HIDDEN = new Set([
+  "/reconciliation/monthly", "/reconciliation/quarterly", "/reconciliation/yearly",
+  "/reconciliation/reports/monthly", "/reconciliation/reports/quarterly", "/reconciliation/reports/yearly",
+]);
+export const MENU_RECONCILIATION_WEEKLY_ONLY = {
+  ...MENU_RECONCILIATION,
+  children: MENU_RECONCILIATION.children.map(g => (g.children
+    ? {...g, children: g.children.filter(c => !BA_RECON_HIDDEN.has(c.href))}
+    : g)), // a direct-href leaf under the pill passes through untouched
+};
 
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
 export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/transactions/approvals"};
@@ -813,6 +843,24 @@ function cleanDividers(children){
   return out;
 }
 
+// Route splits leave STALE keys in users' saved deny-lists: the combined
+// Reconciliation pages became per-tier pages (2026-07), so a `hidden` entry of
+// '/reconciliation' saved before the split must keep covering its replacements
+// — otherwise the module silently un-hides on deploy. Symmetrically, hiding a
+// replacement also blocks the legacy alias that still renders it.
+const LEGACY_HIDDEN_ALIASES = {
+  '/reconciliation': ['/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly'],
+  '/reconciliation/reports': ['/reconciliation/reports/weekly', '/reconciliation/reports/monthly', '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly'],
+};
+export function expandHidden(list){
+  const out = new Set(Array.isArray(list) ? list : []);
+  for (const k of [...out]) (LEGACY_HIDDEN_ALIASES[k] || []).forEach((h) => out.add(h));
+  // The legacy URLs render the WEEKLY pages — hiding weekly must block them too.
+  if (out.has('/reconciliation/weekly')) out.add('/reconciliation');
+  if (out.has('/reconciliation/reports/weekly')) out.add('/reconciliation/reports');
+  return out;
+}
+
 // Recursively remove hidden leaves; then drop any pure container left with no
 // navigable leaf. A node that is itself navigable (has its own href) survives.
 function pruneNode(node, hiddenSet){
@@ -828,7 +876,7 @@ function pruneNode(node, hiddenSet){
 }
 
 export function applyHidden(menus, currentUser){
-  const hidden=new Set(Array.isArray(currentUser?.hidden)?currentUser.hidden:[]);
+  const hidden=expandHidden(currentUser?.hidden); // incl. legacy-alias coverage
   hidden.delete('/dashboard'); // landing page is never hideable (avoids lockout)
   // The visibility-control link is admin-only: hide it from everyone else, and
   // make sure the admin always keeps it (even if it slipped into their list).
@@ -896,7 +944,7 @@ export function roleMenuRoots(branch, currentUser){
   // Branch scope is still enforced by the top-right switcher.
   // Reconciliation: the Branch Accountant PREPARES the weekly certificates, so
   // the module pill is part of their workspace too (AE/FM/Director sign above).
-  return [MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_APPROVALS, MENU_DECISIONS, taxSectionFor(branch), MENU_SUPPORT];
+  return [MENU_ACCOUNTS, MENU_RECONCILIATION_WEEKLY_ONLY, MENU_APPROVALS, MENU_DECISIONS, taxSectionFor(branch), MENU_SUPPORT];
 }
 
 // Keep ONLY the leaves whose href is in `keep`; drop everything else (containers with

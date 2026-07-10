@@ -16,6 +16,7 @@ import { ChevronDown } from 'lucide-react';
 import { getMenu } from '../core/menus';
 import { BranchSwitcher } from './BranchSwitcher';
 import { useMobile } from '../core/hooks';
+import { useReconNavCount } from '../core/useReconciliation';
 
 const DARK = '#0d1326', GOLD = '#d4a437', DIM = '#aeb6d0', LINE = '#1a2340';
 const FIORI_BLUE = '#0070f2', FIORI_TEXT = '#515559', FIORI_TEXT_DARK = '#24272a', FIORI_BORDER = '#cbd5e1';
@@ -152,6 +153,7 @@ function MegaMenu({ item, route, go, buttonCoords, parentWidth }) {
 
 export function TopNav({ branch, setBranch, route, setRoute, currentUser, switchUser }) {
   const menu = getMenu(branch, currentUser);
+  const reco = useReconNavCount(branch); // { pending, overdue } → badge on the Reconciliation pill
   const [open, setOpen] = useState(null); // index of the open section
   const [coords, setCoords] = useState({ left: 0, width: 0, parentWidth: 0 });
   const ref = useRef(null);
@@ -265,6 +267,14 @@ export function TopNav({ branch, setBranch, route, setRoute, currentUser, switch
                 }}>
                 {item.icon && <item.icon size={15} style={{ flexShrink: 0, color: active || isOpen ? FIORI_BLUE : '#64748b', transition: 'color 0.15s' }} />}
                 <span style={{ whiteSpace: 'nowrap' }}>{item.label}</span>
+                {item.label === 'Reconciliation' && reco.pending > 0 && (
+                  <span title={reco.overdue ? `${reco.overdue} weekly cycle(s) overdue` : `${reco.pending} reconciliation item(s) pending`}
+                    style={{ minWidth: 16, height: 16, padding: '0 5px', borderRadius: 9, fontSize: 9.5, fontWeight: 800,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, flexShrink: 0,
+                      background: reco.overdue ? '#A32D2D' : '#d4a437', color: '#fff' }}>
+                    {reco.overdue || reco.pending}
+                  </span>
+                )}
                 {item._regime && (
                   <span style={{ fontSize: 7.5, padding: '2px 5px', borderRadius: 3, fontWeight: 800, letterSpacing: '0.5px',
                     background: item._regime === 'GST' ? '#185FA515' : item._regime === 'VAT' ? '#27500A15' : '#d4a43715',

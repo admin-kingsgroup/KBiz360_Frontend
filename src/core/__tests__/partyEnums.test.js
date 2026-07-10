@@ -27,10 +27,11 @@ describe('partyEnums', () => {
     expect(COUNTRIES).toEqual(expect.arrayContaining(['United Arab Emirates', 'Singapore']));
   });
 
-  test('STATE_NAMES is derived from IN_STATES with a leading blank, Maharashtra present', () => {
+  test('STATE_NAMES is derived from IN_STATES with a leading blank + "Others" (foreign parties)', () => {
     expect(STATE_NAMES[0]).toBe('');
+    expect(STATE_NAMES[1]).toBe('Others'); // non-Indian parties (Africa branches / foreign suppliers)
     expect(STATE_NAMES).toContain('Maharashtra');
-    expect(STATE_NAMES.length).toBe(IN_STATES.length + 1);
+    expect(STATE_NAMES.length).toBe(IN_STATES.length + 2);
   });
 
   test('IN_STATES code↔name pairs are well formed (2-digit code, named)', () => {

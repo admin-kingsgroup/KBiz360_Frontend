@@ -28,6 +28,11 @@ export async function getGroupHealth() {
 export async function getSetupReadiness() {
   return (await apiGet('/api/tk/monitor/readiness')) || {};
 }
+// Roll-up getter (does NOT swallow): the Task List must show a real error state,
+// never a false "all configured". One payload; branch/user scoping is client-side.
+export async function getSetupTasks() {
+  return (await apiGet('/api/tk/monitor/setup-tasks')) || {};
+}
 export async function getIntegrity() {
   return (await apiGet('/api/tk/monitor/integrity')) || {};
 }

@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getFlagState, proposeFlags } from './api/flags';
+import { getFlagState, proposeFlags, setFlag } from './api/flags';
 import { withToggled } from './utils/flags';
 import { useConfigValue } from '../../core/useAccounting';
+import { isOwner } from './utils/owner';
+import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
+import { confirmDialog } from '../../core/ux/confirm';
 import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
 import { Badge } from '../../shell/primitives';
@@ -95,16 +98,48 @@ export function ControlPanel({ setRoute }) {
   const [msg, setMsg] = useState('');
   const flags = flagsQ.data?.flags || {};
   const isOn = (key) => { const f = flags[key] || {}; return f.foundation === true || f.enabled === true; };
-  // Flipping a control PROPOSES the change through the Owner-approved change-request
-  // flow — it never flips live. Dormant-safe: even an approved flag stays guarded by
-  // core.policy_guard until that master is on.
+  const owner = isOwner();
+  // Flipping a control: the OWNER has full override, so their click applies the flag
+  // LIVE (self-approved) and the toggle moves at once — the server returns the new flag
+  // state, which we drop straight into the query cache. Everyone else PROPOSES the
+  // change through the Owner-approved change-request flow (it never flips live for them).
+  // Either way it is written to the audit trail. Dormant-safe: even an engaged flag stays
+  // guarded by core.policy_guard until that master switch is itself on.
   const onPropose = async (key) => {
+    const turningOn = !isOn(key);
+    // The MASTER switch engages/disengages enforcement company-wide (all 6 branches) —
+    // too consequential for a bare click, so the Owner's live flip is confirmed first.
+    // Every other control stays a one-click instant flip. (Non-Owners only propose.)
+    if (owner && key === 'core.policy_guard') {
+      const { confirmed } = await confirmDialog({
+        title: turningOn ? 'Engage the TK Group guard?' : 'Disengage the TK Group guard?',
+        message: turningOn
+          ? 'This turns ON enforcement across all branches immediately — approval chains, segregation-of-duties, cash caps, back-date limits and master-write staging all begin applying to everyone except you. You can switch it back off here at any time.'
+          : 'This turns OFF the whole control layer immediately — nothing is enforced and nobody is blocked. Individual controls keep their settings but stop applying until you re-engage the guard.',
+        danger: true,
+        confirmLabel: turningOn ? 'Engage guard' : 'Disengage guard',
+      });
+      if (!confirmed) return;                                        // cancelled — no change, no toast
+    }
     setMsg('');
     try {
-      await proposeFlags(withToggled(flagsQ.data || { flags: {} }, key));
-      setMsg('Change to “' + key + '” submitted for the Owner’s approval — it applies only once approved.');
+      if (owner) {
+        const next = await setFlag(key, turningOn);                 // live flip → { flags, enabled }
+        qc.setQueryData(['tk', 'flags'], next);                     // toggle reflects immediately
+        const lab = (next && next.flags && next.flags[key] && next.flags[key].label) || key;
+        toastSuccess(`${lab} — ${turningOn ? 'ON' : 'OFF'}`);
+        setMsg(`“${key}” is now ${turningOn ? 'ON' : 'OFF'}${turningOn && key === 'core.policy_guard' ? ' — the guard is engaged and controls now enforce.' : '.'}`);
+      } else {
+        await proposeFlags(withToggled(flagsQ.data || { flags: {} }, key));
+        toastInfo('Submitted for the Owner’s approval.');
+        setMsg('Change to “' + key + '” submitted for the Owner’s approval — it applies only once approved.');
+      }
       qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
-    } catch (e) { setMsg((e && e.message) || 'Could not submit the change.'); }
+    } catch (e) {
+      const m = (e && e.message) || (owner ? 'Could not apply the change.' : 'Could not submit the change.');
+      toastError(m);
+      setMsg(m);
+    }
   };
 
   const screenBody = () => {
@@ -311,11 +346,17 @@ export function ControlPanel({ setRoute }) {
 
   return (
     <div data-testid="tk-control-panel">
-      {/* status strip */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-warning/40 bg-warning-soft px-4 py-2.5">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-warning">Power Console</span>
-        <Badge tone="warning">Everything OFF · dormant</Badge>
-        <span className="text-[12px] text-warning">Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.</span>
+      {/* status strip — reflects the REAL flag state (was hard-coded "Everything OFF") */}
+      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${r.masterOn ? 'border-danger/40 bg-danger-soft' : 'border-warning/40 bg-warning-soft'}`}>
+        <span className={`text-[11px] font-bold uppercase tracking-wide ${r.masterOn ? 'text-danger' : 'text-warning'}`}>Power Console</span>
+        <Badge tone={r.masterOn ? 'danger' : 'warning'}>
+          {r.masterOn ? 'Guard engaged · enforcing' : r.engaged > 0 ? `${r.engaged} control${r.engaged > 1 ? 's' : ''} on · guard dormant` : 'Everything OFF · dormant'}
+        </Badge>
+        <span className={`text-[12px] ${r.masterOn ? 'text-danger' : 'text-warning'}`}>
+          {r.masterOn ? 'The TK Group guard is on — these controls now enforce.'
+            : owner ? 'Flip any switch to engage it live — your change applies immediately and is logged.'
+            : 'Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.'}
+        </span>
       </div>
 
       {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}

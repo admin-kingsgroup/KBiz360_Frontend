@@ -430,3 +430,139 @@ describe('payment → Debtor = client refund (settles open receipts)', () => {
     expect(s.alloc).toEqual({ RV0201: 2000 });
   });
 });
+
+// Split (multi-leg) payment: several expense heads (each its OWN ledger) settled by ONE
+// bank/cash leg. Posts N Dr expense legs + one Cr bank leg for the sum — no party/TDS/bill-wise.
+describe('payment → split (multiple debit legs, different expense ledgers)', () => {
+  test.concurrent('isParty: a split entry is never a bill-wise party', async () => {
+    expect(PM.isParty({ split: true, otherType: 'Creditor' })).toBeFalsy();
+    expect(PM.isParty({ split: false, otherType: 'Creditor' })).toBe(true); // single-account unchanged
+  });
+
+  test.concurrent('toBody: two different expense ledgers → 2 Dr legs + 1 Cr bank leg, balanced', async () => {
+    const b = PM.toBody({ split: true, bankRef: 'ICICI', paymentMode: 'NEFT', date: '2026-07-10', splitLines: [
+      { ledger: 'Office Rent', amt: 5000, desc: 'July rent' },
+      { ledger: 'Electricity', amt: 3000, desc: 'MSEB' },
+    ] }, ctx);
+    expect(b.category).toBe('payment');
+    expect(b.party).toBe('');
+    expect(b.total).toBe(8000);
+    expect(b.tdsAmt).toBe(0);
+    expect(b.allocations).toEqual([]);
+    expect(b.lines).toEqual([
+      { ledger: 'Office Rent', amt: 5000, drCr: 'Dr', desc: 'July rent' },
+      { ledger: 'Electricity', amt: 3000, drCr: 'Dr', desc: 'MSEB' },
+      { ledger: 'ICICI', amt: 8000, drCr: 'Cr', desc: expect.any(String) },
+    ]);
+    const dr = b.lines.filter((l) => l.drCr === 'Dr').reduce((a, l) => a + l.amt, 0);
+    const cr = b.lines.filter((l) => l.drCr === 'Cr').reduce((a, l) => a + l.amt, 0);
+    expect(dr).toBe(cr); // double-entry balances
+  });
+
+  test.concurrent('toBody: blank / zero-amount rows are dropped from the legs and the sum', async () => {
+    const b = PM.toBody({ split: true, bankRef: 'Cash', splitLines: [
+      { ledger: 'Office Rent', amt: 5000 },
+      { ledger: '', amt: 0 },
+      { ledger: 'Internet', amt: 1200 },
+    ] }, ctx);
+    expect(b.lines.filter((l) => l.drCr === 'Dr').map((l) => l.ledger)).toEqual(['Office Rent', 'Internet']);
+    expect(b.total).toBe(6200);
+  });
+
+  test.concurrent('validate: needs a bank + ≥1 complete row; a half-filled row blocks save', async () => {
+    expect(PM.validate({ split: true, bankRef: 'ICICI', splitLines: [{ ledger: 'Rent', amt: 5000 }, { ledger: 'Power', amt: 3000 }] }).ok).toBe(true);
+    expect(PM.validate({ split: true, bankRef: '', splitLines: [{ ledger: 'Rent', amt: 5000 }] }).ok).toBe(false);            // no bank
+    expect(PM.validate({ split: true, bankRef: 'ICICI', splitLines: [{ ledger: '', amt: 0 }] }).ok).toBe(false);              // nothing entered
+    expect(PM.validate({ split: true, bankRef: 'ICICI', splitLines: [{ ledger: 'Rent', amt: 0 }] }).ok).toBe(false);         // ledger but no amount
+    expect(PM.validate({ split: true, bankRef: 'ICICI', splitLines: [{ ledger: '', amt: 3000 }] }).ok).toBe(false);          // amount but no ledger
+  });
+
+  test.concurrent('round-trip: a saved split payment reloads into the split editor with its rows', async () => {
+    const b = PM.toBody({ split: true, bankRef: 'ICICI', splitLines: [
+      { ledger: 'Office Rent', amt: 5000, desc: 'July' },
+      { ledger: 'Electricity', amt: 3000, desc: '' },
+    ] }, ctx);
+    const s = PM.fromVoucher(b);
+    expect(s.split).toBe(true);
+    expect(s.party).toBe('');
+    expect(s.bankRef).toBe('ICICI');
+    expect(s.splitLines.map((l) => l.ledger)).toEqual(['Office Rent', 'Electricity']);
+    expect(s.splitLines.map((l) => l.amt)).toEqual([5000, 3000]);
+  });
+
+  test.concurrent('fromVoucher: a single-leg direct entry still loads as the ordinary (non-split) editor', async () => {
+    const s = PM.fromVoucher({ party: '', bankRef: '', total: 343, subtotal: 0,
+      lines: [{ ledger: 'Blinkit', drCr: 'Dr', amt: 343 }, { ledger: 'Petty Cash', drCr: 'Cr', amt: 343 }] });
+    expect(s.split).toBe(false);
+    expect(s.party).toBe('Blinkit');
+  });
+
+  test.concurrent('fromVoucher: a split leg named "Bank Charges" is NOT dropped (detect by side, not name)', async () => {
+    // Regression: the leg side was filtered by a bankish name regex, so an expense head
+    // containing "bank"/"cash"/"petty" was silently lost on edit.
+    const s = PM.fromVoucher({ party: '', bankRef: 'ICICI Bank', total: 5050, subtotal: 5050, lines: [
+      { ledger: 'Bank Charges', drCr: 'Dr', amt: 50 },
+      { ledger: 'Office Rent', drCr: 'Dr', amt: 5000 },
+      { ledger: 'ICICI Bank', drCr: 'Cr', amt: 5050 },
+    ] });
+    expect(s.split).toBe(true);
+    expect(s.splitLines.map((l) => l.ledger)).toEqual(['Bank Charges', 'Office Rent']); // both kept
+    expect(s.bankRef).toBe('ICICI Bank');
+  });
+
+  test.concurrent('fromVoucher: receipt split with a cash-named income leg keeps every credit leg', async () => {
+    const s = RC.fromVoucher({ party: '', bankRef: 'HDFC', total: 800, subtotal: 800, lines: [
+      { ledger: 'HDFC', drCr: 'Dr', amt: 800 },
+      { ledger: 'Cash Discount Received', drCr: 'Cr', amt: 300 },
+      { ledger: 'Interest Income', drCr: 'Cr', amt: 500 },
+    ] });
+    expect(s.split).toBe(true);
+    expect(s.splitLines.map((l) => l.ledger)).toEqual(['Cash Discount Received', 'Interest Income']);
+  });
+});
+
+// Additive charge legs on a supplier payment: pay the creditor AND book a bank charge
+// in one voucher. The charge rides on lines[] as an extra Dr; total stays the supplier
+// settlement (bill-wise sums to it); the backend lifts the bank credit by the charge.
+describe('payment → supplier + additive charge legs (bank charge etc.)', () => {
+  test.concurrent('toBody: charge legs emitted as extra Dr lines; total = supplier amount only', async () => {
+    const b = PM.toBody({ party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 10000,
+      applyMode: 'onaccount', parkOnAcc: true, alloc: {},
+      hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 50, desc: 'NEFT' }] }, ctx);
+    expect(b.party).toBe('TRIP JACK');
+    expect(b.total).toBe(10000);                 // bill-wise settles the supplier amount, NOT +50
+    expect(b.lines).toEqual([{ ledger: 'Bank Charges', amt: 50, drCr: 'Dr', desc: 'NEFT' }]);
+  });
+
+  test.concurrent('toBody: hasCharges off → no charge legs even if rows linger in state', async () => {
+    const b = PM.toBody({ party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 10000,
+      applyMode: 'onaccount', parkOnAcc: true, alloc: {},
+      hasCharges: false, charges: [{ ledger: 'Bank Charges', amt: 50 }] }, ctx);
+    expect(b.lines).toEqual([]);
+  });
+
+  test.concurrent('toBody: charges never attach to a customer RECEIPT (payment-supplier only)', async () => {
+    const b = RC.toBody({ party: 'Some Debtor', otherType: 'Debtor', bankRef: 'ICICI', amount: 5000,
+      applyMode: 'onaccount', parkOnAcc: true, alloc: {},
+      hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 50 }] }, ctx);
+    expect(b.lines).toEqual([]);
+  });
+
+  test.concurrent('validate: a half-filled charge row blocks save; a complete one is fine', async () => {
+    const base = { party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 10000, applyMode: 'onaccount', parkOnAcc: true, alloc: {} };
+    expect(PM.validate({ ...base, hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 50 }] }).ok).toBe(true);
+    expect(PM.validate({ ...base, hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 0 }] }).ok).toBe(false); // no amount
+    expect(PM.validate({ ...base, hasCharges: true, charges: [{ ledger: '', amt: 50 }] }).ok).toBe(false);           // no ledger
+  });
+
+  test.concurrent('round-trip: a saved supplier payment with a charge reloads with hasCharges + the row', async () => {
+    const b = PM.toBody({ party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 10000,
+      applyMode: 'onaccount', parkOnAcc: true, alloc: {},
+      hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 50, desc: 'NEFT' }] }, ctx);
+    const s = PM.fromVoucher({ ...b, partyType: 'supplier', party: 'TRIP JACK' });
+    expect(s.party).toBe('TRIP JACK');
+    expect(s.split).toBe(false);
+    expect(s.hasCharges).toBe(true);
+    expect(s.charges.map((l) => [l.ledger, l.amt])).toEqual([['Bank Charges', 50]]);
+  });
+});

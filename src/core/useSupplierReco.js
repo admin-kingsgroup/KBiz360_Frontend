@@ -66,6 +66,10 @@ export const useSupplierAutoMatch = () =>
 export const useSupplierManualMatch = () =>
   useReconMutation(({ id, ...body }) => apiPost(`/api/supplier-reconciliation/match/${id}`, body));
 
+// N book legs → one statement line (a split settled by several book entries).
+export const useSupplierGroupMatch = () =>
+  useReconMutation(({ id, books }) => apiPost(`/api/supplier-reconciliation/match-group/${id}`, { books }));
+
 export const useSupplierUnmatch = () =>
   useReconMutation(({ id }) => apiPost(`/api/supplier-reconciliation/unmatch/${id}`));
 

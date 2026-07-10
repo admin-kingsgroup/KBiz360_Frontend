@@ -2,11 +2,21 @@
 // Tier metadata (labels, signer chains, colors), status→tone mapping, currency
 // per branch and progress math. Everything here is pure and unit-tested — the
 // components stay thin over these.
+import { localeOf } from '../../core/format';
 
 export const BRANCHES = ['BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
 
-// FE currency map (mirrors branch books; FE-wide fmt is not branch-aware yet).
-export const BRANCH_CURRENCY = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: 'KES', DAR: 'TZS', FBM: '$' };
+/** The app passes `branch` as either a code string OR a branch OBJECT
+ *  ({code, city…}) — and 'ALL' in group mode. Normalize to a valid code or ''. */
+export function branchCodeOf(branch) {
+  const code = typeof branch === 'object' && branch !== null ? branch.code : branch;
+  return BRANCHES.includes(code) ? code : '';
+}
+
+// FE currency map — mirrors the BOOKS currency. ALL 3 Africa branches keep their
+// books in USD ($); KES/TZS are print-only secondary currencies (NBO/DAR local
+// invoice printing), never a books/report currency. FBM is USD-only.
+export const BRANCH_CURRENCY = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 export const currencyOf = (branch) => BRANCH_CURRENCY[branch] || '₹';
 
 // The four tiers — kept in ladder order. `chain` mirrors the backend service
@@ -66,11 +76,29 @@ export const TIERS = [
 ];
 export const tierOf = (key) => TIERS.find((t) => t.key === key) || TIERS[0];
 
+// Each tier is its OWN menu entry + page pair now (Certification ▸ the
+// four tier pages · Reports ▸ the four tier reports) — the tier is chosen from
+// the menu, never from tabs inside a page.
+export const TIER_PATHS = { weekly: 'weekly', month: 'monthly', quarter: 'quarterly', year: 'yearly' };
+export const hubPathFor = (tierKey) => `/reconciliation/${TIER_PATHS[tierKey] || 'weekly'}`;
+export const reportPathFor = (tierKey) => `/reconciliation/reports/${TIER_PATHS[tierKey] || 'weekly'}`;
+// Page headings match the MENU ENTRY the user clicked (Weekly/Monthly/Quarterly/
+// Yearly …) — tier.short stays the tier's formal name (Month-End, Year-End) on
+// cards, badges and the Rule Book.
+export const tierMenuName = (tierKey) => ({ weekly: 'Weekly', month: 'Monthly', quarter: 'Quarterly', year: 'Yearly' }[tierKey] || 'Weekly');
+
 /** Tiers a role may see/work. The Branch Accountant handles the WEEKLY cycle
  *  only — Month/Quarter/Year closings are done from TK Group Central by
  *  AE/FM/Director/Owner (the backend enforces the same rule on writes). */
 export function visibleTiers(role) {
   return /accountant/i.test(String(role || '')) ? TIERS.filter((t) => t.key === 'weekly') : TIERS;
+}
+
+/** The weekly cycle CONFIG (wallets/gateways joining the cycle) is a control:
+ *  FM / Director / Owner maintain it — AE verifies certificates, never
+ *  reshapes the scope. Mirrors the backend gate exactly. */
+export function canEditCycleConfig(role) {
+  return /finance\s*manager|(^|[^a-z])fm([^a-z]|$)|director|owner|super[\s_-]*admin/i.test(String(role || ''));
 }
 
 // Certificate status → Badge tone + label.
@@ -106,14 +134,44 @@ export function chainProgress(cert) {
   return { done, total: chain.length, next };
 }
 
-/** en-IN formatted amount with the branch currency symbol ('' for null). */
+/** Formatted amount with the branch currency symbol ('' for null). Grouping follows
+ *  the currency — Indian lakh/crore for ₹, Western thousands for the USD branches
+ *  (never `$ 1,25,000`) — via the shared core/format localeOf resolver. */
 export function fmtAmt(n, branch) {
   if (n === null || n === undefined || n === '' || Number.isNaN(Number(n))) return '—';
-  return `${currencyOf(branch)} ${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  const cur = currencyOf(branch);
+  return `${cur} ${Number(n).toLocaleString(localeOf(cur), { maximumFractionDigits: 2 })}`;
 }
 
 /** Count of unresolved exceptions on a certificate. */
 export const openExceptions = (cert) => (cert?.exceptions || []).filter((e) => !e.resolved).length;
+
+// Classification vocabularies by scrutiny perspective: bank statements use the
+// BRS language; supplier/client SOAs ('party') use the trade language. The
+// backend enforces the same split.
+export const BANK_CLASSIFY = [
+  { value: 'unpresented', label: 'Unpresented cheque' },
+  { value: 'in-transit', label: 'Deposit in transit' },
+  { value: 'to-post', label: 'Charge/credit to post' },
+  { value: 'other', label: 'Other reconciling item' },
+];
+export const PARTY_CLASSIFY = [
+  { value: 'invoice-not-received', label: 'Invoice not received' },
+  { value: 'payment-in-transit', label: 'Payment in transit' },
+  { value: 'tds-deduction', label: 'TDS deduction' },
+  { value: 'credit-note-pending', label: 'Credit note / ADM pending' },
+  { value: 'disputed', label: 'Disputed' },
+  { value: 'rate-difference', label: 'Rate difference' },
+  { value: 'other', label: 'Other reconciling item' },
+];
+export const classifyOptionsFor = (perspective) => (perspective === 'party' ? PARTY_CLASSIFY : BANK_CLASSIFY);
+export const classificationLabel = (value) => [...BANK_CLASSIFY, ...PARTY_CLASSIFY].find((c) => c.value === value)?.label || value;
+
+/** Friendly chip text for special match types. */
+export const MATCH_TYPE_LABELS = {
+  ref: 'ref match', 'ref:amount-differs': 'rate difference', learned: 'learned',
+  'explained-deduction': 'TDS-explained', 'carry-cleared': 'carried · cleared',
+};
 
 /** Period choices for a tier's register: the CURRENT period plus every pending
  *  backlog period of that tier (Apr/May/Jun 2026 closings, FY2025-26 / CY2025

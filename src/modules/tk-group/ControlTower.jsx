@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getOverview, getGroupHealth, getIntegrity, getTrend, getSetupReadiness, getDevFindings } from './api/monitor';
 import { overviewKpis, streamRows, actorName } from './utils/monitor';
@@ -11,6 +12,8 @@ import { DataTable } from '../../shell/DataTable';
 import { BandError } from './BandError';
 import { GroupHealth } from './GroupHealth';
 import { SetupReadiness } from './SetupReadiness';
+import { SetupTaskList } from './SetupTaskList';
+import { ModulesHealth } from './ModulesHealth';
 import { IntegritySummary } from './IntegritySummary';
 import { ScrutinyTrend } from './ScrutinyTrend';
 // Development findings share the Dev Control registry + tracking rows — the SAME
@@ -36,6 +39,8 @@ const TABS = [
   { id: 'trend', label: 'Scrutiny Trend' },
   { id: 'dev', label: 'Development' },
   { id: 'gov', label: 'Governance' },
+  { id: 'tasks', label: 'Task List' },
+  { id: 'modules-health', label: 'Modules Health' },
 ];
 
 // ── Development findings — Dev Control's open items surfaced as a Tower lens ──
@@ -81,7 +86,7 @@ function LensCard({ title, onOpen, chart, legend, foot }) {
         {onOpen && <button type="button" onClick={onOpen} className="text-[11.5px] font-semibold text-accent hover:underline">Open →</button>}
       </div>
       <div className="flex items-center gap-4">
-        <div className="shrink-0">{chart}</div>
+        <div className={legend ? 'shrink-0' : 'min-w-0 flex-1'}>{chart}</div>
         {legend && <div className="min-w-0 flex-1">{legend}</div>}
       </div>
       {foot && <div className="mt-auto flex items-center justify-between gap-2 pt-3 text-xs">{foot}</div>}
@@ -152,16 +157,17 @@ function Overview({ focus, goTab }) {
 
         <DevLensCard goTab={goTab} />
 
-        <LensCard title="Controls"
-          chart={<div className="grid w-full gap-1.5">
-            {controls.length ? controls.map((c) => (
-              <div key={c.key} className="flex items-center justify-between gap-2 text-xs">
-                <span className="truncate text-ink-muted">{c.label}</span>
-                <Badge tone={c.enabled ? 'success' : 'neutral'} size="sm">{c.enabled ? 'ON' : 'off'}</Badge>
-              </div>
-            )) : <span className="text-xs text-ink-subtle">No controls configured.</span>}
-          </div>} />
       </div>
+
+      <LensCard title="Controls"
+        chart={<div className="grid w-full grid-cols-1 gap-1">
+          {controls.length ? controls.map((c) => (
+            <div key={c.key} className="flex items-center justify-between gap-3 rounded-md px-1.5 py-1.5 text-xs odd:bg-surface-alt/50">
+              <span className="min-w-0 text-ink-muted">{c.label}</span>
+              <Badge tone={c.enabled ? 'success' : 'neutral'} size="sm">{c.enabled ? 'ON' : 'off'}</Badge>
+            </div>
+          )) : <span className="text-xs text-ink-subtle">No controls configured.</span>}
+        </div>} />
     </div>
   );
 }
@@ -311,7 +317,15 @@ function Governance() {
 
 export function ControlTower({ setRoute } = {}) {
   const focus = useCockpitFocus();
-  const [tab, setTab] = useState('overview');
+  // Tab lives in the URL (`?tab=`), not plain state, so the header/browser Back
+  // button steps back through tab switches one at a time instead of skipping
+  // straight past this whole page — a bare setState here leaves no history entry,
+  // so Back (which drives real browser history) jumps to whatever page was open
+  // BEFORE Control Tower, ignoring every tab you clicked through on the way here.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab = TABS.some((t) => t.id === tabParam) ? tabParam : 'overview';
+  const setTab = (id) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', id); return p; });
   return (
     <div className="grid gap-5">
       <div className="flex gap-1 overflow-x-auto border-b border-surface-border">
@@ -330,6 +344,8 @@ export function ControlTower({ setRoute } = {}) {
       {tab === 'trend' && <ScrutinyTrend />}
       {tab === 'dev' && <DevelopmentLens setRoute={setRoute} />}
       {tab === 'gov' && <Governance />}
+      {tab === 'tasks' && <SetupTaskList setRoute={setRoute} />}
+      {tab === 'modules-health' && <ModulesHealth setRoute={setRoute} />}
     </div>
   );
 }

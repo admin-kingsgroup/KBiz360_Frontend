@@ -4,7 +4,7 @@ import { apiGet } from '../../core/api';
 import { FocusBanner } from '../../core/ux/FocusBanner';
 import { bc } from '../../core/styles';
 import { PeriodBar, periodRange } from '../../core/period';
-import { Button, Select, Input } from '../../shell/primitives';
+import { Button, Select, Input, FormField } from '../../shell/primitives';
 import {
   useProfitAndLoss, useModulePL, useBalanceSheet, useAgeing, useInvoiceGP,
   useTaxSummary, useTrialBalance, useVoucherApprovals, useYearOverYear,
@@ -943,29 +943,48 @@ export function TargetsMaster({ branch }) {
     const rows = opts.map(([mod]) => ({ month: 0, metric, module: mod, amount: Number(valOf(mod)) || 0 }));
     save.mutate({ branch: brCode, fy, rows }, { onSuccess: () => setDraft({}) });
   };
+  const metricLabel = { sales: 'Sales', gp: 'GP', collections: 'Collections', np: 'Nett Profit' }[metric];
+  const companyOnly = metric === 'collections' || metric === 'np';
+  const rows = MOD_OPTS.filter(([mod]) => !companyOnly || mod === '');
   return (
-    <div style={{ margin: 12, maxWidth: 720 }}>
+    <div className="w-full px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
       <FocusBanner />
-      <div className="text-lg font-extrabold text-ink">Sales Targets</div>
-      <div className="mb-3 text-xs text-ink-muted">Set whole-FY targets per module. The Director "vs Target" dashboards pro-rate these to the period and compare against actuals.</div>
-      <div className="mb-3 flex flex-wrap gap-2.5">
-        <div className="w-28"><Select value={brCode} onChange={(e) => setBrCode(e.target.value)} className="font-semibold">{branchList().map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}</Select></div>
-        <div className="w-32"><Input value={fy} onChange={(e) => setFy(e.target.value)} placeholder="FY e.g. 2026-27" /></div>
-        <div className="w-40"><Select value={metric} onChange={(e) => setMetric(e.target.value)} className="font-semibold"><option value="sales">Sales</option><option value="gp">Gross Profit</option><option value="collections">Collections</option><option value="np">Nett Profit</option></Select></div>
+      <div className="mb-4 border-b border-surface-border pb-3">
+        <div className="text-lg font-extrabold text-ink">Sales Targets</div>
+        <div className="mt-0.5 text-xs text-ink-muted">Set whole-FY targets per module. The Director "vs Target" dashboards pro-rate these to the period and compare against actuals.</div>
       </div>
-      <Card title={`${{ sales: 'Sales', gp: 'GP', collections: 'Collections', np: 'Nett Profit' }[metric]} target · ${brCode} · FY ${fy}`} right={<Button variant="accent" size="sm" loading={save.isPending} onClick={onSave}>Save</Button>}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Annual Target ({cur})</th></tr></thead>
-          <tbody>
-            {MOD_OPTS.filter(([mod]) => (metric !== 'collections' && metric !== 'np') || mod === '').map(([mod, label]) => (
-              <tr key={mod || 'all'}><td style={{ ...td, fontWeight: mod === '' ? 700 : 400 }}>{label}{mod === '' ? ' (company)' : ''}</td>
-                <td style={{ ...td, ...num }}><div className="ml-auto w-40"><Input type="number" value={valOf(mod)} onChange={(e) => setDraft((d) => ({ ...d, [mod]: e.target.value }))} className="text-right" /></div></td></tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-brand border border-surface-border bg-surface-alt/60 px-3.5 py-3">
+        <FormField label="Branch" className="w-28">
+          <Select value={brCode} onChange={(e) => setBrCode(e.target.value)} className="font-semibold">
+            {branchList().map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}
+          </Select>
+        </FormField>
+        <FormField label="Financial Year" className="w-36">
+          <Input value={fy} onChange={(e) => setFy(e.target.value)} placeholder="e.g. 2026-27" />
+        </FormField>
+        <FormField label="Metric" className="w-44">
+          <Select value={metric} onChange={(e) => setMetric(e.target.value)} className="font-semibold">
+            <option value="sales">Sales</option><option value="gp">Gross Profit</option><option value="collections">Collections</option><option value="np">Nett Profit</option>
+          </Select>
+        </FormField>
+      </div>
+      <Card title={`${metricLabel} target · ${brCode} · FY ${fy}`} right={<Button variant="accent" size="sm" loading={save.isPending} onClick={onSave}>Save</Button>}>
+        <div className="mb-1.5 grid grid-cols-1 gap-3 p-3.5 tablet:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-4">
+          {rows.map(([mod, label]) => (
+            <div key={mod || 'all'}
+              className={`rounded-brand border p-3 transition-colors ${mod === '' ? 'border-navy/25 bg-navy/5' : 'border-surface-border bg-surface hover:border-ink-subtle'}`}>
+              <div className="mb-1.5 truncate text-[12.5px] font-semibold text-ink">{label}{mod === '' ? ' (company)' : ''}</div>
+              <div className="flex items-center overflow-hidden rounded-md border border-surface-border bg-surface focus-within:border-gold focus-within:shadow-gold-glow">
+                <span className="shrink-0 border-r border-surface-border bg-surface-alt px-2.5 py-2 text-xs font-bold text-ink-muted">{cur}</span>
+                <input type="number" value={valOf(mod)} onChange={(e) => setDraft((d) => ({ ...d, [mod]: e.target.value }))}
+                  className="w-full min-w-0 border-0 bg-transparent px-2.5 py-2 text-right text-[13px] tabular-nums text-ink outline-none" placeholder="0" />
+              </div>
+            </div>
+          ))}
+        </div>
       </Card>
       {save.isSuccess && <div className="mt-2 text-xs text-success">✓ Saved.</div>}
-      {(metric === 'collections' || metric === 'np') && <div className="mt-2 text-[11px] text-ink-muted">{metric === 'np' ? 'Nett Profit' : 'Collections'} targets are company-wide — only the "All modules" row is used.</div>}
+      {companyOnly && <div className="mt-2 text-[11px] text-ink-muted">{metricLabel} targets are company-wide — only the "All modules" row is used.</div>}
     </div>
   );
 }

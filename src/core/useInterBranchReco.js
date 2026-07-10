@@ -12,3 +12,14 @@ export function useInterBranchReco({ from, to } = {}) {
     staleTime: 30_000,
   });
 }
+
+// Line-level: every INB deal by Link No (booked vs open/unbooked) — the exact
+// missing voucher behind a pair mismatch, from the INB Link registry.
+export function useInterBranchLinks({ branch } = {}) {
+  return useQuery({
+    queryKey: ['interbranch-links', branch || ''],
+    queryFn: () => apiGet('/api/inter-branch/reconcile', { branch }),
+    enabled: !!getAuthToken(),
+    staleTime: 30_000,
+  });
+}

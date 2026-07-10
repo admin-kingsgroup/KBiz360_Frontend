@@ -1,27 +1,33 @@
 // ─── Today's FX Rate chip (view-only) ────────────────────────────────────────
-// Shown in the shell top bar for the dual-currency Africa branches only (NBO/DAR/FBM).
+// Shown in the shell top bar for the dual-currency Africa branches only (NBO/DAR).
 // Displays the daily USD→local branch FX rate that an accountant sets each morning in
 // the backend (Masters › Tax & Currency › Forex Rates). It is READ-ONLY here — books
 // stay in USD; this rate only drives local-currency invoice/report printing. When today's
 // rate hasn't been entered yet it shows an amber "not set" nudge (local printing is then
-// blocked downstream).
+// blocked downstream). FBM is VAT but USD-only — no secondary currency, so no chip.
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../core/api';
 import { branchCode } from '../core/useAccounting';
 import { isVatBranch } from '../core/voucherSpecs';
+import { branchCurrenciesOf } from '../core/referenceCache';
 
 export function FxRateChip({ branch }) {
   const code = branchCode(branch);
   const vat = isVatBranch(code);
+  // Dual-currency = the branch carries a secondary local currency (NBO→KES, DAR→TZS).
+  const dual = branchCurrenciesOf(code).length > 1;
   const { data } = useQuery({
     queryKey: ['forex-branch-rate', code],
     queryFn: () => apiGet(`/api/forex-rates/branch/${code}`),
-    enabled: !!code && vat,
+    enabled: !!code && vat && dual,
     staleTime: 5 * 60_000,
   });
-  // Only dual-currency Africa branches carry a daily FX rate; India (₹) shows nothing.
-  if (!vat) return null;
+  // Only dual-currency Africa branches carry a daily FX rate; India (₹) and the
+  // USD-only FBM show nothing. `applicable:false` from the API covers a stale
+  // branch cache that still lists a secondary currency.
+  if (!vat || !dual) return null;
+  if (data && data.applicable === false) return null;
 
   const set = !!(data && data.set);
   const to = (data && data.to) || '';

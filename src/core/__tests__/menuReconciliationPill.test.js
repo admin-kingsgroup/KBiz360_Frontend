@@ -16,9 +16,20 @@ function allHrefs(node, out = []) {
 }
 
 describe('Reconciliation · top-level pill', () => {
-  test('pill exists with the Hub, Reports & Pending and Rule Book leaves', () => {
+  test('pill = per-tier certificate pages + per-tier reports + the moved statement-matching screens', () => {
     expect(MENU_RECONCILIATION.label).toBe('Reconciliation');
-    expect(allHrefs(MENU_RECONCILIATION)).toEqual(['/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook']);
+    expect(allHrefs(MENU_RECONCILIATION)).toEqual([
+      // Certification — one entry per tier, Rule Book last
+      '/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
+      '/reconciliation/rulebook',
+      // Reports — one report per tier
+      '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
+      '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
+      // Statement Matching
+      '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
+      '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+      '/reconciliation/match-guide', // the staff Match Guide — LAST under Statement Matching
+    ]);
   });
 
   test('shows for Super Admin, between Accounts and Reports', () => {
@@ -34,27 +45,34 @@ describe('Reconciliation · top-level pill', () => {
     expect(labels(getMenu('BOM', { role: 'Branch Accountant' }))).toContain('Reconciliation');
   });
 
-  test('does not disturb the Accounts ▸ Reconciliation statement-matching group', () => {
-    const group = MENU_ACCOUNTS.children.find((c) => c.label === 'Reconciliation');
-    expect(group).toBeTruthy();
-    expect(allHrefs(group)).toEqual(expect.arrayContaining(['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco']));
-    // and the new pill's routes don't leak into Accounts
-    expect(allHrefs(MENU_ACCOUNTS)).not.toContain('/reconciliation');
+  test('the Accounts pill no longer carries ANY reconciliation screens', () => {
+    expect(MENU_ACCOUNTS.children.find((c) => c.label === 'Reconciliation')).toBeUndefined();
+    const all = allHrefs(MENU_ACCOUNTS);
+    ['/reconciliation', '/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco', '/finance/reco-queue', '/accounts/interbranch-reco', '/accounts/tally-reco']
+      .forEach((h) => expect(all).not.toContain(h));
   });
 
-  test('TK Group Central cockpit carries the Reconciliation pill (branch-wise oversight)', () => {
+  test('TK Group Central cockpit carries the FULL Reconciliation pill (per-tier certs + reports + statement matching)', () => {
     const cockpit = controlCockpitMenu('', { role: 'Super Admin' });
     const pill = cockpit.find((p) => p && p.label === 'Reconciliation');
     expect(pill).toBeTruthy();
-    expect(allHrefs(pill)).toEqual(['/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook']);
+    expect(allHrefs(pill)).toEqual([
+      '/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
+      '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
+      '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
+      '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
+      '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+      '/reconciliation/match-guide',
+      '/reconciliation/rulebook',
+    ]);
     // and for the other central roles too (Director / FM / Sr. AE share the cockpit)
     const dirCockpit = controlCockpitMenu('', { role: 'Director' });
     expect(dirCockpit.some((p) => p && p.label === 'Reconciliation')).toBe(true);
   });
 
   test('breadcrumbs resolve under the Reconciliation pill', () => {
-    expect(crumbsFor('/reconciliation').map((c) => c.label)).toEqual(['Reconciliation', 'Reconciliation Hub']);
-    expect(crumbsFor('/reconciliation/reports').map((c) => c.label)).toEqual(['Reconciliation', 'Reports & Pending']);
-    expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Rule Book & Process']);
+    expect(crumbsFor('/reconciliation/weekly').map((c) => c.label)).toEqual(['Reconciliation', 'Certification', 'Weekly Certification']);
+    expect(crumbsFor('/reconciliation/reports/monthly').map((c) => c.label)).toEqual(['Reconciliation', 'Reports', 'Monthly Report']);
+    expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Certification', 'Rule Book & Process']);
   });
 });

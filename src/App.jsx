@@ -16,7 +16,7 @@ import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
 import { lazyModule } from './core/lazyModule';
 import { isOwnerDashboardUser, topLevelPillHrefs } from './core/pageCatalog';
-import { canReachRoute } from './core/menus';
+import { canReachRoute, expandHidden } from './core/menus';
 
 /* ── Route-level code-splitting ───────────────────────────────────────────
    Every page component below is loaded via lazyModule() → one dynamic
@@ -60,7 +60,7 @@ const { EWayBill, Form16AGenerator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco,
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/approvals'));
-const { PaymentVerificationLive, PaymentRun } = lazyModule(() => import('./modules/payments'));
+const { PaymentVerificationLive } = lazyModule(() => import('./modules/payments'));
 const { ModuleRegister } = lazyModule(() => import('./modules/reports/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/masters/chartBuilder'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/reportsFinancial/pnlTally'));
@@ -359,10 +359,12 @@ export default function KB360App(){
     // financial statements even by direct URL — send them back to their dashboard.
     if(hideStatements && isStatementHref(route)) return <Navigate to="/accounts/dashboard" replace/>;
 
-    const hiddenPages = Array.isArray(currentUser?.hidden) ? currentUser.hidden : [];
+    // expandHidden also maps LEGACY keys onto their split replacements (e.g. a
+    // pre-split '/reconciliation' deny still covers the four per-tier pages).
+    const hiddenPages = expandHidden(currentUser?.hidden);
     // Top-level pills are structural — never blocked by the deny-list (they can't be
     // hidden from the catalogue either), so a single-page pill like Approvals always works.
-    if(route!=="/dashboard" && route!=="/settings/page-access" && !topLevelPillHrefs().has(route) && hiddenPages.includes(route)){
+    if(route!=="/dashboard" && route!=="/settings/page-access" && !topLevelPillHrefs().has(route) && hiddenPages.has(route)){
       return (
         <div style={{padding:30,maxWidth:560,margin:"40px auto",
           background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
@@ -604,7 +606,8 @@ export default function KB360App(){
     if(route==="/accounts/inb-matrix")     return <InterBranchMatrix branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-counterparty") return <InterBranchCounterpartyLedger branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/tally-reco")    return <TallyReco branch={branch} setRoute={navigate}/>;
-    if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
+    // Payment Run / Batch Pay route removed — bulk supplier payment disabled by
+    // policy (component kept in modules/payments; a direct URL now falls through).
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
     // The owner's home IS the Owner Dashboard — the role-scoped My Dashboard is retired for

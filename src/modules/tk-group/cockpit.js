@@ -101,9 +101,29 @@ export function controlCockpitMenu(focus, currentUser) {
     // Quarterly → Year-End). The central view is oversight of the SAME module: the
     // pages carry their own branch chips, so everything stays BRANCHWISE, never blended.
     { label: 'Reconciliation', icon: ArrowLeftRight, children: [
-      { label: 'Reconcile & Certify', children: [
-        { label: 'Reconciliation Hub', href: '/reconciliation' },
-        { label: 'Reports & Pending', href: '/reconciliation/reports' },
+      // One entry per tier — the menu is the tier switch (pages are tier-locked).
+      { label: 'Certification', children: [
+        { label: 'Weekly Certification', href: '/reconciliation/weekly' },
+        { label: 'Monthly Certification', href: '/reconciliation/monthly' },
+        { label: 'Quarterly Certification', href: '/reconciliation/quarterly' },
+        { label: 'Yearly Certification', href: '/reconciliation/yearly' },
+      ] },
+      { label: 'Reports', children: [
+        { label: 'Weekly Report', href: '/reconciliation/reports/weekly' },
+        { label: 'Monthly Report', href: '/reconciliation/reports/monthly' },
+        { label: 'Quarterly Report', href: '/reconciliation/reports/quarterly' },
+        { label: 'Yearly Report', href: '/reconciliation/reports/yearly' },
+      ] },
+      // Statement matching moved OUT of the Accounts pill — Central must still
+      // reach it (Month/Quarter/Year closings are worked from here).
+      { label: 'Statement Matching', children: [
+        { label: 'Client Reconciliation', href: '/accounts/client-reco' },
+        { label: 'Bank Reconciliation', href: '/bank-reco' },
+        { label: 'Reconciliation Queue', href: '/finance/reco-queue' },
+        { label: 'Supplier Reconciliation', href: '/accounts/supplier-reco' },
+        { label: 'Inter-Branch Reconciliation', href: '/accounts/interbranch-reco' },
+        { label: 'Tally Reconciliation', href: '/accounts/tally-reco' },
+        { label: 'Match Guide', href: '/reconciliation/match-guide' },
       ] },
       { label: 'Govern', children: [
         { label: 'Rule Book & Process', href: '/reconciliation/rulebook' },
@@ -216,8 +236,16 @@ export function controlCockpitMenu(focus, currentUser) {
 // '/dashboard/' covers the role-segregated dashboards surfaced in the cockpit (incl. the
 // owner-only /dashboard/owner); '/dashboards/' covers the AD Dashboards group.
 const COCKPIT_PREFIXES = ['/tk/', '/dashboard/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/', '/reconciliation/'];
+// Statement-matching screens (moved out of the Accounts pill) — reachable from
+// Central because Month/Quarter/Year closings are worked here; each page stays
+// branch-wise via its own selectors.
+const COCKPIT_EXACT = new Set([
+  '/dashboard', '/reconciliation',
+  '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
+  '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+]);
 export function isCockpitRoute(route) {
   // '/reconciliation' — Month/Quarter/Year closings are DONE from TK Group Central
   // (AE/FM/Director/Owner); the pages themselves stay branch-wise via their chips.
-  return !!route && (route === '/dashboard' || route === '/reconciliation' || COCKPIT_PREFIXES.some((p) => route.startsWith(p)));
+  return !!route && (COCKPIT_EXACT.has(route) || COCKPIT_PREFIXES.some((p) => route.startsWith(p)));
 }

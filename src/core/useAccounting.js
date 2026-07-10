@@ -43,6 +43,10 @@ export function invalidateBooks(qc) {
   qc.invalidateQueries({ queryKey: ['accounting'] });
   qc.invalidateQueries({ queryKey: ['groups'] });
   qc.invalidateQueries({ queryKey: ['finance'] });
+  // The Bank Reconciliation "Book" side is a books-derived view (served from the
+  // live ledger). Correcting a voucher must re-fetch it too, or the reco screen
+  // keeps showing the pre-correction figure until its staleTime lapses.
+  qc.invalidateQueries({ queryKey: ['bank-reco'] });
 }
 
 export function useTrialBalance(branch, { from, to } = {}) {

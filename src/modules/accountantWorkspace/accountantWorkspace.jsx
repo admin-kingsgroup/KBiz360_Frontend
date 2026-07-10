@@ -7,7 +7,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { clickable } from '../../core/ux/clickable';
+import { confirmDialog } from '../../core/ux/confirm';
+import { matchVarianceSigned } from '../../core/matchVariance';
 import { usePager, Pager } from '../../core/ux/pager';
+import { useMobile } from '../../core/hooks';
 import { bc } from '../../core/styles';
 import { apiGet } from '../../core/api';
 import { CONSOLIDATED_LABEL } from '../../core/data';
@@ -26,21 +29,21 @@ import { useTaxCalendar, useExpenseBudgets } from '../../core/useReference';
 import { useBankLedgers, useBankReconSummary, useBankReconAggregate } from '../../core/useBankReco';
 import {
   useSupplierBook, useSupplierStatement, useSupplierReconSummary,
-  useImportSupplierStatement, useSupplierAutoMatch, useSupplierManualMatch,
+  useImportSupplierStatement, useSupplierAutoMatch, useSupplierManualMatch, useSupplierGroupMatch,
   useSupplierUnmatch, useSetSupplierReconStatus, useClearSupplierStatement,
   useDeleteSupplierStatementLine,
 } from '../../core/useSupplierReco';
 import { parseSupplierStatement } from '../../core/supplierStatementParse';
 import {
   useClientList, useClientBook, useClientStatement, useClientAllocation, useClientReconSummary,
-  useImportClientStatement, useClientAutoMatch, useClientAutoMatchAll, useClientManualMatch,
+  useImportClientStatement, useClientAutoMatch, useClientAutoMatchAll, useClientManualMatch, useClientGroupMatch,
   useClientUnmatch, useSetClientReconStatus, useClearClientStatement, useDeleteClientStatementLine,
 } from '../../core/useClientReco';
 import { parseClientStatement } from '../../core/clientStatementParse';
-import { useInterBranchReco } from '../../core/useInterBranchReco';
+import { useInterBranchReco, useInterBranchLinks } from '../../core/useInterBranchReco';
 import {
   useTallyBook, useTallyRows, useTallyRecoSummary, useImportTally, useTallyAutoMatch,
-  useTallyManualMatch, useTallyUnmatch, useSetTallyRecoStatus, useClearTally, useDeleteTallyLine,
+  useTallyManualMatch, useTallyGroupMatch, useTallyUnmatch, useSetTallyRecoStatus, useClearTally, useDeleteTallyLine,
 } from '../../core/useTallyReco';
 import { parseTallyStatement } from '../../core/tallyStatementParse';
 import { useCollectionsBoard, useUpsertFollowup, useAddContact, useReminderRun } from '../../core/useCollections';
@@ -56,6 +59,57 @@ const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', g
 // `{...card}` surface in this workspace adopts the premium look without structural change.
 const card = { background: '#fff', border: '1px solid #cdd1d8', borderRadius: 12, boxShadow: '0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString((cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US');
+
+// Shared "Match / Action" cell for every Statement Matching tab (client/supplier/tally).
+// Builds a match from ONE OR MORE book legs (N:1 split): pick legs from the dropdown,
+// see the running sum tie out (or the residual), then Match. 1 leg → onManual, N → onGroup.
+// A non-tying selection warns before saving a partial, so a split never silently looks done.
+function ReconMatchCell({ line, book, cur, bookSign = 1, onManual, onGroup, onUnmatch, onDispute, onDelete }) {
+  const [legs, setLegs] = useState([]);
+  if (line.status === 'reconciled' || line.status === 'partial') {
+    return <td style={{ ...td, whiteSpace: 'nowrap' }}><button onClick={onUnmatch} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button></td>;
+  }
+  const chosen = new Set(legs.map((l) => l.bookKey));
+  const available = book.filter((b) => !chosen.has(b.bookKey));
+  const amt = (b) => Math.abs((Number(b.debit) || 0) - (Number(b.credit) || 0)); // magnitude, for the running Σ display
+  const sum = legs.reduce((t, b) => t + amt(b), 0);
+  // Signed variance per this module's convention (bookSign): so wrong-DIRECTION legs
+  // never read as a tie even when their magnitudes add up to the line.
+  const variance = matchVarianceSigned(line, legs, bookSign);
+  const tie = Math.abs(variance) <= 0.01;
+  const addLeg = (bookKey) => { const b = book.find((x) => x.bookKey === bookKey); if (b) setLegs((p) => [...p, b]); };
+  const commit = async () => {
+    if (!legs.length) return;
+    if (!tie) {
+      const { confirmed } = await confirmDialog({
+        title: 'Amounts don’t match — is this a split?',
+        message: `The selected book ${legs.length > 1 ? 'entries' : 'entry'} and the statement line differ by ${money(cur, Math.abs(variance))}.\n\nA single line is often several book entries combined (a split). Add all the legs so they sum to the line, or match now as a PARTIAL.`,
+        confirmLabel: 'Match as partial', cancelLabel: 'Cancel',
+      });
+      if (!confirmed) return;
+    }
+    if (legs.length === 1) onManual(legs[0]); else onGroup(legs);
+    setLegs([]);
+  };
+  return (
+    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+      {legs.length > 0 && (
+        <div style={{ marginBottom: 4, fontSize: 11, fontWeight: 700, color: tie ? C.green : C.amber }}>
+          {legs.length} leg{legs.length > 1 ? 's' : ''} · Σ {money(cur, sum)} {tie ? '· ties out ✓' : `· Δ ${money(cur, variance)}`}
+          <button onClick={() => setLegs([])} title="Clear legs" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 6, padding: '1px 6px' }}>✕</button>
+        </div>
+      )}
+      <select value="" onChange={(e) => e.target.value && addLeg(e.target.value)}
+        style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
+        <option value="">{legs.length ? 'Add another leg…' : 'Match to book…'}</option>
+        {available.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, amt(b))}</option>)}
+      </select>
+      {legs.length > 0 && <button onClick={commit} style={{ ...aBtn(C.green), marginLeft: 5 }}>Match{legs.length > 1 ? ` ${legs.length}` : ''}</button>}
+      <button onClick={onDispute} style={{ ...aBtn(C.red), marginLeft: 5 }}>Dispute</button>
+      <button onClick={onDelete} title="Delete this line" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
+    </td>
+  );
+}
 const brLabel = (b) => (b === 'ALL' || !b ? CONSOLIDATED_LABEL : (b.name || b.code || b));
 
 // Year-month of a voucher date — handles ISO (YYYY-MM-DD) and DD/MM/YYYY (migrated).
@@ -2063,6 +2117,162 @@ export function CollectionsFollowup({ branch, setRoute }) {
 const STATUS_TONE = { reconciled: C.green, partial: C.gold, exception: C.red, unreconciled: C.dim };
 const recoBadge = (s) => ({ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: STATUS_TONE[s] || C.dim, textTransform: 'capitalize' });
 
+// ── Shared two-pane reconciliation matcher (Supplier + Client) ────────────────
+// The side-by-side matcher used by Supplier and Client reconciliation, mirroring
+// the Bank Reconciliation layout so all three screens read the same way: OUR Book
+// Entries on the LEFT, THEIR Statement on the RIGHT, both visible at once for easy
+// side-by-side comparison. Select one or more book legs + one statement line, watch
+// the running variance tie out (a wrong-direction or short leg never reads as a
+// tie), then Match. `bookSign` follows each module's convention: −1 for a creditor/
+// supplier (their debit = our credit), +1 for a debtor/client (same direction).
+function ReconMatcher({ cur, book, stmt, bookSign, statementTitle, matchHint,
+  onMatch, onGroup, onUnmatch, onDispute, onClearException, onDelete, busy }) {
+  const mob = useMobile();
+  const [selBooks, setSelBooks] = useState([]);   // book legs → one line (N:1 split)
+  const [selStmt, setSelStmt] = useState(null);   // one statement line
+  const [search, setSearch] = useState('');
+  const q = search.trim().toLowerCase();
+
+  const bookRows = useMemo(() => (book || []).filter((l) =>
+    !q || `${l.date} ${l.vno} ${l.narration} ${l.party}`.toLowerCase().includes(q)), [book, q]);
+  const stmtRows = useMemo(() => (stmt || []).filter((l) =>
+    !q || `${l.date} ${l.invoiceNo || ''} ${l.reference || ''} ${l.description || ''}`.toLowerCase().includes(q)), [stmt, q]);
+  const bookPager = usePager(bookRows);
+  const stmtPager = usePager(stmtRows);
+
+  const toggleBook = (l) => setSelBooks((p) => p.some((x) => x.bookKey === l.bookKey)
+    ? p.filter((x) => x.bookKey !== l.bookKey)
+    : [...p, { bookKey: l.bookKey, vno: l.vno, debit: l.debit, credit: l.credit }]);
+  const clearSel = () => { setSelBooks([]); setSelStmt(null); };
+
+  const mag = (x) => Math.abs((Number(x.debit) || 0) - (Number(x.credit) || 0));
+  const bookMag = selBooks.reduce((t, b) => t + mag(b), 0);
+  const variance = selStmt ? matchVarianceSigned(selStmt, selBooks, bookSign) : 0;
+  const tie = Math.abs(variance) <= 0.01;
+  const canMatch = selBooks.length > 0 && !!selStmt && !busy;
+
+  const commit = async () => {
+    if (!selBooks.length || !selStmt) return;
+    // Guardrail: a match that doesn't tie is usually a SPLIT (one line = several book
+    // entries). Warn before saving a partial — otherwise add the remaining legs.
+    if (!tie) {
+      const { confirmed } = await confirmDialog({
+        title: 'Amounts don’t match — is this a split?',
+        message: `The selected book ${selBooks.length > 1 ? 'entries' : 'entry'} and the statement line differ by ${money(cur, Math.abs(variance))}.\n\nA single line is often several book entries combined (a split). Add all the legs so they sum to the line, or match now as a PARTIAL.`,
+        confirmLabel: 'Match as partial', cancelLabel: 'Cancel',
+      });
+      if (!confirmed) return;
+    }
+    if (selBooks.length === 1) onMatch(selStmt, selBooks[0]); else onGroup(selStmt, selBooks);
+    clearSel();
+  };
+
+  const bookBg = (l, sel) => (sel ? '#fff7e0' : l.reconciled ? '#f4fbf4' : '#fff');
+  const stmtBg = (l, sel) => (sel ? '#fff7e0'
+    : l.status === 'reconciled' ? '#f4fbf4'
+    : l.status === 'partial' ? '#eef4ff'
+    : l.status === 'exception' ? '#fdf4f4' : '#fff');
+
+  return (
+    <>
+      {/* Toolbar — one search filters BOTH panes, like Bank Reco */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '0 2px 10px' }}>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search date / ref / narration…"
+          style={{ padding: '6px 10px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12.5, minWidth: 240 }} />
+        <span style={{ fontSize: 11, color: C.dim }}>Select book entr{selBooks.length === 1 ? 'y' : 'ies'} + one statement line, then Match. Several legs that sum to one line = a split.</span>
+      </div>
+
+      {/* Manual-match action bar */}
+      {(selBooks.length > 0 || selStmt) && (
+        <div style={{ ...card, padding: '8px 12px', marginBottom: 10, background: '#eef4ff', border: '1px solid #b9d0f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ fontSize: 12, color: C.blue }}>
+            <b>Manual match —</b> Book: {selBooks.length > 0 ? `${selBooks.length} ${selBooks.length > 1 ? 'entries' : 'entry'} (Σ ${money(cur, bookMag)})` : <i>select one or more book entries</i>} ↔ Statement: {selStmt ? `${selStmt.date} (${money(cur, mag(selStmt))})` : <i>select a statement line</i>}
+            {selBooks.length > 1 && <span style={{ fontWeight: 700 }}> · {selBooks.length}-way split</span>}
+            {canMatch && (tie
+              ? <span style={{ color: C.green, fontWeight: 700 }}> · ties out ✓</span>
+              : <span style={{ color: C.red, fontWeight: 700 }}> · Δ {money(cur, Math.abs(variance))} → Partial</span>)}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={commit} disabled={!canMatch} style={{ ...aBtn(C.green), opacity: canMatch ? 1 : 0.5 }}>Match{selBooks.length > 1 ? ` ${selBooks.length}` : ''}</button>
+            <button onClick={clearSel} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Clear</button>
+          </div>
+        </div>
+      )}
+
+      {/* Two panes: OUR books (left) | THEIR statement (right) */}
+      <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr', gap: 12 }}>
+        {/* Book side */}
+        <div>
+          <SecTitle>Our Book Entries (ledger) · {bookRows.length}</SecTitle>
+          <Table pager={bookPager}>
+            <thead><tr>
+              {['Date', 'Voucher', 'Narration', 'Debit', 'Credit', 'Status'].map((h, i) =>
+                <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {bookRows.length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No book entries in our ledger for this period.</td></tr>}
+              {bookPager.pageRows.map((l) => {
+                const sel = selBooks.some((b) => b.bookKey === l.bookKey);
+                return (
+                  <tr key={l.bookKey} {...(!l.reconciled ? clickable(() => toggleBook(l)) : {})}
+                    style={{ cursor: l.reconciled ? 'default' : 'pointer', background: bookBg(l, sel) }}>
+                    <td style={td}>{l.date}</td>
+                    <td style={{ ...td, fontWeight: 600, color: C.blue }}>{l.vno}</td>
+                    <td style={{ ...td, color: C.dim, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={l.narration || l.party}>{l.narration || l.party || '—'}</td>
+                    <td style={{ ...td, ...rnum }}>{l.debit ? money(cur, l.debit) : '—'}</td>
+                    <td style={{ ...td, ...rnum }}>{l.credit ? money(cur, l.credit) : '—'}</td>
+                    <td style={td}><span style={recoBadge(l.reconciled ? l.status : 'unreconciled')}>{l.reconciled ? l.status : 'open'}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </div>
+
+        {/* Statement side */}
+        <div>
+          <SecTitle>{statementTitle} · {stmtRows.length}</SecTitle>
+          <Table pager={stmtPager}>
+            <thead><tr>
+              {['Date', 'Invoice / Ref', 'Description', 'Debit', 'Credit', 'Status', ''].map((h, i) =>
+                <th key={h || 'act'} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {stmtRows.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No statement imported yet.</td></tr>}
+              {stmtPager.pageRows.map((s) => {
+                const sel = selStmt?.id === s.id;
+                const open = s.status === 'unreconciled' || s.status === 'exception';
+                return (
+                  <tr key={s.id} {...(open ? clickable(() => setSelStmt(sel ? null : s)) : {})}
+                    style={{ cursor: open ? 'pointer' : 'default', background: stmtBg(s, sel) }}>
+                    <td style={td}>{s.date}</td>
+                    <td style={{ ...td, fontWeight: 600, color: C.blue }}>{s.invoiceNo || s.reference || '—'}</td>
+                    <td style={{ ...td, color: C.dim, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.description}>{s.description || '—'}</td>
+                    <td style={{ ...td, ...rnum }}>{s.debit ? money(cur, s.debit) : '—'}</td>
+                    <td style={{ ...td, ...rnum }}>{s.credit ? money(cur, s.credit) : '—'}</td>
+                    <td style={td}><span style={recoBadge(s.status)}>{s.status}{s.variance ? ` · Δ${money(cur, Math.abs(s.variance))}` : ''}</span>{s.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{s.matchedVno}</div> : null}</td>
+                    <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      {(s.status === 'reconciled' || s.status === 'partial')
+                        ? <button onClick={(e) => { e.stopPropagation(); onUnmatch(s); }} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
+                        : (<>
+                            {s.status === 'exception'
+                              ? <button onClick={(e) => { e.stopPropagation(); onClearException(s); }} title="Clear dispute" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>↺</button>
+                              : <button onClick={(e) => { e.stopPropagation(); onDispute(s); }} style={aBtn(C.red)}>Dispute</button>}
+                            <button onClick={(e) => { e.stopPropagation(); onDelete(s); }} title="Delete this line" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
+                          </>)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
+        </div>
+      </div>
+      {matchHint && <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>{matchHint}</div>}
+    </>
+  );
+}
+
 export function SupplierReco({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const age = useAgeing(branch).data || {};
@@ -2075,12 +2285,12 @@ export function SupplierReco({ branch, setRoute }) {
   const sumQ = useSupplierReconSummary(sel, branch);
   const book = bookQ.data || { lines: [] };
   const stmt = stmtQ.data || [];
-  const stmtPager = usePager(stmt); // page the statement rows; count/badges read full `stmt`
   const sum = sumQ.data || {};
 
   const imp = useImportSupplierStatement();
   const auto = useSupplierAutoMatch();
   const manual = useSupplierManualMatch();
+  const group = useSupplierGroupMatch();
   const unmatch = useSupplierUnmatch();
   const setStatus = useSetSupplierReconStatus();
   const del = useDeleteSupplierStatementLine();
@@ -2088,7 +2298,6 @@ export function SupplierReco({ branch, setRoute }) {
 
   const [paste, setPaste] = useState('');
   const parsed = useMemo(() => parseSupplierStatement(paste), [paste]);
-  const unreconciledBook = (book.lines || []).filter((l) => !l.reconciled);
 
   const doImport = () => {
     if (!sel || !parsed.length) return;
@@ -2097,11 +2306,6 @@ export function SupplierReco({ branch, setRoute }) {
   };
 
   const diff = Number(sum.differenceAmount || 0);
-  const matchTo = (s, bookKey) => {
-    const b = (book.lines || []).find((x) => x.bookKey === bookKey);
-    if (!b) return;
-    manual.mutate({ id: s.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit });
-  };
 
   return (
     <Shell title="Supplier Reconciliation"
@@ -2144,46 +2348,19 @@ export function SupplierReco({ branch, setRoute }) {
             </div>
           </div>
 
-          {/* Statement lines */}
-          <SecTitle>Vendor statement ({stmt.length}) — match each to a book entry</SecTitle>
-          <Table pager={stmtPager}>
-            <thead><tr>
-              {['Date', 'Invoice / Ref', 'Description', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) =>
-                <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {stmt.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No statement imported yet for {sel}.</td></tr>}
-              {stmtPager.pageRows.map((s) => (
-                <tr key={s.id} style={{ background: s.status === 'reconciled' ? '#f4fbf4' : s.status === 'exception' ? '#fdf4f4' : '#fff' }}>
-                  <td style={td}>{s.date}</td>
-                  <td style={{ ...td, fontWeight: 600, color: C.blue }}>{s.invoiceNo || s.reference || '—'}</td>
-                  <td style={{ ...td, color: C.dim }}>{s.description || '—'}</td>
-                  <td style={{ ...td, ...rnum }}>{s.debit ? money(cur, s.debit) : '—'}</td>
-                  <td style={{ ...td, ...rnum }}>{s.credit ? money(cur, s.credit) : '—'}</td>
-                  <td style={td}><span style={recoBadge(s.status)}>{s.status}{s.variance ? ` · Δ${money(cur, Math.abs(s.variance))}` : ''}</span>{s.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{s.matchedVno}</div> : null}</td>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                    {s.status === 'reconciled' || s.status === 'partial' ? (
-                      <button onClick={() => unmatch.mutate({ id: s.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
-                    ) : (
-                      <>
-                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(s, e.target.value)}
-                          style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
-                          <option value="">Match to book…</option>
-                          {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.credit - b.debit)}</option>)}
-                        </select>
-                        <button onClick={() => setStatus.mutate({ id: s.id, status: 'exception' })} style={{ ...aBtn(C.red), marginLeft: 5 }}>Dispute</button>
-                        <button onClick={() => del.mutate({ id: s.id })} title="Delete this line" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-
-          <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
-            A statement <b>debit</b> (they billed us) matches a book <b>credit</b> (a bill we posted); a statement <b>credit</b> (our payment) matches a book <b>debit</b>. Unmatched items on either side are the reconciling differences — usually a missing bill, an unposted payment, or an ADM/ACM not captured.
-          </div>
+          {/* Side-by-side matcher — our creditor ledger vs their statement */}
+          <ReconMatcher
+            cur={cur} book={book.lines || []} stmt={stmt} bookSign={-1}
+            statementTitle="Their Statement (vendor SOA)"
+            busy={manual.isPending || group.isPending}
+            onMatch={(s, leg) => manual.mutate({ id: s.id, bookKey: leg.bookKey, vno: leg.vno, bookDebit: leg.debit, bookCredit: leg.credit })}
+            onGroup={(s, legs) => group.mutate({ id: s.id, books: legs.map((b) => ({ bookKey: b.bookKey, vno: b.vno, debit: b.debit, credit: b.credit })) })}
+            onUnmatch={(s) => unmatch.mutate({ id: s.id })}
+            onDispute={(s) => setStatus.mutate({ id: s.id, status: 'exception' })}
+            onClearException={(s) => setStatus.mutate({ id: s.id, status: 'unreconciled' })}
+            onDelete={(s) => del.mutate({ id: s.id })}
+            matchHint={<>A statement <b>debit</b> (they billed us) matches a book <b>credit</b> (a bill we posted); a statement <b>credit</b> (our payment) matches a book <b>debit</b>. Unmatched items on either side are the reconciling differences — usually a missing bill, an unposted payment, or an ADM/ACM not captured.</>}
+          />
         </>
       )}
     </Shell>
@@ -2234,29 +2411,23 @@ export function ClientReco({ branch, setRoute }) {
   const auto = useClientAutoMatch();
   const autoAll = useClientAutoMatchAll();
   const manual = useClientManualMatch();
+  const group = useClientGroupMatch();
   const unmatch = useClientUnmatch();
   const setStatus = useSetClientReconStatus();
   const del = useDeleteClientStatementLine();
   const clear = useClearClientStatement();
 
   const parsed = useMemo(() => parseClientStatement(paste), [paste]);
-  const unreconciledBook = (book.lines || []).filter((l) => !l.reconciled);
 
   const filtered = useMemo(() => (list.rows || []).filter((r) =>
     (!q || r.client.toLowerCase().includes(q.toLowerCase())) &&
     (!onlyDiff || r.status === 'differences')), [list.rows, q, onlyDiff]);
-  // Page the long lists; KPI totals/badges and the empty-states read the full sets.
+  // Page the long workbench list; KPI totals/badges and the empty-states read the full set.
   const wbPager = usePager(filtered);   // workbench: every client ledger
-  const stmtPager = usePager(stmt);     // drill-in: imported statement rows
 
   const doImport = () => {
     if (!client || !parsed.length) return;
     imp.mutate({ client, branch: branch?.code || branch, rows: parsed, fileName: 'pasted' }, { onSuccess: () => setPaste('') });
-  };
-  const matchTo = (s, bookKey) => {
-    const b = (book.lines || []).find((x) => x.bookKey === bookKey);
-    if (!b) return;
-    manual.mutate({ id: s.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit });
   };
   const exportStatement = () => downloadCSV(`client-reco-${client}.csv`,
     stmt.map((s) => ({ date: s.date, invoice: s.invoiceNo || s.reference, description: s.description, debit: s.debit, credit: s.credit, status: s.status, matchedVoucher: s.matchedVno, variance: s.variance })));
@@ -2357,44 +2528,19 @@ export function ClientReco({ branch, setRoute }) {
             </div>
           </div>
 
-          <SecTitle>Client statement ({stmt.length}) — match each to a book entry</SecTitle>
-          <Table pager={stmtPager}>
-            <thead><tr>
-              {['Date', 'Invoice / Ref', 'Description', 'Debit', 'Credit', 'Status', 'Match / Action'].map((h, i) =>
-                <th key={h} style={{ ...th, ...(i >= 3 && i <= 4 ? rnum : {}) }}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {stmt.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No statement imported yet for {client}. Use the internal tab to reconcile against our own books.</td></tr>}
-              {stmtPager.pageRows.map((s) => (
-                <tr key={s.id} style={{ background: s.status === 'reconciled' ? '#f4fbf4' : s.status === 'exception' ? '#fdf4f4' : '#fff' }}>
-                  <td style={td}>{s.date}</td>
-                  <td style={{ ...td, fontWeight: 600, color: C.blue }}>{s.invoiceNo || s.reference || '—'}</td>
-                  <td style={{ ...td, color: C.dim }}>{s.description || '—'}</td>
-                  <td style={{ ...td, ...rnum }}>{s.debit ? money(cur, s.debit) : '—'}</td>
-                  <td style={{ ...td, ...rnum }}>{s.credit ? money(cur, s.credit) : '—'}</td>
-                  <td style={td}><span style={recoBadge(s.status)}>{s.status}{s.variance ? ` · Δ${money(cur, Math.abs(s.variance))}` : ''}</span>{s.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{s.matchedVno}</div> : null}</td>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                    {s.status === 'reconciled' || s.status === 'partial' ? (
-                      <button onClick={() => unmatch.mutate({ id: s.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
-                    ) : (
-                      <>
-                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(s, e.target.value)}
-                          style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
-                          <option value="">Match to book…</option>
-                          {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.debit - b.credit)}</option>)}
-                        </select>
-                        <button onClick={() => setStatus.mutate({ id: s.id, status: 'exception' })} style={{ ...aBtn(C.red), marginLeft: 5 }}>Dispute</button>
-                        <button onClick={() => del.mutate({ id: s.id })} title="Delete this line" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-          <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
-            A statement <b>debit</b> (an invoice) matches a book <b>debit</b> (a sale); a statement <b>credit</b> (their payment) matches a book <b>credit</b> (a receipt) — same direction, since a client is a debtor. Unmatched items are the reconciling differences.
-          </div>
+          {/* Side-by-side matcher — our debtor ledger vs their statement */}
+          <ReconMatcher
+            cur={cur} book={book.lines || []} stmt={stmt} bookSign={1}
+            statementTitle="Their Statement (client SOA)"
+            busy={manual.isPending || group.isPending}
+            onMatch={(s, leg) => manual.mutate({ id: s.id, bookKey: leg.bookKey, vno: leg.vno, bookDebit: leg.debit, bookCredit: leg.credit })}
+            onGroup={(s, legs) => group.mutate({ id: s.id, books: legs.map((b) => ({ bookKey: b.bookKey, vno: b.vno, debit: b.debit, credit: b.credit })) })}
+            onUnmatch={(s) => unmatch.mutate({ id: s.id })}
+            onDispute={(s) => setStatus.mutate({ id: s.id, status: 'exception' })}
+            onClearException={(s) => setStatus.mutate({ id: s.id, status: 'unreconciled' })}
+            onDelete={(s) => del.mutate({ id: s.id })}
+            matchHint={<>A statement <b>debit</b> (an invoice) matches a book <b>debit</b> (a sale); a statement <b>credit</b> (their payment) matches a book <b>credit</b> (a receipt) — same direction, since a client is a debtor. Unmatched items are the reconciling differences.</>}
+          />
         </>
       ) : (
         <>
@@ -2497,6 +2643,8 @@ export function InterBranchReco({ branch }) {
           ))}
         </tbody>
       </Table>
+      {/* Line level — the exact deal behind a pair mismatch, by INB Link No. */}
+      <InterBranchLinkLevel branch={branch} cur={cur} />
       <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
         Each pair compares branch A's "Travkings Tours and Travels B" ledger against branch B's "Travkings Tours and Travels A" ledger (sub-group <b>Inter Branch</b>). The selling branch books a debtor and the buying branch a creditor, so the two should be equal and opposite (net zero). A non-zero difference means one branch booked the deal and the other hasn't, or the amounts disagree — an agreement check, not an elimination.
       </div>
@@ -2508,6 +2656,45 @@ export function InterBranchReco({ branch }) {
 // Reconcile ANY ERP ledger against an imported Tally ledger export — the in-app
 // version of the per-bank Tally↔ERP recon scripts. Pick a ledger, paste its Tally
 // export, then auto/manual match against the live ERP postings.
+
+// Line-level inter-branch: every INB deal by Link No from the registry — an
+// OPEN link names the exact voucher one side hasn't booked yet, which is the
+// line-level answer behind a non-zero pair difference above.
+function InterBranchLinkLevel({ branch, cur }) {
+  const code = branch && branch !== 'ALL' ? (branch.code || branch) : '';
+  const q = useInterBranchLinks({ branch: code || undefined });
+  const data = q.data || { links: [], totals: {} };
+  const open = (data.unbooked || []).slice(0, 50);
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 6 }}>
+        Line level — by INB Link No
+        <span style={{ marginLeft: 10, fontSize: 11.5, fontWeight: 700, color: (data.totals?.open || 0) ? C.red : C.green }}>
+          {data.totals?.open || 0} open · {data.totals?.booked || 0} booked{(data.totals?.open || 0) ? ` · ${money(cur, data.totals?.openAmount)} unbooked` : ''}
+        </span>
+      </div>
+      <Table>
+        <thead><tr>{['Link No', 'Date', 'From → To', 'Module', 'Total', 'Status'].map((h, i) => <th key={h} style={{ ...th, ...(i === 4 ? rnum : {}) }}>{h}</th>)}</tr></thead>
+        <tbody>
+          {q.isLoading && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>Loading…</td></tr>}
+          {!q.isLoading && open.length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.green, padding: 16 }}>✓ Every INB link is booked on both sides.</td></tr>}
+          {open.map((l) => (
+            <tr key={l.inbLinkNo} style={{ background: '#fdf6f4' }}>
+              <td style={{ ...td, fontWeight: 700 }}>{l.inbLinkNo}</td>
+              <td style={td}>{l.date}</td>
+              <td style={td}>{l.fromBranch} → {l.toBranch}</td>
+              <td style={td}>{l.module || '—'}</td>
+              <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(cur, l.total)}</td>
+              <td style={td}><span style={wbBadge('differences')}>open — one side unbooked</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 6 }}>An <b>open</b> link = the selling branch pushed the deal but the buying branch hasn't booked its purchase leg (or vice-versa) — book the missing leg and the pair above nets to zero. Showing up to 50.</div>
+    </div>
+  );
+}
+
 export function TallyReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const tb = useTrialBalance(branch).data || {};
@@ -2526,6 +2713,7 @@ export function TallyReco({ branch }) {
   const imp = useImportTally();
   const auto = useTallyAutoMatch();
   const manual = useTallyManualMatch();
+  const group = useTallyGroupMatch();
   const unmatch = useTallyUnmatch();
   const setStatus = useSetTallyRecoStatus();
   const del = useDeleteTallyLine();
@@ -2537,7 +2725,6 @@ export function TallyReco({ branch }) {
   const diff = Number(sum.differenceAmount || 0);
 
   const doImport = () => { if (!sel || !parsed.length) return; imp.mutate({ ledger: sel, branch: branch?.code || branch, rows: parsed, fileName: 'pasted' }, { onSuccess: () => setPaste('') }); };
-  const matchTo = (t, bookKey) => { const b = (book.lines || []).find((x) => x.bookKey === bookKey); if (!b) return; manual.mutate({ id: t.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit }); };
 
   return (
     <Shell title="Tally Reconciliation" sub={`${brLabel(branch)} · import a ledger's Tally export, then match it against the ERP books`}
@@ -2585,20 +2772,12 @@ export function TallyReco({ branch }) {
                   <td style={{ ...td, ...rnum }}>{t.debit ? money(cur, t.debit) : '—'}</td>
                   <td style={{ ...td, ...rnum }}>{t.credit ? money(cur, t.credit) : '—'}</td>
                   <td style={td}><span style={recoBadge(t.status)}>{t.status}{t.variance ? ` · Δ${money(cur, Math.abs(t.variance))}` : ''}</span>{t.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{t.matchedVno}</div> : null}</td>
-                  <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                    {t.status === 'reconciled' || t.status === 'partial' ? (
-                      <button onClick={() => unmatch.mutate({ id: t.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
-                    ) : (
-                      <>
-                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(t, e.target.value)} style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
-                          <option value="">Match to ERP…</option>
-                          {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.debit - b.credit)}</option>)}
-                        </select>
-                        <button onClick={() => setStatus.mutate({ id: t.id, status: 'exception' })} style={{ ...aBtn(C.red), marginLeft: 5 }}>Exception</button>
-                        <button onClick={() => del.mutate({ id: t.id })} title="Delete" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
-                      </>
-                    )}
-                  </td>
+                  <ReconMatchCell line={t} book={unreconciledBook} cur={cur}
+                    onManual={(leg) => manual.mutate({ id: t.id, bookKey: leg.bookKey, vno: leg.vno, bookDebit: leg.debit, bookCredit: leg.credit })}
+                    onGroup={(legs) => group.mutate({ id: t.id, books: legs.map((b) => ({ bookKey: b.bookKey, vno: b.vno, debit: b.debit, credit: b.credit })) })}
+                    onUnmatch={() => unmatch.mutate({ id: t.id })}
+                    onDispute={() => setStatus.mutate({ id: t.id, status: 'exception' })}
+                    onDelete={() => del.mutate({ id: t.id })} />
                 </tr>
               ))}
             </tbody>

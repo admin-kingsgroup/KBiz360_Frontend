@@ -21,7 +21,7 @@ export const RULE_BOOK = [
     { t: 'Tax regime: NBO/DAR/FBM run VAT (Africa); all other branches run India GST.', r: 'constants/taxRegime.js:11' },
     { t: 'Single VAT rate per Africa branch — Kenya(NBO) 16%, Tanzania(DAR) 18%, DR Congo(FBM) 16%.', r: 'constants/taxRegime.js:13' },
     { t: 'On VAT branches tax routes to a single VAT Input/Output leg vs CGST/SGST/IGST on GST branches.', r: 'posting.builder.js:175' },
-    { t: 'Africa branches carry a mandated local reporting currency (NBO→KES, DAR→TZS, FBM→CDF).', r: 'constants/taxRegime.js:19' },
+    { t: 'NBO and DAR carry a mandated local reporting currency (NBO→KES, DAR→TZS); FBM trades in USD only — no secondary currency.', r: 'constants/taxRegime.js:19' },
     { t: '"Without VAT" (noVat) zeroes booking output tax and applies only on Africa/VAT branches; India always follows the module GST rule.', r: 'voucherSpecs.js:27 · import.service.js:621' },
     { t: 'Africa input VAT is decoupled from the Without-VAT sale flag — it follows the supplier invoice and is still recorded.', r: 'voucherSpecs.js:32' },
     { t: 'Incentive/commission output GST routes through the same CGST/SGST(intra)/IGST(inter) Output heads as a sale so it lands in GSTR-1 with correct place-of-supply.', r: 'posting.builder.js:233' },

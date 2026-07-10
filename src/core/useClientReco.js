@@ -94,6 +94,10 @@ export const useClientAutoMatchAll = () =>
 export const useClientManualMatch = () =>
   useReconMutation(({ id, ...body }) => apiPost(`/api/client-reconciliation/match/${id}`, body));
 
+// N book legs → one statement line (a split settled by several book entries).
+export const useClientGroupMatch = () =>
+  useReconMutation(({ id, books }) => apiPost(`/api/client-reconciliation/match-group/${id}`, { books }));
+
 export const useClientUnmatch = () =>
   useReconMutation(({ id }) => apiPost(`/api/client-reconciliation/unmatch/${id}`));
 

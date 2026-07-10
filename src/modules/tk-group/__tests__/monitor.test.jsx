@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { overviewKpis, streamRows, actorName } from '../utils/monitor';
 
@@ -23,7 +24,9 @@ import { AuditTrail } from '../AuditTrail';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+  // MemoryRouter: ControlTower's tab now lives in `?tab=` (useSearchParams), which
+  // throws outside a Router context.
+  return render(<QueryClientProvider client={qc}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>);
 }
 
 describe('monitor utils', () => {

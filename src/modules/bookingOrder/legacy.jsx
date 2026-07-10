@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
-  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw,
+  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw, FileEdit,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
@@ -254,7 +254,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
   );
 }
 
-export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false, poOnly = false }) {
+export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false, poOnly = false, autoApprove = false }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
   // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
@@ -611,7 +611,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     // Editing an existing booking requires a reason (saved to the audit trail).
     let editReason = '';
     if (editing) {
-      const { confirmed, reason } = await confirmDialog({ title: 'Save changes to this voucher?', message: 'Editing reverses any posted entry and returns it to Pending for re-approval.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save changes' });
+      const { confirmed, reason } = await confirmDialog(autoApprove
+        ? { title: 'Save changes & keep Approved?', message: 'This reverses the posted entry, re-posts it with your changes, and re-approves automatically — the booking stays Approved with no Pending step.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save & keep Approved' }
+        : { title: 'Save changes to this voucher?', message: 'Editing reverses any posted entry and returns it to Pending for re-approval.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save changes' });
       if (!confirmed) return; // cancelled — nothing saved
       editReason = reason;
     }
@@ -638,10 +640,20 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
         : await apiPost('/api/booking-orders', payload);
-      setResult({ ...booking, _approved: false, _edited: editing });
+      // autoApprove (Edit PO from the Approved tab): the edit above reverses & returns
+      // the voucher to Pending same as any edit — immediately re-approve it here so the
+      // caller never sees a Pending stop; if re-approval fails (e.g. validation), the
+      // edit itself still stands and the voucher is left in Pending for manual approval.
+      let reapproved = false, reapproveErr = '';
+      if (editing && autoApprove && booking?.id) {
+        try { const approveRes = await apiPost('/api/booking-orders/' + booking.id + '/approve'); Object.assign(booking, approveRes); reapproved = true; }
+        catch (e) { reapproveErr = e.message || 'Re-approve failed'; }
+      }
+      setResult({ ...booking, _approved: reapproved, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
       if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
-      toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
+      if (reapproveErr) toast(`Voucher ${booking.bookingNo || ''} saved — but auto re-approve failed (${reapproveErr}); approve it manually from Pending`, 'error');
+      else toast(reapproved ? `Voucher ${booking.bookingNo || ''} saved — stays Approved` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
       // If this PO was fetched from an open inter-branch leg, consume it (mark the
       // INB link booked). Non-fatal: a miss leaves the link open to retry.
       if (inbId && booking?.bookingNo) {
@@ -886,7 +898,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
             <div>
               <h3 style={{ margin: 0, fontSize: 15, color: DARK, display: 'flex', alignItems: 'center', gap: 7 }}><Pencil size={15} style={{ color: PO_BAR }} /> Edit Purchase Order · {editBooking.bookingNo}</h3>
-              <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#5b616e' }}>{spec.icon} {spec.name} · Link <b style={{ fontFamily: 'monospace' }}>{editBooking.linkNo}</b> · saving returns this voucher to Pending for re-approval.</p>
+              <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#5b616e' }}>{spec.icon} {spec.name} · Link <b style={{ fontFamily: 'monospace' }}>{editBooking.linkNo}</b> · {autoApprove ? <>saving re-posts the changes and <b>keeps this voucher Approved</b> — no Pending step.</> : 'saving returns this voucher to Pending for re-approval.'}</p>
             </div>
             <button onClick={close} style={{ ...btnGh, padding: '4px 10px' }}>✕</button>
           </div>
@@ -898,7 +910,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <button onClick={close} disabled={saving} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
             <button disabled={!canSave || isNoSupp || saving} onClick={() => save()} className="max-tablet:min-h-[44px]"
               style={{ ...btnG, background: (canSave && !isNoSupp) ? DARK : '#9ca3af', cursor: (canSave && !isNoSupp) ? 'pointer' : 'not-allowed', opacity: (canSave && !isNoSupp) ? 1 : 0.7 }}>
-              {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : 'Save changes (Pending)'}
+              {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (autoApprove ? 'Save & keep Approved' : 'Save changes (Pending)')}
             </button>
           </div>
         </div>
@@ -1755,7 +1767,7 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onEditPax, onInvoice, busyId, sel, onToggleSel }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onEditPax, onEditPO, onInvoice, busyId, sel, onToggleSel }) {
   const chainCfg = useApprovalChain(); // three-level chain assignees (drives the stage-aware button)
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Voucher Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
@@ -1850,9 +1862,10 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                       // numbers). Revoke is approver-only; Delete is admin-only.
                       <div style={{ display: 'flex', gap: 6 }}>
                         {onEditPax && sp && <button disabled={busyId === b.id} onClick={() => onEditPax(b)} title="Edit passenger details (names / ticket & document refs / sectors) in place — amounts unchanged, booking stays approved. No revoke needed." style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit Pax</button>}
+                        {canRevoke && onEditPO && !b.noSupplier && <button disabled={busyId === b.id} onClick={() => onEditPO(b)} title="Edit Purchase Order — fix the cost/tax/fare fields in place; saving re-posts the changes and keeps this booking Approved (no manual re-approval, no Pending step)." style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: PO_BAR, borderColor: '#e3b8c8' }}><FileEdit size={12} /> Edit PO</button>}
                         {canRevoke && onRevoke && <button disabled={busyId === b.id} onClick={() => onRevoke(b)} title="Revoke — un-post the Sales/Purchase and return this booking to Pending so it can be edited & re-approved (numbers kept)" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: GOLD, borderColor: '#e3cd97' }}><RotateCcw size={12} /> Revoke</button>}
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={12} /> Delete</button>}
-                        {!(onEditPax && sp) && !(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
+                        {!(onEditPax && sp) && !(canRevoke && onEditPO && !b.noSupplier) && !(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
                       </div>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#9197a3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
@@ -2357,6 +2370,9 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState('');
   const [editing, setEditing] = useState(null); useModalEsc(() => setEditing(null), !!editing);
+  // Approved-tab "Edit PO" — same compact PO-only modal as `editing`, but saving
+  // auto-re-approves so the booking never sits in Pending waiting on a second click.
+  const [editingPO, setEditingPO] = useState(null); useModalEsc(() => setEditingPO(null), !!editingPO);
   const [groupBy, setGroupBy] = useState('none');
   // Refund/Reissue (SO/PO/GP reversal modules RF/RI) live in this same queue and show
   // inline in the normal Pending window alongside forward bookings — no separate filter.
@@ -2406,6 +2422,15 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       if (!confirmed) return;
     }
     setEditing(b);
+  };
+  // Approved tab's "Edit PO" button: opens the same compact PO-only editor, but the
+  // voucher is auto-re-approved on save (see SoPoGpVoucherEntry's autoApprove prop),
+  // so — unlike plain Edit above — it never lands in the Pending queue for the user
+  // to chase down.
+  const onEditPO = async (b) => {
+    const { confirmed } = await confirmDialog({ title: `Edit Purchase Order for ${b.bookingNo}?`, message: `Its posted Sales (${b.saleVno})${b.noSupplier ? '' : ` & Purchase (${b.purchaseVno})`} will be reversed and re-posted with your changes — the booking stays Approved (auto re-approved, no Pending step).`, confirmLabel: 'Edit PO' });
+    if (!confirmed) return;
+    setEditingPO(b);
   };
   const onCancel = async (b) => {
     const { confirmed, reason } = await confirmDialog({ title: `Reject voucher ${b.bookingNo}?`, message: 'Marked Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
@@ -2488,9 +2513,15 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       {status === 'edited'
         ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
         : <>
-            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onEditPO={onEditPO} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
             <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
           </>}
+      {/* Approved tab's "Edit PO" — same compact modal, but autoApprove re-posts &
+          re-approves on save so the booking stays Approved (never drops to Pending). */}
+      {editingPO && (
+        <SoPoGpVoucherEntry poOnly autoApprove branch={branch} setRoute={setRoute} editBooking={editingPO}
+          onDone={() => { setEditingPO(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }} />
+      )}
     </div>
   );
 }

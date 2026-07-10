@@ -2,6 +2,7 @@
 //  • India branch → a single (₹) invoice, no currency variants, no FX lookup.
 //  • Africa branch + today's FX set → USD + local variants (local converts at the rate).
 //  • Africa branch + today's FX NOT set → the local tab is locked (printing blocked).
+//  • FBM (VAT but USD-only, no secondary currency) → single USD invoice, no FX lookup.
 // invoiceHtml + api are mocked; we capture the dispatched `kb:print` job detail.
 import { printBookingInvoice } from '../printInvoice';
 
@@ -37,6 +38,14 @@ describe('printBookingInvoice — local-currency toggle wiring', () => {
     expect(v.map((x) => x.label)).toEqual(['USD', 'KES']);
     expect(v[1].disabled).toBeFalsy();
     expect(v[1].html).toContain('local KES 130');
+    c.off();
+  });
+
+  test('Africa (FBM, USD-only) → single USD invoice, no currency variants, no FX lookup', async () => {
+    const c = capture();
+    await printBookingInvoice({ booking: { branch: 'FBM', bookingNo: 'X' }, side: 'sale', branch: { code: 'FBM' } });
+    expect(apiGet).not.toHaveBeenCalled();
+    expect(c.jobs[0].currencyVariants).toBeFalsy();
     c.off();
   });
 

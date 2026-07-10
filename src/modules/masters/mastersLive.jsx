@@ -12,7 +12,7 @@ import { Plus, Pencil, Trash2, Download, Printer, Ban, RotateCcw } from 'lucide-
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import {
   SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
-  PAY_TERMS, SETTLE_CYCLES, PAY_METHODS, CUST_TYPES, CUST_SOURCES,
+  SETTLE_CYCLES, PAY_METHODS, CUST_TYPES, CUST_SOURCES,
 } from '../../core/partyEnums';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { SourceBadge } from '../../core/LedgerLabel';
@@ -56,9 +56,61 @@ export const validParentGroups = (groups = []) => {
 };
 
 const blankFromFields = (fields) => fields.reduce((o, f) => {
-  o[f.key] = f.type === 'bool' ? (f.default ?? false) : f.type === 'tags' ? [] : f.type === 'number' ? (f.default ?? 0) : (f.default ?? '');
+  o[f.key] = f.type === 'bool' ? (f.default ?? false) : (f.type === 'tags' || f.type === 'multiselect') ? [] : f.type === 'number' ? (f.default ?? 0) : (f.default ?? '');
   return o;
 }, {});
+
+// Type-to-search, click-to-add multi-picker over live `options` (array or fn(form)).
+// Already-picked values show as removable chips above the search box; the dropdown
+// only lists NOT-yet-picked matches, so you can keep typing to add more.
+function MultiSelectAutocomplete({ field, value, onChange, form }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+  const raw = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
+  const options = raw.filter((o) => o !== '' && o != null);
+  const selected = Array.isArray(value) ? value : [];
+  const q = query.trim().toLowerCase();
+  const matches = options.filter((o) => !selected.includes(o) && (!q || o.toLowerCase().includes(q)));
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const pick = (name) => { onChange([...selected, name]); setQuery(''); setOpen(false); };
+  const remove = (name) => onChange(selected.filter((s) => s !== name));
+
+  return (
+    <div ref={boxRef} className="relative">
+      {selected.length > 0 && (
+        <div className="mb-1.5 flex flex-wrap gap-1.5">
+          {selected.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-medium text-ink">
+              <span>{s}</span>
+              <button type="button" onClick={() => remove(s)} className="text-ink-subtle hover:text-danger" aria-label={`Remove ${s}`}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <Input value={query} onFocus={() => setOpen(true)} onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        placeholder={field.placeholder || 'Type to search…'} />
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-surface-border bg-surface shadow-md">
+          {matches.length === 0 && <p className="px-2.5 py-2 text-[11.5px] text-ink-subtle">{field.emptyLabel || 'No matches.'}</p>}
+          {matches.map((o) => (
+            <button key={o} type="button" onClick={() => pick(o)}
+              className="block w-full px-2.5 py-1.5 text-left text-[12.5px] text-ink hover:bg-surface-alt">
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function FieldInput({ field, value, onChange, form }) {
   if (field.type === 'bool') {
@@ -90,6 +142,14 @@ function FieldInput({ field, value, onChange, form }) {
         placeholder="comma, separated, values" />
     );
   }
+  // Pick-from-list version of 'tags' — for fields that must reference REAL records
+  // (e.g. Drawdown Ledgers → real ledgers) rather than free-typed names that could
+  // typo or drift from the actual master. Type to filter, click to add — a separate
+  // component so its own local (search text / open) state stays out of FieldInput,
+  // which must not call hooks conditionally.
+  if (field.type === 'multiselect') {
+    return <MultiSelectAutocomplete field={field} value={value} onChange={onChange} form={form} />;
+  }
   // System-managed fields (e.g. a ledger's auto-generated code) are shown but not
   // editable — render a greyed, read-only box with a hint when there's no value yet.
   if (field.readOnly) {
@@ -114,11 +174,13 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   const [form, setForm] = useState(record);
   // Changing a field may invalidate a dependent one (e.g. picking a new Group makes
   // the previously-chosen Sub-Group stale). A field can declare `clears: ['subGroup']`
-  // to reset those dependents to blank whenever it changes.
+  // to reset those dependents to blank whenever it changes, or `onSet(v, next)` to
+  // derive/overwrite another field's value (e.g. Country → auto-set State to 'Others').
   const set = (k, v) => setForm((f) => {
     const next = { ...f, [k]: v };
     const fld = fields.find((x) => x.key === k);
     if (fld && Array.isArray(fld.clears)) fld.clears.forEach((c) => { next[c] = ''; });
+    if (fld && typeof fld.onSet === 'function') fld.onSet(v, next);
     return next;
   });
   // `show` / `required` may be a fn(form) so fields can react to other values (e.g.
@@ -193,7 +255,12 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     const label = body.name || body.code || 'Record';
     const onError = (e) => { setErr(e.message); toast(`Could not save — ${e.message}`, 'error'); };
     const onSuccess = () => { setEditing(null); toast(`${label} saved`); };
-    if (__new) create.mutate(body, { onSuccess, onError });
+    // "derived:" rows are ledgers the backend surfaces here for visibility (a party
+    // that only exists because a voucher referenced it) — they have no real master
+    // document to PUT to. Opening one through "Edit" must still CREATE the real
+    // record on save, or the backend 404s ("Cannot PUT .../derived:...").
+    const isDerived = !id || String(id).startsWith('derived:');
+    if (__new || isDerived) create.mutate(body, { onSuccess, onError });
     else update.mutate({ id, body }, { onSuccess, onError });
   };
 
@@ -425,22 +492,35 @@ export const CustomersMaster = ({ branch } = {}) => {
       // so values stay consistent with the rest of the ERP instead of free-typed text.
       { key: 'customerType', label: 'Customer Type', type: 'select', options: CUST_TYPES, table: false },
       { key: 'source', label: 'Source', type: 'select', options: CUST_SOURCES, table: false },
+      // Already stored on the model (used by the 12-tab master) but wasn't exposed here.
+      { key: 'accountManager', label: 'Key Account Manager', type: 'text', table: false },
       // Branch must be a real code (not a free-text/blank field) — a blank branch creates
       // an unscoped party. Scoped to the top-bar branch when one is selected.
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
-      { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
+      // GSTIN is only mandatory once the customer is GST-registered (Regular/Composition) —
+      // an Unregistered/SEZ/Overseas customer may have no GSTIN at all.
+      { key: 'gstin', label: 'GSTIN', type: 'text', table: false, required: (f) => /^Registered/.test(f.gstTreatment || '') },
       { key: 'pan', label: 'PAN', type: 'text', table: false },
       { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
       { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
+      // Some customers deduct TDS on what they pay us — flag it and capture the rate they
+      // deduct at (applied per invoice); leave blank/hidden when the customer doesn't deduct.
+      { key: 'isTdsDeducted', label: 'Is TDS Deducted (by Customer)', type: 'bool', default: false, table: false },
+      { key: 'tdsRate', label: 'TDS Rate (%) per Invoice', type: 'number', table: false, show: (f) => !!f.isTdsDeducted, required: (f) => !!f.isTdsDeducted },
       { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
       { key: 'address', label: 'Address', type: 'text', table: false },
+      // Country sits right below Address. Anything other than India → the customer is
+      // treated as overseas (GST Treatment auto-set to 'Overseas'), same country-driven
+      // logic as the Supplier master.
+      { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false,
+        onSet: (v, next) => { next.gstTreatment = (v && v !== 'India') ? 'Overseas' : (next.gstTreatment === 'Overseas' ? '' : next.gstTreatment); } },
       { key: 'city', label: 'City', type: 'text', table: false },
-      { key: 'phone', label: 'Phone', type: 'text' },
+      { key: 'phone', label: 'Phone', type: 'text', required: true },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
-      { key: 'email', label: 'Email', type: 'text', table: false },
+      { key: 'email', label: 'Email', type: 'text', table: false, required: true },
       { key: 'paymentTerms', label: 'Payment Terms', type: 'select', options: PAY_TERMS, table: false },
-      { key: 'creditLimit', label: 'Credit Limit', type: 'number' },
-      { key: 'creditDays', label: 'Credit Days', type: 'number' },
+      { key: 'creditLimit', label: 'Credit Limit', type: 'number', required: true },
+      { key: 'creditDays', label: 'Credit Time (Days)', type: 'number', required: true },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
   );
@@ -459,22 +539,37 @@ export const SuppliersMaster = ({ branch } = {}) => {
       // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
-      { key: 'pan', label: 'PAN', type: 'text', table: false },
+      // TDS is only actually deducted on some suppliers — flag it explicitly instead of
+      // inferring from tdsSection, and only then does PAN become mandatory (needed to
+      // deduct at the correct rate instead of the higher no-PAN default).
+      { key: 'isTdsDeducted', label: 'Is TDS Deducted', type: 'bool', default: false, table: false },
+      { key: 'pan', label: 'PAN', type: 'text', table: false, required: (f) => !!f.isTdsDeducted },
+      // Address line sits before Country/State (matches the physical order on the form).
+      { key: 'addressLine', label: 'Address Line', type: 'text', required: true, table: false },
       // Country '' (the default) is treated as India downstream but does NOT force a state;
       // picking India explicitly does (it decides CGST/SGST vs IGST) — the backend derives
-      // the state code from the chosen state name.
-      { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false },
-      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false },
+      // the state code from the chosen state name. Picking any other country auto-selects
+      // State = 'Others' (a foreign party has no Indian GST state, but State stays mandatory).
+      { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false, required: true,
+        onSet: (v, next) => { next.state = (v && v !== 'India') ? 'Others' : ''; } },
+      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false, required: true },
       { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
       { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
       { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },
-      { key: 'email', label: 'Email', type: 'text', table: false },
+      { key: 'email', label: 'Email', type: 'text', table: false, required: true },
       { key: 'city', label: 'City', type: 'text', table: false },
-      { key: 'settlementCycle', label: 'Settlement Cycle', type: 'select', options: SETTLE_CYCLES, table: false },
+      { key: 'settlementCycle', label: 'Settlement Cycle', type: 'select', options: SETTLE_CYCLES, table: false, required: true },
       { key: 'paymentMethod', label: 'Payment Method', type: 'select', options: PAY_METHODS, table: false },
-      { key: 'creditDays', label: 'Credit Days', type: 'number' },
+      { key: 'creditDays', label: 'Credit Period (Days)', type: 'number', required: true },
+      { key: 'creditLimit', label: 'Credit Limit', type: 'number', required: true },
+      // Bank details are only collected when the supplier opts in — three flat fields
+      // (mirrors the Ledger party's bankName/bankAcNo/bankIfsc), required only when shown.
+      { key: 'provideBankDetails', label: 'Provide Bank Details', type: 'bool', default: false, table: false },
+      { key: 'bankName', label: 'Bank Name', type: 'text', table: false, show: (f) => !!f.provideBankDetails, required: (f) => !!f.provideBankDetails },
+      { key: 'bankAcNo', label: 'Bank A/c No.', type: 'text', table: false, show: (f) => !!f.provideBankDetails, required: (f) => !!f.provideBankDetails },
+      { key: 'bankIfsc', label: 'Bank IFSC Code', type: 'text', table: false, show: (f) => !!f.provideBankDetails, required: (f) => !!f.provideBankDetails },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
   );
@@ -489,22 +584,36 @@ export const SuppliersMaster = ({ branch } = {}) => {
 const FACILITY_TYPES = ['Supplier Trade Credit', 'BSP-BG', 'Bank Card', 'Bank OD'];
 export const CreditFacilitiesMaster = ({ branch } = {}) => {
   const scope = partyScope(branchCode(branch));
+  // Drawdown Ledgers must pick from REAL Sundry Creditors (supplier) ledgers, not
+  // free-typed names — a facility can only ever roll up ledgers that actually exist,
+  // so a typo can't silently leave a ledger's drawn balance out of the limit check.
+  const ledgersQ = useMasterList('ledgers');
+  const supplierLedgerNames = (ledgersQ.data || [])
+    .filter((l) => /sundry\s+creditors/i.test(l.group || '') && scope.rowFilter(l))
+    .map((l) => l.name)
+    .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
   return (
   <MasterCrud title="Credit Facilities & Limits" subtitle="Supplier / BSP / card credit lines — drawn is read live from the ledgers" resource="credit-facilities"
     rowFilter={scope.rowFilter}
     fields={[
-      { key: 'name', label: 'Facility', type: 'text', required: true },
-      { key: 'counterparty', label: 'Counterparty', type: 'text' },
+      // Free text, no supplier master lookup — the facility is just a descriptive
+      // label (e.g. "Akbar Travels — Trade Credit"); the actual link to a supplier
+      // is the Drawdown Ledgers picker below (a real ledger picker, not this field).
+      { key: 'name', label: 'Facility', type: 'text', required: true, placeholder: 'e.g. Akbar Travels — Trade Credit' },
+      { key: 'counterparty', label: 'Counterparty', type: 'text', placeholder: 'e.g. Akbar Travels' },
       { key: 'type', label: 'Type', type: 'select', options: FACILITY_TYPES, default: 'Supplier Trade Credit' },
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       { key: 'currency', label: 'Currency', type: 'select', options: ['INR', 'USD'], default: 'INR', table: false },
       { key: 'limit', label: 'Limit', type: 'number' },
-      // Maps the facility to a supplier's ledger(s): one facility → many drawdown ledgers.
-      { key: 'drawdownLedgers', label: 'Drawdown Ledgers', type: 'tags' },
-      { key: 'secured', label: 'Secured (FD-backed)', type: 'bool', default: false, table: false },
-      { key: 'securityLedger', label: 'Security Ledger (FD)', type: 'text', table: false },
-      { key: 'securityAmount', label: 'Security / BG Amount', type: 'number', table: false },
-      { key: 'cycle', label: 'Settlement Cycle', type: 'text', table: false },
+      // Maps the facility to a supplier's ledger(s): one facility → many drawdown
+      // ledgers. Picked from the live Sundry Creditors ledger list (any supplier),
+      // never free-typed.
+      { key: 'drawdownLedgers', label: 'Drawdown Ledgers', type: 'multiselect', options: supplierLedgerNames, emptyLabel: 'No supplier ledgers found for this branch.' },
+      // Security is a Post-Dated Cheque, not an FD/BG — one Yes/No + one amount
+      // (was Secured/Security Ledger/Security-BG-Amount: three fields effectively
+      // asking for the security amount twice).
+      { key: 'pdcGiven', label: 'PDC Cheque Given?', type: 'bool', default: false, table: false },
+      { key: 'pdcAmount', label: 'PDC Amount', type: 'number', table: false, show: (f) => !!f.pdcGiven, required: (f) => !!f.pdcGiven },
       { key: 'reviewDate', label: 'Review Date', type: 'date', table: false },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />

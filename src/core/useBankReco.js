@@ -98,6 +98,15 @@ export function useBankReconAggregate(branch, { from, to } = {}) {
   };
 }
 
+// Manual "Re-fetch ERP Books" — forces the book/statement/summary/BRS queries to
+// reload from the live ledger. Use after correcting a voucher (esp. one fixed in
+// another tab/session, where this client never ran invalidateBooks). Returns a
+// stable callback that resolves once the active queries have refetched.
+export function useRefreshBankReco() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: ['bank-reco'] });
+}
+
 // Every mutation invalidates the whole 'bank-reco' tree so book + statement +
 // summary all re-fetch and stay consistent after any reconciliation action.
 function useReconMutation(mutationFn) {
@@ -116,6 +125,10 @@ export const useAutoMatch = () =>
 
 export const useManualMatch = () =>
   useReconMutation(({ id, ...body }) => apiPost(`/api/bank-reconciliation/match/${id}`, body));
+
+// N book legs → one statement line (a split in our books = one consolidated bank line).
+export const useGroupMatch = () =>
+  useReconMutation(({ id, books }) => apiPost(`/api/bank-reconciliation/match-group/${id}`, { books }));
 
 export const useUnmatch = () =>
   useReconMutation(({ id }) => apiPost(`/api/bank-reconciliation/unmatch/${id}`));
