@@ -193,8 +193,16 @@ export function inbDealStageEntries(legs = []) {
   }
   const out = [];
   for (const d of deals.values()) {
-    if (!d.anyPending) continue;
     const lead = d.sale || d.lead;
+    const raw = (lead && lead.status) || 'pending';
+    // Mirror the INB approvals tab's status bucketing so the funnel count matches it
+    // exactly (voucherApprovals mk()): a pending/unpushed lead is pending; an approved/
+    // saved lead is pending ONLY while a leg is still pending/unpushed (half-approved);
+    // a rejected/deleted/cancelled/pushed/posted lead is never pending.
+    const pending = (raw === 'pending' || raw === 'unpushed') ? true
+      : (raw === 'approved' || raw === 'saved') ? d.anyPending
+      : false;
+    if (!pending) continue;
     out.push({ id: lead.id || lead.vno, source: 'inb', reviewStage: lead.reviewStage || '', total: num(lead.total), date: lead.date });
   }
   return out;

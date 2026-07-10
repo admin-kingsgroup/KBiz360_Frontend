@@ -143,6 +143,22 @@ describe('inbDealStageEntries — INB deals folded in, ONE entry per deal', () =
     ];
     expect(inbDealStageEntries(legs)).toEqual([]);
   });
+  test('lead-driven bucketing mirrors the INB tab: a rejected sale is NOT pending even if a leg lingers', () => {
+    // Anomalous state — reject cascades to both legs in practice, but the funnel must
+    // bucket by the LEAD leg (like voucherApprovals mk()), not "any leg pending".
+    const legs = [
+      { vno: 'IS/R', category: 'sale', status: 'rejected', bookingId: 'INB/R/1', total: 30000, date: '2026-07-01' },
+      { vno: 'IP/R', category: 'purchase', status: 'pending', bookingId: 'INB/R/1', total: 29000, date: '2026-07-01' },
+    ];
+    expect(inbDealStageEntries(legs)).toEqual([]);
+  });
+  test('a pushed/posted deal (approved, no leg left pending) is not pending', () => {
+    const legs = [
+      { vno: 'IS/P', category: 'sale', status: 'approved', pushed: true, bookingId: 'INB/P/1', total: 40000 },
+      { vno: 'IP/P', category: 'purchase', status: 'approved', pushed: true, bookingId: 'INB/P/1', total: 39000 },
+    ];
+    expect(inbDealStageEntries(legs)).toEqual([]);
+  });
   test('migrated legs (per-leg Tally sourceRefs) pair on the sale againstPurchase', () => {
     const legs = [
       { vno: 'IS/9', category: 'sale', status: 'pending', againstPurchase: 'IP/9', total: 12000, date: '2026-07-02' },

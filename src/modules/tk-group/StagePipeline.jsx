@@ -42,7 +42,10 @@ export function StagePipeline() {
   const bq = useQueries({
     queries: view.map((b) => ({
       queryKey: ['tk', 'appr-stage', 'bkg', b.code],
-      queryFn: () => apiGet('/api/booking-orders', { branch: b.code }),
+      // status:'pending' slims the payload server-side — the funnel only counts pending,
+      // and every pending booking still carries its DTO reviewStage + so.total. (No
+      // ?fields= projection: that returns raw rows WITHOUT the computed reviewStage.)
+      queryFn: () => apiGet('/api/booking-orders', { branch: b.code, status: 'pending' }),
       staleTime: 30_000,
     })),
   });
