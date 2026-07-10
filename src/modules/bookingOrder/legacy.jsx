@@ -2226,6 +2226,13 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const onReview = makeBookingReview(qc, setBusyId, setMsg);
   const onReviewSelected = makeBookingReviewSelected(qc, setBusyId, setMsg, sel, setSel);
 
+  // Editing opens the FULL SO/PO/GP entry form (same as the Pending bookings page),
+  // not the compact PO-only modal — customer, SO, PO and sectors are all editable.
+  if (editing) {
+    return <SoPoGpVoucherEntry branch={branch} setRoute={setRoute} editBooking={editing}
+      onDone={() => { setEditing(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }} />;
+  }
+
   const tab = (k, label) => (
     <button key={k} onClick={() => setStatus(k)} className="max-tablet:min-h-[44px]" style={{ padding: '8px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `3px solid ${status === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? DARK : '#5b616e' }}>{label} <span style={{ fontSize: 11, color: '#9197a3' }}>({counts[k]})</span></button>
   );
@@ -2272,13 +2279,6 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
             <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onEditPO={onEditPO} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
             <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
           </>}
-      {/* Edit — a compact modal scoped to the Purchase Order fields only (fares,
-          Supplier Service Charge, Supp Comm/Inc Rcvd, TDS, sectors), not the full
-          SO/PO/GP entry page. Reuses SoPoGpVoucherEntry's own state/save logic. */}
-      {editing && (
-        <SoPoGpVoucherEntry poOnly branch={branch} setRoute={setRoute} editBooking={editing}
-          onDone={() => { setEditing(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }} />
-      )}
       {/* Approved tab's "Edit PO" — same compact modal, but autoApprove re-posts &
           re-approves on save so the booking stays Approved (never drops to Pending). */}
       {editingPO && (
