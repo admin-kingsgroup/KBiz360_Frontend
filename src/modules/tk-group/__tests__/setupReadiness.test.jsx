@@ -159,15 +159,23 @@ describe('TK setup readiness · module map (pure)', () => {
 
   test('openDevByModule: every dev item maps by module id; cleared items drop off', () => {
     const by = openDevByModule({});
-    // spot-check: the open (pending) CRM booking-bridge finding lands on booking-orders,
-    // while the LIVE 'SO/PO/GP booking' item is cleared and stays off the map.
-    const bookings = by['booking-orders'] || [];
-    expect(bookings.some((i) => i.name.startsWith('CRM → ERP booking bridge'))).toBe(true);
-    expect(bookings.some((i) => i.name.startsWith('SO/PO/GP booking'))).toBe(false);
+    // Registry-agnostic spot-checks (item statuses change as dev work lands):
+    // every OPEN (dev-pending) item with modules appears under each of its module
+    // ids; LIVE and DORMANT items never appear (live = cleared; dormant = a
+    // go-live switch, not dev work).
+    const isOpen = (i) => i.status !== 'live' && i.status !== 'dormant';
+    ALL_ITEMS.filter((i) => isOpen(i) && (i.modules || []).length).forEach((i) => {
+      i.modules.forEach((m) => expect((by[m] || []).map((x) => x.id)).toContain(i.id));
+    });
+    ALL_ITEMS.filter((i) => !isOpen(i) && (i.modules || []).length).forEach((i) => {
+      i.modules.forEach((m) => expect((by[m] || []).map((x) => x.id)).not.toContain(i.id));
+    });
     // marking an item done clears it from the map (same rule as Dev Control)
-    const item = ALL_ITEMS.find((i) => i.status !== 'live' && (i.modules || []).length);
-    const cleared = openDevByModule({ [item.id]: { status: 'done' } });
-    expect((cleared[item.modules[0]] || []).map((i) => i.id)).not.toContain(item.id);
+    const item = ALL_ITEMS.find((i) => isOpen(i) && (i.modules || []).length);
+    if (item) {
+      const cleared = openDevByModule({ [item.id]: { status: 'done' } });
+      expect((cleared[item.modules[0]] || []).map((i) => i.id)).not.toContain(item.id);
+    }
   });
 
   test('registry hygiene: every item declares modules[], ids match the backend tree', () => {

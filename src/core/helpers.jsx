@@ -285,13 +285,23 @@ export const _ADVANCES=[];
 export const _TICKET_CTRL=[];
 
 
-export const _MARKUP_RULES=[];
-
+const MARKUP_RULE_BLANK={client:"ALL B2C",type:"B2C",module:"Flight",markupType:"Percentage",value:12,floor:8,note:""};
 
 export function MarkupRateSheet({branch}){
-  const [rules,setRules]=useState(_MARKUP_RULES);
+  /* Live rule master (/api/markup-rules) — rules persist via the CRUD mutations and
+     feed the SO/PO/GP booking screen's markup prefill. editId null = Add Rule. */
+  const {data:rules=[]}=useMasterList('markup-rules');
+  const {create,update,remove}=useMasterMutations('markup-rules');
   const [modal,setModal]=useState(false);
-  const [form,setForm]=useState({client:"ALL B2C",type:"B2C",module:"Flight",markupType:"Percentage",value:12,floor:8,note:""});
+  const [editId,setEditId]=useState(null);
+  const [form,setForm]=useState(MARKUP_RULE_BLANK);
+  const openNew=()=>{setForm(MARKUP_RULE_BLANK);setEditId(null);setModal(true);};
+  const openEdit=(r)=>{setForm({client:r.client||"ALL",type:r.type||"ALL",module:r.module||"ALL",markupType:r.markupType||"Percentage",value:r.value??0,floor:r.floor??0,note:r.note||""});setEditId(r.id);setModal(true);};
+  const saveRule=()=>{
+    const body={...form,value:+form.value||0,floor:+form.floor||0};
+    const done={onSuccess:()=>{setModal(false);setEditId(null);setForm(MARKUP_RULE_BLANK);}};
+    editId?update.mutate({id:editId,body},done):create.mutate(body,done);
+  };
 
   /* GP floor alert checker */
   const alertCount=rules.filter(r=>r.floor>0&&r.value<r.floor).length;
@@ -308,7 +318,7 @@ export function MarkupRateSheet({branch}){
         </div>
         <div style={{display:"flex",gap:8}}>
           <HExportBtn name="other-taxes-rules" rows={rules} columns={[{key:"id",label:"ID"},{key:"client",label:"Client / Segment"},{key:"type",label:"Type"},{key:"module",label:"Module"},{key:"markupType",label:"Service Charge - 2 Type"},{key:"value",label:"Service Charge - 2 Value"},{key:"floor",label:"GP Floor %"},{key:"note",label:"Notes"}]}/>
-          <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Rule</button>
+          <button onClick={openNew} style={{...btnG,fontSize:11}}><Plus size={13}/> Add Rule</button>
         </div>
       </div>
 
@@ -325,7 +335,7 @@ export function MarkupRateSheet({branch}){
           </tr></thead>
           <tbody>{rules.map((r,i)=>(
             <tr key={r.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{r.id}</td>
+              <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{String(r.id||"").slice(-6).toUpperCase()}</td>
               <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{r.client}</td>
               <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{r.type}</span></td>
               <td style={{padding:"8px 12px",color:"#384677"}}>{r.module}</td>
@@ -334,7 +344,10 @@ export function MarkupRateSheet({branch}){
               <td style={{padding:"8px 12px",textAlign:"right",fontWeight:600,color:r.value<r.floor?"#A32D2D":"#5a6691"}}>{r.floor>0?`${r.floor}% min`:"None"}</td>
               <td style={{padding:"8px 12px"}}>{r.value<r.floor?<span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:"#FCEBEB",color:"#A32D2D",fontWeight:700}}>Below Floor!</span>:<span style={{color:"#27500A",fontSize:14}}>✔</span>}</td>
               <td style={{padding:"8px 12px",fontSize:10,color:"#5a6691"}}>{r.note}</td>
-              <td style={{padding:"8px 12px"}}><button onClick={()=>setRules(rs=>rs.filter(x=>x.id!==r.id))} style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D",fontSize:13}}>✕</button></td>
+              <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>
+                <button onClick={()=>openEdit(r)} title="Edit rule" style={{background:"transparent",border:"none",cursor:"pointer",color:"#185FA5",fontSize:13,marginRight:6}}>✎</button>
+                <button onClick={()=>remove.mutate(r.id)} title="Delete rule" style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D",fontSize:13}}>✕</button>
+              </td>
             </tr>
           ))}</tbody>
         </table>
@@ -343,17 +356,17 @@ export function MarkupRateSheet({branch}){
         <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
           <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
             <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
-              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Add Service Charge - 2 Rule</p>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>{editId?"Edit Service Charge - 2 Rule":"Add Service Charge - 2 Rule"}</p>
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FL label="Client / ALL B2B / ALL B2C"><input value={form.client} onChange={e=>setForm(f=>({...f,client:e.target.value}))} style={inp} placeholder="ALL B2C"/></FL>
-                <FL label="Type"><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inp}><option>B2B</option><option>B2C</option><option>B2E</option></select></FL>
+                <FL label="Type"><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inp}><option>ALL</option><option>B2B</option><option>B2C</option><option>B2E</option></select></FL>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FL label="Module"><select value={form.module} onChange={e=>setForm(f=>({...f,module:e.target.value}))} style={inp}>{["ALL","Flight","Holiday","Hotel","Car","Visa","Insurance","Misc"].map(m=><option key={m}>{m}</option>)}</select></FL>
-                <FL label="Service Charge - 2 type"><select value={form.markupType} onChange={e=>setForm(f=>({...f,markupType:e.target.value}))} style={inp}><option>Percentage</option><option>Fixed Fee</option></select></FL>
+                <FL label="Service Charge - 2 type"><select value={form.markupType} onChange={e=>setForm(f=>({...f,markupType:e.target.value}))} style={inp}><option>Percentage</option><option value="Flat">Fixed Fee</option></select></FL>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 <FL label={form.markupType==="Percentage"?"Service Charge - 2 %":"Fixed fee (₹)"}><input type="number" value={form.value} onChange={e=>setForm(f=>({...f,value:+e.target.value}))} style={inp}/></FL>
@@ -363,10 +376,7 @@ export function MarkupRateSheet({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={()=>{
-                const id=`MR${String(rules.length+1).padStart(3,"0")}`;
-                setRules(rs=>[...rs,{...form,id}]);setModal(false);
-              }} style={btnG}>💾 Save Rule</button>
+              <button onClick={saveRule} disabled={create.isPending||update.isPending} style={btnG}>💾 {create.isPending||update.isPending?"Saving…":"Save Rule"}</button>
             </div>
           </div>
         </div>
@@ -1040,24 +1050,42 @@ export function BudgetPlanning({branch}){
 
 /* ── INTERCOMPANY BILLING ────────────────────────────────────── */
 
+const SEAT_BLOCK_BLANK=()=>({flight:"",airline:"",route:"",date:todayISO(),dep:"",aircraft:"",status:"Open",classConfig:[{cls:"Economy",total:"",held:"",sold:""}]});
+
 export function SeatInventory({branch}){
   const mob=useMobile();
   const [search,setSearch]=useState("");
   const [date,setDate]=useState(todayISO());
-  const SEATS=[
-    {id:"SI001",flight:"AI-144",route:"BOM-DXB",date:"2026-06-15",aircraft:"B787",classConfig:[{cls:"Economy",total:250,held:18,sold:196,avail:36},{cls:"Business",total:30,held:2,sold:21,avail:7}],status:"Open",dep:"14:20"},
-    {id:"SI002",flight:"EK-506",route:"BOM-DXB",date:"2026-06-15",aircraft:"A380",classConfig:[{cls:"Economy",total:420,held:22,sold:398,avail:0},{cls:"Business",total:58,held:3,sold:45,avail:10},{cls:"First",total:14,held:0,sold:12,avail:2}],status:"Near Full",dep:"03:30"},
-    {id:"SI003",flight:"6E-1754",route:"BOM-DEL",date:"2026-06-15",aircraft:"A320",classConfig:[{cls:"Economy",total:186,held:8,sold:142,avail:36}],status:"Open",dep:"09:15"},
-    {id:"SI004",flight:"AI-101",route:"DEL-LHR",date:"2026-06-16",aircraft:"B777",classConfig:[{cls:"Economy",total:240,held:14,sold:220,avail:6},{cls:"Business",total:48,held:1,sold:40,avail:7}],status:"Open",dep:"01:45"},
-  ];
-  const filtered=SEATS.filter(s=>!search||(s.flight+s.route).toLowerCase().includes(search.toLowerCase()));
+  /* Live seat-block master (/api/seat-blocks). available is DERIVED per cabin
+     (total − held − sold, floored at 0) — never stored. editId null = new block. */
+  const {data:blocks=[]}=useMasterList('seat-blocks');
+  const {create,update}=useMasterMutations('seat-blocks');
+  const [modal,setModal]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const [form,setForm]=useState(SEAT_BLOCK_BLANK());
+  const setF=(p)=>setForm(f=>({...f,...p}));
+  const setCls=(i,key,val)=>setForm(f=>({...f,classConfig:f.classConfig.map((c,idx)=>idx===i?{...c,[key]:val}:c)}));
+  const addCls=()=>setForm(f=>({...f,classConfig:[...f.classConfig,{cls:"Business",total:"",held:"",sold:""}]}));
+  const delCls=(i)=>setForm(f=>({...f,classConfig:f.classConfig.length>1?f.classConfig.filter((_,idx)=>idx!==i):f.classConfig}));
+  const openNew=()=>{setForm(SEAT_BLOCK_BLANK());setEditId(null);setModal(true);};
+  const openEdit=(s)=>{setForm({flight:s.flight||"",airline:s.airline||"",route:s.route||"",date:s.date||todayISO(),dep:s.dep||"",aircraft:s.aircraft||"",status:s.status||"Open",classConfig:(s.classConfig||[]).length?s.classConfig.map(c=>({cls:c.cls||"",total:c.total??"",held:c.held??"",sold:c.sold??""})):[{cls:"Economy",total:"",held:"",sold:""}]});setEditId(s.id);setModal(true);};
+  const saveBlock=()=>{
+    if(!(form.flight||"").trim())return;
+    const body={flight:form.flight.trim().toUpperCase(),airline:form.airline.trim(),route:form.route.trim().toUpperCase(),date:form.date,dep:form.dep.trim(),aircraft:form.aircraft.trim(),status:form.status,
+      classConfig:form.classConfig.filter(c=>(c.cls||"").trim()).map(c=>({cls:c.cls.trim(),total:+c.total||0,held:+c.held||0,sold:+c.sold||0}))};
+    const done={onSuccess:()=>{setModal(false);setEditId(null);setForm(SEAT_BLOCK_BLANK());}};
+    editId?update.mutate({id:editId,body},done):create.mutate(body,done);
+  };
+  /* Release every held seat on a flight — a real write, not a stub button. */
+  const releaseHeld=(s)=>update.mutate({id:s.id,body:{classConfig:(s.classConfig||[]).map(({avail,...c})=>({...c,held:0}))}});
+  const SEATS=blocks.map(s=>({...s,classConfig:(s.classConfig||[]).map(c=>({...c,avail:Math.max(0,(+c.total||0)-(+c.held||0)-(+c.sold||0))}))}));
+  const filtered=SEATS.filter(s=>!search||((s.flight||"")+(s.route||"")).toLowerCase().includes(search.toLowerCase()));
   // Flatten the per-flight class config into one row per flight × cabin class for export.
   const seatRows=filtered.flatMap(s=>s.classConfig.map(c=>({flight:s.flight,route:s.route,date:s.date,dep:s.dep,aircraft:s.aircraft,status:s.status,cls:c.cls,total:c.total,sold:c.sold,held:c.held,avail:c.avail})));
   const STATUS_CLR={"Near Full":"#A32D2D",Open:"#27500A",Closed:"#5a6691"};
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1200,margin:"0 auto"}}>
-      <div role="note" style={{margin:"0 0 12px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Sample data — seat inventory isn’t wired to a live source yet.</div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💺</div>
@@ -1070,7 +1098,7 @@ export function SeatInventory({branch}){
           <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}/>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Flight / route..." style={{...inp,width:160,minHeight:32,fontSize:11}}/>
           <HExportBtn name="seat-inventory" rows={seatRows} columns={[{key:"flight",label:"Flight"},{key:"route",label:"Route"},{key:"date",label:"Date"},{key:"dep",label:"Departure"},{key:"aircraft",label:"Aircraft"},{key:"status",label:"Status"},{key:"cls",label:"Class"},{key:"total",label:"Total Seats"},{key:"sold",label:"Sold"},{key:"held",label:"Held"},{key:"avail",label:"Available"}]}/>
-          <button style={{...btnG,fontSize:11}}><Plus size={13}/> Reserve Seats</button>
+          <button onClick={openNew} style={{...btnG,fontSize:11}}><Plus size={13}/> Reserve Seats</button>
         </div>
       </div>
 
@@ -1089,15 +1117,15 @@ export function SeatInventory({branch}){
               </div>
             </div>
             <div style={{display:"flex",gap:6}}>
-              <button style={{...btnG,fontSize:10,padding:"4px 12px"}}>+ Reserve More</button>
-              <button style={{...btnGh,fontSize:10,padding:"4px 10px"}}>Release Held</button>
+              <button onClick={()=>openEdit(s)} style={{...btnG,fontSize:10,padding:"4px 12px"}}>✎ Edit / Reserve</button>
+              <button onClick={()=>releaseHeld(s)} disabled={update.isPending} style={{...btnGh,fontSize:10,padding:"4px 10px"}}>Release Held</button>
             </div>
           </div>
           {/* Class config */}
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
             {s.classConfig.map((cls,ci)=>{
-              const soldPct=Math.round(cls.sold/cls.total*100);
-              const heldPct=Math.round(cls.held/cls.total*100);
+              const soldPct=cls.total>0?Math.round(cls.sold/cls.total*100):0;
+              const heldPct=cls.total>0?Math.round(cls.held/cls.total*100):0;
               return(
                 <div key={cls.cls} style={{flex:1,minWidth:160,padding:"10px 12px",borderRadius:9,border:"1px solid #cdd1d8",background:"#fafafa"}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
@@ -1122,6 +1150,49 @@ export function SeatInventory({branch}){
           </div>
         </div>
       ))}
+
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>{editId?"Edit Seat Block":"Reserve Seats"}</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FL label="Flight No"><input value={form.flight} onChange={e=>setF({flight:e.target.value.toUpperCase()})} style={inp} placeholder="AI-144"/></FL>
+                <FL label="Airline"><input value={form.airline} onChange={e=>setF({airline:e.target.value})} style={inp} placeholder="Air India"/></FL>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                <FL label="Sector / Route"><input value={form.route} onChange={e=>setF({route:e.target.value.toUpperCase()})} style={inp} placeholder="BOM-DXB"/></FL>
+                <FL label="Travel date"><input type="date" value={form.date} onChange={e=>setF({date:e.target.value})} style={inp}/></FL>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
+                <FL label="Departure"><input value={form.dep} onChange={e=>setF({dep:e.target.value})} style={inp} placeholder="14:20"/></FL>
+                <FL label="Aircraft"><input value={form.aircraft} onChange={e=>setF({aircraft:e.target.value})} style={inp} placeholder="B787"/></FL>
+                <FL label="Status"><select value={form.status} onChange={e=>setF({status:e.target.value})} style={inp}><option>Open</option><option>Near Full</option><option>Closed</option></select></FL>
+              </div>
+              <div>
+                <p style={{margin:"0 0 6px",fontSize:10.5,fontWeight:700,color:"#5a6691"}}>Cabin blocks (available = blocked − held − sold)</p>
+                {form.classConfig.map((c,i)=>(
+                  <div key={i} style={{display:"grid",gridTemplateColumns:"1.4fr 1fr 1fr 1fr auto",gap:8,marginBottom:6,alignItems:"end"}}>
+                    <FL label={i===0?"Class":""}><select value={c.cls} onChange={e=>setCls(i,"cls",e.target.value)} style={inp}><option>Economy</option><option>Premium Economy</option><option>Business</option><option>First</option></select></FL>
+                    <FL label={i===0?"Blocked":""}><input type="number" min="0" value={c.total} onChange={e=>setCls(i,"total",e.target.value)} style={inp} placeholder="0"/></FL>
+                    <FL label={i===0?"Held":""}><input type="number" min="0" value={c.held} onChange={e=>setCls(i,"held",e.target.value)} style={inp} placeholder="0"/></FL>
+                    <FL label={i===0?"Sold":""}><input type="number" min="0" value={c.sold} onChange={e=>setCls(i,"sold",e.target.value)} style={inp} placeholder="0"/></FL>
+                    <button onClick={()=>delCls(i)} title="Remove cabin" style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D",fontSize:13,paddingBottom:8}}>✕</button>
+                  </div>
+                ))}
+                <button onClick={addCls} style={{...btnGh,fontSize:10,padding:"4px 10px"}}>+ Add cabin</button>
+              </div>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
+              <button onClick={saveBlock} disabled={create.isPending||update.isPending} style={btnG}>💾 {create.isPending||update.isPending?"Saving…":editId?"Save Block":"Reserve Seats"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1219,17 +1290,45 @@ export const FIXED_ASSETS_DATA = [];
 export const VENDOR_ADVANCES_DATA = [];
 
 
-export const FX_REVAL_DATA = [];
-
-
+/* ── FX REVALUATION — LIVE (2026-07-10) ─────────────────────────────
+   Per-CURRENCY revaluation of the consolidated foreign exposure against the
+   LAST revaluation's rates (branch books are single-currency, so ledger-level
+   FCY revaluation doesn't exist here). "Post Revaluation JV" creates ONE
+   PENDING journal voucher in the HO (BOM) books via
+   POST /api/accounting/fx-revaluation — it posts only when approved.
+   First run per currency establishes the baseline (records rates, no JV). */
 export function FxRevaluation({branch,setRoute}){
   const mob=useMobile();
-  const cfg=bc(branch);
-  const cur=cfg.cur;
-  const brCode=branch==="ALL"?null:branch?.code;
+  const cur="₹"; // the revaluation JV + INR equivalents live in the HO (INR) books
   const [period,setPeriod]=useState(CUR_MONTH);
+  const [data,setData]=useState(null);
+  const [err,setErr]=useState("");
+  const [posting,setPosting]=useState(false);
 
-  const rows=FX_REVAL_DATA.filter(r=>!brCode||r.branch===brCode);
+  const load=async(p)=>{
+    setErr("");
+    try{ const { apiGet } = await import('./api'); setData(await apiGet('/api/accounting/fx-revaluation',{period:p})); }
+    catch(e){ setErr(e?.message||"Failed to load FX revaluation"); }
+  };
+  useEffect(()=>{ load(period); },[period]);
+
+  const postJv=async()=>{
+    setPosting(true); setErr("");
+    try{
+      const { apiPost } = await import('./api');
+      const res=await apiPost('/api/accounting/fx-revaluation',{period});
+      setData(res);
+      toast(res?.record?.voucherVno ? `Revaluation JV ${res.record.voucherVno} created (pending approval).` : `Baseline rates recorded for ${period} — no JV needed.`);
+    }catch(e){ setErr(e?.message||"Post failed"); }
+    finally{ setPosting(false); }
+  };
+
+  const rows=(data?.rows||[]).map(r=>({
+    ledger:`Net ${r.currency} exposure (${(r.branches||[]).join(", ")})`,
+    branch:(r.branches||[]).join("/"), ccy:r.currency, origAmt:r.netExposure,
+    bookRate:r.baselineRate, monthEndRate:r.currentRate,
+    bookValue:r.bookValue??0, revalued:r.revalued, fxGain:r.delta||0,
+  }));
   const totGain=rows.reduce((s,r)=>s+(r.fxGain>0?r.fxGain:0),0);
   const totLoss=rows.reduce((s,r)=>s+(r.fxGain<0?Math.abs(r.fxGain):0),0);
   const net=totGain-totLoss;
@@ -1247,9 +1346,29 @@ export function FxRevaluation({branch,setRoute}){
           <select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11.5}}>
             {MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
-          <button style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>📒 Post Revaluation JV</button>
+          <button onClick={postJv} disabled={posting||!data||data.alreadyPosted||!rows.length}
+            style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:posting||!data||data?.alreadyPosted||!rows.length?"not-allowed":"pointer",opacity:posting||!data||data?.alreadyPosted||!rows.length?0.5:1}}>
+            📒 {posting?"Posting…":data?.alreadyPosted?"Already posted":data?.baseline?"Record Baseline Rates":"Post Revaluation JV"}
+          </button>
         </div>
       </div>
+
+      {err&&<div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:11,color:"#A32D2D",fontWeight:600}}>{err}</div>}
+      {data?.alreadyPosted&&(
+        <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#E9F3E4",border:"1px solid #BFDDB0",fontSize:11,color:"#27500A"}}>
+          ✔ {period} revaluation posted{data.record?.voucherVno?<> — JV <b>{data.record.voucherVno}</b> (approve it in Voucher Approvals to hit the books)</>:" as the rate baseline (no JV needed)"}. Posted by {data.record?.postedBy||"—"}.
+        </div>
+      )}
+      {!data?.alreadyPosted&&data?.baseline&&(
+        <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B9D9F5",fontSize:11,color:"#185FA5"}}>
+          First revaluation — this run records today's rates as the baseline; the next period's run posts the movement as a JV.
+        </div>
+      )}
+      {(data?.missingRates||[]).length>0&&(
+        <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FFF8E1",border:"1px solid #F1E3B0",fontSize:11,color:"#854F0B"}}>
+          ⚠ No INR rate on file for: {data.missingRates.join(", ")} — add it under Masters ▸ Forex Rates to include that currency.
+        </div>
+      )}
 
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
         <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Unrealised Gain</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{cur+fmt(totGain)}</p></div>
@@ -1273,9 +1392,9 @@ export function FxRevaluation({branch,setRoute}){
                   <td style={{padding:"7px 8px",fontWeight:600}}>{r.ledger}<div style={{fontSize:9.5,color:"#5a6691",fontWeight:400}}>{r.branch}</div></td>
                   <td style={{padding:"7px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:"#E6F1FB",color:"#185FA5"}}>{r.ccy}</span></td>
                   <td style={{padding:"7px 8px",textAlign:"right"}}>{fmt(r.origAmt)}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right",fontSize:10,color:"#5a6691"}}>{r.bookRate.toFixed(2)}</td>
+                  <td style={{padding:"7px 8px",textAlign:"right",fontSize:10,color:"#5a6691"}}>{r.bookRate==null?"— (baseline)":r.bookRate.toFixed(2)}</td>
                   <td style={{padding:"7px 8px",textAlign:"right",fontSize:10,color:"#854F0B",fontWeight:600}}>{r.monthEndRate.toFixed(2)}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(r.bookValue)}</td>
+                  <td style={{padding:"7px 8px",textAlign:"right"}}>{r.bookRate==null?"—":cur+fmt(r.bookValue)}</td>
                   <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(r.revalued)}</td>
                   <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:r.fxGain>0?"#27500A":"#A32D2D"}}>{r.fxGain>0?"+":""}{cur+fmt(r.fxGain)}</td>
                 </tr>
@@ -1290,7 +1409,8 @@ export function FxRevaluation({branch,setRoute}){
       </div>
 
       <p style={{marginTop:14,fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>
-        💡 Posts JV: Dr/Cr Exchange Rate Difference vs each foreign-currency ledger. Reverses on next period close (AS 11).
+        💡 Posts ONE pending JV in the HO (BOM) books: FX Revaluation Adjustment ↔ Foreign Currency Translation Reserve (FCTR — equity,
+        never P&L, per AS 11/Ind AS 21 translation). Each period's JV is the movement since the last revaluation, so no reversal entry is needed.
       </p>
     </div>
   );

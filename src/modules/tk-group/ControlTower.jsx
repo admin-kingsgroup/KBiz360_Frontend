@@ -17,7 +17,7 @@ import { ScrutinyTrend } from './ScrutinyTrend';
 // clearing rule (registry row live, or tracked done/won't-do). Fixing an item in
 // /dev/control clears its finding here automatically; the shared react-query key
 // ['dev-control','status'] keeps both screens on one cache.
-import { ALL_ITEMS as DEV_ITEMS, STATUS_META as DEV_STATUS_META, moduleRollup, VERDICT_META, isCleared as devCleared } from '../devControl/registry';
+import { ALL_ITEMS as DEV_ITEMS, STATUS_META as DEV_STATUS_META, moduleRollup, VERDICT_META, isDevPending, isCleared as devCleared, isDormant as devDormant } from '../devControl/registry';
 
 // ─── TK GROUP · FE · Control Tower (container) ───────────────────────────────
 // "Is the control layer healthy?" — split into SECTIONS via a tab bar (the same
@@ -47,8 +47,11 @@ function useDevFindings() {
   });
   const trackMap = {};
   (trackQ.data || []).forEach((r) => { trackMap[r.itemId] = r; });
-  const open = DEV_ITEMS.filter((i) => !devCleared(i, trackMap[i.id]));
-  return { open, trackMap, isLoading: trackQ.isLoading };
+  // Dormant = built + intentionally OFF until go-live — not developer work,
+  // so it is surfaced separately, never as an open finding.
+  const open = DEV_ITEMS.filter((i) => isDevPending(i, trackMap[i.id]));
+  const dormant = DEV_ITEMS.filter((i) => !devCleared(i, trackMap[i.id]) && devDormant(i));
+  return { open, dormant, trackMap, isLoading: trackQ.isLoading };
 }
 
 const EVENT_COLS = [
@@ -165,14 +168,13 @@ function Overview({ focus, goTab }) {
 
 // ── Development lens card (Overview) — is dev work blocking the ERP? ──
 function DevLensCard({ goTab }) {
-  const { open } = useDevFindings();
+  const { open, dormant } = useDevFindings();
   const broken = open.filter((i) => i.status === 'stub' || i.status === 'pending').length;
   const gaps = open.filter((i) => i.status === 'partial' || i.status === 'audit').length;
-  const dormant = open.filter((i) => i.status === 'dormant').length;
   return (
     <LensCard title="Development" onOpen={() => goTab('dev')}
-      chart={<div className="w-[130px]"><StackedBar segments={[{ value: broken, color: SEM.err }, { value: gaps, color: SEM.warn }, { value: dormant, color: SEM.info }]} /></div>}
-      legend={<Legend items={[{ label: 'Not working', value: broken, color: SEM.err }, { label: 'Working, gaps', value: gaps, color: SEM.warn }, { label: 'Dormant by design', value: dormant, color: SEM.info }]} />}
+      chart={<div className="w-[130px]"><StackedBar segments={[{ value: broken, color: SEM.err }, { value: gaps, color: SEM.warn }, { value: dormant.length, color: SEM.info }]} /></div>}
+      legend={<Legend items={[{ label: 'Not working', value: broken, color: SEM.err }, { label: 'Working, gaps', value: gaps, color: SEM.warn }, { label: 'Dormant by design', value: dormant.length, color: SEM.info }]} />}
       foot={<><span className="text-ink-subtle">from the developer registry</span><Badge tone={broken ? 'danger' : open.length ? 'warning' : 'success'} size="sm">{open.length ? `${open.length} findings open` : 'clear'}</Badge></>} />
   );
 }
@@ -193,9 +195,10 @@ const DEV_COLS = [
 ];
 
 function DevelopmentLens({ setRoute }) {
-  const { open, trackMap, isLoading } = useDevFindings();
+  const { open, dormant, trackMap, isLoading } = useDevFindings();
   const rollup = moduleRollup(trackMap);
   const rows = open.map((i) => ({ ...i, _tracked: trackMap[i.id] }));
+  const dormantRows = dormant.map((i) => ({ ...i, _tracked: trackMap[i.id] }));
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
@@ -238,6 +241,18 @@ function DevelopmentLens({ setRoute }) {
         showDensityToggle={false}
         zebra
       />
+
+      {dormantRows.length > 0 && (
+        <DataTable
+          title={`Dormant by design — built, switched off until go-live (${dormantRows.length})`}
+          columns={DEV_COLS}
+          rows={dormantRows}
+          getRowKey={(r) => r.id}
+          emptyMessage="Nothing dormant."
+          showDensityToggle={false}
+          zebra
+        />
+      )}
     </div>
   );
 }

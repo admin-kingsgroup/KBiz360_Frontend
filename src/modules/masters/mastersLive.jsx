@@ -8,7 +8,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, Download, Printer } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Printer, Ban, RotateCcw } from 'lucide-react';
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import {
   SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
@@ -203,6 +203,26 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     remove.mutate(r.id, { onSuccess: () => toast(`${r.name || 'Record'} deleted`), onError: (e) => toast(`Could not delete — ${e.message}`, 'error') });
   };
 
+  // Safe alternative to delete, offered on every master that carries an `active`
+  // flag: the record keeps its history/postings but is marked Inactive (and, where
+  // the backend filters — ledgers, cost centres — leaves the pickers). Reversible.
+  const hasActive = fields.some((f) => f.key === 'active');
+  const toggleActive = async (r) => {
+    const makeActive = r.active === false;
+    if (!makeActive) {
+      const { confirmed } = await confirmDialog({
+        title: `Deactivate "${r.name}"?`,
+        message: 'The record is kept with its full history but stops being offered for new entries. You can reactivate it any time.',
+        confirmLabel: 'Deactivate',
+      });
+      if (!confirmed) return;
+    }
+    update.mutate({ id: r.id, body: { active: makeActive } }, {
+      onSuccess: () => toast(`${r.name || 'Record'} ${makeActive ? 'reactivated' : 'deactivated'}`),
+      onError: (e) => toast(`Could not ${makeActive ? 'reactivate' : 'deactivate'} — ${e.message}`, 'error'),
+    });
+  };
+
   // Export every record (all fields, not just the table-visible ones) to Excel.
   // bool → Yes/No, tags → comma-joined, so the sheet stays human-readable.
   const exportSheet = () => {
@@ -258,6 +278,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     // A wired/system ledger (locked) carries the `~*` marker on its name — ~ = engine-
     // wired, * = non-editable/non-deletable (changed only in the database).
     if (f.key === 'name' && r.locked) return (<>{v || '—'} <span title="Wired ledger — locked; editable only directly in the database" style={{ color: '#dc2626', fontWeight: 800, fontSize: 11 }}>~*</span></>);
+    if (f.key === 'name' && r.active === false) return (<>{v || '—'} <span style={{ marginLeft: 6, padding: '1px 7px', borderRadius: 999, background: '#f3f4f8', color: '#5b616e', fontSize: 9.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Inactive</span></>);
     return v || '—';
   };
 
@@ -296,13 +317,16 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
                 // rowStyle lets a view emphasize certain rows (e.g. a tinted,
                 // bold band on each primary Tally group). Cell weight inherits
                 // from the row so a bold rowStyle cascades to the text.
-                <tr key={r.id} style={{ borderBottom: '1px solid #dfe2e7', ...(rowStyle ? rowStyle(r) : null) }}>
+                <tr key={r.id} style={{ borderBottom: '1px solid #dfe2e7', ...(r.active === false ? { opacity: 0.6 } : null), ...(rowStyle ? rowStyle(r) : null) }}>
                   {cols.map((f) => <td key={f.key} style={{ padding: '9px 13px', textAlign: f.type === 'number' ? 'right' : 'left', color: '#334155', fontWeight: f.key === 'name' ? 700 : 'inherit' }}>{cell(r, f)}</td>)}
                   <td style={{ padding: '9px 13px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {readOnly || (lockedRow && lockedRow(r))
                       ? <span title="Locked" style={{ color: '#c2c8d6', fontSize: 13 }}>🔒</span>
                       : (<>
                           <button onClick={() => openEdit(r)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 4 }}><Pencil size={14} /></button>
+                          {hasActive && (r.active === false
+                            ? <button onClick={() => toggleActive(r)} title="Reactivate" style={{ background: 'none', border: 'none', cursor: 'pointer', color: GREEN, padding: 4 }}><RotateCcw size={14} /></button>
+                            : <button onClick={() => toggleActive(r)} title="Deactivate — keeps the record and its history; use instead of Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', padding: 4 }}><Ban size={14} /></button>)}
                           <button onClick={() => del(r)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, padding: 4 }}><Trash2 size={14} /></button>
                         </>)}
                   </td>
@@ -417,6 +441,7 @@ export const CustomersMaster = ({ branch } = {}) => {
       { key: 'paymentTerms', label: 'Payment Terms', type: 'select', options: PAY_TERMS, table: false },
       { key: 'creditLimit', label: 'Credit Limit', type: 'number' },
       { key: 'creditDays', label: 'Credit Days', type: 'number' },
+      { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />
   );
 };

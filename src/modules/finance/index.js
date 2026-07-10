@@ -14,12 +14,16 @@
      3. delete the dead component from `legacy.jsx`
    ──────────────────────────────────────────────────────────────────── */
 
-// Not-yet-migrated screens (BankReco, DayBook, LedgerAc, …) + shared exports
-// such as TDS_SECTIONS. Explicit named re-exports below take precedence.
+// Not-yet-migrated screens (BankReco, CashFlowForecast, YearEndClose, …) +
+// shared exports such as TDS_SECTIONS. Explicit named re-exports below take
+// precedence. The dead legacy reports (DayBook, LedgerAc, TrialBalanceLegacy,
+// AdvanceDepositLedger, CashBookReport) were DELETED 2026-07-10 — live
+// replacements are in modules/accountingLive.
 export * from './legacy';
 
 // ── Migrated → live, feature-folder, DataTable-based ────────────────────────
 export { TrialBalancePage as TrialBalance } from './pages/trial-balance';
+export { YearEndClosePage as YearEndClose } from './pages/year-end-close';
 
 // Declarative route table consumed by the incremental react-router host.
 export { financeRoutes } from './routes';

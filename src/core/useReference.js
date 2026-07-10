@@ -27,7 +27,7 @@ export const useExpenseBudgets  = (params = {}) => refQuery('expense-budgets', '
 export const useTaxCalendar     = () => refQuery('tax-calendar', '/api/tax-calendar', REF);
 export const useAssetCategories = () => refQuery('asset-categories', '/api/asset-categories', REF);
 export const useApprovalRules   = () => refQuery('approval-rules', '/api/approval-rules', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.ruleId })) });
-export const useApprovalLimits  = () => refQuery('approval-limits', '/api/approval-limits', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.alId })) });
+export const useApprovalLimits  = () => refQuery('approval-limits', '/api/approval-limits', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, dbId: r.id, id: r.alId })) });
 export const useDocumentTypes   = () => refQuery('document-types', '/api/document-types', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.dtId })) });
 // dbId keeps the Mongo id the CRUD routes key on (PUT/DELETE /:id) — `id` is
 // remapped to the display code (etId/cfId) for the legacy screen shapes.

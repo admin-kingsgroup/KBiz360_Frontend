@@ -37,3 +37,8 @@ export { ScheduleIIIBS } from './pages/schedule-iii-bs';
 export { ReportExpenseBgt } from './pages/expense-budget';
 export { MisReport } from './pages/mis-report';
 export { ReportGP } from './pages/gp-report';
+
+// ── Report Tools — live (backend: /api/report-views + /api/report-schedules) ─
+export { CustomReportBuilder } from './pages/report-builder';
+export { SavedReportViews } from './pages/saved-views';
+export { ScheduledReports } from './pages/scheduled-reports';

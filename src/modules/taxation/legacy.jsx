@@ -7,13 +7,14 @@ import React, { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Calendar, ChevronDown, Download, Plus, Settings, Users } from 'lucide-react';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
-import { useGpBills, useRcmLiability } from '../../core/useAccounting';
+import { useGpBills, useRcmLiability, useProfitAndLoss, useTaxSummary, useConfigValue, useSaveConfigValue } from '../../core/useAccounting';
 import { useTaxCalendar } from '../../core/useReference';
 import { useMasterMutations } from '../../core/useMasters';
 import { toast } from '../../core/ux/toast';
-import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, rangeNote } from '../../core/dates';
+import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, fyRange, rangeNote } from '../../core/dates';
 import { fmt, fmtINR } from '../../core/format';
-import { FORM16A_DATA, _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../../core/helpers';
+import { _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../../core/helpers';
+import { useTdsLedgerStatements, tdsAccrualEntries, tdsReliefTotal, taxableOf, gstOf, saleBills, fyQuarterOfISO } from './taxLive';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { clickable } from '../../core/ux/clickable';
@@ -390,36 +391,60 @@ export function TaxVat({branch}){
   );
 }
 
-export function TaxEInvoice(){
-  const EINV_D=[]; // TODO: wire up live e-invoice / IRN rows; empty until the data source exists
+// GSP/IRP integration is blocked on a provider contract — the register below is
+// LIVE (every posted GST sale invoice from gp-bills is an e-invoice candidate),
+// but IRN generation stays disabled until credentials exist.
+const GSP_NOTE = 'Awaiting GSP/IRP provider credentials — configure under Settings ▸ GSP-IRP';
+
+export function TaxEInvoice({branch}){
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills) — same source as GSTR-1
+  const bills=saleBills(GP,brCode,{from:`${period}-01`,to:`${period}-31`});
+  const totTaxable=bills.reduce((s,b)=>s+taxableOf(b),0);
+  const totGST=bills.reduce((s,b)=>s+gstOf(b),0);
+  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   return (
-    <TaxShell title="E-Invoice &amp; IRN Log" subtitle="Invoice Reference Numbers · May 2026">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        <div style={{background:"#f3f4f8",borderRadius:9,padding:"9px 13px"}}><p style={{margin:0,fontSize:9.5,color:"#384677",fontWeight:600,textTransform:"uppercase"}}>Total invoices</p><p style={{margin:"2px 0 0",fontSize:16,fontWeight:700,color:"#384677"}}>{EINV_D.length}</p></div>
-          <div style={{background:"#EAF3DE",borderRadius:9,padding:"9px 13px"}}><p style={{margin:0,fontSize:9.5,color:"#27500A",fontWeight:600,textTransform:"uppercase"}}>IRN generated</p><p style={{margin:"2px 0 0",fontSize:16,fontWeight:700,color:"#27500A"}}>{EINV_D.filter(r=>r.status==="Generated").length}</p></div>
-          <div style={{background:"#FAEEDA",borderRadius:9,padding:"9px 13px"}}><p style={{margin:0,fontSize:9.5,color:"#854F0B",fontWeight:600,textTransform:"uppercase"}}>Pending IRN</p><p style={{margin:"2px 0 0",fontSize:16,fontWeight:700,color:"#854F0B"}}>{EINV_D.filter(r=>r.status==="Pending").length}</p></div>
+    <TaxShell title="E-Invoice &amp; IRN Log" subtitle={`${brCode||"All branches"} · ${monthLabel(period)} · live sale invoices from the books`}
+      action={<div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
+          {MONTH_OPTIONS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
+        </select>
+        <button disabled title={GSP_NOTE} aria-disabled="true" style={{...btnG,fontSize:11,opacity:0.5,cursor:"not-allowed"}}>⚡ Generate IRN</button>
+      </div>}>
+      <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600}}>
+        🔌 {GSP_NOTE}. The invoices below are live from the books — IRN &amp; Ack. numbers fill in once the provider is connected.
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
+        <div style={{background:"#f3f4f8",borderRadius:9,padding:"9px 13px"}}><p style={{margin:0,fontSize:9.5,color:"#384677",fontWeight:600,textTransform:"uppercase"}}>E-invoice candidates</p><p style={{margin:"2px 0 0",fontSize:16,fontWeight:700,color:"#384677"}}>{bills.length}</p></div>
+        <div style={{background:"#E6F1FB",borderRadius:9,padding:"9px 13px"}}><p style={{margin:0,fontSize:9.5,color:"#185FA5",fontWeight:600,textTransform:"uppercase"}}>Taxable value</p><p style={{margin:"2px 0 0",fontSize:16,fontWeight:700,color:"#185FA5"}}>{f(totTaxable)}</p></div>
+        <div style={{background:"#FCEBEB",borderRadius:9,padding:"9px 13px"}}><p style={{margin:0,fontSize:9.5,color:"#A32D2D",fontWeight:600,textTransform:"uppercase"}}>GST</p><p style={{margin:"2px 0 0",fontSize:16,fontWeight:700,color:"#A32D2D"}}>{f(totGST)}</p></div>
+        <div style={{background:"#FAEEDA",borderRadius:9,padding:"9px 13px"}}><p style={{margin:0,fontSize:9.5,color:"#854F0B",fontWeight:600,textTransform:"uppercase"}}>IRN generated</p><p style={{margin:"2px 0 0",fontSize:16,fontWeight:700,color:"#854F0B"}}>0 <span style={{fontSize:9,fontWeight:600}}>· awaiting GSP</span></p></div>
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",fontSize:11.5,borderCollapse:"collapse"}}>
             <thead><tr style={{background:"#f3f4f8",borderBottom:"2px solid #cdd1d8"}}>
-              {["Date","Voucher no.","Party","Amount ₹","IRN (truncated)","Ack. no.","Status"].map((h,i)=>(
-                <th key={i} style={{textAlign:i===3?"right":"left",padding:"9px 11px",fontWeight:600,color:"#384677",fontSize:11}}>{h}</th>
+              {["Date","Invoice / file no.","Party","GSTIN","Module","Taxable ₹","GST ₹","IRN","Status"].map((h,i)=>(
+                <th key={i} style={{textAlign:i===5||i===6?"right":"left",padding:"9px 11px",fontWeight:600,color:"#384677",fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{EINV_D.map((r,i)=>(
-              <tr key={i} style={{borderBottom:"1px solid #cdd1d8"}}
-                onMouseEnter={e=>e.currentTarget.style.background="#f9fafb"}
-                onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                <td style={{padding:"9px 11px",color:"#5a6691"}}>{r.date}</td>
-                <td style={{padding:"9px 11px",fontFamily:"monospace",fontSize:11,color:"#185FA5"}}>{r.vno}</td>
-                <td style={{padding:"9px 11px",fontWeight:500}}>{r.party}</td>
-                <td style={{padding:"9px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fmt(r.amt)}</td>
-                <td style={{padding:"9px 11px",fontFamily:"monospace",fontSize:10,color:"#5a6691",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.irn||"—"}</td>
-                <td style={{padding:"9px 11px",fontFamily:"monospace",fontSize:11,color:"#5a6691"}}>{r.ack||"—"}</td>
-                <td style={{padding:"9px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,background:r.status==="Generated"?"#EAF3DE":"#FAEEDA",color:r.status==="Generated"?"#27500A":"#854F0B",fontWeight:600}}>{r.status}</span></td>
-              </tr>
-            ))}</tbody>
+            <tbody>
+              {bills.length===0&&<tr><td colSpan={9} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No posted sale invoices for {monthLabel(period)} — e-invoice candidates appear here as sales are booked.</td></tr>}
+              {bills.map((b,i)=>(
+                <tr key={b.id+i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
+                  <td style={{padding:"8px 11px",color:"#5a6691",whiteSpace:"nowrap"}}>{b.date}</td>
+                  <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10.5,color:"#185FA5"}}>{b.id}</td>
+                  <td style={{padding:"8px 11px",fontWeight:600,color:"#0d1326"}}>{b.client}</td>
+                  <td style={{padding:"8px 11px",color:"#8b94b3",fontSize:10}} title="Party GSTIN is not captured in the customer master yet">—</td>
+                  <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{b.mod}</span></td>
+                  <td style={{padding:"8px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(taxableOf(b))}</td>
+                  <td style={{padding:"8px 11px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{f(gstOf(b))}</td>
+                  <td style={{padding:"8px 11px",fontSize:10,color:"#8b94b3",whiteSpace:"nowrap"}}>— awaiting GSP provider</td>
+                  <td style={{padding:"8px 11px"}}><span title={GSP_NOTE} style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,background:"#f3f4f8",color:"#5a6691",fontWeight:700}}>Not generated</span></td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       </div>
@@ -925,14 +950,29 @@ export function TaxTdsTcs({branch}){
    SALES HOLIDAY — ENHANCED with GST scheme + component breakout
    ════════════════════════════════════════════════════════════════ */
 
+/* Form 26AS — TDS-receivable view, LIVE from the books: the TDS Receivable
+   chart ledgers' Dr accruals (a customer/supplier withheld tax on us), grouped
+   by deductor × section. The 26AS side itself lives on TRACES and is NOT in the
+   system — that column stays honestly blank until a 26AS import exists (same
+   stance as the GSTR-2B reconciliation). */
 export function Form26AS({branch}){
-  const mob=useMobile();
+  const brCode=branch==="ALL"?null:(branch?.code||null);
   const [fy,setFy]=useState(CUR_FY.label);
-  const [quarter,setQuarter]=useState("Q4");
-  // Form 26AS reconciliation — no bundled demo data (fed from TDS data later).
-  const TWENTYSIX_DATA=[];
-  const filtered=TWENTYSIX_DATA.filter(r=>r.quarter===quarter);
-  const mismatches=filtered.filter(r=>r.status!=="Matched");
+  const [quarter,setQuarter]=useState("ALL");
+  const {from,to}=fyRange(fy);
+
+  const q=useTdsLedgerStatements('receivable',branch,{from,to});
+  const statements=q.data?.statements||[];
+  const all=tdsAccrualEntries(statements,'Dr');
+  const entries=all.filter(e=>quarter==="ALL"||e.quarter===quarter);
+  const claimed=tdsReliefTotal(statements,'Dr'); // FY claims / adjustments (Cr side)
+
+  const rows=[...entries.reduce((m,e)=>{
+    const k=e.party+"|"+e.section;
+    if(!m.has(k))m.set(k,{party:e.party,section:e.section,count:0,books:0,quarters:new Set()});
+    const r=m.get(k);r.count++;r.books+=e.amount;r.quarters.add(e.quarter);return m;
+  },new Map()).values()].sort((a,b)=>b.books-a.books);
+  const totBooks=rows.reduce((s,r)=>s+r.books,0);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return(
@@ -942,50 +982,64 @@ export function Form26AS({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📑</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Form 26AS Reconciliation</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>FY {fy} · {quarter} · Match TDS credits with books · {mismatches.length} mismatches</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · FY {fy} · {quarter==="ALL"?"all quarters":quarter} · TDS credits per the books (TDS Receivable ledgers)</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <select value={quarter} onChange={e=>setQuarter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
-            {["Q1","Q2","Q3","Q4"].map(q=><option key={q}>{q}</option>)}
+          <select value={fy} onChange={e=>setFy(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
+            {fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
-          <button style={{...btnG,fontSize:11}}><Download size={12}/> Download 26AS</button>
+          <select value={quarter} onChange={e=>setQuarter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
+            {["ALL","Q1","Q2","Q3","Q4"].map(qq=><option key={qq} value={qq}>{qq==="ALL"?"All quarters":qq}</option>)}
+          </select>
+          <a href="https://www.tdscpc.gov.in/" target="_blank" rel="noreferrer" style={{...btnG,fontSize:11,display:"inline-flex",alignItems:"center",gap:5,textDecoration:"none"}}><Download size={12}/> Get 26AS (TRACES)</a>
         </div>
       </div>
 
-      {mismatches.length>0&&<div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:10.5,color:"#A32D2D",fontWeight:600,display:"flex",gap:8}}>
-        <AlertTriangle size={14}/> {mismatches.length} mismatch{mismatches.length>1?"es":""} found — contact deductors to correct or file revised return
-      </div>}
+      <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10.5,color:"#185FA5",fontWeight:600}}>
+        The “TDS in books” column is live from the TDS Receivable ledger postings. The actual Form 26AS lives on TRACES and is not imported yet — the 26AS column stays blank (no reconciliation is claimed) until it is. Compare the downloaded statement against these figures deductor-by-deductor.
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
+        {[{l:"TDS in Books (accrued)",v:f(totBooks),c:"#185FA5",bg:"#E6F1FB"},
+          {l:"Deduction entries",v:String(entries.length),c:"#384677",bg:"#f3f4f8"},
+          {l:"Deductors",v:String(new Set(entries.map(e=>e.party)).size),c:"#854F0B",bg:"#FAEEDA"},
+          {l:"Claimed / adjusted (FY)",v:f(claimed),c:"#27500A",bg:"#EAF3DE"},
+        ].map((k,i)=>(
+          <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"11px 13px",background:k.bg}}>
+            <p style={{margin:0,fontSize:9,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
+            <p style={{margin:"4px 0 0",fontSize:19,fontWeight:800,color:"#0d1326"}}>{k.v}</p>
+          </div>
+        ))}
+      </div>
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
-            {["Deductor","PAN","Section","26AS TDS","Books TDS","Difference","Status"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 12px",textAlign:i>=3&&i<=5?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+            {["Deductor","Section","Entries","Quarters","TDS in Books","TDS in 26AS","Difference","Status"].map((h,i)=>(
+              <th key={i} style={{padding:"9px 12px",textAlign:i>=4&&i<=6?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{filtered.map((r,i)=>(
-            <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:r.status!=="Matched"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{r.party}</td>
-              <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{r.pan}</td>
-              <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#FAEEDA",color:"#854F0B",fontWeight:700}}>{r.section}</span></td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(r.asTDS)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(r.bookTDS)}</td>
-              <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:r.diff===0?"#5a6691":r.diff>0?"#A32D2D":"#854F0B"}}>{r.diff!==0?f(Math.abs(r.diff)):"—"}{r.diff>0?" excess":r.diff<0?" short":""}</td>
-              <td style={{padding:"8px 12px"}}>
-                <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,
-                  background:r.status==="Matched"?"#EAF3DE":r.status==="Mismatch"?"#FCEBEB":"#FAEEDA",
-                  color:r.status==="Matched"?"#27500A":r.status==="Mismatch"?"#A32D2D":"#854F0B"}}>{r.status}</span>
-              </td>
-            </tr>
-          ))}</tbody>
-          <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
-            <td colSpan={3} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437"}}>TOTAL</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(filtered.reduce((s,r)=>s+r.asTDS,0))}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(filtered.reduce((s,r)=>s+r.bookTDS,0))}</td>
-            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:mismatches.length>0?"#d4a437":"#5ab84b",fontVariantNumeric:"tabular-nums"}}>{f(Math.abs(filtered.reduce((s,r)=>s+r.diff,0)))}</td>
-            <td/>
-          </tr></tfoot>
+          <tbody>
+            {!q.isLoading&&rows.length===0&&<tr><td colSpan={8} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No TDS-receivable postings for {quarter==="ALL"?`FY ${fy}`:`${quarter} FY ${fy}`} — credits appear here when a party withholds TDS on a receipt or on our commission.</td></tr>}
+            {rows.map((r,i)=>(
+              <tr key={r.party+r.section} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
+                <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{r.party}</td>
+                <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#FAEEDA",color:"#854F0B",fontWeight:700}}>{r.section}</span></td>
+                <td style={{padding:"8px 12px"}}>{r.count}</td>
+                <td style={{padding:"8px 12px",fontSize:10,color:"#5a6691"}}>{[...r.quarters].sort().join(", ")}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums",fontWeight:600}}>{f(r.books)}</td>
+                <td style={{padding:"8px 12px",textAlign:"right",color:"#8b94b3"}}>—</td>
+                <td style={{padding:"8px 12px",textAlign:"right",color:"#8b94b3"}}>—</td>
+                <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}>Awaiting 26AS</span></td>
+              </tr>
+            ))}
+          </tbody>
+          {rows.length>0&&<tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
+            <td colSpan={4} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437"}}>TOTAL — {rows.length} deductor-section rows</td>
+            <td style={{padding:"9px 12px",textAlign:"right",fontWeight:800,color:"#fff",fontVariantNumeric:"tabular-nums"}}>{f(totBooks)}</td>
+            <td colSpan={3} style={{padding:"9px 12px",textAlign:"right",fontWeight:600,color:"#8b94b3"}}>26AS not imported</td>
+          </tr></tfoot>}
         </table>
       </div>
     </div>
@@ -995,85 +1049,64 @@ export function Form26AS({branch}){
 /* ── API KEY SETTINGS ─────────────────────────────────────────── */
 
 export function EWayBill({branch}){
-  const mob=useMobile();
-  const [ewbs,setEwbs]=useState([
-    {id:"EWB-2122-1234567890",invoice:"BOM/1726/SF00041",date:"2026-05-15",from:"Mumbai",to:"Pune",goods:"Travel documents & MICE materials",value:185000,vehicle:"MH01AB1234",distance:150,validity:"2026-05-16",status:"Active"},
-    {id:"EWB-2122-9876543210",invoice:"BOM/1726/SH00028",date:"2026-05-12",from:"Mumbai",to:"Ahmedabad",goods:"Tour kits and branded merchandise",value:92000,vehicle:"GJ01CD5678",distance:530,validity:"2026-05-14",status:"Expired"},
-  ]);
-  const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
-  const STATUS_CLR={Active:"#27500A",Expired:"#A32D2D",Cancelled:"#5a6691"};
-  const STATUS_BG ={Active:"#EAF3DE",Expired:"#FCEBEB",Cancelled:"#f3f4f8"};
+  const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
+  const [period,setPeriod]=useState(CUR_MONTH);
+  const EWB_THRESHOLD=50000; // e-way bill required for goods movement ≥ ₹50,000
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
+  // Candidates: posted sale invoices ≥ ₹50,000 for the period. Most of the book is
+  // services (no e-way bill needed) — this register flags the invoices that COULD
+  // need one (MICE materials / tour kits / merchandise) so nothing slips by value.
+  const candidates=saleBills(GP,brCode,{from:`${period}-01`,to:`${period}-31`}).filter(b=>(+b.sell||0)>=EWB_THRESHOLD);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
-      <SampleBanner note="e-way bills shown here are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#FAEEDA",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📦</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>E-Way Bill Register</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>GST E-Way Bill for goods movement &gt;₹50,000 · ewaybillgst.gov.in</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode||"All branches"} · {monthLabel(period)} · invoices ≥ ₹50,000 from the live books · ewaybillgst.gov.in</p>
           </div>
         </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> Generate E-Way Bill</button>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
+            {MONTH_OPTIONS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
+          </select>
+          <button disabled title={GSP_NOTE} aria-disabled="true" style={{...btnG,fontSize:11,opacity:0.5,cursor:"not-allowed"}}><Plus size={13}/> Generate E-Way Bill</button>
+        </div>
       </div>
 
+      <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600}}>
+        🔌 {GSP_NOTE}. Candidate invoices below are live from the books; EWB numbers fill in once the provider is connected.
+      </div>
       <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10.5,color:"#185FA5"}}>
-        <b>When required:</b> Movement of goods valued ≥ ₹50,000 between states or within state (Maharashtra). Applicable for MICE materials, tour kits, and promotional goods — NOT for service invoices. Validity: 200 km/day; expires at midnight.
+        <b>When required:</b> Movement of goods valued ≥ ₹50,000 between states or within state (Maharashtra). Applicable for MICE materials, tour kits, and promotional goods — NOT for pure service invoices. Validity: 200 km/day; expires at midnight.
       </div>
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#0d1326"}}>
-            {["EWB No.","Invoice Ref","Date","From","To","Goods","Value","Vehicle","Validity","Status"].map((h,i)=>(
-              <th key={i} style={{padding:"8px 10px",textAlign:i===6?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9,whiteSpace:"nowrap"}}>{h}</th>
+            {["Invoice / file ref","Date","Party","Module","Invoice value","EWB No.","Status"].map((h,i)=>(
+              <th key={i} style={{padding:"8px 10px",textAlign:i===4?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{ewbs.map((e,i)=>(
-            <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:e.status==="Expired"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
-              <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{e.id}</td>
-              <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:9.5}}>{e.invoice}</td>
-              <td style={{padding:"7px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{e.date}</td>
-              <td style={{padding:"7px 10px",color:"#384677"}}>{e.from}</td>
-              <td style={{padding:"7px 10px",color:"#384677"}}>{e.to}</td>
-              <td style={{padding:"7px 10px",color:"#384677",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis"}}>{e.goods}</td>
-              <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(e.value)}</td>
-              <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:9.5}}>{e.vehicle}</td>
-              <td style={{padding:"7px 10px",color:e.status==="Expired"?"#A32D2D":"#5a6691",fontWeight:e.status==="Expired"?700:400}}>{e.validity}</td>
-              <td style={{padding:"7px 10px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[e.status],color:STATUS_CLR[e.status]}}>{e.status}</span></td>
-            </tr>
-          ))}</tbody>
+          <tbody>
+            {candidates.length===0&&<tr><td colSpan={7} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No sale invoices ≥ ₹50,000 for {monthLabel(period)} — nothing needs an e-way bill this period.</td></tr>}
+            {candidates.map((b,i)=>(
+              <tr key={b.id+i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
+                <td style={{padding:"7px 10px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{b.id}</td>
+                <td style={{padding:"7px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{b.date}</td>
+                <td style={{padding:"7px 10px",fontWeight:600,color:"#0d1326"}}>{b.client}</td>
+                <td style={{padding:"7px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{b.mod}</span></td>
+                <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(b.sell)}</td>
+                <td style={{padding:"7px 10px",fontSize:10,color:"#8b94b3",whiteSpace:"nowrap"}}>— awaiting GSP provider</td>
+                <td style={{padding:"7px 10px"}}><span title={GSP_NOTE} style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}>Not generated</span></td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
-
-      {modal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
-              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Generate E-Way Bill</p>
-              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
-            </div>
-            <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              <FL label="Linked invoice"><input style={{...inp,fontFamily:"monospace"}} placeholder="BOM/1726/SF00045"/></FL>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <FL label="From (supplier location)"><input style={inp} defaultValue="Mumbai"/></FL>
-                <FL label="To (delivery location)"><input style={inp} placeholder="Pune"/></FL>
-              </div>
-              <FL label="Nature of goods"><input style={inp} placeholder="e.g. Tour kits and promotional materials"/></FL>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-                <FL label="Value (₹)"><input type="number" style={inp}/></FL>
-                <FL label="Vehicle no."><input style={{...inp,fontFamily:"monospace"}} placeholder="MH01AB1234"/></FL>
-                <FL label="Distance (km)"><input type="number" style={inp}/></FL>
-              </div>
-            </div>
-            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
-              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={()=>setModal(false)} style={btnG}>Generate on GST Portal</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1084,58 +1117,111 @@ export function EWayBill({branch}){
    ════════════════════════════════════════════════════════════════ */
 
 
+/* GSTR-9C — LIVE books-vs-returns reconciliation.
+   · Turnover per books  = Sales Accounts total from /api/accounting/profit-and-loss
+   · Turnover per GSTR   = GST base of the posted sale invoices (/api/accounting/gp-bills,
+                           the same source the GSTR-1 screen files from)
+   · Tax per books       = /api/accounting/tax-summary (Output − ITC from the tax ledgers)
+   Adjustments that live OUTSIDE the system (unbilled revenue, post-FY credit notes,
+   audited-FS adjustments, figures actually filed) are explicit MANUAL rows that
+   default 0 and persist per branch × FY via /api/app-config. */
 export function Gstr9c({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
+  const brCode=branch==="ALL"?null:(branch?.code||null);
   const [fy,setFy]=useState(CUR_FY.label);
+  const {from,to}=fyRange(fy);
 
-  const RECON_TABLE=[
-    {sn:"5A",label:"Turnover (incl. exports) as per audited annual financial statement",booksValue:124850000,returnValue:124850000,diff:0,note:"Tied"},
-    {sn:"5B",label:"Unbilled revenue at the end of FY",booksValue:1850000,returnValue:0,diff:-1850000,note:"To be added in next FY"},
-    {sn:"5C",label:"Unadjusted advances at the end of FY",booksValue:850000,returnValue:0,diff:-850000,note:"Adjusted on supply in next FY"},
-    {sn:"5D",label:"Deemed supplies u/s 7 Schedule I",booksValue:0,returnValue:0,diff:0,note:"None"},
-    {sn:"5E",label:"Credit notes issued after end of FY (related to FY)",booksValue:285000,returnValue:0,diff:285000,note:"Reduces turnover"},
-    {sn:"5F",label:"Trade discounts not part of value of supply",booksValue:120000,returnValue:0,diff:120000,note:"Per Sec 15(3)"},
-    {sn:"5G",label:"Turnover from FY 2024-25 declared in returns of FY 2025-26",booksValue:0,returnValue:625000,diff:625000,note:"Prior year carry-over"},
-    {sn:"5H",label:"Unbilled revenue at start of FY",booksValue:0,returnValue:0,diff:0,note:""},
-    {sn:"5I",label:"Adjustments on account of supply of goods by SEZ units",booksValue:0,returnValue:0,diff:0,note:"N/A"},
-    {sn:"5J",label:"Turnover for the period under composition scheme",booksValue:0,returnValue:0,diff:0,note:"N/A"},
+  const plQ=useProfitAndLoss(branch,{from,to});
+  const gpQ=useGpBills(branch,{from,to});
+  const taxQ=useTaxSummary(branch,{from,to});
+  const pl=plQ.data, tax=taxQ.data;
+  const bills=saleBills(gpQ.data||[],brCode);
+
+  // ── live figures ──────────────────────────────────────────────────
+  const salesGroups=((pl?.trading?.credit)||[]).filter(g=>((g.primary||g.group)==="Sales Accounts"));
+  const turnoverBooks=salesGroups.reduce((s,g)=>s+(+g.amount||0),0);
+  const turnoverGstr=bills.reduce((s,b)=>s+taxableOf(b),0);
+  const gstOnBills=bills.reduce((s,b)=>s+gstOf(b),0);
+  const outputTaxBooks=tax?.output?.total||0;
+  const itcBooks=tax?.input?.total||0;
+  const netPayableBooks=tax?.netPayable??(outputTaxBooks-itcBooks);
+
+  // ── manual figures (not in the system) — persisted per branch × FY ─
+  const cfgKey=`taxation.gstr9c.${brCode||'ALL'}.${fy}`;
+  const saved=useConfigValue(cfgKey).data||{};
+  const saveCfg=useSaveConfigValue();
+  const [edits,setEdits]=useState({});
+  const mVal=(k)=>edits[k]!==undefined?edits[k]:(saved[k]!==undefined&&saved[k]!==0?String(saved[k]):"");
+  const mNum=(k)=>Number(edits[k]!==undefined?edits[k]:saved[k])||0;
+  const commitManual=()=>{
+    const changed=Object.keys(edits);
+    if(!changed.length)return;
+    const value={...saved,...Object.fromEntries(changed.map(k=>[k,Number(edits[k])||0]))};
+    saveCfg.mutate({key:cfgKey,value,description:'GSTR-9C manual reconciliation figures (per branch × FY)'},{
+      onSuccess:()=>{setEdits({});toast('Manual figure saved');},
+      onError:(e)=>toast('Could not save — '+(e?.message||'unknown error'),'error'),
+    });
+  };
+  // Plain render helper (NOT a nested component — a nested component would
+  // remount on every keystroke and drop the input focus).
+  const manualInput=(k)=>(
+    <input type="number" value={mVal(k)} placeholder="0"
+      onChange={e=>setEdits(s=>({...s,[k]:e.target.value}))} onBlur={commitManual}
+      style={{width:110,padding:"3px 6px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:10.5,textAlign:"right"}}/>
+  );
+
+  // Table 5 — turnover reconciliation. sign +1 adds to, −1 reduces, the adjusted turnover.
+  const MANUAL_ROWS=[
+    {sn:"5B",k:"adj5B",sign:+1,label:"Unbilled revenue at the end of FY",note:"Manual — not tracked in the system"},
+    {sn:"5C",k:"adj5C",sign:+1,label:"Unadjusted advances at the end of FY",note:"Manual — advances aren't revenue in the books yet"},
+    {sn:"5D",k:"adj5D",sign:+1,label:"Deemed supplies u/s 7 Schedule I",note:"Manual — enter if any"},
+    {sn:"5E",k:"adj5E",sign:-1,label:"Credit notes issued after FY end (relating to FY)",note:"Manual — reduces turnover"},
+    {sn:"5F",k:"adj5F",sign:-1,label:"Trade discounts not part of value of supply",note:"Manual — per Sec 15(3)"},
+    {sn:"5O",k:"adj5O",sign:+1,label:"Other adjustments incl. audited-FS differences (±)",note:"Manual — enter signed amount"},
   ];
+  const adjustments=MANUAL_ROWS.reduce((s,r)=>s+r.sign*mNum(r.k),0);
+  const adjustedTurnover=turnoverBooks+adjustments;
+  const turnoverDiff=adjustedTurnover-turnoverGstr;
 
-  const totBooks=RECON_TABLE.reduce((s,r)=>s+r.booksValue,0);
-  const totReturn=RECON_TABLE.reduce((s,r)=>s+r.returnValue,0);
-  const totDiff=totBooks-totReturn;
+  const taxPaidReturns=mNum('taxPaidReturns');
+  const taxDiff=netPayableBooks-taxPaidReturns;
+  const itcReturns=mNum('itcReturns');
+  const itcDiff=itcBooks-itcReturns;
 
-  const ITC_RECON=[
-    {label:"ITC availed as per books",books:1850000,return:1850000,diff:0},
-    {label:"ITC availed in returns (3B Table 4A)",books:1850000,return:1825000,diff:25000},
-    {label:"ITC lapsed / ineligible",books:0,return:25000,diff:-25000},
-  ];
-
+  const loading=plQ.isLoading||gpQ.isLoading||taxQ.isLoading;
+  const empty=!loading&&turnoverBooks===0&&bills.length===0;
+  const f=n=>cur+fmt(Math.round(Math.abs(n)));
+  const sf=n=>(n<0?"−":"")+f(n);
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
+  const liveTag=<span style={{fontSize:8.5,padding:"1px 6px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700,marginLeft:6}}>LIVE</span>;
+  const manualTag=<span style={{fontSize:8.5,padding:"1px 6px",borderRadius:999,background:"#FAEEDA",color:"#854F0B",fontWeight:700,marginLeft:6}}>MANUAL</span>;
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
-      <SampleBanner note="GSTR-9C books-vs-returns reconciliation isn’t wired to live data yet." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>📑 GSTR-9C — Audit Reconciliation</h2>
-          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Books vs Returns · Required if turnover &gt; ₹5 cr · Self-certified (Notification 30/2021)</p>
+          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>{brCode||"All branches"} · FY {fy} · computed live from the books · Required if turnover &gt; ₹5 cr · Self-certified (Notification 30/2021)</p>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11.5}}>
+          <select value={fy} onChange={e=>{setFy(e.target.value);setEdits({});}} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11.5}}>
             {fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
-          <button style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>📤 Generate JSON</button>
+          <button onClick={()=>openPrintPreview({selector:'main',title:`GSTR-9C — FY ${fy}`,recommend:'portrait'})} style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>🖨 Print / PDF</button>
         </div>
       </div>
 
+      {empty&&<div style={{...card,padding:"24px",textAlign:"center",color:"#5a6691",fontSize:11.5,marginBottom:14}}>
+        No posted sales in the books for FY {fy} — the reconciliation appears once sale vouchers are posted.
+      </div>}
+
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Books Turnover</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>{cur+fmt(124850000)}</p></div>
-        <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Returns Turnover</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{cur+fmt(124235000)}</p></div>
-        <div style={{...card,borderTop:"3px solid "+(totDiff===0?"#27500A":"#A32D2D")}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Reco Difference</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:totDiff===0?"#27500A":"#A32D2D"}}>{cur+fmt(Math.abs(615000))}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>Explained below</p></div>
-        <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Tax Liability Diff.</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{cur+fmt(0)}</p></div>
+        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Books Turnover (P&amp;L Sales)</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>{f(turnoverBooks)}</p></div>
+        <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Turnover per GSTR (GST base)</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{f(turnoverGstr)}</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>{bills.length} sale invoices</p></div>
+        <div style={{...card,borderTop:"3px solid "+(Math.round(turnoverDiff)===0?"#27500A":"#A32D2D")}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Un-reconciled Turnover</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:Math.round(turnoverDiff)===0?"#27500A":"#A32D2D"}}>{sf(turnoverDiff)}</p></div>
+        <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Net Tax Payable (books)</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{sf(netPayableBooks)}</p></div>
       </div>
 
       <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Part II — Reconciliation of Turnover (Table 5)</h3>
@@ -1145,122 +1231,278 @@ export function Gstr9c({branch,setRoute}){
             <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
               <th style={{padding:"9px 8px",textAlign:"center"}}>SN</th>
               <th style={{padding:"9px 8px",textAlign:"left"}}>Description</th>
-              <th style={{padding:"9px 8px",textAlign:"right"}}>Books</th>
-              <th style={{padding:"9px 8px",textAlign:"right"}}>As per Returns</th>
-              <th style={{padding:"9px 8px",textAlign:"right"}}>Difference</th>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Reason</th>
+              <th style={{padding:"9px 8px",textAlign:"right"}}>Amount</th>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Source</th>
             </tr></thead>
             <tbody>
-              {RECON_TABLE.map((r,i)=>(
-                <tr key={r.sn} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
+              <tr style={{background:"#fff",borderBottom:"1px solid #cdd1d8"}}>
+                <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#185FA5"}}>5A</td>
+                <td style={{padding:"7px 8px",fontSize:10.5}}>Turnover as per the books (Sales Accounts, P&amp;L){liveTag}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600}}>{f(turnoverBooks)}</td>
+                <td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>/api/accounting/profit-and-loss</td>
+              </tr>
+              {MANUAL_ROWS.map((r,i)=>(
+                <tr key={r.sn} style={{background:i%2===0?"#f3f4f8":"#fff",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#185FA5"}}>{r.sn}</td>
-                  <td style={{padding:"7px 8px",fontSize:10.5}}>{r.label}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right"}}>{r.booksValue>0?cur+fmt(r.booksValue):"—"}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right"}}>{r.returnValue>0?cur+fmt(r.returnValue):"—"}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,color:r.diff===0?"#5a6691":r.diff>0?"#27500A":"#A32D2D"}}>{r.diff!==0?(r.diff>0?"+":"")+cur+fmt(r.diff):"—"}</td>
+                  <td style={{padding:"7px 8px",fontSize:10.5}}>{r.label} {r.sign<0?"(−)":"(+)"}{manualTag}</td>
+                  <td style={{padding:"7px 8px",textAlign:"right"}}>{manualInput(r.k)}</td>
                   <td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>{r.note}</td>
                 </tr>
               ))}
+              <tr style={{background:"#fafbfd",borderBottom:"1px solid #cdd1d8",borderTop:"2px solid #0d1326"}}>
+                <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#185FA5"}}>5P</td>
+                <td style={{padding:"7px 8px",fontSize:10.5,fontWeight:700}}>Annual turnover after adjustments (5A ± 5B…5O)</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800}}>{sf(adjustedTurnover)}</td>
+                <td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>computed</td>
+              </tr>
+              <tr style={{background:"#fff",borderBottom:"1px solid #cdd1d8"}}>
+                <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#185FA5"}}>5Q</td>
+                <td style={{padding:"7px 8px",fontSize:10.5}}>Turnover as declared in GSTR (GST base of posted sale invoices){liveTag}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600}}>{f(turnoverGstr)}</td>
+                <td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>/api/accounting/gp-bills — GSTR-1 source</td>
+              </tr>
+              <tr style={{background:Math.round(turnoverDiff)===0?"#EAF3DE":"#FCEBEB"}}>
+                <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#185FA5"}}>5R</td>
+                <td style={{padding:"7px 8px",fontSize:10.5,fontWeight:700}}>Un-reconciled turnover (5P − 5Q)</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:Math.round(turnoverDiff)===0?"#27500A":"#A32D2D"}}>{sf(turnoverDiff)}</td>
+                <td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>{Math.round(turnoverDiff)===0?"Reconciled":"Explain line-wise before certifying"}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Part III — Reconciliation of Tax Paid (Table 9)</h3>
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:14}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Description</th>
+              <th style={{padding:"9px 8px",textAlign:"right"}}>Amount</th>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Source</th>
+            </tr></thead>
+            <tbody>
+              <tr style={{borderBottom:"1px solid #cdd1d8"}}><td style={{padding:"7px 8px"}}>Output tax per books (GST output ledgers){liveTag}</td><td style={{padding:"7px 8px",textAlign:"right",fontWeight:600}}>{sf(outputTaxBooks)}</td><td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>/api/accounting/tax-summary</td></tr>
+              <tr style={{background:"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}><td style={{padding:"7px 8px"}}>ITC per books (GST input ledgers){liveTag}</td><td style={{padding:"7px 8px",textAlign:"right",fontWeight:600}}>{sf(itcBooks)}</td><td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>/api/accounting/tax-summary</td></tr>
+              <tr style={{borderBottom:"1px solid #cdd1d8"}}><td style={{padding:"7px 8px",fontWeight:700}}>Net tax payable per books{liveTag}</td><td style={{padding:"7px 8px",textAlign:"right",fontWeight:800}}>{sf(netPayableBooks)}</td><td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>Output − ITC</td></tr>
+              <tr style={{background:"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}><td style={{padding:"7px 8px"}}>Tax paid as per filed returns (GSTR-3B cash + credit){manualTag}</td><td style={{padding:"7px 8px",textAlign:"right"}}>{manualInput("taxPaidReturns")}</td><td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>Manual — from the filed 3Bs</td></tr>
+              <tr style={{background:Math.round(taxDiff)===0?"#EAF3DE":"#FCEBEB"}}><td style={{padding:"7px 8px",fontWeight:700}}>Difference (books − returns)</td><td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:Math.round(taxDiff)===0?"#27500A":"#A32D2D"}}>{sf(taxDiff)}</td><td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>{Math.round(taxDiff)===0?"Reconciled":"Reconciling item — additional liability payable via DRC-03 if short-paid"}</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
       <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Part IV — Reconciliation of Input Tax Credit (Table 12)</h3>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
               <th style={{padding:"9px 8px",textAlign:"left"}}>Description</th>
-              <th style={{padding:"9px 8px",textAlign:"right"}}>Books</th>
-              <th style={{padding:"9px 8px",textAlign:"right"}}>Returns</th>
-              <th style={{padding:"9px 8px",textAlign:"right"}}>Diff</th>
+              <th style={{padding:"9px 8px",textAlign:"right"}}>Amount</th>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Source</th>
             </tr></thead>
             <tbody>
-              {ITC_RECON.map((r,i)=>(
-                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
-                  <td style={{padding:"7px 8px"}}>{r.label}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(r.books)}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right"}}>{cur+fmt(r.return)}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right",fontWeight:600,color:r.diff===0?"#5a6691":r.diff>0?"#27500A":"#A32D2D"}}>{r.diff!==0?cur+fmt(r.diff):"—"}</td>
-                </tr>
-              ))}
+              <tr style={{borderBottom:"1px solid #cdd1d8"}}><td style={{padding:"7px 8px"}}>ITC availed as per books (GST input ledgers){liveTag}</td><td style={{padding:"7px 8px",textAlign:"right",fontWeight:600}}>{sf(itcBooks)}</td><td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>/api/accounting/tax-summary</td></tr>
+              <tr style={{background:"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}><td style={{padding:"7px 8px"}}>ITC availed in returns (3B Table 4A){manualTag}</td><td style={{padding:"7px 8px",textAlign:"right"}}>{manualInput("itcReturns")}</td><td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>Manual — from the filed 3Bs</td></tr>
+              <tr style={{background:Math.round(itcDiff)===0?"#EAF3DE":"#FCEBEB"}}><td style={{padding:"7px 8px",fontWeight:700}}>Difference (books − returns)</td><td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:Math.round(itcDiff)===0?"#27500A":"#A32D2D"}}>{sf(itcDiff)}</td><td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>{Math.round(itcDiff)===0?"Reconciled":"Un-reconciled ITC — reverse or explain before certifying"}</td></tr>
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div style={{padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10,color:"#185FA5"}}>
+        GST on posted invoices this FY (per gp-bills): <b>{f(gstOnBills)}</b>. Manual rows persist per branch × FY (app-config <code>{cfgKey}</code>) and default to 0 — they cover data the system doesn't hold (audited-FS adjustments, filed-return figures).
       </div>
     </div>
   );
 }
 
 
+/* Form 3CD working papers — the clauses that ARE derivable from the books are
+   computed live (turnover, GP/NP ratios from /profit-and-loss; TDS deducted
+   summary from the real TDS Payable chart ledgers). Clauses that need data the
+   system doesn't hold (cash-payment mode, MSME ageing by udyam status, 269SS…)
+   are explicit MANUAL placeholders — no fabricated flags. */
 export function TaxAudit3CD({branch,setRoute}){
   const mob=useMobile();
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [section,setSection]=useState("21");
+  const brCode=branch==="ALL"?null:(branch?.code||null);
+  const [fy,setFy]=useState(CUR_FY.label);
+  const {from,to}=fyRange(fy);
+  const prevFy=`${parseInt(fy,10)-1}-${String(parseInt(fy,10)).slice(2)}`;
+  const prevRange=fyRange(prevFy);
 
-  const CLAUSES=[
-    {clause:"14",title:"Method of valuation of closing stock",status:"N/A",note:"Service business — no inventory"},
-    {clause:"17",title:"Property transferred during the year",status:"Nil",note:"No fixed asset disposals above ₹50,000"},
-    {clause:"18",title:"Particulars of depreciation u/s 32",status:"Complete",note:"Block-wise depreciation computed — see Block of Assets"},
-    {clause:"20",title:"Bonus/PF — disallowance u/s 36(1)(va) / 43B",status:"Complete",note:"All statutory dues paid before due date"},
-    {clause:"21",title:"Amounts inadmissible u/s 40A(3) — cash payments &gt; ₹10,000",status:"Review",note:"3 entries flagged — see details"},
-    {clause:"22",title:"Amounts payable to MSME beyond 45 days (Sec 43B(h))",status:"Review",note:"2 entries flagged — see MSME tracker"},
-    {clause:"24",title:"Amounts deemed as profits u/s 33AB / 33ABA",status:"N/A",note:""},
-    {clause:"26",title:"TDS deducted but not deposited (Sec 40(a)(ia))",status:"Complete",note:"All TDS deposited within due date"},
-    {clause:"27",title:"CENVAT / ITC / Service Tax credit",status:"Complete",note:"Reconciled with GSTR-9C"},
-    {clause:"31",title:"Loans/deposits accepted u/s 269SS",status:"Review",note:"1 cash receipt &gt; ₹20,000 from director (see L31a)"},
-    {clause:"32",title:"Brought forward losses",status:"Nil",note:"No carried losses"},
-    {clause:"34",title:"TDS u/s 192-194 — quarterly reconciliation",status:"Complete",note:"TDS register reconciled with returns"},
-    {clause:"36A",title:"Receipts in cash u/s 269ST &gt; ₹2 lakh",status:"Nil",note:"All cash receipts within limits"},
-    {clause:"38",title:"Cost audit applicable",status:"N/A",note:"Service business"},
+  const plQ=useProfitAndLoss(branch,{from,to});
+  const plPrevQ=useProfitAndLoss(branch,{from:prevRange.from,to:prevRange.to});
+  const tdsQ=useTdsLedgerStatements('payable',branch,{from,to});
+
+  const pl=plQ.data, plPrev=plPrevQ.data;
+  const turnoverOf=(p)=>(((p?.trading?.credit)||[]).filter(g=>((g.primary||g.group)==="Sales Accounts")).reduce((s,g)=>s+(+g.amount||0),0));
+  const turnover=turnoverOf(pl), turnoverPrev=turnoverOf(plPrev);
+  const gp=pl?.grossProfit||0, np=pl?.netProfit||0;
+  const gpPrev=plPrev?.grossProfit||0, npPrev=plPrev?.netProfit||0;
+  const pct=(a,b)=>b?((a/b)*100).toFixed(1)+"%":"—";
+
+  const indirectHeads=((pl?.indirect?.debit)||[]).slice().sort((a,b)=>(b.amount||0)-(a.amount||0));
+  const indirectTotal=pl?.indirect?.debitTotal||0;
+
+  // Clause 34(a): TDS deducted (Cr accruals on the TDS Payable ledgers) by section.
+  const statements=tdsQ.data?.statements||[];
+  const tdsEntries=tdsAccrualEntries(statements,'Cr');
+  const tdsDeducted=tdsEntries.reduce((s,e)=>s+e.amount,0);
+  const tdsDeposited=tdsReliefTotal(statements,'Cr');
+  const tdsClosing=statements.reduce((s,st)=>s+(st.closingSide==='Cr'?(st.closingBalance||0):-(st.closingBalance||0)),0);
+  const bySection=[...tdsEntries.reduce((m,e)=>{
+    if(!m.has(e.section))m.set(e.section,{section:e.section,count:0,tds:0});
+    const r=m.get(e.section);r.count++;r.tds+=e.amount;return m;
+  },new Map()).values()].sort((a,b)=>b.tds-a.tds);
+
+  // Clauses NOT derivable from the double-entry books — explicit manual work.
+  const MANUAL_CLAUSES=[
+    {clause:"14",title:"Method of valuation of closing stock",note:"Service business — confirm N/A with the auditor"},
+    {clause:"17",title:"Land/building transferred below stamp value (43CA/50C)",note:"Asset transfer details are not tracked in the system"},
+    {clause:"18",title:"Particulars of depreciation u/s 32 (blocks, additions, deletions)",note:"Compile from the Fixed Asset Register"},
+    {clause:"20",title:"Bonus / PF / ESI — due-date-wise deposits (36(1)(va), 43B)",note:"Payroll statutory challan dates are not in the books"},
+    {clause:"21(d)",title:"Cash payments > ₹10,000 u/s 40A(3)",note:"Payment MODE (cash vs bank) per voucher is not captured — review the Cash Book"},
+    {clause:"22",title:"MSME dues beyond 45 days (43B(h))",note:"Supplier Udyam/MSME status is not captured in the supplier master"},
+    {clause:"26",title:"43B items paid after the due date",note:"Requires challan/payment due-date evidence"},
+    {clause:"31",title:"Loans/deposits accepted or repaid in cash (269SS/269T)",note:"Requires payment-mode detail"},
+    {clause:"32",title:"Brought-forward losses / depreciation",note:"From prior ITRs, outside the books"},
+    {clause:"36A",title:"Cash receipts > ₹2 lakh u/s 269ST",note:"Requires payment-mode detail"},
   ];
 
-  const CASH_FLAGS=[
-    {date:"2026-02-15",voucher:"PV-BOM-2026-127",payee:"Site Visit — Driver",amount:12500,head:"Travel & Conveyance",risk:"Sec 40A(3)"},
-    {date:"2026-03-08",voucher:"PV-BOM-2026-189",payee:"Express Courier",amount:14200,head:"Postage & Courier",risk:"Sec 40A(3)"},
-    {date:"2026-04-22",voucher:"PV-AMD-2026-074",payee:"Local Vendor Repair",amount:11800,head:"Repairs & Maintenance",risk:"Sec 40A(3)"},
-  ];
-
+  const f=n=>cur+fmt(Math.round(Math.abs(n)));
+  const sf=n=>(n<0?"−":"")+f(n);
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
+  const empty=!plQ.isLoading&&turnover===0&&tdsEntries.length===0;
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
-      <SampleBanner note="these cash-payment audit flags are sample data, not live." />
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:12,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>📋 Tax Audit Working Papers — Form 3CD</h2>
-          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>Section 44AB · Clause-by-clause data for tax auditor · FY 2025-26</p>
+          <p style={{margin:"4px 0 0",fontSize:11.5,color:"#5a6691"}}>{brCode||"All branches"} · Section 44AB · FY {fy} · derivable clauses computed live from the books</p>
         </div>
-        <button style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>📤 Export to CA</button>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <select value={fy} onChange={e=>setFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:7,fontSize:11.5}}>
+            {fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+          </select>
+          <button onClick={()=>openPrintPreview({selector:'main',title:`Form 3CD working papers — FY ${fy}`,recommend:'portrait'})} style={{padding:"7px 14px",border:"none",background:"#d4a437",color:"#0d1326",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>🖨 Print for CA</button>
+        </div>
       </div>
+
+      {empty&&<div style={{...card,padding:"24px",textAlign:"center",color:"#5a6691",fontSize:11.5,marginBottom:14}}>
+        No posted books for FY {fy} — the computed clauses fill in once vouchers are posted.
+      </div>}
 
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Clauses Total</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>{CLAUSES.length}</p></div>
-        <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Complete</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{CLAUSES.filter(c=>c.status==="Complete").length}</p></div>
-        <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Needs Review</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{CLAUSES.filter(c=>c.status==="Review").length}</p></div>
-        <div style={{...card,borderTop:"3px solid #5a6691"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>N/A or Nil</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#5a6691"}}>{CLAUSES.filter(c=>c.status==="N/A"||c.status==="Nil").length}</p></div>
+        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Turnover (P&amp;L Sales)</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}}>{f(turnover)}</p></div>
+        <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Net Profit / Turnover</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{pct(np,turnover)}</p></div>
+        <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>TDS Deducted (FY)</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{f(tdsDeducted)}</p></div>
+        <div style={{...card,borderTop:"3px solid "+(tdsClosing>0.5?"#A32D2D":"#27500A")}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>TDS Payable (closing)</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:tdsClosing>0.5?"#A32D2D":"#27500A"}}>{sf(tdsClosing)}</p></div>
       </div>
 
-      <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Clause Status Overview</h3>
+      <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Clause 40 — Accounting Ratios <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>LIVE</span></h3>
       <div style={{...card,padding:0,overflow:"hidden",marginBottom:14}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
-              <th style={{padding:"9px 8px",textAlign:"center",width:60}}>Clause</th>
               <th style={{padding:"9px 8px",textAlign:"left"}}>Particulars</th>
-              <th style={{padding:"9px 8px",textAlign:"center",width:100}}>Status</th>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Notes / Action</th>
+              <th style={{padding:"9px 8px",textAlign:"right"}}>FY {fy}</th>
+              <th style={{padding:"9px 8px",textAlign:"right"}}>FY {prevFy} (preceding)</th>
             </tr></thead>
             <tbody>
-              {CLAUSES.map((c,i)=>(
+              {[
+                {l:"Turnover (Sales Accounts)",a:sf(turnover),b:sf(turnoverPrev)},
+                {l:"Gross Profit",a:sf(gp),b:sf(gpPrev)},
+                {l:"Gross Profit / Turnover",a:pct(gp,turnover),b:pct(gpPrev,turnoverPrev)},
+                {l:"Net Profit",a:sf(np),b:sf(npPrev)},
+                {l:"Net Profit / Turnover",a:pct(np,turnover),b:pct(npPrev,turnoverPrev)},
+              ].map((r,i)=>(
+                <tr key={r.l} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
+                  <td style={{padding:"7px 8px",fontWeight:600}}>{r.l}</td>
+                  <td style={{padding:"7px 8px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{r.a}</td>
+                  <td style={{padding:"7px 8px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#5a6691"}}>{r.b}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Clause 34(a) — TDS Deducted by Section <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>LIVE — TDS Payable ledgers</span></h3>
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:14}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Section</th>
+              <th style={{padding:"9px 8px",textAlign:"center"}}>Deduction entries</th>
+              <th style={{padding:"9px 8px",textAlign:"right"}}>TDS deducted</th>
+            </tr></thead>
+            <tbody>
+              {bySection.length===0&&<tr><td colSpan={3} style={{padding:"20px",textAlign:"center",color:"#5a6691"}}>No TDS withheld in the books for FY {fy}.</td></tr>}
+              {bySection.map((r,i)=>(
+                <tr key={r.section} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
+                  <td style={{padding:"7px 8px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#FAEEDA",color:"#854F0B",fontWeight:700}}>{r.section}</span>{r.section==="—"&&<span style={{marginLeft:6,fontSize:9.5,color:"#8b94b3"}}>section not stated on the posting narration</span>}</td>
+                  <td style={{padding:"7px 8px",textAlign:"center"}}>{r.count}</td>
+                  <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(r.tds)}</td>
+                </tr>
+              ))}
+              {bySection.length>0&&<tr style={{background:"#fafbfd",borderTop:"2px solid #0d1326"}}>
+                <td style={{padding:"7px 8px",fontWeight:700}}>TOTAL — deducted {f(tdsDeducted)} · deposited {f(tdsDeposited)}</td>
+                <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700}}>{tdsEntries.length}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontWeight:800,color:tdsClosing>0.5?"#A32D2D":"#27500A"}}>{sf(tdsClosing)} payable</td>
+              </tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Indirect Expense Heads (P&amp;L) <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>LIVE</span></h3>
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:14}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Expense head (group)</th>
+              <th style={{padding:"9px 8px",textAlign:"right"}}>Amount</th>
+              <th style={{padding:"9px 8px",textAlign:"left",width:180}}>Share</th>
+            </tr></thead>
+            <tbody>
+              {indirectHeads.length===0&&<tr><td colSpan={3} style={{padding:"20px",textAlign:"center",color:"#5a6691"}}>No indirect expenses posted for FY {fy}.</td></tr>}
+              {indirectHeads.map((g,i)=>(
+                <tr key={g.group||i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
+                  <td style={{padding:"7px 8px",fontWeight:600}}>{g.group}</td>
+                  <td style={{padding:"7px 8px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{sf(g.amount||0)}</td>
+                  <td style={{padding:"7px 8px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:10,color:"#5a6691",width:40,textAlign:"right",flexShrink:0,fontVariantNumeric:"tabular-nums"}}>{pctText(share(g.amount||0,indirectTotal))}</span>
+                      <div style={{flex:1,minWidth:36}}><MiniBar pct={share(g.amount||0,indirectTotal)} tone="cogs"/></div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Clauses Requiring Manual Compilation <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#FAEEDA",color:"#854F0B",fontWeight:700}}>MANUAL</span></h3>
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
+              <th style={{padding:"9px 8px",textAlign:"center",width:70}}>Clause</th>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Particulars</th>
+              <th style={{padding:"9px 8px",textAlign:"center",width:90}}>Status</th>
+              <th style={{padding:"9px 8px",textAlign:"left"}}>Why it can't be computed here</th>
+            </tr></thead>
+            <tbody>
+              {MANUAL_CLAUSES.map((c,i)=>(
                 <tr key={c.clause} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",textAlign:"center",fontWeight:700,color:"#185FA5"}}>{c.clause}</td>
                   <td style={{padding:"7px 8px"}}>{c.title}</td>
-                  <td style={{padding:"7px 8px",textAlign:"center"}}>
-                    <span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:c.status==="Complete"?"#EAF3DE":c.status==="Review"?"#FAEEDA":c.status==="Nil"?"#E6F1FB":"#f3f4f8",color:c.status==="Complete"?"#27500A":c.status==="Review"?"#854F0B":c.status==="Nil"?"#185FA5":"#5a6691"}}>{c.status}</span>
-                  </td>
+                  <td style={{padding:"7px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:"#FAEEDA",color:"#854F0B"}}>Manual</span></td>
                   <td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>{c.note}</td>
                 </tr>
               ))}
@@ -1268,33 +1510,8 @@ export function TaxAudit3CD({branch,setRoute}){
           </table>
         </div>
       </div>
-
-      <h3 style={{margin:"8px 0 6px",fontSize:13,color:"#0d1326"}}>Clause 21 Detail — Cash Payments &gt; ₹10,000 (Sec 40A(3))</h3>
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Date</th>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Voucher</th>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Payee</th>
-              <th style={{padding:"9px 8px",textAlign:"right"}}>Amount</th>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Expense Head</th>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Risk</th>
-            </tr></thead>
-            <tbody>
-              {CASH_FLAGS.map((c,i)=>(
-                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
-                  <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{c.date}</td>
-                  <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{c.voucher}</td>
-                  <td style={{padding:"7px 8px"}}>{c.payee}</td>
-                  <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#A32D2D"}}>{cur+fmt(c.amount)}</td>
-                  <td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>{c.head}</td>
-                  <td style={{padding:"7px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:"#FCEBEB",color:"#A32D2D"}}>{c.risk}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div style={{padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10,color:"#185FA5"}}>
+        Computed sections read /api/accounting/profit-and-loss (this FY + preceding FY) and the TDS Payable chart ledgers (trial-balance discovery → per-ledger statements). Manual clauses are listed WITHOUT figures — no sample data — compile them with the auditor from source records.
       </div>
     </div>
   );
@@ -1580,55 +1797,104 @@ export function GSTR3BPrep(){
    12. TDS CERTIFICATE FORM 16A GENERATOR
    ════════════════════════════════════════════════════════════════════ */
 
-export function Form16AGenerator(){
+/* Form 16A — TDS certificates per deductee, LIVE from the TDS Payable chart
+   ledgers: each Cr accrual (TDS withheld on a purchase/payment voucher) is a
+   deduction entry, grouped per vendor for the selected FY quarter. Download
+   renders the printable certificate (openPrintPreview) with the live figures.
+   PAN/TAN/challan details are not tracked in the system — the certificate
+   shows explicit fill-in blanks for them (no invented identifiers). */
+export function Form16AGenerator({branch}){
+  const [fy,setFy]=useState(CUR_FY.label);
+  const [quarter,setQuarter]=useState(fyQuarterOfISO(todayISO()));
   const [selVendor,setSelVendor]=useState(0);
-  const v=FORM16A_DATA[selVendor];
+  const {from,to}=fyRange(fy);
+
+  const q=useTdsLedgerStatements('payable',branch,{from,to});
+  const statements=q.data?.statements||[];
+  const entries=tdsAccrualEntries(statements,'Cr').filter(e=>quarter==="ALL"||e.quarter===quarter);
+  const vendors=[...entries.reduce((m,e)=>{
+    if(!m.has(e.party))m.set(e.party,{vendor:e.party,tds:0,count:0,sections:new Set(),entries:[]});
+    const r=m.get(e.party);r.tds+=e.amount;r.count++;r.sections.add(e.section);r.entries.push(e);return m;
+  },new Map()).values()].sort((a,b)=>b.tds-a.tds);
+  const idx=Math.min(selVendor,Math.max(0,vendors.length-1));
+  const v=vendors[idx];
+  const deposited=tdsReliefTotal(statements,'Cr'); // FY deposits to government (lump-sum, not vendor-tagged)
+
+  const entity=(branch&&branch!=="ALL"&&branch.entity)||bc(branch)?.entity||"";
+  const startYear=parseInt(fy,10);
+  const ay=`${startYear+1}-${String(startYear+2).slice(2)}`;
+  const qLabel=quarter==="ALL"?`FY ${fy}`:`${quarter} FY ${fy}`;
+  const blank=<span style={{color:"#8b94b3",fontStyle:"italic",fontWeight:400}}>____________ (fill in)</span>;
+
   return(
-    <PHASE2_Page title="TDS Certificate — Form 16A Generator" subtitle="Per-vendor TDS certificate · Q4 FY 2025-26 · auto-generated from TDS register"
-      toolbar={<><select value={selVendor} onChange={e=>setSelVendor(+e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{FORM16A_DATA.map((v,i)=><option key={i} value={i}>{v.vendor}</option>)}</select><button onClick={()=>openPrintPreview({ selector: 'main', title: 'Taxation', recommend: 'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 Send by Email</button></>}>
+    <PHASE2_Page title="TDS Certificate — Form 16A Generator" subtitle={`Per-vendor TDS certificate · ${qLabel} · live from the TDS Payable ledger postings`}
+      toolbar={<>
+        <select value={fy} onChange={e=>{setFy(e.target.value);setSelVendor(0);}} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{fyOptions().map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select>
+        <select value={quarter} onChange={e=>{setQuarter(e.target.value);setSelVendor(0);}} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{["Q1","Q2","Q3","Q4","ALL"].map(qq=><option key={qq} value={qq}>{qq==="ALL"?"Full FY":qq}</option>)}</select>
+        <button onClick={()=>{if(v)openPrintPreview({selector:'#form16a-cert',title:`Form 16A — ${v.vendor} — ${qLabel}`,recommend:'portrait'});}} disabled={!v} style={{padding:"7px 14px",background:v?"#d4a437":"#e6e8f1",color:v?"#0d1326":"#8b94b3",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:v?"pointer":"not-allowed"}}>📥 Download / Print</button>
+      </>}>
+      {vendors.length===0&&!q.isLoading&&(
+        <div style={{...cardStyle,padding:"28px",textAlign:"center",color:"#5a6691",fontSize:12}}>
+          No TDS deducted in {qLabel} — certificates appear here once purchase / payment vouchers withhold TDS (posted to the TDS Payable ledgers).
+        </div>
+      )}
+      {vendors.length>0&&(
       <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:14}}>
-        {/* Vendor list */}
+        {/* Vendor list — live per-deductee totals */}
         <div style={cardStyle} onKeyDown={listKeyNav()}>
-          <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Vendors — Q4 FY 2025-26</p>
-          {FORM16A_DATA.map((v,i)=>(
-            <div key={i} {...clickable(()=>setSelVendor(i),{role:'option'})} style={{padding:"10px",border:selVendor===i?"2px solid #d4a437":"1px solid #cdd1d8",borderRadius:6,marginBottom:6,cursor:"pointer",background:selVendor===i?"#fff8e8":"#fff"}}>
-              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{v.vendor}</p>
-              <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{v.section} · {fmtINR(v.tds)} TDS</p>
-              <span style={{padding:"1px 7px",background:v.paid?"#d4edda":"#f8d7da",color:v.paid?"#155724":"#721c24",borderRadius:3,fontSize:9.5,fontWeight:700}}>{v.paid?"TDS Paid":"TDS Pending"}</span>
+          <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Deductees — {qLabel} · {vendors.length}</p>
+          {vendors.map((vv,i)=>(
+            <div key={vv.vendor} {...clickable(()=>setSelVendor(i),{role:'option'})} style={{padding:"10px",border:idx===i?"2px solid #d4a437":"1px solid #cdd1d8",borderRadius:6,marginBottom:6,cursor:"pointer",background:idx===i?"#fff8e8":"#fff"}}>
+              <p style={{margin:0,fontSize:12,fontWeight:700,color:"#0d1326"}}>{vv.vendor}</p>
+              <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{[...vv.sections].join(", ")} · {fmtINR(Math.round(vv.tds))} TDS · {vv.count} deduction{vv.count>1?"s":""}</p>
             </div>
           ))}
+          <p style={{margin:"10px 0 0",fontSize:10,color:"#5a6691"}}>TDS deposited to government (FY, all vendors): <b>{fmtINR(Math.round(deposited))}</b> — deposits are lump-sum challans, not vendor-tagged in the books.</p>
         </div>
-        {/* Certificate preview */}
-        <div style={{background:"#fff",border:"2px solid #0d1326",borderRadius:6,overflow:"hidden",fontSize:11.5}}>
+        {/* Certificate preview — printable via openPrintPreview('#form16a-cert') */}
+        {v&&(
+        <div id="form16a-cert" style={{background:"#fff",border:"2px solid #0d1326",borderRadius:6,overflow:"hidden",fontSize:11.5}}>
           <div style={{padding:"12px 18px",background:"#0d1326",color:"#fff",textAlign:"center"}}>
             <p style={{margin:0,fontSize:13,fontWeight:700,letterSpacing:"0.8px"}}>FORM 16A</p>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#d4a437"}}>Certificate under Section 203 of the Income-tax Act, 1961 · {v.certNo}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#d4a437"}}>Certificate under Section 203 of the Income-tax Act, 1961 · {qLabel}</p>
           </div>
           <div style={{padding:16}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
               {[
-                {l:"Deductor Name",v:"Travkings Tours & Travels Pvt. Ltd."},
-                {l:"Deductor TAN",v:"MUMA12345B"},
+                {l:"Deductor Name",v:entity||blank},
+                {l:"Deductor TAN",v:blank},
+                {l:"Deductor PAN",v:blank},
                 {l:"Deductee Name",v:v.vendor},
-                {l:"Deductee PAN",v:v.pan},
-                {l:"Section",v:v.section},
-                {l:"Quarter",v:v.quarter},
-              ].map(f=>(
-                <div key={f.l} style={{display:"flex",gap:6,padding:"3px 0",borderBottom:"1px solid #dfe2e7"}}>
-                  <span style={{color:"#5a6691",minWidth:130}}>{f.l}</span><b>{f.v}</b>
+                {l:"Deductee PAN",v:blank},
+                {l:"Section(s)",v:[...v.sections].join(", ")},
+                {l:"Quarter",v:qLabel},
+                {l:"Assessment Year",v:ay},
+              ].map(fld=>(
+                <div key={fld.l} style={{display:"flex",gap:6,padding:"3px 0",borderBottom:"1px solid #dfe2e7"}}>
+                  <span style={{color:"#5a6691",minWidth:130}}>{fld.l}</span><b>{fld.v}</b>
                 </div>
               ))}
             </div>
             <table style={{width:"100%",borderCollapse:"collapse",marginBottom:14}}>
-              <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Particulars</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount (₹)</th></tr></thead>
+              <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Date</th><th style={RPT_thStyle}>Voucher</th><th style={RPT_thStyle}>Section</th><th style={RPT_thStyle}>Nature (narration)</th><th style={{...RPT_thStyle,textAlign:"right"}}>TDS (₹)</th></tr></thead>
               <tbody>
-                <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Gross Payment</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{v.gross.toLocaleString("en-IN")}</td></tr>
-                <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>TDS Deducted ({v.section==="194J"?"10":"1"}%)</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700,color:"#A32D2D"}}>{v.tds.toLocaleString("en-IN")}</td></tr>
-                <tr style={{borderBottom:"2px solid #0d1326",background:"#fafbfd"}}><td style={{...RPT_tdStyle,fontWeight:700}}>Net Payment Released</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700,color:"#22c55e"}}>{v.net.toLocaleString("en-IN")}</td></tr>
+                {v.entries.map((e,i)=>(
+                  <tr key={e.vno+i} style={{borderBottom:"1px solid #dfe2e7"}}>
+                    <td style={{...RPT_tdStyle,whiteSpace:"nowrap"}}>{e.date}</td>
+                    <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#185FA5"}}>{e.vno}</td>
+                    <td style={RPT_tdStyle}>{e.section}</td>
+                    <td style={{...RPT_tdStyle,fontSize:10.5,color:"#5a6691"}}>{e.narration||"—"}</td>
+                    <td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700,color:"#A32D2D"}}>{Math.round(e.amount).toLocaleString("en-IN")}</td>
+                  </tr>
+                ))}
+                <tr style={{borderTop:"2px solid #0d1326",background:"#fafbfd"}}>
+                  <td colSpan={4} style={{...RPT_tdStyle,fontWeight:700}}>Total tax deducted — {v.count} deduction{v.count>1?"s":""}</td>
+                  <td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:800}}>{Math.round(v.tds).toLocaleString("en-IN")}</td>
+                </tr>
               </tbody>
             </table>
-            <div style={{padding:10,background:v.paid?"#d4edda":"#f8d7da",borderRadius:6,marginBottom:14}}>
-              <p style={{margin:0,fontSize:11.5,fontWeight:700,color:v.paid?"#155724":"#721c24"}}>{v.paid?"✓ TDS deposited to Government — Challan 281":"⚠ TDS not yet deposited — please deposit before issuing certificate"}</p>
+            <div style={{padding:10,background:"#FAEEDA",borderRadius:6,marginBottom:14}}>
+              <p style={{margin:0,fontSize:10.5,fontWeight:600,color:"#854F0B"}}>Challan details (BSR code, challan serial no., deposit date u/s 200) are not tracked in this system — fill them from the bank challans / OLTAS before issuing. Verify against the filed 26Q/27Q before signing.</p>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:20,paddingTop:12,borderTop:"1px solid #cdd1d8"}}>
               {["Signature of Deductor","Date"].map(s=>(
@@ -1637,7 +1903,9 @@ export function Form16AGenerator(){
             </div>
           </div>
         </div>
+        )}
       </div>
+      )}
     </PHASE2_Page>
   );
 }

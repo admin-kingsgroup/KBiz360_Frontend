@@ -30,6 +30,7 @@ import {
   TDS_SECTIONS, PAY_TERMS, SETTLE_CYCLES, PAY_METHODS, CURRENCIES, ADDR_TYPES,
   CUST_TYPES, CUST_SOURCES,
 } from '../../core/partyEnums';
+import { isIndiaCountry as isIndiaFE, isExplicitIndiaCountry as isExplicitIndiaFE, stateCodeOf, supplyTypeOf } from '../../core/gstSupply';
 import { openLedgerModal } from '../../core/LedgerModalHost';
 import { useHotkey } from '../../core/ux/hotkeys';
 import { Combobox } from '../../core/ux/Combobox';
@@ -48,28 +49,22 @@ const tabPanel = (children) => <div className="min-h-[360px] p-4 tablet:p-5">{ch
 // CUST_TYPES, CUST_SOURCES) now live in core/partyEnums so the simple list masters in
 // mastersLive.jsx share the exact same vocabulary. Imported at the top of this file.
 
-// GST place-of-supply helpers (mirror backend src/shared/util/gstSupplyType.js). A supplier
-// attracts Indian GST/TDS only when it is Indian; CGST+SGST (intra) vs IGST (inter) is then
-// decided by the supplier's state vs the branch's home state.
-const HOME_STATE_BY_BRANCH = { BOM: '27', AMD: '24' }; // branch GST registration state
-const isIndiaFE = (c) => { const x = String(c || '').trim().toLowerCase(); return x === '' || x === 'india' || x === 'in' || x === 'bharat'; };
-const isExplicitIndiaFE = (c) => { const x = String(c || '').trim().toLowerCase(); return x === 'india' || x === 'in' || x === 'bharat'; };
-const stateCodeFE = (f) => {
-  const byName = IN_STATES.find(([, n]) => n.toLowerCase() === String(f.state || '').trim().toLowerCase());
-  if (f.stateCode && IN_STATES.some(([c]) => c === f.stateCode)) return f.stateCode;
-  if (byName) return byName[0];
-  const g = String(f.gstin || '').match(/^\d{2}/);
-  return g ? g[0] : '';
-};
+// GST place-of-supply helpers — shared with the SO/PO/GP booking screen (which
+// auto-picks each leg's GST mode from these same rules). Mirrors the backend
+// src/shared/util/gstSupplyType.js. A party attracts Indian GST/TDS only when it
+// is Indian; CGST+SGST (intra) vs IGST (inter) is then decided by the party's
+// state vs the branch's home state.
+const stateCodeFE = (f) => stateCodeOf(f || {});
 // → { type, label, tone } for the read-only Inter/Intra/Foreign indicator.
-function supplyTypeFE(f = {}) {
-  if (!isIndiaFE(f.country)) return { type: 'foreign', label: 'Overseas supplier — Indian GST / TDS NOT applicable', tone: 'muted' };
-  const sc = stateCodeFE(f);
-  if (!sc) return { type: '', label: 'Select a State to determine Inter / Intra', tone: 'warn' };
-  const home = HOME_STATE_BY_BRANCH[String(f.branch || '').toUpperCase()] || '27';
-  return sc === home
-    ? { type: 'intra', label: 'Intra-state — CGST + SGST', tone: 'ok' }
-    : { type: 'inter', label: 'Inter-state — IGST', tone: 'ok' };
+function supplyTypeFE(f = {}, kind = 'supplier') {
+  const type = supplyTypeOf(f, f.branch);
+  if (type === 'foreign') {
+    return { type, label: kind === 'customer' ? 'Overseas customer — Indian GST NOT applicable' : 'Overseas supplier — Indian GST / TDS NOT applicable', tone: 'muted' };
+  }
+  if (!type) return { type: '', label: 'Select a State to determine Inter / Intra', tone: 'warn' };
+  return type === 'intra'
+    ? { type, label: 'Intra-state — CGST + SGST', tone: 'ok' }
+    : { type, label: 'Inter-state — IGST', tone: 'ok' };
 }
 
 // Branch-aware full amount: ₹ + Indian grouping for India branches, $ + Western
@@ -444,6 +439,60 @@ const CUSTOM_COLS = [
   { key: 'value', label: 'Value', type: 'text' },
 ];
 
+/* Admin-DEFINED custom fields (Settings ▸ Custom Fields, /api/custom-fields) —
+   the consumer that makes that master real: every active definition for this
+   master renders its typed input (Text/Number/Date/Dropdown, required badge)
+   and binds by label into the same customFields[] the doc persists. Free-form
+   rows keep working below for anything not admin-defined. */
+function DefinedCustomFields({ master, rows = [], onChange }) {
+  const { data: defs = [] } = useMasterList('custom-fields', { master, active: true });
+  if (!defs.length) return null;
+  const valOf = (label) => (rows.find((r) => r.label === label) || {}).value ?? '';
+  const setVal = (label, value) => onChange([...rows.filter((r) => r.label !== label), { label, value }]);
+  const input = (d) => {
+    const common = { value: valOf(d.label), onChange: (e) => setVal(d.label, e.target.value), style: { width: '100%', padding: '7px 10px', border: '1px solid #cdd1d8', borderRadius: 5, fontSize: 12 } };
+    if (/dropdown/i.test(d.type)) {
+      const opts = String(d.options || '').split(',').map((o) => o.trim()).filter(Boolean);
+      return <select {...common}><option value="">—</option>{opts.map((o) => <option key={o} value={o}>{o}</option>)}</select>;
+    }
+    if (/date/i.test(d.type)) return <input type="date" {...common} />;
+    if (/number/i.test(d.type)) return <input type="number" {...common} />;
+    return <input type="text" {...common} />;
+  };
+  return (
+    <div style={{ marginBottom: 14, padding: 12, background: '#fafbfd', border: '1px solid #cdd1d8', borderRadius: 6 }}>
+      <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase' }}>Defined fields (Settings ▸ Custom Fields)</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10 }}>
+        {defs.map((d) => (
+          <div key={d.cfId || d.id}>
+            <label style={{ display: 'block', fontSize: 10.5, color: '#5b616e', fontWeight: 700, marginBottom: 3 }}>
+              {d.label}{d.required && <span style={{ color: '#dc2626' }}> *</span>}
+            </label>
+            {input(d)}
+            {d.required && !String(valOf(d.label)).trim() && <p style={{ margin: '3px 0 0', fontSize: 9.5, color: '#dc2626' }}>required</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* The whole Custom tab: admin-defined typed fields on top, free-form key/value
+   rows below (free-form hides labels an admin definition already covers). */
+function CustomFieldsTab({ master, hint, rows = [], onChange }) {
+  const { data: defs = [] } = useMasterList('custom-fields', { master, active: true });
+  const defined = new Set(defs.map((d) => d.label));
+  const freeRows = rows.filter((r) => !defined.has(r.label));
+  const definedRows = rows.filter((r) => defined.has(r.label));
+  return (
+    <>
+      <DefinedCustomFields master={master} rows={rows} onChange={onChange} />
+      <EmptyHint>{hint}</EmptyHint>
+      <ArrayEditor rows={freeRows} cols={CUSTOM_COLS} onChange={(v) => onChange([...definedRows, ...v])} addLabel="Add Field" />
+    </>
+  );
+}
+
 /* ════════════════════════════════════════════════════════════════════
    1. CUSTOMER MASTER (live)
    ════════════════════════════════════════════════════════════════════ */
@@ -486,11 +535,16 @@ export function CustomerMasterTabbed({ branch } = {}) {
       {tab === 'address' && tabPanel(
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,200px),1fr))', gap: 14, marginBottom: 18 }}>
-            <FormField label="Primary Billing Address (used on invoices)">
+            <FormField label="Primary Billing Address (required — used on invoices)">
               <Textarea value={f.address || ''} onChange={(e) => set('address', e.target.value)} rows={3} />
             </FormField>
             <Field label="City" value={f.city} onChange={(v) => set('city', v)} />
           </div>
+          {isIndiaFE(f.country) && !String(f.address || '').trim() && (
+            <div style={{ padding: '8px 11px', borderRadius: 6, background: '#fdf3e3', color: '#a9690a', fontSize: 11.5, fontWeight: 600, marginBottom: 12 }}>
+              ⚠ Address is mandatory for an Indian customer — saving without it will be rejected. State (Tax Info tab) fixes the place of supply.
+            </div>
+          )}
           <EmptyHint>Additional addresses (shipping, registered office, …)</EmptyHint>
           <ArrayEditor rows={f.addresses} cols={ADDR_COLS} onChange={(v) => set('addresses', v)} addLabel="Add address" />
         </>
@@ -501,18 +555,49 @@ export function CustomerMasterTabbed({ branch } = {}) {
       {tab === 'bank' && tabPanel(
         <ArrayEditor rows={f.banks} cols={BANK_COLS} onChange={(v) => set('banks', v)} addLabel="Add Bank Account" />
       )}
-      {tab === 'tax' && tabPanel(
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
-          <Field label="GSTIN" value={f.gstin} onChange={(v) => set('gstin', v)} mono />
-          <Field label="PAN" value={f.pan} onChange={(v) => set('pan', v)} mono />
-          <Field label="TAN" value={f.tan} onChange={(v) => set('tan', v)} mono />
-          <Field label="TIN (state)" value={f.tin} onChange={(v) => set('tin', v)} mono />
-          <Field label="State Code" value={f.stateCode} onChange={(v) => set('stateCode', v)} />
-          <SelectField label="GST Treatment" value={f.gstTreatment} onChange={(v) => set('gstTreatment', v)} options={GST_TREATMENTS} />
-          <SelectField label="TDS Section" value={f.tdsSection} onChange={(v) => set('tdsSection', v)} options={TDS_SECTIONS} />
-          <SelectField label="MSME Status" value={f.msmeStatus} onChange={(v) => set('msmeStatus', v)} options={MSME_STATUS} />
-        </div>
-      )}
+      {tab === 'tax' && tabPanel((() => {
+        const india = isIndiaFE(f.country);
+        const sup = supplyTypeFE(f, 'customer');
+        const setState = (name) => {
+          const row = IN_STATES.find(([, n]) => n === name);
+          set('state', name);
+          set('stateCode', row ? row[0] : '');
+        };
+        const toneBg = { ok: '#e9f7ef', warn: '#fdf3e3', muted: '#eef0f4' }[sup.tone] || '#eef0f4';
+        const toneFg = { ok: '#16794c', warn: '#a9690a', muted: '#5b616e' }[sup.tone] || '#5b616e';
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Place of supply — the customer's state vs the branch's home state decides
+                the SALE leg's CGST/SGST (intra) vs IGST (inter); the SO/PO/GP booking
+                screen auto-picks its Sale GST mode from exactly this. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
+              <SelectField label="Country" value={f.country || 'India'} onChange={(v) => set('country', v)} options={COUNTRIES} />
+              {india && (
+                <SelectField label="State (required for India)" value={f.state || ''} onChange={setState} options={STATE_NAMES} />
+              )}
+              <FormField label="GST Supply Type (auto)">
+                <div style={{ padding: '7px 10px', borderRadius: 6, background: toneBg, color: toneFg, fontSize: 12, fontWeight: 700, border: '1px solid #cdd1d8' }}>
+                  {sup.type === 'intra' ? '🟢 ' : sup.type === 'inter' ? '🔵 ' : sup.type === 'foreign' ? '🌐 ' : '⚠ '}{sup.label}
+                </div>
+              </FormField>
+            </div>
+            {isExplicitIndiaFE(f.country) && !stateCodeFE(f) && (
+              <div style={{ padding: '8px 11px', borderRadius: 6, background: '#fdf3e3', color: '#a9690a', fontSize: 11.5, fontWeight: 600 }}>
+                ⚠ State is mandatory for an Indian customer — it decides the sale's CGST/SGST (intra-state) vs IGST (inter-state). Saving without it will be rejected.
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
+              <Field label="GSTIN" value={f.gstin} onChange={(v) => set('gstin', v)} mono />
+              <Field label="PAN" value={f.pan} onChange={(v) => set('pan', v)} mono />
+              <Field label="TAN" value={f.tan} onChange={(v) => set('tan', v)} mono />
+              <Field label="TIN (state)" value={f.tin} onChange={(v) => set('tin', v)} mono />
+              <SelectField label="GST Treatment" value={f.gstTreatment} onChange={(v) => set('gstTreatment', v)} options={GST_TREATMENTS} />
+              <SelectField label="TDS Section" value={f.tdsSection} onChange={(v) => set('tdsSection', v)} options={TDS_SECTIONS} />
+              <SelectField label="MSME Status" value={f.msmeStatus} onChange={(v) => set('msmeStatus', v)} options={MSME_STATUS} />
+            </div>
+          </div>
+        );
+      })())}
       {tab === 'credit' && tabPanel(
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 14 }}>
           <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
@@ -545,7 +630,7 @@ export function CustomerMasterTabbed({ branch } = {}) {
         <ArrayEditor rows={f.notes} cols={NOTE_COLS} onChange={(v) => set('notes', v)} addLabel="Add Note" />
       )}
       {tab === 'custom' && tabPanel(
-        <><EmptyHint>Custom key/value fields for this customer.</EmptyHint><ArrayEditor rows={f.customFields} cols={CUSTOM_COLS} onChange={(v) => set('customFields', v)} addLabel="Add Field" /></>
+        <CustomFieldsTab master="Customer" hint="Custom key/value fields for this customer." rows={f.customFields} onChange={(v) => set('customFields', v)} />
       )}
       {tab === 'history' && <HistoryTab q={m.vouchersQ} branch={m.current?.branch} />}
       {tab === 'linked' && <LinkedVouchersTab q={m.vouchersQ} />}
@@ -678,7 +763,7 @@ export function SupplierMasterTabbed({ branch } = {}) {
         <ArrayEditor rows={f.notes} cols={NOTE_COLS} onChange={(v) => set('notes', v)} addLabel="Add Note" />
       )}
       {tab === 'custom' && tabPanel(
-        <><EmptyHint>Custom key/value fields for this supplier.</EmptyHint><ArrayEditor rows={f.customFields} cols={CUSTOM_COLS} onChange={(v) => set('customFields', v)} addLabel="Add Field" /></>
+        <CustomFieldsTab master="Supplier" hint="Custom key/value fields for this supplier." rows={f.customFields} onChange={(v) => set('customFields', v)} />
       )}
       {tab === 'history' && <HistoryTab q={m.vouchersQ} branch={m.current?.branch} />}
       {tab === 'linked' && <LinkedVouchersTab q={m.vouchersQ} />}

@@ -13,7 +13,7 @@ import { toast } from '../../core/ux/toast';
 import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
-import { apiPost, apiPut, apiPatch, apiDelete } from '../../core/api';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../core/api';
 import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../core/useReference';
 import { Switch } from '../../shell/primitives';
 import { useModalEsc } from '../../core/ux/useModalEsc';
@@ -1090,9 +1090,27 @@ export function EmailSMSTemplates(){
     catch(e){ toast(e.message||"Create failed","error"); }
   };
   const tokens=["{CustomerName}","{BookingRef}","{TripName}","{Amount}","{DueDate}","{VoucherNo}","{ConsultantName}","{BranchPhone}","{InvoiceNo}","{Date}"];
+  // Send pipeline (LIVE 2026-07-10): POST /api/email-templates/:id/send renders the
+  // tokens and mails over the server's SMTP config; 503 with the reason when SMTP
+  // isn't configured — the send modal surfaces that honestly.
+  const [sendModal,setSendModal]=useState(null); // {to, vars:{}}
+  const openSend=async()=>{
+    if(!t.dbId){toast("Save the template first","error");return;}
+    try{
+      const meta=await apiGet(`/api/email-templates/${t.dbId}/placeholders`);
+      const vars={}; (meta.placeholders||[]).forEach(p=>{vars[p]="";});
+      setSendModal({to:"",vars,smtp:meta.smtpConfigured});
+    }catch(e){ toast(e.message||"Failed to load template","error"); }
+  };
+  const doSend=async()=>{
+    try{
+      const r=await apiPost(`/api/email-templates/${t.dbId}/send`,{to:sendModal.to,vars:sendModal.vars});
+      toast(`Sent "${r.subject}" to ${r.to.join(", ")}`); setSendModal(null);
+    }catch(e){ toast(e.message||"Send failed","error"); }
+  };
   return(
     <PHASE2_Page title="Email / SMS Template Editor" subtitle="Customise communication templates · token substitution · channel-specific"
-      toolbar={<><button onClick={save} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button disabled title="Test sending isn’t wired to a mail provider yet" style={{padding:"7px 12px",background:"#eef0f6",border:"1px solid #cdd1d8",color:"#9aa3bd",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"not-allowed"}}>Send Test</button></>}>
+      toolbar={<><button onClick={save} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button onClick={openSend} style={{padding:"7px 12px",background:"#0d1326",border:"none",color:"#d4a437",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>📤 Send…</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:14}}>
         {/* Template list */}
         <div style={cardStyle} onKeyDown={listKeyNav()}>
@@ -1131,6 +1149,28 @@ export function EmailSMSTemplates(){
           </div>
         </div>
       </div>
+      {sendModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:460,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>Send — {t.name}</p>
+              <button onClick={()=>setSendModal(null)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5b616e"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:10}}>
+              {!sendModal.smtp&&<div style={{padding:"8px 12px",borderRadius:8,background:"#FFF8E1",border:"1px solid #F1E3B0",fontSize:11,color:"#854F0B"}}>⚠ SMTP is not configured on the server (SMTP_HOST) — sending will fail until it is.</div>}
+              <div><label style={{fontSize:10.5,color:"#5a6691",fontWeight:700,display:"block",marginBottom:3}}>To (comma-separated)</label><input value={sendModal.to} onChange={e=>setSendModal(m=>({...m,to:e.target.value}))} placeholder="name@company.com, …" style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>
+              {Object.keys(sendModal.vars).length>0&&<p style={{margin:"4px 0 0",fontSize:10.5,color:"#5a6691",fontWeight:700}}>Token values</p>}
+              {Object.keys(sendModal.vars).map(k=>(
+                <div key={k}><label style={{fontSize:10.5,color:"#5a6691",fontWeight:600,display:"block",marginBottom:3,fontFamily:"monospace"}}>{`{${k}}`}</label><input value={sendModal.vars[k]} onChange={e=>setSendModal(m=>({...m,vars:{...m.vars,[k]:e.target.value}}))} style={{padding:"6px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12,width:"100%"}}/></div>
+              ))}
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setSendModal(null)} style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={doSend} disabled={!sendModal.to.trim()} style={{padding:"7px 16px",background:"#0d1326",color:"#d4a437",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",opacity:sendModal.to.trim()?1:0.5}}>📤 Send now</button>
+            </div>
+          </div>
+        </div>
+      )}
     </PHASE2_Page>
   );
 }
@@ -1140,38 +1180,57 @@ export function EmailSMSTemplates(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function ApprovalMatrixBuilder(){
-  // Live approval thresholds (GET /api/approval-limits). Was hardcoded APPROVAL_LIMITS_DATA.
+  // LIVE 2026-07-10: rows are controlled and 💾 Save & Publish diffs against the
+  // server — new rows POST (next AL-### allocated), edited rows PUT, removed rows
+  // DELETE — all on /api/approval-limits. Was preview-only with a disabled save.
   const live=useApprovalLimits().data;
+  const qc=useQueryClient();
   const [rules,setRules]=useState([]);
-  useEffect(()=>{ if(live) setRules(live); },[live]);
+  const [removed,setRemoved]=useState([]); // dbIds queued for DELETE on save
+  const [saving,setSaving]=useState(false);
+  useEffect(()=>{ if(live){ setRules(live.map(r=>({...r}))); setRemoved([]);} },[live]);
   const [form,setForm]=useState({role:"Accounts Executive",voucherType:"Payment Voucher",minAmount:0,maxAmount:50000,backup:"Sr. Accounts Executive"});
   const groupByType={};
   rules.forEach(r=>{if(!groupByType[r.voucherType])groupByType[r.voucherType]=[];groupByType[r.voucherType].push(r);});
   const fmt=n=>n>=999999999?"Unlimited":"₹"+n.toLocaleString("en-IN");
   const inp={padding:"7px 8px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,width:"100%"};
+  const setRule=(id,patch)=>setRules(rs=>rs.map(x=>x.id===id?{...x,...patch,_dirty:true}:x));
+  const removeRule=(rule)=>{ if(rule.dbId)setRemoved(d=>[...d,rule.dbId]); setRules(rs=>rs.filter(x=>x.id!==rule.id)); };
+  const saveAll=async()=>{
+    setSaving(true);
+    try{
+      let nextNo=Math.max(0,...(live||[]).map(x=>parseInt(String(x.alId||"").replace(/\D/g,""),10)||0))+1;
+      let created=0,updated=0,deleted=0;
+      for(const dbId of removed){ await apiDelete(`/api/approval-limits/${dbId}`); deleted++; }
+      for(const r of rules){
+        const body={role:r.role,voucherType:r.voucherType,minAmount:Number(r.minAmount)||0,maxAmount:Number(r.maxAmount)||999999999,backup:r.backup||"",active:r.active!==false};
+        if(!r.dbId){ await apiPost("/api/approval-limits",{alId:`AL-${String(nextNo++).padStart(3,"0")}`,...body}); created++; }
+        else if(r._dirty){ await apiPut(`/api/approval-limits/${r.dbId}`,body); updated++; }
+      }
+      toast(`Approval matrix published — ${created} added · ${updated} updated · ${deleted} removed.`);
+      qc.invalidateQueries({queryKey:["ref","approval-limits"]});
+    }catch(e){ toast(e.message||"Publish failed","error"); }
+    finally{ setSaving(false); }
+  };
   return(
-    <PHASE2_Page title="Approval Matrix Builder" subtitle="Preview — drag-and-configure per-role, per-voucher-type thresholds (server save not enabled on this screen yet)"
-      toolbar={<button disabled title="Saving the approval matrix isn’t available on this screen yet" style={{padding:"7px 14px",background:"#eef0f6",color:"#9aa3bd",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,fontWeight:700,cursor:"not-allowed"}}>💾 Save & Publish</button>}>
+    <PHASE2_Page title="Approval Matrix Builder" subtitle="Per-role, per-voucher-type thresholds — saved live to /api/approval-limits"
+      toolbar={<button onClick={saveAll} disabled={saving} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",opacity:saving?0.6:1}}>💾 {saving?"Publishing…":"Save & Publish"}</button>}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:14}}>
         <div>
           {Object.entries(groupByType).map(([type,typeRules])=>(
             <div key={type} style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden",marginBottom:12}}>
               <div style={{padding:"9px 14px",background:"#0d1326",color:"#fff",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <p style={{margin:0,fontSize:12.5,fontWeight:700}}>{type}</p>
-                <button onClick={()=>setRules(r=>r.filter(x=>x.voucherType!==type||x.id!==typeRules[typeRules.length-1].id))} style={{padding:"2px 8px",background:"transparent",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",borderRadius:3,fontSize:10,cursor:"pointer"}}>Remove last tier</button>
               </div>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-                <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Approver Role</th><th style={{...RPT_thStyle,textAlign:"right"}}>From (₹)</th><th style={{...RPT_thStyle,textAlign:"right"}}>To (₹)</th><th style={RPT_thStyle}>Backup</th><th style={{...RPT_thStyle,textAlign:"center"}}>↕</th></tr></thead>
-                <tbody>{typeRules.map((r,i)=>(<tr key={r.id} style={{borderBottom:"1px solid #dfe2e7"}}>
-                  <td style={RPT_tdStyle}><select defaultValue={r.role} style={{...inp,width:"auto"}}><option>Accounts Executive</option><option>Sr. Accounts Executive</option><option>Senior Finance Manager</option><option>Director</option></select></td>
-                  <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><input type="number" defaultValue={r.minAmount} style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
-                  <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><input type="number" defaultValue={r.maxAmount<999999999?r.maxAmount:""} placeholder="Unlimited" style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
-                  <td style={RPT_tdStyle}><input defaultValue={r.backup} style={{...inp,width:"auto"}}/></td>
+                <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Approver Role</th><th style={{...RPT_thStyle,textAlign:"right"}}>From (₹)</th><th style={{...RPT_thStyle,textAlign:"right"}}>To (₹)</th><th style={RPT_thStyle}>Backup</th><th style={{...RPT_thStyle,textAlign:"center"}}></th></tr></thead>
+                <tbody>{typeRules.map((r)=>(<tr key={r.id} style={{borderBottom:"1px solid #dfe2e7"}}>
+                  <td style={RPT_tdStyle}><select value={r.role} onChange={e=>setRule(r.id,{role:e.target.value})} style={{...inp,width:"auto"}}><option>Accounts Executive</option><option>Sr. Accounts Executive</option><option>Senior Finance Manager</option><option>Director</option></select></td>
+                  <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><input type="number" value={r.minAmount} onChange={e=>setRule(r.id,{minAmount:+e.target.value})} style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
+                  <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><input type="number" value={r.maxAmount<999999999?r.maxAmount:""} onChange={e=>setRule(r.id,{maxAmount:e.target.value===""?999999999:+e.target.value})} placeholder="Unlimited" style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
+                  <td style={RPT_tdStyle}><input value={r.backup||""} onChange={e=>setRule(r.id,{backup:e.target.value})} style={{...inp,width:"auto"}}/></td>
                   <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
-                    <div style={{display:"flex",gap:2,justifyContent:"center"}}>
-                      {i>0&&<button style={{padding:"2px 6px",background:"#f7f8fb",border:"1px solid #cdd1d8",borderRadius:2,cursor:"pointer",fontSize:11}}>▲</button>}
-                      {i<typeRules.length-1&&<button style={{padding:"2px 6px",background:"#f7f8fb",border:"1px solid #cdd1d8",borderRadius:2,cursor:"pointer",fontSize:11}}>▼</button>}
-                    </div>
+                    <button onClick={()=>removeRule(r)} title="Remove tier (deleted on Save & Publish)" style={{padding:"2px 8px",background:"#fbe9e9",border:"1px solid #f3c9c9",color:"#dc2626",borderRadius:3,fontSize:10.5,cursor:"pointer",fontWeight:700}}>✕</button>
                   </td>
                 </tr>))}</tbody>
               </table>
