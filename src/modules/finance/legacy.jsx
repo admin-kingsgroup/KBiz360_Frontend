@@ -10,7 +10,8 @@ import { clickable } from '../../core/ux/clickable';
 import { SampleBanner } from '../../core/ux/SampleBanner';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { AlertTriangle, ChevronDown, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
-import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement, useRefreshBankReco } from '../../core/useBankReco';
+import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useGroupMatch, useUnmatch, useSetReconStatus, useClearStatement, useRefreshBankReco } from '../../core/useBankReco';
+import { useReconQueue, useReconSummary } from '../../core/useReconciliation';
 import { usePDCs, usePDCSummary, useCreatePDC, useDepositPDC, useBouncePDC, useRepresentPDC, useDeletePDC } from '../../core/usePDC';
 import { branchCode } from '../../core/useAccounting';
 import { PeriodBar } from '../../core/period';
@@ -213,6 +214,7 @@ export function BankReco({branch}){
   const importMut=useImportStatement();
   const autoMut=useAutoMatch();
   const matchMut=useManualMatch();
+  const groupMut=useGroupMatch();
   const unmatchMut=useUnmatch();
   const statusMut=useSetReconStatus();
   const clearMut=useClearStatement();
@@ -222,7 +224,7 @@ export function BankReco({branch}){
   const {data:brs}=useBankBRS(ledger,branch,range);
   const [view,setView]=useState("detailed");  // detailed | minimal
   const [search,setSearch]=useState("");
-  const [selBook,setSelBook]=useState(null);   // { bookKey, vno, debit, credit }
+  const [selBooks,setSelBooks]=useState([]);   // { bookKey, vno, debit, credit }[] — N book legs → one line (split)
   const [selStmt,setSelStmt]=useState(null);   // statement line
   const [showImport,setShowImport]=useState(false);
 
@@ -249,25 +251,32 @@ export function BankReco({branch}){
   const bookFiltered=bookLines.filter(l=>!q||`${l.date} ${l.vno} ${l.narration} ${l.party}`.toLowerCase().includes(q));
   const stmtFiltered=stmt.filter(l=>!q||`${l.date} ${l.reference} ${l.chequeNo} ${l.utr} ${l.description}`.toLowerCase().includes(q));
 
-  /* ── Manual match: pair one selected book line with one statement line ── */
-  const variancePreview=(selBook&&selStmt)?Math.round(((selStmt.credit-selStmt.debit)-(selBook.debit-selBook.credit))*100)/100:0;
+  /* ── Manual match: pair one or more book lines with one statement line (N:1 split) ── */
+  const toggleBook=(b)=>setSelBooks(p=>p.some(x=>x.bookKey===b.bookKey)?p.filter(x=>x.bookKey!==b.bookKey):[...p,b]);
+  const bookSum=selBooks.reduce((t,b)=>t+(b.debit-b.credit),0);
+  const stmtSigned=selStmt?(selStmt.credit-selStmt.debit):0;
+  const variancePreview=(selBooks.length&&selStmt)?Math.round((stmtSigned-bookSum)*100)/100:0;
+  const clearSel=()=>{setSelBooks([]);setSelStmt(null);};
   const confirmMatch=async()=>{
-    if(!selBook||!selStmt) return;
-    // Guardrail: a 1:1 match that doesn't tie is usually a SPLIT (one bank line =
-    // several book entries). Warn before saving it as a partial.
+    if(!selBooks.length||!selStmt) return;
+    // Guardrail: a match that doesn't tie is usually a SPLIT (one bank line = several
+    // book entries). Warn before saving a partial — otherwise add the remaining legs.
     if(Math.abs(variancePreview)>0.01){
       const {confirmed}=await confirmDialog({
         title:"Amounts don’t match — is this a split?",
-        message:`The book entry and the statement line differ by ${f(Math.abs(variancePreview))}.\n\nA single bank line is often several book entries combined (a split). If so, Cancel and match all the legs together.\n\nMatching now records a PARTIAL with this variance.`,
+        message:`The selected book ${selBooks.length>1?"entries":"entry"} and the statement line differ by ${f(Math.abs(variancePreview))}.\n\nA single bank line is often several book entries combined (a split). If so, select all the legs so they sum to the line. Matching now records a PARTIAL with this variance.`,
         confirmLabel:"Match as partial",
         cancelLabel:"Cancel",
       });
       if(!confirmed) return;
     }
-    matchMut.mutate(
-      {id:selStmt.id,bookKey:selBook.bookKey,vno:selBook.vno,bookDebit:selBook.debit,bookCredit:selBook.credit},
-      {onSuccess:()=>{setSelBook(null);setSelStmt(null);}}
-    );
+    const done={onSuccess:clearSel};
+    if(selBooks.length===1){
+      const b=selBooks[0];
+      matchMut.mutate({id:selStmt.id,bookKey:b.bookKey,vno:b.vno,bookDebit:b.debit,bookCredit:b.credit},done);
+    }else{
+      groupMut.mutate({id:selStmt.id,books:selBooks.map(b=>({bookKey:b.bookKey,vno:b.vno,debit:b.debit,credit:b.credit}))},done);
+    }
   };
   const runAutoMatch=()=>autoMut.mutate({ledger,branch:code,from,to});
 
@@ -305,7 +314,7 @@ export function BankReco({branch}){
           </div>
         </div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
-          <select value={ledger} onChange={e=>{setLedger(e.target.value);setSelBook(null);setSelStmt(null);}} style={{...inp,width:"auto",minWidth:180,minHeight:32,fontSize:11}}>
+          <select value={ledger} onChange={e=>{setLedger(e.target.value);setSelBooks([]);setSelStmt(null);}} style={{...inp,width:"auto",minWidth:180,minHeight:32,fontSize:11}}>
             {bankLedgers.length===0&&<option value="">{ledgersLoading?"Loading banks…":"No bank ledgers"}</option>}
             {bankLedgers.map(b=><option key={b.code||b.name} value={b.name}>{b.name}{b.currency&&b.currency!=="INR"?` (${b.currency})`:""}</option>)}
           </select>
@@ -369,15 +378,17 @@ export function BankReco({branch}){
           </div>
 
           {/* Manual-match action bar */}
-          {(selBook||selStmt)&&(
+          {(selBooks.length>0||selStmt)&&(
             <div style={{...card,padding:"8px 12px",marginBottom:10,background:"#E6F1FB",border:"1px solid #B5D4F4",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <div style={{fontSize:11,color:"#185FA5"}}>
-                <b>Manual match —</b> Book: {selBook?`${selBook.vno} (${f(selBook.debit-selBook.credit)})`:<i>select a book entry</i>} ↔ Statement: {selStmt?`${selStmt.date} (${f(selStmt.credit-selStmt.debit)})`:<i>select a statement line</i>}
-                {selBook&&selStmt&&Math.abs(variancePreview)>0.01&&<span style={{color:"#A32D2D",fontWeight:700}}> · variance {f(variancePreview)} → Partial</span>}
+                <b>Manual match —</b> Book: {selBooks.length>0?`${selBooks.length} ${selBooks.length>1?"entries":"entry"} (${f(bookSum)})`:<i>select one or more book entries</i>} ↔ Statement: {selStmt?`${selStmt.date} (${f(stmtSigned)})`:<i>select a statement line</i>}
+                {selBooks.length>1&&<span style={{color:"#185FA5",fontWeight:700}}> · {selBooks.length}-way split</span>}
+                {selBooks.length>0&&selStmt&&Math.abs(variancePreview)>0.01&&<span style={{color:"#A32D2D",fontWeight:700}}> · variance {f(variancePreview)} → Partial</span>}
+                {selBooks.length>0&&selStmt&&Math.abs(variancePreview)<=0.01&&<span style={{color:"#27500A",fontWeight:700}}> · ties out ✓</span>}
               </div>
               <div style={{display:"flex",gap:6}}>
-                <button onClick={confirmMatch} disabled={!selBook||!selStmt||matchMut.isPending} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#27500A",opacity:(!selBook||!selStmt)?0.5:1}}><Link2 size={12}/> Match</button>
-                <button onClick={()=>{setSelBook(null);setSelStmt(null);}} style={{...btnGh,fontSize:10.5,padding:"4px 10px"}}><X size={12}/> Clear</button>
+                <button onClick={confirmMatch} disabled={!selBooks.length||!selStmt||matchMut.isPending||groupMut.isPending} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#27500A",opacity:(!selBooks.length||!selStmt)?0.5:1}}><Link2 size={12}/> Match</button>
+                <button onClick={clearSel} style={{...btnGh,fontSize:10.5,padding:"4px 10px"}}><X size={12}/> Clear</button>
               </div>
             </div>
           )}
@@ -393,10 +404,10 @@ export function BankReco({branch}){
                     {bookLoading&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
                     {!bookLoading&&bookFiltered.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No book entries for this bank/period.</td></tr>}
                     {bookFiltered.map((l,i)=>{
-                      const sel=selBook?.bookKey===l.bookKey;
+                      const sel=selBooks.some(b=>b.bookKey===l.bookKey);
                       const net=l.debit-l.credit;
                       return (
-                        <tr key={l.bookKey} {...(!l.reconciled ? clickable(()=>{ setSelBook(sel?null:{bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }) : {})}
+                        <tr key={l.bookKey} {...(!l.reconciled ? clickable(()=>{ toggleBook({bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }) : {})}
                           style={{borderBottom:"1px solid #dfe2e7",cursor:l.reconciled?"default":"pointer",background:sel?"#FFF4D6":l.reconciled?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}>
                           <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
                           <td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{l.vno}</td>
@@ -456,7 +467,7 @@ export function BankReco({branch}){
               </div>
             </div>
           </div>
-          <p style={{margin:"10px 2px 0",fontSize:9.5,color:"#5a6691"}}>Tip: select one Book entry and one Statement line, then <b>Match</b>. Use <b>Auto-match</b> to pair by amount + date + reference. Reconciliation state is saved server-side and survives voucher edits.</p>
+          <p style={{margin:"10px 2px 0",fontSize:9.5,color:"#5a6691"}}>Tip: select <b>one or more</b> Book entries (tap several that together sum to the line — a split) and one Statement line, then <b>Match</b>. Use <b>Auto-match</b> to pair by amount + date + reference. Reconciliation state is saved server-side and survives voucher edits.</p>
         </div>
       )}
 
@@ -1976,30 +1987,106 @@ export function LoanAmortization(){
    6. RECONCILIATION QUEUE
    ════════════════════════════════════════════════════════════════════ */
 
+// The four tiers, in ladder order, for the pending strip.
+const RECO_QUEUE_TIERS = [
+  { key:'weekly',  label:'Weekly' },
+  { key:'month',   label:'Month-End' },
+  { key:'quarter', label:'Quarterly' },
+  { key:'year',    label:'Year-End' },
+];
+// Facts → the row's colour badge + sort rank. Overdue floats to the top, done sinks;
+// untouched "pending" ranks above part-worked rows so the most work-to-do is visible.
+function recoRowState(it){
+  if(it.overdue) return { label:'Overdue', c:'#A32D2D', bg:'#FCEBEB', dot:'#A32D2D', rank:0 };
+  if(it.status==='signed'||it.status==='locked') return { label:'Reconciled', c:'#27500A', bg:'#EAF3DE', dot:'#27500A', rank:4 };
+  if(it.status==='reconciled') return { label:'Ready to sign', c:'#185FA5', bg:'#E6F1FB', dot:'#185FA5', rank:3 };
+  if(it.status==='open'||it.statementImported) return { label:'In progress', c:'#8a5a00', bg:'#FFF4D6', dot:'#d4a437', rank:2 };
+  return { label:'Pending', c:'#5a6691', bg:'#eef0f5', dot:'#9aa3bd', rank:1 };
+}
+const recoWeekShort = (p)=> p ? String(p).replace(/^\d{4}-/,'') : '';
+const qTh = (a)=>({padding:"9px 10px",textAlign:a,whiteSpace:"nowrap"});
+
 export function ReconciliationQueue({branch,setRoute}){
-  const { data } = useBankLedgers(branch);
-  const ledgers=data||[];
+  const { data:qData, isLoading:qLoading } = useReconQueue(branch);
+  const { data:sData } = useReconSummary(branch);
+  const { data:bankData } = useBankLedgers(branch);
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
+  // Prefer the certificate-backed status rows; fall back to the bare bank-ledger
+  // list so the screen never regresses if the status endpoint is unavailable.
+  const items = (qData && Array.isArray(qData.items) && qData.items.length)
+    ? qData.items
+    : (bankData||[]).map(l=>({ code:l.code, name:l.name, group:l.group, status:'not-started', difference:null, statementImported:false, lastReconciled:null, waitingOn:null, overdue:false }));
+  const rows = [...items].sort((a,b)=> (recoRowState(a).rank - recoRowState(b).rank) || String(a.name||'').localeCompare(String(b.name||'')));
+  const tiers = (sData && sData.tiers) || {};
+  const overdueCount = items.filter(it=>it.overdue).length;
+  const weekLabel = qData && qData.period ? recoWeekShort(qData.period) : '';
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>Reconciliation Queue</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Bank / OD ledgers to reconcile against imported statements. Live - lists your real bank ledgers.</p>
+      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Bank / OD ledgers to reconcile against imported statements — live status from the weekly certificate ladder, so everyone can see what's pending{weekLabel?` (this week ${weekLabel})`:''}.</p>
+
+      {/* Pending strip — how far each tier's close has progressed, plus overdue count. */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:8,margin:"0 0 12px"}}>
+        {RECO_QUEUE_TIERS.map(t=>{
+          const g=tiers[t.key]||{}; const total=g.total||0, done=g.done||0, pct=total?Math.round(done/total*100):0;
+          return(
+            <div key={t.key} style={{...card,padding:"8px 12px",minWidth:150,flex:"1 1 150px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:".4px"}}>
+                <span>{t.label}</span><span style={{color:"#0d1326"}}>{done}/{total}</span>
+              </div>
+              <div style={{height:5,borderRadius:3,background:"#eef0f5",marginTop:6,overflow:"hidden"}}>
+                <div style={{height:"100%",width:`${pct}%`,background:total&&done>=total?"#27500A":"#d4a437"}}/>
+              </div>
+            </div>
+          );
+        })}
+        <div style={{...card,padding:"8px 12px",minWidth:150,flex:"1 1 150px",display:"flex",flexDirection:"column",justifyContent:"center",
+          background:overdueCount?"#FCEBEB":"#EAF3DE",borderColor:overdueCount?"#f0c9c9":"#cfe3bb"}}>
+          <div style={{fontSize:18,fontWeight:800,color:overdueCount?"#A32D2D":"#27500A",lineHeight:1}}>{overdueCount?`⚠ ${overdueCount}`:"✓ 0"}</div>
+          <div style={{fontSize:10.5,color:overdueCount?"#A32D2D":"#27500A",fontWeight:700,marginTop:3}}>{overdueCount?"overdue this week":"none overdue"}</div>
+        </div>
+      </div>
+
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
-              <th style={{padding:"9px 10px",textAlign:"left"}}>Bank Ledger</th><th style={{padding:"9px 10px",textAlign:"left"}}>Group</th><th style={{padding:"9px 10px",textAlign:"center"}}>Action</th>
+              <th style={qTh("left")}>Bank Ledger</th>
+              <th style={qTh("left")}>Group</th>
+              <th style={qTh("left")}>Last reconciled</th>
+              <th style={qTh("center")}>Statement</th>
+              <th style={qTh("right")}>Difference</th>
+              <th style={qTh("left")}>Status</th>
+              <th style={qTh("left")}>Waiting on</th>
+              <th style={qTh("center")}>Action</th>
             </tr></thead>
             <tbody>
-              {ledgers.map((l,i)=>(<tr key={l.code||l.name||i} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #cdd1d8"}}>
-                <td style={{padding:"8px 10px",fontWeight:600}}>{l.name||l.ledger||l}</td>
-                <td style={{padding:"8px 10px",color:"#5a6691"}}>{l.group||"Bank Accounts"}</td>
-                <td style={{padding:"8px 10px",textAlign:"center"}}><button onClick={()=>setRoute&&setRoute('/bank-reco')} style={{...btnGh,minHeight:28,fontSize:11}}>Reconcile</button></td>
-              </tr>))}
-              {ledgers.length===0&&<tr><td colSpan={3} style={{padding:20,textAlign:"center",color:"#5a6691"}}>No bank ledgers yet - create a Bank ledger to reconcile.</td></tr>}
+              {rows.map((it,i)=>{
+                const st=recoRowState(it);
+                return(
+                  <tr key={it.code||it.name||i} style={{background:i%2?"#f3f4f8":"#fff",borderBottom:"1px solid #cdd1d8"}}>
+                    <td style={{padding:"8px 10px",fontWeight:600}}>{it.name}</td>
+                    <td style={{padding:"8px 10px",color:"#5a6691"}}>{it.group||"Bank Accounts"}</td>
+                    <td style={{padding:"8px 10px",fontFamily:"monospace",color:it.lastReconciled?"#0d1326":"#9aa3bd"}}>{it.lastReconciled?recoWeekShort(it.lastReconciled.period):"never"}</td>
+                    <td style={{padding:"8px 10px",textAlign:"center",fontSize:11,fontWeight:700,color:it.statementImported?"#27500A":"#9aa3bd"}}>{it.statementImported?"✓ Imported":"✗ Missing"}</td>
+                    <td style={{padding:"8px 10px",textAlign:"right",fontFamily:"monospace",color:it.difference==null?"#9aa3bd":Math.abs(it.difference)<1?"#27500A":"#A32D2D"}}>{it.difference==null?"—":fmtINR(it.difference)}</td>
+                    <td style={{padding:"8px 10px"}}><span style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,fontWeight:700,color:st.c,background:st.bg,padding:"3px 9px",borderRadius:20,whiteSpace:"nowrap"}}><span style={{width:7,height:7,borderRadius:"50%",background:st.dot}}/>{st.label}</span></td>
+                    <td style={{padding:"8px 10px",color:it.waitingOn?"#0d1326":"#9aa3bd",fontWeight:it.waitingOn?600:400}}>{it.waitingOn||"—"}</td>
+                    <td style={{padding:"8px 10px",textAlign:"center"}}><button onClick={()=>setRoute&&setRoute('/bank-reco')} style={{...btnGh,minHeight:28,fontSize:11}}>Reconcile</button></td>
+                  </tr>
+                );
+              })}
+              {rows.length===0&&<tr><td colSpan={8} style={{padding:20,textAlign:"center",color:"#5a6691"}}>{qLoading?"Loading…":"No bank ledgers yet - create a Bank ledger to reconcile."}</td></tr>}
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Legend — one colour language across the queue, the bell and the cockpit tile. */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:14,margin:"10px 2px 0",fontSize:10.5,color:"#5a6691"}}>
+        {[["#A32D2D","Overdue — past Friday"],["#9aa3bd","Pending / not started"],["#d4a437","In progress"],["#185FA5","Ready to sign"],["#27500A","Reconciled"]].map(([c,l])=>(
+          <span key={l} style={{display:"inline-flex",alignItems:"center",gap:5}}><span style={{width:8,height:8,borderRadius:"50%",background:c}}/>{l}</span>
+        ))}
       </div>
     </div>
   );

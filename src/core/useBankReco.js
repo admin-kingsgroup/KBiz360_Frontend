@@ -126,6 +126,10 @@ export const useAutoMatch = () =>
 export const useManualMatch = () =>
   useReconMutation(({ id, ...body }) => apiPost(`/api/bank-reconciliation/match/${id}`, body));
 
+// N book legs → one statement line (a split in our books = one consolidated bank line).
+export const useGroupMatch = () =>
+  useReconMutation(({ id, books }) => apiPost(`/api/bank-reconciliation/match-group/${id}`, { books }));
+
 export const useUnmatch = () =>
   useReconMutation(({ id }) => apiPost(`/api/bank-reconciliation/unmatch/${id}`));
 

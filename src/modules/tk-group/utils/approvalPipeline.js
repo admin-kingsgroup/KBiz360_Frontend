@@ -135,4 +135,89 @@ export function stagePipeline(entries = [], limits = {}, nowMs = Date.now()) {
   return PIPELINE_STAGES.map((s) => acc[s.key]);
 }
 
+// ─── Sources feeding the funnel — normalise each pending queue to one entry shape ──
+// The funnel must reflect EVERY pending approval on the page, not just the gated vouchers.
+// The approval screen has three disjoint pending queues, each its own collection/endpoint:
+//   • gated vouchers  (Receipt/Payment/Contra/Journal/Debit Note/Purchase Expense/
+//                       refund/reissue/ADM/ACM)  → /api/vouchers/approvals  { entries }
+//   • SO/PO/GP        (booking orders, incl. RF/RI reversal bookings)       → /api/booking-orders
+//   • INB deals       (inter-branch sale+purchase voucher pairs)            → /api/vouchers?type=INB
+// They never overlap for PENDING items: a booking order spawns its sale/purchase vouchers
+// only ON approval, and INB legs are category 'sale'/'purchase' (never gated) — so summing
+// the three counts each real pending item exactly once. Each normaliser returns the SAME
+// { id, source, reviewStage, total, date } shape stagePipeline() buckets on.
+const num = (n) => Math.abs(Number(n) || 0);
+
+/** Pending SO/PO/GP booking orders → funnel entries (amount = the sale total). */
+export function bookingStageEntries(bookings = []) {
+  return (Array.isArray(bookings) ? bookings : [])
+    .filter((b) => b && b.status === 'pending')
+    .map((b) => ({
+      id: b.id || b._id,
+      source: 'sopogp',
+      reviewStage: b.reviewStage || '',
+      total: num((b.so && b.so.total) != null ? b.so.total : b.saleTotal),
+      date: b.date,
+    }));
+}
+
+const INB_LINK = /^INB\//;
+// The shared INB Link a leg carries — bookingId (the deal id) or, on engine legs, an
+// INB-shaped sourceRef. Blank for migrated legs (their sourceRef is a per-leg Tally ref).
+const inbLinkOf = (v) => (INB_LINK.test(v && v.bookingId) && v.bookingId) || (INB_LINK.test(v && v.sourceRef) && v.sourceRef) || '';
+
+/** Pending INB deals → funnel entries, ONE per deal. Legs (type INB, category sale/
+ *  purchase) are grouped into deals; a deal counts once while ANY of its legs is still
+ *  pending/unpushed (so a half-approved deal is not lost). Stage + amount come off the
+ *  sale leg (the deal lead). INB refunds are category refund/reissue — excluded here,
+ *  they are already counted in the gated-voucher queue.
+ *  Pairing mirrors the INB approvals screen: the shared INB Link first, else the sale's
+ *  `againstPurchase` (set on every deal — migrated legs keep differing Tally sourceRefs,
+ *  so the link alone would wrongly split them). */
+export function inbDealStageEntries(legs = []) {
+  const list = (Array.isArray(legs) ? legs : []).filter((v) => v && (v.category === 'sale' || v.category === 'purchase'));
+  const saleKey = (v) => inbLinkOf(v) || v.vno || '';
+  // A purchase with no INB link folds onto the sale that answers it (sale.againstPurchase).
+  const saleKeyByPurchaseVno = new Map();
+  for (const v of list) if (v.category === 'sale' && v.againstPurchase) saleKeyByPurchaseVno.set(v.againstPurchase, saleKey(v));
+  const keyOf = (v) => inbLinkOf(v) || (v.category === 'sale' ? v.vno : (saleKeyByPurchaseVno.get(v.vno) || v.vno)) || '';
+  const deals = new Map();
+  for (const v of list) {
+    const k = keyOf(v) || String(v.id || v.vno || '');
+    let d = deals.get(k);
+    if (!d) { d = { sale: null, lead: null, anyPending: false }; deals.set(k, d); }
+    if (v.category === 'sale' && !d.sale) d.sale = v;
+    if (!d.lead) d.lead = v;
+    const st = v.status || 'pending';
+    if (st === 'pending' || st === 'unpushed') d.anyPending = true;
+  }
+  const out = [];
+  for (const d of deals.values()) {
+    const lead = d.sale || d.lead;
+    const raw = (lead && lead.status) || 'pending';
+    // Mirror the INB approvals tab's status bucketing so the funnel count matches it
+    // exactly (voucherApprovals mk()): a pending/unpushed lead is pending; an approved/
+    // saved lead is pending ONLY while a leg is still pending/unpushed (half-approved);
+    // a rejected/deleted/cancelled/pushed/posted lead is never pending.
+    const pending = (raw === 'pending' || raw === 'unpushed') ? true
+      : (raw === 'approved' || raw === 'saved') ? d.anyPending
+      : false;
+    if (!pending) continue;
+    out.push({ id: lead.id || lead.vno, source: 'inb', reviewStage: lead.reviewStage || '', total: num(lead.total), date: lead.date });
+  }
+  return out;
+}
+
+/** Merge the three pending queues into the single entry list the funnel buckets on.
+ *  `voucherEntries` already carry { reviewStage, total, date } (from the approvals
+ *  report); bookings & inbLegs are normalised here. Pure — the funnel behind
+ *  "pending under whom", now spanning vouchers + SO/PO/GP + INB. */
+export function pipelineEntries({ voucherEntries = [], bookings = [], inbLegs = [] } = {}) {
+  return [
+    ...(Array.isArray(voucherEntries) ? voucherEntries : []),
+    ...bookingStageEntries(bookings),
+    ...inbDealStageEntries(inbLegs),
+  ];
+}
+
 export { ZERO as _ZERO };
