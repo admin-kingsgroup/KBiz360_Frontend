@@ -32,7 +32,7 @@ export function RuleBookPage({ branch, setRoute }) {
   const periods = live?.periods || {};
 
   return (
-    <div className="grid gap-4">
+    <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="kbiz-page-title">Reconciliation Rule Book</h1>

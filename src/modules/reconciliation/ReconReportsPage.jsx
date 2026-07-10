@@ -62,7 +62,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
   // gets the rule, not a broken page (the menu already hides these entries).
   if (!tierAllowed) {
     return (
-      <div className="grid gap-4">
+      <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
         <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Report</h1>
         <EmptyState title="Central closing tier"
           hint="The Branch Accountant works the WEEKLY cycle only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
@@ -72,7 +72,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Report</h1>
