@@ -33,45 +33,29 @@ const fmtShort = (cur, n) => {
 
 const CSS = `
 .cvd,.cvd *{box-sizing:border-box}
-.cvd{--nav:#0f1729;--nav2:#16203a;--nav-ink:#c3cde0;--nav-dim:#6b7690;--nav-active:#14b8a6;
-  --bg:#eef1f6;--card:#ffffff;--line:#e3e7ef;--line2:#eef1f6;--ink:#151b28;--ink2:#3a4356;--dim:#6b7488;
+.cvd{--bg:#eef1f6;--card:#ffffff;--line:#e3e7ef;--line2:#eef1f6;--ink:#151b28;--ink2:#3a4356;--dim:#6b7488;
   --primary:#0d9488;--primary-d:#0b7d73;--amber:#d97706;--amber-s:#fdf3e6;--green:#16a34a;--red:#dc2626;
   --violet:#6366f1;--teal-s:#e9f6f4;--blue:#2563eb;
   font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);
-  display:grid;grid-template-columns:236px 1fr;min-height:100vh;font-size:14px;line-height:1.45}
+  display:block;font-size:14px;line-height:1.45}
 .cvd .num{font-variant-numeric:tabular-nums}
-
-/* ── sidebar ─────────────────────────────────────────── */
-.cvd .rail{background:var(--nav);color:var(--nav-ink);position:sticky;top:0;height:100vh;overflow-y:auto;
-  display:flex;flex-direction:column;padding:18px 0}
-.cvd .brand{padding:2px 20px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #22304f}
-.cvd .brand .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#14b8a6,#0d9488);
-  display:flex;align-items:center;justify-content:center;font-weight:800;color:#04211d;font-size:14px}
-.cvd .brand .nm{font-weight:800;font-size:14px;color:#fff;letter-spacing:.3px}
-.cvd .brand .nm span{display:block;font-size:9.5px;color:var(--nav-dim);font-weight:600;letter-spacing:1.5px;margin-top:1px}
-.cvd .navlabel{font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--nav-dim);padding:16px 20px 7px;font-weight:700}
-.cvd .navlink{display:flex;align-items:center;gap:11px;padding:9px 20px;color:var(--nav-ink);text-decoration:none;
-  font-size:13px;font-weight:500;border-left:3px solid transparent;cursor:pointer;transition:background .14s;background:none;border-top:0;border-right:0;border-bottom:0;width:100%;text-align:left;font-family:inherit}
-.cvd .navlink:hover{background:#18223c}
-.cvd .navlink.on{background:#18223c;border-left-color:var(--nav-active);color:#fff;font-weight:700}
-.cvd .navlink:focus-visible{outline:2px solid var(--nav-active);outline-offset:-2px}
-.cvd .navlink .ico{width:16px;text-align:center;color:var(--nav-active);font-size:13px}
-.cvd .railcard{margin:18px 16px 6px;background:var(--nav2);border-radius:10px;padding:13px 14px}
-.cvd .railcard .l{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--nav-dim);font-weight:700}
-.cvd .railcard .big{font-size:22px;font-weight:800;color:#fff;margin-top:5px}
-.cvd .railcard .sub{font-size:11px;color:#8ad9cf;margin-top:2px}
-.cvd .rail .live{margin-top:auto;padding:14px 20px 4px;font-size:11px;color:var(--nav-dim);display:flex;align-items:center;gap:8px}
-.cvd .rail .live .dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:cvdpl 2s infinite}
-@keyframes cvdpl{70%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}
 @media(prefers-reduced-motion:reduce){.cvd *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 /* ── main ────────────────────────────────────────────── */
 .cvd .main{min-width:0;display:flex;flex-direction:column}
-.cvd .topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);
-  border-bottom:1px solid var(--line);padding:13px 26px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.cvd .crumb{font-size:12px;color:var(--dim)}
+.cvd .topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);padding:10px 22px 8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.cvd .crumb{font-size:11.5px;color:var(--dim)}
 .cvd .crumb b{color:var(--ink);font-weight:700}
-.cvd .h1{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.cvd .h1{font-size:16px;font-weight:800;letter-spacing:-.01em}
+/* section tabs — horizontal, inside the sticky topbar (replaces the old side rail) */
+.cvd .tabs{flex-basis:100%;display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-top:2px}
+.cvd .navlink{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;color:var(--ink2);white-space:nowrap;
+  font-size:12.5px;font-weight:600;border:1px solid transparent;border-radius:8px;cursor:pointer;background:none;font-family:inherit}
+.cvd .navlink:hover{background:#f1f3f8}
+.cvd .navlink.on{background:var(--teal-s);border-color:#c8ebe5;color:var(--primary-d);font-weight:700}
+.cvd .navlink:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.cvd .navlink .ico{color:var(--primary);font-size:12px}
 .cvd .controls{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .cvd .presets{display:flex;background:#f1f3f8;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .cvd .presets button{appearance:none;border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:var(--dim);
@@ -86,63 +70,51 @@ const CSS = `
   background:#fff;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer}
 .cvd .btn.pri{background:var(--primary);border-color:var(--primary);color:#fff}
 
-.cvd .content{padding:22px 26px 60px;display:flex;flex-direction:column;gap:22px}
+.cvd .content{width:100%;max-width:1600px;margin:0 auto;padding:18px 22px 56px;display:flex;flex-direction:column;gap:16px}
 .cvd .state{padding:48px 20px;text-align:center;color:var(--dim);font-size:14px;background:#fff;border:1px solid var(--line);border-radius:14px}
 
 /* verdict banner */
-.cvd .banner{display:flex;align-items:center;gap:14px;padding:14px 18px;border-radius:12px;
+.cvd .banner{display:flex;align-items:center;gap:12px;padding:11px 15px;border-radius:11px;
   background:linear-gradient(90deg,#e9f6f4,#f4fbfa);border:1px solid #c8ebe5}
-.cvd .banner .ic{width:38px;height:38px;border-radius:10px;background:var(--primary);color:#fff;font-size:19px;
+.cvd .banner .ic{width:30px;height:30px;border-radius:9px;background:var(--primary);color:#fff;font-size:15px;
   display:flex;align-items:center;justify-content:center;flex:none;font-weight:800}
-.cvd .banner .t{font-size:14px;font-weight:800;color:#0b5d55}
-.cvd .banner .s{font-size:12.5px;color:#337b73;margin-top:2px}
+.cvd .banner .t{font-size:13.5px;font-weight:800;color:#0b5d55}
+.cvd .banner .s{font-size:12px;color:#337b73;margin-top:2px}
 .cvd .banner.bad{background:linear-gradient(90deg,#fdecec,#fff5f5);border-color:#f6cccc}
 .cvd .banner.bad .ic{background:var(--red)}.cvd .banner.bad .t{color:#8f1d1d}.cvd .banner.bad .s{color:#a53a3a}
 .cvd .banner.muted{background:linear-gradient(90deg,#f3f5f9,#f9fafc);border-color:var(--line)}
 .cvd .banner.muted .ic{background:var(--dim)}.cvd .banner.muted .t{color:var(--ink2)}.cvd .banner.muted .s{color:var(--dim)}
 
 /* KPI strip */
-.cvd .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.cvd .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden}
+.cvd .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.cvd .kpi{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 14px;position:relative;overflow:hidden}
 .cvd .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}
-.cvd .kpi.amber::before{background:var(--amber)}.cvd .kpi.violet::before{background:var(--violet)}
-.cvd .kpi.green::before{background:var(--green)}.cvd .kpi.slate::before{background:#64748b}.cvd .kpi.red::before{background:var(--red)}
-.cvd .kpi .l{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);font-weight:700;
+.cvd .kpi.amber::before{background:var(--amber)}
+.cvd .kpi .l{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);font-weight:700;
   display:flex;align-items:center;justify-content:space-between;gap:8px}
-.cvd .kpi .v{font-size:23px;font-weight:800;margin-top:8px;letter-spacing:-.01em}
-.cvd .kpi .s{font-size:11.5px;color:var(--dim);margin-top:3px}
+.cvd .kpi .v{font-size:18.5px;font-weight:800;margin-top:6px;letter-spacing:-.01em}
+.cvd .kpi .s{font-size:11px;color:var(--dim);margin-top:2px}
 .cvd .kpi .pill{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .cvd .pill.up{background:#e7f6ec;color:var(--green)}.cvd .pill.warn{background:var(--amber-s);color:var(--amber)}
 .cvd .pill.dn{background:#fdecec;color:var(--red)}
 
-/* analytics row */
-.cvd .analytics{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:16px}
-.cvd .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.cvd .card>.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line)}
+/* capital bridge card */
+.cvd .card{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+.cvd .card>.hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line)}
 .cvd .card>.hd .ti{font-size:13px;font-weight:800}
 .cvd .card>.hd .mut{font-size:11px;color:var(--dim);font-weight:600}
-.cvd .card>.bd{padding:16px 18px}
-.cvd .donutwrap{display:flex;align-items:center;gap:16px}
-.cvd .legend{display:flex;flex-direction:column;gap:12px;font-size:12.5px;flex:1}
-.cvd .legend .row{display:flex;align-items:center;gap:9px}
-.cvd .legend .sw{width:11px;height:11px;border-radius:3px;flex:none}
-.cvd .legend .amt{margin-left:auto;font-weight:800}
-.cvd .legend .pc{color:var(--dim);font-size:11px;width:46px;text-align:right}
-.cvd .bridge{display:flex;flex-direction:column;gap:11px}
-.cvd .brow{display:grid;grid-template-columns:132px 1fr 108px;align-items:center;gap:12px;font-size:12.5px}
+.cvd .card>.bd{padding:14px 16px}
+.cvd .bridge{display:flex;flex-direction:column;gap:9px}
+.cvd .brow{display:grid;grid-template-columns:170px 1fr 120px;align-items:center;gap:12px;font-size:12.5px}
 .cvd .brow .nm{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cvd .brow .nm.b{font-weight:800;color:var(--ink)}
-.cvd .track{height:16px;background:#f1f3f8;border-radius:5px;position:relative;overflow:hidden}
+.cvd .track{height:14px;background:#f1f3f8;border-radius:5px;position:relative;overflow:hidden}
 .cvd .fill{position:absolute;top:0;bottom:0;left:0;border-radius:5px}
 .cvd .brow .amt{text-align:right;font-weight:800}
 .cvd .amt.neg{color:var(--red)}
-.cvd .gaugewrap{display:flex;flex-direction:column;align-items:center;gap:6px}
-.cvd .gaugewrap .big{font-size:30px;font-weight:800;color:var(--primary);margin-top:-46px}
-.cvd .gaugewrap .cap{font-size:11.5px;color:var(--dim);margin-top:2px;text-align:center;line-height:1.5}
-.cvd .gaugewrap .cap b{color:var(--ink)}
 
 /* section card */
-.cvd .section{scroll-margin-top:80px}
+.cvd .section{scroll-margin-top:104px}
 .cvd .sec-hd{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--line)}
 .cvd .sec-hd .no{width:26px;height:26px;border-radius:8px;background:var(--ink);color:#fff;font-size:12px;font-weight:800;
   display:flex;align-items:center;justify-content:center;flex:none}
@@ -192,7 +164,7 @@ const CSS = `
 .cvd .formula .cell{flex:1;min-width:120px;padding:13px 16px;border-right:1px solid var(--line)}
 .cvd .formula .cell:last-child{border-right:0}
 .cvd .formula .cell .l{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);font-weight:700}
-.cvd .formula .cell .v{font-size:19px;font-weight:800;margin-top:4px}
+.cvd .formula .cell .v{font-size:17px;font-weight:800;margin-top:4px}
 .cvd .formula .op{flex:0 0 34px;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--dim);
   font-weight:800;border-right:1px solid var(--line)}
 .cvd .formula .cell.res{background:var(--teal-s)}.cvd .formula .cell.res .v{color:var(--primary-d)}
@@ -200,7 +172,7 @@ const CSS = `
 .cvd .perfrow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .cvd .pcard{border:1px solid var(--line);border-radius:10px;padding:13px 15px}
 .cvd .pcard .l{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);font-weight:700}
-.cvd .pcard .v{font-size:22px;font-weight:800;color:var(--primary-d);margin-top:4px}
+.cvd .pcard .v{font-size:18.5px;font-weight:800;color:var(--primary-d);margin-top:4px}
 .cvd .pcard .d{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.4}
 .cvd .recon{font-size:12px;color:var(--ink2);background:#f7f9fc;border:1px dashed var(--line);border-radius:9px;padding:11px 14px}
 .cvd .recon b{color:var(--primary-d)}
@@ -210,24 +182,16 @@ const CSS = `
 .cvd .foot{font-size:11px;color:var(--dim);padding:0 2px;line-height:1.6}
 .cvd .foot b{color:var(--ink2)}
 
-@media(max-width:1080px){.cvd .analytics{grid-template-columns:1fr 1fr}.cvd .analytics .card:last-child{grid-column:1/-1}}
 @media(max-width:900px){
-  .cvd{grid-template-columns:1fr}
-  .cvd .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;padding:12px}
-  .cvd .rail .navlabel,.cvd .railcard,.cvd .rail .live{display:none}
-  .cvd .rail .brand{border:0;padding:2px 8px 2px 4px}
-  .cvd .navlink{border-left:0;border-radius:8px;padding:7px 11px;width:auto}
-  .cvd .navlink.on{border-left:0}
   .cvd .kpis{grid-template-columns:1fr 1fr}
   .cvd .bsgrid{grid-template-columns:1fr}
   .cvd .bsgrid>div:first-child{border-right:0;border-bottom:1px solid var(--line)}
 }
 @media(max-width:560px){
   .cvd .content{padding:16px 12px 48px}
-  .cvd .analytics{grid-template-columns:1fr}
   .cvd .perfrow{grid-template-columns:1fr}
   .cvd .brow{grid-template-columns:104px 1fr 92px}
-  .cvd .topbar{padding:11px 14px}
+  .cvd .topbar{padding:9px 14px 7px}
   .cvd .kids{margin-left:10px;padding-left:8px}
   .cvd .grphd,.cvd .subhd,.cvd .row.led{padding-left:12px;padding-right:12px}
   .cvd .amt{min-width:96px}
@@ -311,7 +275,7 @@ export function CapitalVsInvestmentLive({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const inr = (n) => fmtAmt(cur, n);   // full amount in branch currency
   const cr = (n) => fmtShort(cur, n);  // short scale (Cr/L · K/M/B)
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['capital-analysis', brCodeOf(branch), range.from, range.to],
     queryFn: () => apiGet('/api/accounting/capital-analysis', { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from: range.from, to: range.to }),
   });
@@ -352,16 +316,6 @@ export function CapitalVsInvestmentLive({ branch }) {
   ];
   const maxAbs = Math.max(1, ...bridge.map((r) => Math.abs(r.v)));
 
-  // Donut (blocked vs in-flow) + gauge (GP yield vs hurdle).
-  const DC = 289.03; // 2π·46
-  const blkLen = (DC * Math.max(0, Math.min(100, t.blockedPct || 0)) / 100).toFixed(1);
-  const flwLen = (DC * Math.max(0, Math.min(100, t.inflowPct || 0)) / 100).toFixed(1);
-  const ARC = 257.6; // π·82 semicircle
-  const gaugeFill = (ARC * Math.max(0, Math.min(40, t.gpYield || 0)) / 40).toFixed(1);
-  const needleAng = (Math.max(0, Math.min(40, hurdle)) / 40 * 180 - 90).toFixed(1);
-  const yieldDiffN = (t.gpYield || 0) - hurdle;      // signed points above/below hurdle
-  const yieldDiff = Math.abs(yieldDiffN).toFixed(1); // magnitude for display
-
   // Scroll-spy: highlight the rail link for whatever section is in view.
   useEffect(() => {
     if (isLoading || error || !data) return undefined;
@@ -380,31 +334,14 @@ export function CapitalVsInvestmentLive({ branch }) {
     <div className="cvd">
       <style>{CSS}</style>
 
-      {/* ═══ SIDEBAR ═══ */}
-      <aside className="rail">
-        <div className="brand">
-          <div className="logo">K</div>
-          <div className="nm">KBiz360<span>AD DASHBOARDS</span></div>
-        </div>
-        <div className="navlabel">Capital vs Investment</div>
-        {NAV.map(([id, label, ico]) => (
-          <button key={id} type="button" className={`navlink ${active === id ? 'on' : ''}`} onClick={() => jump(id)} aria-current={active === id ? 'true' : undefined}>
-            <span className="ico">{ico}</span> {label}
-          </button>
-        ))}
-        <div className="railcard">
-          <div className="l">Capital Employed</div>
-          <div className="big num">{cr(employed)}</div>
-          <div className="sub">In-Flow {(t.inflowPct || 0).toFixed(1)}% · Blocked {(t.blockedPct || 0).toFixed(1)}%</div>
-        </div>
-        <div className="live"><span className="dot" /> Live · Balance Sheet + P&amp;L</div>
-      </aside>
-
       {/* ═══ MAIN ═══ */}
       <div className="main">
+        {/* Sticky topbar: title + controls, with the section tabs on a second row
+            (replaces the old page-level side rail — the AppShell already provides
+            global navigation, so the page no longer double-wraps itself in chrome). */}
         <div className="topbar">
           <div>
-            <div className="crumb">Dashboards › AD Dashboards › <b>Capital vs Investment</b></div>
+            <div className="crumb">Dashboards › AD Dashboards › <b>Capital vs Investment</b> · Live from Balance Sheet + P&amp;L</div>
             <div className="h1">Capital vs Investment · {brCodeOf(branch)}</div>
           </div>
           <div className="controls">
@@ -419,8 +356,14 @@ export function CapitalVsInvestmentLive({ branch }) {
                 title="Cost-of-capital benchmark used for the GP-yield verdict" />%
             </div>
             <button className="btn" type="button" onClick={() => { if (typeof window !== 'undefined' && window.print) window.print(); }}>⤓ Export</button>
-            <button className="btn pri" type="button" onClick={() => refetch && refetch()}>↻ Refresh</button>
           </div>
+          <nav className="tabs" aria-label="Sections">
+            {NAV.map(([id, label, ico]) => (
+              <button key={id} type="button" className={`navlink ${active === id ? 'on' : ''}`} onClick={() => jump(id)} aria-current={active === id ? 'true' : undefined}>
+                <span className="ico">{ico}</span> {label}
+              </button>
+            ))}
+          </nav>
         </div>
 
         <div className="content">
@@ -446,69 +389,29 @@ export function CapitalVsInvestmentLive({ branch }) {
               </div>
             </div>
 
-            {/* KPI strip */}
+            {/* KPI strip — the four capital figures only. Profitability (GP · Net ·
+                yields · turnover) lives in Section 4, the verdict in the banner. */}
             <div className="kpis" id="cvd-ov">
               <div className="kpi"><div className="l">Capital Invested <span className="pill up">COMMITTED</span></div><div className="v num">{cr(t.capitalInvested)}</div><div className="s">Capital + owner &amp; partner loans</div></div>
               <div className="kpi"><div className="l">Capital Employed <span className="pill warn">NET</span></div><div className="v num">{cr(employed)}</div><div className="s">Invested, net of retained earnings</div></div>
               <div className="kpi amber"><div className="l">Capital Blocked <span className="pill warn">{(t.blockedPct || 0).toFixed(1)}%</span></div><div className="v num">{cr(t.capitalBlocked)}</div><div className="s">Fixed &amp; slow assets — tied up</div></div>
               <div className="kpi"><div className="l">In-Flow Capital <span className="pill up">{(t.inflowPct || 0).toFixed(1)}%</span></div><div className="v num">{cr(t.inflowCapital)}</div><div className="s">Circulating working capital</div></div>
-              <div className="kpi violet"><div className="l">Gross Profit</div><div className="v num">{cr(t.grossProfit)}</div><div className="s">{(t.gpMargin || 0).toFixed(1)}% margin on turnover</div></div>
-              <div className={`kpi ${(t.netProfit || 0) < 0 ? 'red' : 'green'}`}><div className="l">Net {(t.netProfit || 0) < 0 ? 'Loss' : 'Profit'}</div><div className="v num" style={{ color: (t.netProfit || 0) < 0 ? 'var(--red)' : undefined }}>{cr(t.netProfit)}</div><div className="s">After {cr(t.indirectExpense)} operating costs</div></div>
-              <div className="kpi"><div className="l">GP Yield on In-Flow</div><div className="v num">{(t.gpYield || 0).toFixed(1)}%</div><div className="s">vs {hurdle}% hurdle · <span style={{ color: good ? 'var(--green)' : 'var(--red)', fontWeight: 700 }}>{yieldDiffN >= 0 ? '+' : '−'}{yieldDiff} pts</span></div></div>
-              <div className="kpi slate"><div className="l">Flow Turnover</div><div className="v num">{(t.flowTurnover || 0).toFixed(2)}×</div><div className="s">Turnover ÷ In-Flow</div></div>
             </div>
 
-            {/* analytics row */}
-            <div className="analytics">
-              <div className="card">
-                <div className="hd"><div className="ti">Capital Allocation</div><div className="mut">of {cr(employed)} employed</div></div>
-                <div className="bd">
-                  <div className="donutwrap">
-                    <svg width="132" height="132" viewBox="0 0 132 132" aria-label="Blocked vs in-flow allocation">
-                      <circle cx="66" cy="66" r="46" fill="none" stroke="#f1f3f8" strokeWidth="18" />
-                      <circle cx="66" cy="66" r="46" fill="none" stroke="#d97706" strokeWidth="18" strokeDasharray={`${blkLen} ${DC}`} transform="rotate(-90 66 66)" />
-                      <circle cx="66" cy="66" r="46" fill="none" stroke="#0d9488" strokeWidth="18" strokeDasharray={`${flwLen} ${DC}`} strokeDashoffset={`-${blkLen}`} transform="rotate(-90 66 66)" />
-                      <text x="66" y="63" textAnchor="middle" fontSize="15" fontWeight="800" fill="#151b28">{cr(employed)}</text>
-                      <text x="66" y="80" textAnchor="middle" fontSize="8.5" letterSpacing="1" fill="#6b7488">EMPLOYED</text>
-                    </svg>
-                    <div className="legend">
-                      <div className="row"><span className="sw" style={{ background: '#d97706' }} />Blocked <span className="amt num">{cr(t.capitalBlocked)}</span><span className="pc">{(t.blockedPct || 0).toFixed(1)}%</span></div>
-                      <div className="row"><span className="sw" style={{ background: '#0d9488' }} />In-Flow <span className="amt num">{cr(t.inflowCapital)}</span><span className="pc">{(t.inflowPct || 0).toFixed(1)}%</span></div>
+            {/* Capital Bridge — the one overview visual: sources → invested → employed
+                → less blocked → in-flow. (The old donut + gauge cards repeated the
+                same figures; the verdict lives in the banner, yields in Section 4.) */}
+            <div className="card">
+              <div className="hd"><div className="ti">Capital Bridge</div><div className="mut">sources → employed → in-flow</div></div>
+              <div className="bd">
+                <div className="bridge">
+                  {bridge.map((r, i) => (
+                    <div className="brow" key={i}>
+                      <span className={`nm ${r.b ? 'b' : ''}`}>{r.nm}</span>
+                      <div className="track"><div className="fill" style={{ width: `${Math.max(1.5, Math.abs(r.v) / maxAbs * 100)}%`, background: r.c }} /></div>
+                      <span className={`amt num ${r.v < 0 ? 'neg' : ''}`} style={r.b ? { color: 'var(--primary-d)' } : (r.c === '#d97706' ? { color: 'var(--amber)' } : undefined)}>{cr(r.v)}</span>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="hd"><div className="ti">Capital Bridge</div><div className="mut">sources → employed → in-flow</div></div>
-                <div className="bd">
-                  <div className="bridge">
-                    {bridge.map((r, i) => (
-                      <div className="brow" key={i}>
-                        <span className={`nm ${r.b ? 'b' : ''}`}>{r.nm}</span>
-                        <div className="track"><div className="fill" style={{ width: `${Math.max(1.5, Math.abs(r.v) / maxAbs * 100)}%`, background: r.c }} /></div>
-                        <span className={`amt num ${r.v < 0 ? 'neg' : ''}`} style={r.b ? { color: 'var(--primary-d)' } : (r.c === '#d97706' ? { color: 'var(--amber)' } : undefined)}>{cr(r.v)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="hd"><div className="ti">Return vs Hurdle</div><div className="mut">hurdle {hurdle}%</div></div>
-                <div className="bd">
-                  <div className="gaugewrap">
-                    <svg width="200" height="118" viewBox="0 0 200 118" aria-label="GP yield versus hurdle gauge">
-                      <path d="M18 104 A82 82 0 0 1 182 104" fill="none" stroke="#f1f3f8" strokeWidth="15" strokeLinecap="round" />
-                      <path d="M18 104 A82 82 0 0 1 182 104" fill="none" stroke={good ? '#0d9488' : '#dc2626'} strokeWidth="15" strokeLinecap="round" strokeDasharray={`${gaugeFill} 999`} />
-                      <g transform={`rotate(${needleAng} 100 104)`}>
-                        <line x1="100" y1="104" x2="100" y2="34" stroke="#151b28" strokeWidth="2.5" />
-                        <circle cx="100" cy="104" r="5" fill="#151b28" />
-                      </g>
-                    </svg>
-                    <div className="big num" style={{ color: good ? 'var(--primary-d)' : 'var(--red)' }}>{(t.gpYield || 0).toFixed(1)}%</div>
-                    <div className="cap">GP yield on in-flow capital<br /><b>{good ? `clears the ${hurdle}% hurdle by ${yieldDiff} pts` : `short of the ${hurdle}% hurdle by ${Math.abs(yieldDiff)} pts`}</b></div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -662,7 +565,7 @@ export function CapitalVsInvestmentLive({ branch }) {
               </Stmt>
             </div>
 
-            <div className="foot">Read-only · live from the posted <b>Balance Sheet</b> and <b>Profit &amp; Loss</b>. Sequence: Capital Invested → less Capital Blocked → the residual In-Flow Capital that circulates. Section 4 tests whether that in-flow capital generates enough gross profit, benchmarked against the editable {hurdle}% cost-of-capital hurdle.</div>
+            <div className="foot">Read-only · live from the posted <b>Balance Sheet</b> and <b>Profit &amp; Loss</b> · GP-yield verdict benchmarked against the editable {hurdle}% hurdle.</div>
           </>)}
         </div>
       </div>
