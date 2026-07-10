@@ -50,7 +50,7 @@ export function MatchGuidePage({ setRoute }) {
           <h1 className="kbiz-page-title">Match Guide — statement matching, line by line</h1>
           <p className="text-sm text-ink-muted">Matching means putting THEIR statement next to OUR books and pairing the lines. Every matching screen speaks the same four-bucket language — learn it once, read every screen.</p>
         </div>
-        <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Back to Reconciliation</Button>
+        <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Weekly Reconciliation</Button>
       </div>
 
       {/* 1 · buckets */}

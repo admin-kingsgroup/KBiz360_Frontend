@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CalendarClock, AlertTriangle } from 'lucide-react';
 import { getPending, getList, generateCertificates } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, currencyOf, fmtAmt, chainProgress, pendingStateMeta, fmtDue, visibleTiers, hubPathFor, tierMenuName } from './utils';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, currencyOf, fmtAmt, chainProgress, pendingStateMeta, fmtDue, visibleTiers, hubPathFor, reportPathFor, tierMenuName } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select, FormField } from '../../shell/primitives';
 
 // ─── Reconciliation · per-tier Report ────────────────────────────────────────
@@ -31,16 +31,20 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
   const [statusFilter, setStatusFilter] = useState('');
 
   // Branch Accountant sees the weekly cycle only — Month/Quarter/Year closings
-  // are worked from TK Group Central by AE/FM/Director/Owner.
+  // are worked from TK Group Central by AE/FM/Director/Owner. An explicit
+  // Page-Visibility GRANT of this report opens it (read-only data anyway) —
+  // otherwise the admin's grant toggle would promise a page the guard refuses.
   const tiers = visibleTiers(currentUser?.role);
-  const tierAllowed = tiers.some((t) => t.key === tierKey);
+  const granted = Array.isArray(currentUser?.granted) ? currentUser.granted : [];
+  const tierAllowed = tiers.some((t) => t.key === tierKey) || granted.includes(reportPathFor(tierKey));
 
   const qc = useQueryClient();
+  // Queries stay idle behind the tier guard — a guarded page must not fetch.
   const { data: pendingData, isLoading: pendingLoading, isError: pendingError, refetch: refetchPending } = useQuery({
-    queryKey: ['recon-certs', 'pending', branch], queryFn: () => getPending({ branch }),
+    queryKey: ['recon-certs', 'pending', branch], queryFn: () => getPending({ branch }), enabled: tierAllowed,
   });
   const { data: certs = [], isLoading: certsLoading, isError: certsError, refetch: refetchCerts } = useQuery({
-    queryKey: ['recon-certs', 'register', branch], queryFn: () => getList({ branch }),
+    queryKey: ['recon-certs', 'register', branch], queryFn: () => getList({ branch }), enabled: tierAllowed,
   });
   // "Generate" on a not-started closing spawns that period's per-ledger
   // certificates so the team can start it straight from the pending board.
@@ -95,7 +99,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
           year: 'Year-End — India FY2025-26 (Apr–Mar) · Africa CY2025 (Jan–Dec).',
         }[tierKey]} A row leaves this board only when every ledger certificate in it is ${tierKey === 'weekly' ? 'signed' : 'locked'}.`}>
         {gen.isError && <p className="mb-3 text-sm text-danger">Couldn’t generate certificates: {gen.error?.message}</p>}
-        {gen.isSuccess && gen.data && <p className="mb-3 text-sm text-success">Generated {gen.data.created ?? 0} certificate{(gen.data.created ?? 0) === 1 ? '' : 's'} for {gen.variables?.period} — open the Hub to reconcile them.</p>}
+        {gen.isSuccess && gen.data && <p className="mb-3 text-sm text-success">Generated {gen.data.created ?? 0} certificate{(gen.data.created ?? 0) === 1 ? '' : 's'} for {gen.variables?.period} — open {tierMenuName(tierKey)} Reconciliation to work them.</p>}
         {pendingLoading && <LoadingState label="Loading pending closings…" />}
         {pendingError && <ErrorState title="Couldn’t load the pending closings" message="The reconciliation service didn’t respond — this board may NOT be complete. Retry before relying on it." onRetry={() => refetchPending()} />}
         {!pendingLoading && !pendingError && pendingRows.length === 0 && <EmptyState title="Nothing pending" hint="Every scheduled closing is complete for this branch." />}
@@ -152,7 +156,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
         </div>
         {certsLoading && <LoadingState label="Loading register…" />}
         {certsError && <ErrorState title="Couldn’t load the register" message="The reconciliation service didn’t respond. Check the connection and retry." onRetry={() => refetchCerts()} />}
-        {!certsLoading && !certsError && registerRows.length === 0 && <EmptyState title="No certificates match" hint={`Generate them from ${tier.short} Reconciliation, or clear the status filter.`} />}
+        {!certsLoading && !certsError && registerRows.length === 0 && <EmptyState title="No certificates match" hint={`Generate them from ${tierMenuName(tierKey)} Reconciliation, or clear the status filter.`} />}
         {!certsError && registerRows.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] border-collapse">

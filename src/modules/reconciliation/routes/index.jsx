@@ -21,14 +21,14 @@ export const reconciliationRoutes = [
   { path: '/reconciliation/monthly', title: 'Monthly Reconciliation', moduleName: 'Reconciliation', Element: tierEl(Hub, 'month') },
   { path: '/reconciliation/quarterly', title: 'Quarterly Reconciliation', moduleName: 'Reconciliation', Element: tierEl(Hub, 'quarter') },
   { path: '/reconciliation/yearly', title: 'Yearly Reconciliation', moduleName: 'Reconciliation', Element: tierEl(Hub, 'year') },
-  // Reports — one report per tier.
-  { path: '/reconciliation/reports/weekly', title: 'Weekly Reconciliation Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'weekly') },
-  { path: '/reconciliation/reports/monthly', title: 'Monthly Reconciliation Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'month') },
-  { path: '/reconciliation/reports/quarterly', title: 'Quarterly Reconciliation Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'quarter') },
-  { path: '/reconciliation/reports/yearly', title: 'Yearly Reconciliation Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'year') },
+  // Reports — one report per tier (titles match the menu entries exactly).
+  { path: '/reconciliation/reports/weekly', title: 'Weekly Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'weekly') },
+  { path: '/reconciliation/reports/monthly', title: 'Monthly Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'month') },
+  { path: '/reconciliation/reports/quarterly', title: 'Quarterly Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'quarter') },
+  { path: '/reconciliation/reports/yearly', title: 'Yearly Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'year') },
   // Legacy combined paths → weekly (old bookmarks keep working).
   { path: '/reconciliation', title: 'Weekly Reconciliation', moduleName: 'Reconciliation', Element: tierEl(Hub, 'weekly') },
-  { path: '/reconciliation/reports', title: 'Weekly Reconciliation Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'weekly') },
+  { path: '/reconciliation/reports', title: 'Weekly Report', moduleName: 'Reconciliation', Element: tierEl(Reports, 'weekly') },
   // Governance + guide.
   { path: '/reconciliation/rulebook', title: 'Reconciliation Rule Book', moduleName: 'Reconciliation', Element: lazyEl(() => import('../index'), 'RuleBookPage') },
   { path: '/reconciliation/match-guide', title: 'Statement Match Guide', moduleName: 'Reconciliation', Element: lazyEl(() => import('../index'), 'MatchGuidePage') },
