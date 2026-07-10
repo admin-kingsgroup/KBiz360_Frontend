@@ -3,7 +3,7 @@
 import {
   BRANCHES, TIERS, tierOf, statusMeta, sourceMeta, tierProgress, chainProgress,
   fmtAmt, currencyOf, openExceptions, GOLDEN_RULES, ROLE_MATRIX,
-  pendingStateMeta, fmtDue, periodOptions, visibleTiers, branchCodeOf,
+  pendingStateMeta, fmtDue, periodOptions, visibleTiers, canEditCycleConfig, branchCodeOf,
   classifyOptionsFor, classificationLabel, MATCH_TYPE_LABELS, BANK_CLASSIFY, PARTY_CLASSIFY,
 } from '../utils';
 
@@ -26,6 +26,14 @@ describe('reconciliation · tiers', () => {
     expect(visibleTiers('Branch Accountant').map((t) => t.key)).toEqual(['weekly']);
     ['Sr. Accounts Executive', 'Senior Finance Manager', 'Director', 'Super Admin', undefined].forEach((r) => {
       expect(visibleTiers(r)).toHaveLength(4);
+    });
+  });
+  test('cycle CONFIG is FM/Director/Owner only — AE and Branch Accountant cannot reshape the scope', () => {
+    ['Senior Finance Manager', 'FM', 'Director', 'Owner', 'Super Admin', 'super_admin'].forEach((r) => {
+      expect(canEditCycleConfig(r)).toBe(true);
+    });
+    ['Sr. Accounts Executive', 'AE', 'Branch Accountant', '', undefined].forEach((r) => {
+      expect(canEditCycleConfig(r)).toBe(false);
     });
   });
 });

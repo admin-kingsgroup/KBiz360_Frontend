@@ -83,6 +83,13 @@ export function visibleTiers(role) {
   return /accountant/i.test(String(role || '')) ? TIERS.filter((t) => t.key === 'weekly') : TIERS;
 }
 
+/** The weekly cycle CONFIG (wallets/gateways joining the cycle) is a control:
+ *  FM / Director / Owner maintain it — AE verifies certificates, never
+ *  reshapes the scope. Mirrors the backend gate exactly. */
+export function canEditCycleConfig(role) {
+  return /finance\s*manager|(^|[^a-z])fm([^a-z]|$)|director|owner|super[\s_-]*admin/i.test(String(role || ''));
+}
+
 // Certificate status → Badge tone + label.
 export const STATUS_META = {
   open:       { tone: 'neutral', label: 'Open' },

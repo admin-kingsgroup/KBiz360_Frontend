@@ -127,9 +127,9 @@ export function MatchGuidePage({ setRoute }) {
         <div className="rounded-brand border border-surface-border bg-surface-alt/50 p-4 text-sm leading-relaxed text-ink-muted">
           <p><b className="text-ink">Document reference first</b> — an invoice/ticket/PNR/cheque number shared by both sides pairs the lines regardless of date. Same reference but a different amount = a <b>rate difference on a known document</b> (shown with the Δ).</p>
           <p className="mt-1"><b className="text-ink">Matched</b> = same signed amount + dates within <b>±3 days</b> (or the cheque/UTR/name tokens agree). <b className="text-ink">Learned</b> matches pair instantly from patterns you confirmed before.</p>
-          <p className="mt-1"><b className="text-ink">Probable</b> = same amount, dates within <b>±10 days</b> — or one statement line equals the SUM of up to 4 book entries (bulk NEFT → <b>1:N</b>; if the group includes a TDS entry it's tagged <b>TDS-explained</b>, not an anomaly).</p>
+          <p className="mt-1"><b className="text-ink">Probable</b> = same amount, dates within <b>±10 days</b> — or one statement line equals the SUM of up to 6 book entries (bulk NEFT → <b>1:N</b>; if the group includes a TDS entry it's tagged <b>TDS-explained</b>, not an anomaly).</p>
           <p className="mt-1">Everything else lands in Statement-only / Book-only — each with a <b>suggested</b> classification you can apply in one tap.</p>
-          <p className="mt-2 text-xs text-ink-subtle">Dates read Indian formats (14/07/2026, 14-Jul-26); amounts understand Dr/Cr columns, signed columns, ₹ symbols and parentheses-negatives. Supplier/client SOA scrutinies automatically switch to the trade vocabulary (invoice not received · TDS deduction · credit note pending · disputed…).</p>
+          <p className="mt-2 text-xs text-ink-subtle">Dates read Indian formats (14/07/2026, 14-Jul-26); amounts understand Dr/Cr columns, signed columns, ₹/$ symbols and parentheses-negatives. Supplier/client SOA scrutinies automatically switch to the trade vocabulary (invoice not received · TDS deduction · credit note pending · disputed…).</p>
         </div>
       </PageSection>
 

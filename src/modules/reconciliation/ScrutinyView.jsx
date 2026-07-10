@@ -55,8 +55,12 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
   const frozen = (cert.signatures?.length || 0) > 0;
   const actionable = (e) => e.status === 'probable' || ((e.status === 'stmt-only' || e.status === 'book-only') && !e.classification);
   const selectable = entries.filter(actionable);
+  // Selection never outlives its filter — a bulk action must only ever hit
+  // lines the user can SEE when they press Apply.
+  const pickFilter = (k) => { setFilter(k); setSelected(new Set()); };
+  const allSelected = selectable.length > 0 && selectable.every((e) => selected.has(e._id));
   const toggle = (id) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const toggleAll = () => setSelected((prev) => (prev.size === selectable.length ? new Set() : new Set(selectable.map((e) => e._id))));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(selectable.map((e) => e._id)));
 
   // "Copy → open voucher entry": stmt-only lines that need posting jump the user
   // into voucher entry with the line's details on the clipboard (2b-lite).
@@ -103,7 +107,7 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
         {/* filter + rerun */}
         <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Scrutiny filter">
           {[['all', 'All'], ['open', 'Needs action'], ['matched', 'Matched'], ['probable', 'Probable'], ['stmt-only', 'Statement-only'], ['book-only', 'Book-only']].map(([k, l]) => (
-            <button key={k} type="button" role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}
+            <button key={k} type="button" role="tab" aria-selected={filter === k} onClick={() => pickFilter(k)}
               className={`rounded-full border px-3 py-1 text-xs font-semibold ${filter === k ? 'border-transparent bg-navy text-white' : 'border-surface-border bg-surface text-ink-muted hover:border-ink/20'}`}>
               {l}
             </button>
@@ -147,7 +151,7 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
               <tr className="bg-surface-alt text-left text-[10px] font-bold uppercase tracking-wider text-ink-muted">
                 <th className="border-b border-surface-border px-2 py-2">
                   {!frozen && selectable.length > 0 && (
-                    <Checkbox aria-label="Select all actionable" checked={selected.size === selectable.length && selectable.length > 0} onChange={toggleAll} />
+                    <Checkbox aria-label="Select all actionable" checked={allSelected} onChange={toggleAll} />
                   )}
                 </th>
                 <th className="border-b border-surface-border px-2.5 py-2" colSpan={2}>Statement</th>
@@ -176,7 +180,7 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
                     <Cell className="whitespace-nowrap text-right font-semibold tabular-nums">{e.stmt ? fmtAmt(e.stmt.amount, cert.branch) : ''}</Cell>
                     <Cell className="text-center">
                       <Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge>
-                      {typeChip ? <div className="mt-0.5 text-[10px] font-semibold text-ink-muted">{typeChip}{e.delta ? ` · Δ ${fmtAmt(e.delta, cert.branch)}` : ''}</div>
+                      {typeChip ? <div className="mt-0.5 text-[10px] font-semibold text-ink-muted" title={e.delta ? 'Δ = statement − books' : undefined}>{typeChip}{e.delta ? ` · Δ ${fmtAmt(e.delta, cert.branch)}` : ''}</div>
                         : (e.matchType && e.matchType !== '1:1' ? <div className="mt-0.5 text-[10px] text-ink-subtle">{e.matchType}</div> : null)}
                       {e.carriedFrom ? <div className="mt-0.5 text-[10px] font-semibold text-ink-subtle">carried from {e.carriedFrom}</div> : null}
                       {e.classification ? <div className="mt-0.5 text-[10px] font-semibold text-ink-muted">{classificationLabel(e.classification)}</div> : null}

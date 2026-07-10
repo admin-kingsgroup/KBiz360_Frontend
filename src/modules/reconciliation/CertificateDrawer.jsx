@@ -97,10 +97,15 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
   // Attach = evidence upload + (when the file is HTML/TXT/CSV/Excel) client-side
   // parse → server-side entry-to-entry scrutiny in one step. PDF stays evidence.
   const attachM = useAction(async ({ label, source, file }) => {
+    // Once SIGNING has started the scrutiny is read-only (Rule 02) — a late
+    // file still attaches as evidence, it just can't rebuild the match.
+    const signingStarted = (cert?.signatures?.length || 0) > 0;
     let parsed = null;
-    if (file && /\.(csv|txt|xlsx?|xlsm|html?|htm)$/i.test(file.name)) parsed = await parseStatementFile(file);
+    if (!signingStarted && file && /\.(csv|txt|xlsx?|xlsm|html?|htm)$/i.test(file.name)) parsed = await parseStatementFile(file);
     const res = await addAttachment(id, { label, source, file });
-    if (parsed?.rows?.length) {
+    if (signingStarted) {
+      setParseNote('Attached as evidence — signing has started, so the scrutiny stays as signed (Rule 02).');
+    } else if (parsed?.rows?.length) {
       const fresh = res?.data || res;
       const att = fresh?.attachments?.[(fresh.attachments?.length || 1) - 1];
       await scrutinizeStatement(id, {

@@ -20,8 +20,8 @@ const HDR = {
   balance: /^(balance|running\s*balance|closing\s*balance|available\s*balance)$/i,
 };
 
-const num = (v) => {
-  const n = Number(String(v ?? '').replace(/[₹,\s]/g, '').replace(/\((.+)\)/, '-$1'));
+const num = (v) => { // strip currency marks — India books ₹, Africa books $ (USD)
+  const n = Number(String(v ?? '').replace(/USD|INR|KES|TZS/gi, '').replace(/[₹$,\s]/g, '').replace(/\((.+)\)/, '-$1'));
   return Number.isFinite(n) ? n : null;
 };
 

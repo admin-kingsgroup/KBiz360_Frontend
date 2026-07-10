@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2 } from 'lucide-react';
 import { getTree, getSummary, getPending, generateCertificates } from './api';
-import { BRANCHES, branchCodeOf, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers } from './utils';
+import { BRANCHES, branchCodeOf, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { CertificateDrawer } from './CertificateDrawer';
 import { CycleLedgerDrawer } from './CycleLedgerDrawer';
@@ -87,7 +87,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" icon={CalendarClock} onClick={() => setRoute && setRoute('/reconciliation/reports')}>Reports &amp; Pending</Button>
-          {tiers.length > 1 && tierKey === 'weekly' && (
+          {tierKey === 'weekly' && canEditCycleConfig(currentUser?.role) && (
             <Button variant="ghost" icon={Settings2} onClick={() => setShowCycleCfg(true)}>Cycle ledgers</Button>
           )}
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/reconciliation/rulebook')}>Rule Book</Button>
