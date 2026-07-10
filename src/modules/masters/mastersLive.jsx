@@ -195,7 +195,12 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     const label = body.name || body.code || 'Record';
     const onError = (e) => { setErr(e.message); toast(`Could not save — ${e.message}`, 'error'); };
     const onSuccess = () => { setEditing(null); toast(`${label} saved`); };
-    if (__new) create.mutate(body, { onSuccess, onError });
+    // "derived:" rows are ledgers the backend surfaces here for visibility (a party
+    // that only exists because a voucher referenced it) — they have no real master
+    // document to PUT to. Opening one through "Edit" must still CREATE the real
+    // record on save, or the backend 404s ("Cannot PUT .../derived:...").
+    const isDerived = !id || String(id).startsWith('derived:');
+    if (__new || isDerived) create.mutate(body, { onSuccess, onError });
     else update.mutate({ id, body }, { onSuccess, onError });
   };
 
