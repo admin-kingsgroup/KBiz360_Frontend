@@ -10,7 +10,7 @@ import { clickable } from '../../core/ux/clickable';
 import { SampleBanner } from '../../core/ux/SampleBanner';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { AlertTriangle, ChevronDown, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
-import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement } from '../../core/useBankReco';
+import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement, useRefreshBankReco } from '../../core/useBankReco';
 import { usePDCs, usePDCSummary, useCreatePDC, useDepositPDC, useBouncePDC, useRepresentPDC, useDeletePDC } from '../../core/usePDC';
 import { branchCode } from '../../core/useAccounting';
 import { PeriodBar } from '../../core/period';
@@ -113,8 +113,10 @@ function normDate(v){
   const MON={jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
   m=s.match(/^(\d{1,2})[\-\s]([A-Za-z]{3})[A-Za-z]*[\-\s](\d{2,4})/);
   if(m){ let [,d,mon,y]=m; if(y.length===2) y="20"+y; const mm=MON[mon.toLowerCase()]; if(mm) return `${y}-${mm}-${String(d).padStart(2,"0")}`; }
-  const t=Date.parse(s); if(!isNaN(t)) return new Date(t).toISOString().slice(0,10);
-  return s.slice(0,10);
+  // Date.parse treats a bare date as LOCAL midnight — read LOCAL components (not
+  // toISOString, which is UTC and shifts the day back in +ve timezones like IST).
+  const t=Date.parse(s); if(!isNaN(t)){ const d=new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+  return ""; // unrecognized → not a date; don't fabricate one that would never show in a period view
 }
 
 /* Build importable rows from the raw grid + the chosen column mapping. */
@@ -258,6 +260,11 @@ export function BankReco({branch}){
   };
   const runAutoMatch=()=>autoMut.mutate({ledger,branch:code,from,to});
 
+  /* Re-fetch ERP Books after a voucher was corrected (pulls the live ledger again). */
+  const refreshBooks=useRefreshBankReco();
+  const [refreshing,setRefreshing]=useState(false);
+  const reFetchBooks=async()=>{ setRefreshing(true); try{ await refreshBooks(); toast("ERP Books re-fetched"); } finally{ setRefreshing(false); } };
+
   const exportRecon=()=>{
     const rows=[
       ...stmtFiltered.map(l=>["STATEMENT",l.date,l.reference||l.chequeNo||l.utr,l.description,l.debit||"",l.credit||"",RECON_CLR[l.status]?.label||l.status]),
@@ -292,6 +299,7 @@ export function BankReco({branch}){
             {bankLedgers.map(b=><option key={b.code||b.name} value={b.name}>{b.name}{b.currency&&b.currency!=="INR"?` (${b.currency})`:""}</option>)}
           </select>
           <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r)=>{setFrom(r.from);setTo(r.to);}}/>
+          <button onClick={reFetchBooks} disabled={!ledger||refreshing} title="Re-fetch the ERP Books after correcting a voucher" style={{...btnGh,fontSize:11,opacity:(!ledger||refreshing)?0.6:1}}><RefreshCw size={12} style={refreshing?{animation:"spin 0.8s linear infinite"}:undefined}/> {refreshing?"Refreshing…":"Re-fetch Books"}</button>
           <button onClick={runAutoMatch} disabled={!ledger||autoMut.isPending} style={{...btnG,fontSize:11,opacity:(!ledger||autoMut.isPending)?0.6:1}}><RefreshCw size={12}/> {autoMut.isPending?"Matching…":"Auto-match"}</button>
           <button onClick={()=>setShowImport(s=>!s)} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Upload size={12}/> Import</button>
           <button onClick={exportRecon} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Download size={12}/> Export</button>
@@ -314,6 +322,7 @@ export function BankReco({branch}){
 
       {/* Import panel */}
       {showImport&&ledger&&<ImportPanel ledger={ledger} code={code} from={from} to={to}
+        onImported={({from:f,to:t})=>{ setFrom(f); setTo(t); }}
         onClose={()=>setShowImport(false)} importMut={importMut} clearMut={clearMut}/>}
 
       {/* KPI cards */}
@@ -368,10 +377,10 @@ export function BankReco({branch}){
               <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Book Entries (Ledger) <span style={{fontWeight:400,color:"#5a6691"}}>· {bookFiltered.length}</span></p>
               <div style={{...card,padding:0,overflow:"hidden"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Voucher","Amount","Status"]:["Date","Voucher","Narration","Debit","Credit","Status"]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Voucher","Amount","Status"]:["Date","Voucher","Narration","Debit","Credit","Balance","Status"]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount"||h==="Balance")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {bookLoading&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
-                    {!bookLoading&&bookFiltered.length===0&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No book entries for this bank/period.</td></tr>}
+                    {bookLoading&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
+                    {!bookLoading&&bookFiltered.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No book entries for this bank/period.</td></tr>}
                     {bookFiltered.map((l,i)=>{
                       const sel=selBook?.bookKey===l.bookKey;
                       const net=l.debit-l.credit;
@@ -385,6 +394,7 @@ export function BankReco({branch}){
                             ?<td style={{padding:"6px 9px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:net>=0?"#27500A":"#A32D2D"}}>{f(net)}</td>
                             :<><td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{l.debit?f(l.debit):""}</td>
                                <td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{l.credit?f(l.credit):""}</td></>}
+                          {view!=="minimal"&&<td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#5a6691",whiteSpace:"nowrap"}} title="Running book balance">{l.balance!=null?`${f(Math.abs(l.balance))} ${l.balanceSide||""}`.trim():"—"}</td>}
                           <td style={{padding:"6px 9px",textAlign:"center"}}><StatusChip status={l.reconciled?l.status:"unreconciled"}/></td>
                         </tr>
                       );
@@ -399,10 +409,10 @@ export function BankReco({branch}){
               <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Bank Statement <span style={{fontWeight:400,color:"#5a6691"}}>· {stmtFiltered.length}</span></p>
               <div style={{...card,padding:0,overflow:"hidden"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Description","Amount","Status",""]:["Date","Ref / Cheque / UTR","Description","Debit","Credit","Status",""]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Description","Amount","Status",""]:["Date","Ref / Cheque / UTR","Description","Debit","Credit","Balance","Status",""]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount"||h==="Balance")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {stmtLoading&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
-                    {!stmtLoading&&stmtFiltered.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No statement lines. Use <b>Import</b> to load a bank statement (CSV / paste).</td></tr>}
+                    {stmtLoading&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
+                    {!stmtLoading&&stmtFiltered.length===0&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No statement lines. Use <b>Import</b> to load a bank statement (CSV / paste).</td></tr>}
                     {stmtFiltered.map((l,i)=>{
                       const sel=selStmt?.id===l.id;
                       const net=l.credit-l.debit;
@@ -418,6 +428,7 @@ export function BankReco({branch}){
                             ?<td style={{padding:"6px 9px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:net>=0?"#27500A":"#A32D2D"}}>{f(net)}</td>
                             :<><td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{l.debit?f(l.debit):""}</td>
                                <td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{l.credit?f(l.credit):""}</td></>}
+                          {view!=="minimal"&&<td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#5a6691",whiteSpace:"nowrap"}} title={l.balance!=null?"Running balance from the imported statement":"Import a statement with a Balance column to populate this"}>{l.balance!=null?f(l.balance):"—"}</td>}
                           <td style={{padding:"6px 9px",textAlign:"center"}}><StatusChip status={l.status}/></td>
                           <td style={{padding:"6px 6px",textAlign:"center",whiteSpace:"nowrap"}}>
                             {(l.status==="reconciled"||l.status==="partial")
@@ -541,7 +552,7 @@ export function BankReco({branch}){
 }
 
 /* Statement import — paste or upload CSV, map columns, preview, import. */
-function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut}){
+function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut,onImported}){
   const [raw,setRaw]=useState("");
   const [fileName,setFileName]=useState("");
   const {headers,rows}=useMemo(()=>parseDelimited(raw),[raw]);
@@ -550,7 +561,17 @@ function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut}){
   const built=useMemo(()=>buildImportRows(rows,mapping),[rows,mapping]);
   const valid=built.filter(r=>r.date&&(r.debit||r.credit));
   const onFile=e=>{ const file=e.target.files?.[0]; if(!file) return; setFileName(file.name); const rd=new FileReader(); rd.onload=()=>setRaw(String(rd.result||"")); rd.readAsText(file); };
-  const doImport=()=>importMut.mutate({ledger,branch:code,rows:built,fileName},{onSuccess:()=>{ setRaw(""); setFileName(""); }});
+  // Post exactly the rows we counted (valid), then widen — never shrink — the
+  // period so every row we just imported is visible below. ISO dates sort/compare
+  // lexicographically, so string min/max is chronological.
+  const doImport=()=>{
+    const dates=valid.map(r=>r.date).filter(Boolean).sort();
+    const fileFrom=dates[0], fileTo=dates[dates.length-1];
+    importMut.mutate({ledger,branch:code,rows:valid,fileName},{onSuccess:()=>{
+      if(fileFrom) onImported?.({from:fileFrom<from?fileFrom:from, to:fileTo>to?fileTo:to});
+      setRaw(""); setFileName("");
+    }});
+  };
 
   return (
     <div style={{...card,padding:14,marginBottom:12,border:"1px solid #B5D4F4",background:"#fbfdff"}}>
@@ -603,7 +624,7 @@ function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut}){
       <div style={{display:"flex",gap:8,marginTop:10,alignItems:"center"}}>
         <button onClick={doImport} disabled={!valid.length||mapping.date==null||importMut.isPending} style={{...btnG,fontSize:11,opacity:(!valid.length||mapping.date==null||importMut.isPending)?0.5:1}}><Upload size={12}/> {importMut.isPending?"Importing…":`Import ${valid.length} lines`}</button>
         <button onClick={async()=>{ const{confirmed}=await confirmDialog({title:'Clear all statement lines?',message:`Delete ALL statement lines for ${ledger} between ${from} and ${to}? This cannot be undone.`,danger:true,confirmLabel:'Clear period'}); if(confirmed) clearMut.mutate({ledger,from,to}); }} disabled={clearMut.isPending} style={{...btnGh,fontSize:11,color:"#A32D2D"}}><Trash2 size={12}/> Clear period</button>
-        {importMut.isSuccess&&importMut.data&&<span style={{fontSize:10.5,color:"#27500A"}}>✔ {importMut.data.inserted} imported{importMut.data.skipped?`, ${importMut.data.skipped} skipped (blank/duplicate)`:""}.</span>}
+        {importMut.isSuccess&&importMut.data&&<span style={{fontSize:10.5,color:"#27500A"}}>✔ {importMut.data.inserted} imported{importMut.data.duplicate?`, ${importMut.data.duplicate} already on file (re-import)`:""}{importMut.data.blank?`, ${importMut.data.blank} blank`:""}.</span>}
         {(importMut.isError||clearMut.isError)&&<span style={{fontSize:10.5,color:"#A32D2D"}}>{String(importMut.error?.message||clearMut.error?.message||"Failed")}</span>}
       </div>
     </div>

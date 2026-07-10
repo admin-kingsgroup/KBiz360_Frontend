@@ -56,6 +56,21 @@ export function trialBalanceTotals(rows = []) {
  * party in the journal — a full-reversal refund nets its debtor leg, so the header
  * `total` (gross) is not what the ledger (or the JV view) shows.
  */
+// A supplier payment can carry ADDITIVE charge legs (bank charge etc.) the bank parts
+// with ON TOP of the party amount, so `total` (= the supplier settlement) understates
+// the real bank/cash outflow. Add those legs back so the register row — and its footer
+// sum — foot to the outflow. Mirrors posting.builder.paymentLines' chargeLegs: a party
+// payment whose lines are Dr-only (a Cr line ⇒ a full/legacy journal, not charges).
+function additiveChargeSum(v) {
+  if ((v.category || '') !== 'payment' || !v.party) return 0;
+  const lines = Array.isArray(v.lines) ? v.lines : [];
+  if (lines.some((l) => l && l.drCr === 'Cr')) return 0;
+  const p = String(v.party).trim().toLowerCase();
+  return lines
+    .filter((l) => l && l.drCr !== 'Cr' && String(l.ledger || '').trim().toLowerCase() !== p)
+    .reduce((s, l) => s + (num(l.amt) || 0), 0);
+}
+
 export function toVoucherRegisterRow(v = {}) {
   const lines = Array.isArray(v.lines) ? v.lines : [];
   const firstLedger = (lines.find((l) => l && l.ledger) || {}).ledger || '';
@@ -67,7 +82,7 @@ export function toVoucherRegisterRow(v = {}) {
     branch: v.branch || '',
     account: v.party || v.billTo || v.counterParty || firstLedger || '—',
     narration: v.remarks || (lines[0] && lines[0].desc) || '',
-    amount: num(v.partyNet) || num(v.total) || num(v.subtotal),
+    amount: num(v.partyNet) || (num(v.total) + additiveChargeSum(v)) || num(v.subtotal),
     status: v.status || '',
     mode: v.paymentMode || '',
   };

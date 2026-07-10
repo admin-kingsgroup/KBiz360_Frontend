@@ -12,11 +12,16 @@ const parseNum = (s) => {
 
 export function normDate(s) {
   const str = String(s || '').trim();
+  if (!str) return '';
   let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
   m = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
   if (m) { let y = +m[3]; if (y < 100) y += 2000; return `${y}-${String(+m[2]).padStart(2, '0')}-${String(+m[1]).padStart(2, '0')}`; }
-  return str.slice(0, 10);
+  // Date.parse treats a bare date as LOCAL midnight — read LOCAL components (not
+  // toISOString, which is UTC and shifts the day back in +ve timezones like IST).
+  const t = Date.parse(str);
+  if (!Number.isNaN(t)) { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+  return ''; // unrecognized → not a date; drop it rather than store a garbage value that hides in the period view
 }
 
 export function parseSupplierStatement(text) {
@@ -29,11 +34,12 @@ export function parseSupplierStatement(text) {
     // Skip a header row (first cell mentions "date" and the line names amount cols).
     if (/^date$/i.test(cells[0]) || (/date/i.test(cells[0]) && /(deb|cred|amount|invoice)/i.test(line))) continue;
     const [date, invoiceNo, debit, credit, ...rest] = cells;
-    if (!date) continue;
+    const iso = normDate(date);
+    if (!iso) continue; // no / unparseable date — can't reconcile, and would only hide in the period view
     const d = parseNum(debit);
     const c = parseNum(credit);
     if (!d && !c) continue; // nothing to reconcile on this row
-    out.push({ date: normDate(date), invoiceNo: invoiceNo || '', debit: d, credit: c, description: rest.join(' ').trim() });
+    out.push({ date: iso, invoiceNo: invoiceNo || '', debit: d, credit: c, description: rest.join(' ').trim() });
   }
   return out;
 }
