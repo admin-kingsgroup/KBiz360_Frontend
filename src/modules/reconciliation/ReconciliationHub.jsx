@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2 } from 'lucide-react';
 import { getTree, getSummary, getPending, generateCertificates } from './api';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, reportPathFor } from './utils';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, reportPathFor, tierMenuName } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { CertificateDrawer } from './CertificateDrawer';
 import { CycleLedgerDrawer } from './CycleLedgerDrawer';
@@ -84,7 +84,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
   if (!tierAllowed) {
     return (
       <div className="grid gap-4">
-        <h1 className="kbiz-page-title">{tier.short} Reconciliation</h1>
+        <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Reconciliation</h1>
         <EmptyState title="Central closing tier"
           hint="The Branch Accountant works the WEEKLY cycle only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
           action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Open Weekly Reconciliation</Button>} />
@@ -97,11 +97,11 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="kbiz-page-title">{tier.short} Reconciliation</h1>
+          <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Reconciliation</h1>
           <p className="text-sm text-ink-muted">One certificate per ledger · {tier.mode === 'digital' ? 'digital sign chain' : 'physical certificate + scan-back'} · branch-wise, never mixed.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" icon={CalendarClock} onClick={() => setRoute && setRoute(reportPathFor(tierKey))}>{tier.short} Report</Button>
+          <Button variant="ghost" icon={CalendarClock} onClick={() => setRoute && setRoute(reportPathFor(tierKey))}>{tierMenuName(tierKey)} Report</Button>
           {tierKey === 'weekly' && canEditCycleConfig(currentUser?.role) && (
             <Button variant="ghost" icon={Settings2} onClick={() => setShowCycleCfg(true)}>Cycle ledgers</Button>
           )}

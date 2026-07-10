@@ -82,6 +82,10 @@ export const tierOf = (key) => TIERS.find((t) => t.key === key) || TIERS[0];
 export const TIER_PATHS = { weekly: 'weekly', month: 'monthly', quarter: 'quarterly', year: 'yearly' };
 export const hubPathFor = (tierKey) => `/reconciliation/${TIER_PATHS[tierKey] || 'weekly'}`;
 export const reportPathFor = (tierKey) => `/reconciliation/reports/${TIER_PATHS[tierKey] || 'weekly'}`;
+// Page headings match the MENU ENTRY the user clicked (Weekly/Monthly/Quarterly/
+// Yearly …) — tier.short stays the tier's formal name (Month-End, Year-End) on
+// cards, badges and the Rule Book.
+export const tierMenuName = (tierKey) => ({ weekly: 'Weekly', month: 'Monthly', quarter: 'Quarterly', year: 'Yearly' }[tierKey] || 'Weekly');
 
 /** Tiers a role may see/work. The Branch Accountant handles the WEEKLY cycle
  *  only — Month/Quarter/Year closings are done from TK Group Central by
