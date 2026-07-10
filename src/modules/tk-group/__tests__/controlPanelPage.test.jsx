@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 jest.mock('../api/flags', () => ({
   getFlagState: jest.fn().mockResolvedValue({ flags: { 'core.policy_guard': { enabled: false, label: 'Master' } } }),
   proposeFlags: jest.fn().mockResolvedValue({ ok: true }),
+  setFlag: jest.fn().mockResolvedValue({ flags: { 'core.policy_guard': { enabled: true, label: 'Master control — engage the TK Group guard' } }, enabled: ['core.policy_guard'] }),
 }));
 jest.mock('../../../core/useAccounting', () => ({ useConfigValue: () => ({ data: {} }) }));
 // eslint-disable-next-line import/first
@@ -15,6 +16,9 @@ function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 }
+
+// No kb360-user in localStorage → isOwner() is false → the propose-to-approve path.
+afterEach(() => { try { localStorage.clear(); } catch { /* ignore */ } });
 
 describe('Control Panel · Power Console', () => {
   test('opens on the Master Switch, dormant, with the 17-screen nav', async () => {
@@ -89,5 +93,24 @@ describe('Control Panel · Power Console', () => {
     expect((await screen.findAllByText('Active')).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('Not required').length).toBeGreaterThanOrEqual(3);
     expect(screen.queryByText('Planned')).not.toBeInTheDocument(); // nothing on this screen is "Planned" anymore
+  });
+
+  test('OWNER: flipping the Master Switch applies it LIVE (self-approve), not a proposal', async () => {
+    const { setFlag, proposeFlags } = require('../api/flags');
+    setFlag.mockClear(); proposeFlags.mockClear();
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin', email: 'afshin@travkings.com' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(await screen.findByRole('switch', { name: /Engage the TK Group guard/ }));
+    // live flip: setFlag(key, turningOn=true) — NOT the change-request proposal path
+    expect(await screen.findByText(/is now ON/)).toBeInTheDocument();
+    expect(setFlag).toHaveBeenCalledWith('core.policy_guard', true);
+    expect(proposeFlags).not.toHaveBeenCalled();
+  });
+
+  test('OWNER: the status strip reflects the live guard state, not a hard-coded "OFF"', async () => {
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'super_admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    // guard is off in the mocked getFlagState → still dormant, but the owner is told it flips live
+    expect(await screen.findByText(/applies immediately and is logged/)).toBeInTheDocument();
   });
 });
