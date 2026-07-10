@@ -50,7 +50,9 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
   const classify = classifyOptionsFor(s.perspective);
   const entries = (s.entries || []).filter((e) => filter === 'all'
     || (filter === 'open' ? (e.status === 'probable' || ((e.status === 'stmt-only' || e.status === 'book-only') && !e.classification)) : e.status === filter));
-  const frozen = !!cert.snapshot?.frozenAt;
+  // Edits allowed until SIGNING starts (matches the backend guard) — staff
+  // can still reclassify and re-freeze between freeze and the first signature.
+  const frozen = (cert.signatures?.length || 0) > 0;
   const actionable = (e) => e.status === 'probable' || ((e.status === 'stmt-only' || e.status === 'book-only') && !e.classification);
   const selectable = entries.filter(actionable);
   const toggle = (id) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -76,7 +78,7 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
             {sum.unresolved > 0 && <Badge tone="warning" size="sm" className="ml-2">{sum.unresolved} unresolved</Badge>}
             {sum.carriedOpen > 0 && <Badge tone="neutral" size="sm" className="ml-2">{sum.carriedOpen} carried forward</Badge>}
           </span>
-          <span className="text-xs text-ink-subtle">{frozen ? 'Snapshot frozen — actions locked once signing starts.' : 'Adopt these from the snapshot form ("Use scrutiny figures").'}</span>
+          <span className="text-xs text-ink-subtle">{frozen ? 'Signing has started — the scrutiny is read-only.' : 'Adopt these from the snapshot form ("Use scrutiny figures") — you can reclassify and re-freeze until the first signature.'}</span>
         </div>
       )}>
       <div className="grid gap-4 p-4">
@@ -187,7 +189,7 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
                     </Cell>
                     <Cell className="whitespace-nowrap text-right font-semibold tabular-nums">{e.book ? fmtAmt(e.book.amount, cert.branch) : ''}</Cell>
                     <Cell>
-                      {frozen ? <span className="text-[10.5px] text-ink-subtle">frozen</span> : e.status === 'probable' ? (
+                      {frozen ? <span className="text-[10.5px] text-ink-subtle">signed</span> : e.status === 'probable' ? (
                         <Button size="xs" variant="primary" icon={CheckCircle2} loading={act.isPending && act.variables?.entryId === e._id}
                           onClick={() => act.mutate({ entryId: e._id, action: 'confirm' })}>Confirm</Button>
                       ) : (e.status === 'stmt-only' || e.status === 'book-only') ? (

@@ -2533,8 +2533,8 @@ function InterBranchLinkLevel({ branch, cur }) {
           {q.isLoading && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>Loading…</td></tr>}
           {!q.isLoading && open.length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.green, padding: 16 }}>✓ Every INB link is booked on both sides.</td></tr>}
           {open.map((l) => (
-            <tr key={l.linkNo} style={{ background: '#fdf6f4' }}>
-              <td style={{ ...td, fontWeight: 700 }}>{l.linkNo}</td>
+            <tr key={l.inbLinkNo} style={{ background: '#fdf6f4' }}>
+              <td style={{ ...td, fontWeight: 700 }}>{l.inbLinkNo}</td>
               <td style={td}>{l.date}</td>
               <td style={td}>{l.fromBranch} → {l.toBranch}</td>
               <td style={td}>{l.module || '—'}</td>
