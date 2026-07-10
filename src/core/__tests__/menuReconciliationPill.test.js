@@ -16,10 +16,16 @@ function allHrefs(node, out = []) {
 }
 
 describe('Reconciliation · top-level pill', () => {
-  test('pill has the certificate ladder AND the moved statement-matching screens', () => {
+  test('pill = per-tier certificate pages + per-tier reports + the moved statement-matching screens', () => {
     expect(MENU_RECONCILIATION.label).toBe('Reconciliation');
     expect(allHrefs(MENU_RECONCILIATION)).toEqual([
-      '/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook',
+      // Reconcile & Certify — one entry per tier, Rule Book last
+      '/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
+      '/reconciliation/rulebook',
+      // Reports — one report per tier
+      '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
+      '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
+      // Statement Matching
       '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
       '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
       '/reconciliation/match-guide', // the staff Match Guide — LAST under Statement Matching
@@ -46,12 +52,14 @@ describe('Reconciliation · top-level pill', () => {
       .forEach((h) => expect(all).not.toContain(h));
   });
 
-  test('TK Group Central cockpit carries the FULL Reconciliation pill (certs + statement matching)', () => {
+  test('TK Group Central cockpit carries the FULL Reconciliation pill (per-tier certs + reports + statement matching)', () => {
     const cockpit = controlCockpitMenu('', { role: 'Super Admin' });
     const pill = cockpit.find((p) => p && p.label === 'Reconciliation');
     expect(pill).toBeTruthy();
     expect(allHrefs(pill)).toEqual([
-      '/reconciliation', '/reconciliation/reports',
+      '/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
+      '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
+      '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
       '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
       '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
       '/reconciliation/match-guide',
@@ -63,8 +71,8 @@ describe('Reconciliation · top-level pill', () => {
   });
 
   test('breadcrumbs resolve under the Reconciliation pill', () => {
-    expect(crumbsFor('/reconciliation').map((c) => c.label)).toEqual(['Reconciliation', 'Certificates & Closing', 'Reconciliation Hub']);
-    expect(crumbsFor('/reconciliation/reports').map((c) => c.label)).toEqual(['Reconciliation', 'Certificates & Closing', 'Reports & Pending']);
-    expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Certificates & Closing', 'Rule Book & Process']);
+    expect(crumbsFor('/reconciliation/weekly').map((c) => c.label)).toEqual(['Reconciliation', 'Reconcile & Certify', 'Weekly Reconciliation']);
+    expect(crumbsFor('/reconciliation/reports/monthly').map((c) => c.label)).toEqual(['Reconciliation', 'Reports', 'Monthly Report']);
+    expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Reconcile & Certify', 'Rule Book & Process']);
   });
 });

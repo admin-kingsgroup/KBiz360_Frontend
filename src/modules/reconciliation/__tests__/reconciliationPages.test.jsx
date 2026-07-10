@@ -47,51 +47,74 @@ const wrap = (ui) => {
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 };
 
-describe('ReconciliationHub · render', () => {
-  test('central role: all four tier cards + the grouped ledger register', async () => {
-    wrap(<ReconciliationHub branch="BOM" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
-    expect(await screen.findByText('Weekly')).toBeInTheDocument();
-    expect(screen.getByText('Month-End')).toBeInTheDocument();
-    expect(screen.getByText('Quarterly')).toBeInTheDocument();
-    expect(screen.getByText('Year-End')).toBeInTheDocument();
+describe('ReconciliationHub · render (tier-locked pages — the menu is the tier switch)', () => {
+  test('weekly page: this tier\'s card ONLY + the grouped ledger register', async () => {
+    wrap(<ReconciliationHub branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText('Weekly Reconciliation')).toBeInTheDocument(); // page title
+    expect(screen.getByText('Weekly')).toBeInTheDocument();                   // the tier progress card
+    expect(screen.queryByText('Month-End')).not.toBeInTheDocument();          // other tiers live on their own pages
+    expect(screen.queryByText('Quarterly')).not.toBeInTheDocument();
+    expect(screen.queryByText('Year-End')).not.toBeInTheDocument();
     expect(await screen.findByText('ICICI Bank A/c')).toBeInTheDocument();   // register row
     expect(screen.getByText('Current Assets')).toBeInTheDocument();          // parent group band
     expect(screen.getByText('Bank Accounts')).toBeInTheDocument();           // sub-group band
   });
 
+  test('monthly page: tier prop locks the page to Month-End', async () => {
+    wrap(<ReconciliationHub branch="BOM" tier="month" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText('Month-End Reconciliation')).toBeInTheDocument();
+    expect(screen.getByText('Month-End')).toBeInTheDocument();
+    expect(screen.queryByText('Weekly')).not.toBeInTheDocument();
+  });
+
   test('branch prop as an OBJECT (the real app shape) selects that branch', async () => {
-    wrap(<ReconciliationHub branch={{ code: 'AMD', city: 'Ahmedabad' }} setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    wrap(<ReconciliationHub branch={{ code: 'AMD', city: 'Ahmedabad' }} tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
     const amdChip = await screen.findByRole('tab', { name: /AMD/ });
     expect(amdChip).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('Branch Accountant: ONLY the weekly tier card + the TK-Group note', async () => {
-    wrap(<ReconciliationHub branch="BOM" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
+  test('Branch Accountant: weekly page works + the TK-Group note', async () => {
+    wrap(<ReconciliationHub branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
     expect(await screen.findByText('Weekly')).toBeInTheDocument();
     expect(screen.queryByText('Month-End')).not.toBeInTheDocument();
-    expect(screen.queryByText('Quarterly')).not.toBeInTheDocument();
     expect(screen.getByText(/worked from TK Group Central/i)).toBeInTheDocument();
+  });
+
+  test('Branch Accountant on a central tier URL: guarded, not broken', async () => {
+    wrap(<ReconciliationHub branch="BOM" tier="quarter" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
+    expect(await screen.findByText('Central closing tier')).toBeInTheDocument();
+    expect(screen.getByText(/WEEKLY cycle only/i)).toBeInTheDocument();
+    expect(screen.queryByText('ICICI Bank A/c')).not.toBeInTheDocument();     // no register leaks
   });
 });
 
-describe('ReconReportsPage · render', () => {
-  test('central role: pending board shows the backlog + upcoming Friday weekly', async () => {
-    wrap(<ReconReportsPage branch="BOM" setRoute={() => {}} currentUser={{ role: 'Director' }} />);
-    expect(await screen.findByText(/Year-End Closing — FY2025-26/)).toBeInTheDocument();
-    expect(screen.getByText(/Month-End Closing — April 2026/)).toBeInTheDocument();
-    expect(screen.getByText(/Weekly Reconciliation — 2026-W29/)).toBeInTheDocument();
+describe('ReconReportsPage · render (one report per tier)', () => {
+  test('Weekly Report: only weekly pending rows + weekly certs; upcoming Friday shown', async () => {
+    wrap(<ReconReportsPage branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Director' }} />);
+    expect(await screen.findByText('Weekly Report')).toBeInTheDocument();     // page title
+    expect(await screen.findByText(/Weekly Reconciliation — 2026-W29/)).toBeInTheDocument();
+    expect(screen.queryByText(/Year-End Closing/)).not.toBeInTheDocument();   // other tiers live on their own reports
+    expect(screen.queryByText(/Month-End Closing/)).not.toBeInTheDocument();
     expect(screen.getByText(/opens Fri/)).toBeInTheDocument();               // upcoming = no Generate button
     expect(await screen.findByText(/Cheque unpresented 90\+ days/)).toBeInTheDocument(); // open exceptions report
     // certNo appears in BOTH the register and the open-exceptions list
     expect(screen.getAllByText('WK/BOM/2026-W28/B1').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText('ME/BOM/2026-04/B1')).not.toBeInTheDocument();  // month cert on the Monthly Report only
   });
 
-  test('Branch Accountant: weekly rows only — no year/month closings, no month certs', async () => {
-    wrap(<ReconReportsPage branch="BOM" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
-    expect(await screen.findByText(/Weekly Reconciliation — 2026-W29/)).toBeInTheDocument();
-    expect(screen.queryByText(/Year-End Closing/)).not.toBeInTheDocument();
+  test('Yearly Report: only the year-end backlog row', async () => {
+    wrap(<ReconReportsPage branch="BOM" tier="year" setRoute={() => {}} currentUser={{ role: 'Director' }} />);
+    expect(await screen.findByText('Year-End Report')).toBeInTheDocument();
+    expect(await screen.findByText(/Year-End Closing — FY2025-26/)).toBeInTheDocument();
+    expect(screen.queryByText(/Weekly Reconciliation — 2026-W29/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Month-End Closing/)).not.toBeInTheDocument();
-    expect(screen.queryByText('ME/BOM/2026-04/B1')).not.toBeInTheDocument(); // month cert filtered from register
+  });
+
+  test('Branch Accountant: weekly report works; a central tier report is guarded', async () => {
+    wrap(<ReconReportsPage branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
+    expect(await screen.findByText(/Weekly Reconciliation — 2026-W29/)).toBeInTheDocument();
+    wrap(<ReconReportsPage branch="BOM" tier="year" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
+    expect(await screen.findByText('Central closing tier')).toBeInTheDocument();
   });
 });
 

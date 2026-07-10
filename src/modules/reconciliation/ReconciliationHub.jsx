@@ -2,22 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2 } from 'lucide-react';
 import { getTree, getSummary, getPending, generateCertificates } from './api';
-import { BRANCHES, branchCodeOf, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig } from './utils';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, reportPathFor } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { CertificateDrawer } from './CertificateDrawer';
 import { CycleLedgerDrawer } from './CycleLedgerDrawer';
 
-// ─── Reconciliation Hub — the module's home ─────────────────────────────────
-// Branch-wise (Rule 06: one branch at a time, never mixed), four tier tabs,
-// and the per-ledger register grouped Parent Group → Sub-group → ledger — one
+// ─── Reconciliation — one page per tier ──────────────────────────────────────
+// Branch-wise (Rule 06: one branch at a time, never mixed). The TIER is fixed
+// by the route — Reconcile & Certify ▸ Weekly / Monthly / Quarterly / Yearly
+// Reconciliation are separate menu entries rendering this page tier-locked.
+// Per-ledger register grouped Parent Group → Sub-group → ledger — one
 // certificate per ledger (Rule 01). Opening a row works the certificate in a
 // drawer: freeze → attach → exceptions → sign chain → (physical) scan-back.
 
-function TierCard({ tier, counts, period, active, onClick }) {
+function TierCard({ tier, counts, period }) {
   const p = tierProgress(counts);
   return (
-    <button type="button" onClick={onClick} aria-pressed={active}
-      className={`rounded-brand border p-4 text-left transition-colors ${active ? 'border-navy bg-navy/5 shadow-card' : 'border-surface-border bg-surface hover:border-ink/20'}`}>
+    <div className="rounded-brand border border-navy bg-navy/5 p-4 text-left shadow-card">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-bold uppercase tracking-wider text-ink-subtle">{tier.short}</span>
         <Badge tone={tier.tone} size="sm">{tier.mode === 'digital' ? 'Digital' : 'Physical'}</Badge>
@@ -27,14 +28,17 @@ function TierCard({ tier, counts, period, active, onClick }) {
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-alt">
         <div className="h-full rounded-full bg-navy transition-all" style={{ width: `${p.pct}%` }} />
       </div>
-    </button>
+    </div>
   );
 }
 
-export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) {
+// The tier is FIXED by the route (Reconcile & Certify ▸ Weekly / Monthly /
+// Quarterly / Yearly Reconciliation) — the menu is the tier switch, the page
+// never mixes tiers.
+export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, tier: fixedTier }) {
   const appCode = branchCodeOf(appBranch); // app passes a branch OBJECT (or 'ALL')
   const [branch, setBranch] = useState(appCode || 'BOM');
-  const [tierKey, setTierKey] = useState('weekly');
+  const tierKey = TIERS.some((t) => t.key === fixedTier) ? fixedTier : 'weekly';
   const [openId, setOpenId] = useState(null);
   const [showCycleCfg, setShowCycleCfg] = useState(false);
   // Per-(branch,tier) period override — '' means "the current period". Lets the
@@ -51,9 +55,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
   // Branch Accountant works the WEEKLY cycle only (Month/Quarter/Year are done
   // from TK Group Central by AE/FM/Director/Owner — backend enforces it too).
   const tiers = visibleTiers(currentUser?.role);
-  useEffect(() => {
-    if (!tiers.some((t) => t.key === tierKey)) setTierKey('weekly');
-  }, [tiers, tierKey]);
+  const tierAllowed = tiers.some((t) => t.key === tierKey);
 
   const { data: summary } = useQuery({ queryKey: ['recon-certs', 'summary', branch], queryFn: () => getSummary({ branch }) });
   const { data: pendingData } = useQuery({ queryKey: ['recon-certs', 'pending', branch], queryFn: () => getPending({ branch }) });
@@ -77,16 +79,29 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
     },
   });
 
+  // Direct-URL guard: a Branch Accountant landing on a central closing tier
+  // gets the rule, not a broken page (the menu already hides these entries).
+  if (!tierAllowed) {
+    return (
+      <div className="grid gap-4">
+        <h1 className="kbiz-page-title">{tier.short} Reconciliation</h1>
+        <EmptyState title="Central closing tier"
+          hint="The Branch Accountant works the WEEKLY cycle only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
+          action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Open Weekly Reconciliation</Button>} />
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4">
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="kbiz-page-title">Reconciliation</h1>
-          <p className="text-sm text-ink-muted">One certificate per ledger · four signed tiers · branch-wise, never mixed.</p>
+          <h1 className="kbiz-page-title">{tier.short} Reconciliation</h1>
+          <p className="text-sm text-ink-muted">One certificate per ledger · {tier.mode === 'digital' ? 'digital sign chain' : 'physical certificate + scan-back'} · branch-wise, never mixed.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" icon={CalendarClock} onClick={() => setRoute && setRoute('/reconciliation/reports')}>Reports &amp; Pending</Button>
+          <Button variant="ghost" icon={CalendarClock} onClick={() => setRoute && setRoute(reportPathFor(tierKey))}>{tier.short} Report</Button>
           {tierKey === 'weekly' && canEditCycleConfig(currentUser?.role) && (
             <Button variant="ghost" icon={Settings2} onClick={() => setShowCycleCfg(true)}>Cycle ledgers</Button>
           )}
@@ -108,13 +123,10 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
         <span className="ml-auto text-xs italic text-ink-subtle">Branch-wise — data is never mixed across branches</span>
       </div>
 
-      {/* tier cards — role-scoped: Branch Accountant sees the weekly cycle only */}
-      <div className={`grid gap-3 ${tiers.length > 1 ? 'grid-cols-2 desktop:grid-cols-4' : 'grid-cols-1 tablet:max-w-sm'}`}>
-        {tiers.map((t) => (
-          <TierCard key={t.key} tier={t} active={tierKey === t.key}
-            counts={summary?.tiers?.[t.key]} period={summary?.periods?.[t.key]}
-            onClick={() => setTierKey(t.key)} />
-        ))}
+      {/* this tier's progress card — switching tiers happens from the menu
+          (Reconcile & Certify ▸ Weekly / Monthly / Quarterly / Yearly) */}
+      <div className="grid grid-cols-1 gap-3 tablet:max-w-sm">
+        <TierCard tier={tier} counts={summary?.tiers?.[tierKey]} period={summary?.periods?.[tierKey]} />
       </div>
       {tiers.length === 1 && (
         <p className="text-xs text-ink-subtle">Month-End, Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner.</p>

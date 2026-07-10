@@ -101,9 +101,18 @@ export function controlCockpitMenu(focus, currentUser) {
     // Quarterly → Year-End). The central view is oversight of the SAME module: the
     // pages carry their own branch chips, so everything stays BRANCHWISE, never blended.
     { label: 'Reconciliation', icon: ArrowLeftRight, children: [
+      // One entry per tier — the menu is the tier switch (pages are tier-locked).
       { label: 'Reconcile & Certify', children: [
-        { label: 'Reconciliation Hub', href: '/reconciliation' },
-        { label: 'Reports & Pending', href: '/reconciliation/reports' },
+        { label: 'Weekly Reconciliation', href: '/reconciliation/weekly' },
+        { label: 'Monthly Reconciliation', href: '/reconciliation/monthly' },
+        { label: 'Quarterly Reconciliation', href: '/reconciliation/quarterly' },
+        { label: 'Yearly Reconciliation', href: '/reconciliation/yearly' },
+      ] },
+      { label: 'Reports', children: [
+        { label: 'Weekly Report', href: '/reconciliation/reports/weekly' },
+        { label: 'Monthly Report', href: '/reconciliation/reports/monthly' },
+        { label: 'Quarterly Report', href: '/reconciliation/reports/quarterly' },
+        { label: 'Yearly Report', href: '/reconciliation/reports/yearly' },
       ] },
       // Statement matching moved OUT of the Accounts pill — Central must still
       // reach it (Month/Quarter/Year closings are worked from here).

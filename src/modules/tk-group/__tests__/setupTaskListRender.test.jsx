@@ -27,6 +27,15 @@ const PAYLOAD = {
       { name: 'Half Entered', branch: 'BOM', missing: ['Designation', 'Basic salary'] },
     ] },
   },
+  coverage: {
+    total: 75,
+    byVia: { task: 41, scan: 13, system: 11, transactions: 4, 'manual-recon': 5, 'crm-side': 1 },
+    modules: [
+      { id: 'accounting', name: 'Core Accounting (journals)', head: 'Accounting & Ledgers', kind: 'op', via: 'scan' },
+      { id: 'ledgers', name: 'Chart of Accounts / Ledgers', head: 'Accounting & Ledgers', kind: 'op', via: 'task' },
+      { id: 'auth', name: 'Authentication', head: 'System · Config · Access', kind: 'sys', via: 'system' },
+    ],
+  },
 };
 
 const mockGetSetupTasks = jest.fn();
@@ -72,6 +81,11 @@ describe('SetupTaskList render (wiring smoke)', () => {
     // Staff completeness drill renders too
     expect(screen.getByText('Employees with missing details (1)')).toBeInTheDocument();
     expect(screen.getByText('Designation · Basic salary')).toBeInTheDocument();
+    // Full-tree coverage proof renders — every sub-module accounted for
+    expect(screen.getByText('Module scan coverage — 75/75 sub-modules accounted for')).toBeInTheDocument();
+    const cov = screen.getByTestId('tk-tasks-coverage');
+    expect(cov.textContent).toContain('Core Accounting (journals)');
+    expect(cov.textContent).toContain('Authentication');
   });
 
   test('branch scoping is client-side: BOM pill filters tasks without mixing Central rows', async () => {

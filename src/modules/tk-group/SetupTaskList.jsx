@@ -235,6 +235,30 @@ export function SetupTaskList({ setRoute } = {}) {
         </PageSection>
       )}
 
+      {d.coverage && (
+        <PageSection title={`Module scan coverage — ${d.coverage.total}/75 sub-modules accounted for`}>
+          <p className="mb-3 text-xs text-ink-muted">
+            Proof the Task List scans the whole ERP: every sub-module is either covered by a
+            <b> register task</b>, <b>auto-scanned</b> branch-wise from its config milestones, is
+            <b> system machinery</b> (nothing to configure), a <b>transaction surface</b> (excluded by the
+            config-only rule), <b>manual reconciliation</b> (the team's workstream), or <b>CRM-side</b>.
+          </p>
+          <div className="grid gap-2" data-testid="tk-tasks-coverage">
+            {[...new Set((d.coverage.modules || []).map((m) => m.head))].map((head) => (
+              <div key={head} className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="w-full font-bold text-ink sm:w-56">{head}</span>
+                {(d.coverage.modules || []).filter((m) => m.head === head).map((m) => (
+                  <span key={m.id} title={m.via}
+                    className={`rounded-full border px-2 py-0.5 ${m.via === 'task' ? 'border-transparent bg-accent/10 text-accent' : m.via === 'scan' ? 'border-transparent bg-info/10 text-info' : 'border-surface-border text-ink-subtle'}`}>
+                    {m.name}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </PageSection>
+      )}
+
     </div>
   );
 }

@@ -76,6 +76,13 @@ export const TIERS = [
 ];
 export const tierOf = (key) => TIERS.find((t) => t.key === key) || TIERS[0];
 
+// Each tier is its OWN menu entry + page pair now (Reconcile & Certify ▸ the
+// four tier pages · Reports ▸ the four tier reports) — the tier is chosen from
+// the menu, never from tabs inside a page.
+export const TIER_PATHS = { weekly: 'weekly', month: 'monthly', quarter: 'quarterly', year: 'yearly' };
+export const hubPathFor = (tierKey) => `/reconciliation/${TIER_PATHS[tierKey] || 'weekly'}`;
+export const reportPathFor = (tierKey) => `/reconciliation/reports/${TIER_PATHS[tierKey] || 'weekly'}`;
+
 /** Tiers a role may see/work. The Branch Accountant handles the WEEKLY cycle
  *  only — Month/Quarter/Year closings are done from TK Group Central by
  *  AE/FM/Director/Owner (the backend enforces the same rule on writes). */

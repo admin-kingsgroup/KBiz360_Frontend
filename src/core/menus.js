@@ -652,11 +652,22 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
 // matching screens stay under Accounts ▸ Reconciliation — this module is the
 // certificate/sign-off layer above them.
 export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight, children:[
-  // The certificate ladder (4 tiers, one certificate per ledger).
-  {label:"Certificates & Closing", children:[
-    {label:"Reconciliation Hub", href:"/reconciliation"},
-    {label:"Reports & Pending", href:"/reconciliation/reports"},
-    {label:"Rule Book & Process", href:"/reconciliation/rulebook"},
+  // The certificate ladder — ONE menu entry per tier (the menu IS the tier
+  // switch; each page renders tier-locked and branch-wise, never mixed).
+  {label:"Reconcile & Certify", children:[
+    {label:"Weekly Reconciliation",    href:"/reconciliation/weekly"},
+    {label:"Monthly Reconciliation",   href:"/reconciliation/monthly"},
+    {label:"Quarterly Reconciliation", href:"/reconciliation/quarterly"},
+    {label:"Yearly Reconciliation",    href:"/reconciliation/yearly"},
+    {label:"Rule Book & Process",      href:"/reconciliation/rulebook"},
+  ]},
+  // One report per tier — that tier's pending closings, certificate register
+  // and open exceptions.
+  {label:"Reports", children:[
+    {label:"Weekly Report",    href:"/reconciliation/reports/weekly"},
+    {label:"Monthly Report",   href:"/reconciliation/reports/monthly"},
+    {label:"Quarterly Report", href:"/reconciliation/reports/quarterly"},
+    {label:"Yearly Report",    href:"/reconciliation/reports/yearly"},
   ]},
   // Statement matching — MOVED here from the Accounts pill: all line-level
   // import/match screens live under Reconciliation now (tax recon stays under
@@ -671,6 +682,18 @@ export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight,
     {label:"Match Guide",              href:"/reconciliation/match-guide"},
   ]},
 ]};
+
+// Branch-Accountant view of the pill: they PREPARE the weekly certificates
+// only — Month/Quarter/Year entries are hidden (those closings are worked from
+// TK Group Central by AE/FM/Director/Owner; the pages also self-guard).
+const BA_RECON_HIDDEN = new Set([
+  "/reconciliation/monthly", "/reconciliation/quarterly", "/reconciliation/yearly",
+  "/reconciliation/reports/monthly", "/reconciliation/reports/quarterly", "/reconciliation/reports/yearly",
+]);
+export const MENU_RECONCILIATION_WEEKLY_ONLY = {
+  ...MENU_RECONCILIATION,
+  children: MENU_RECONCILIATION.children.map(g => ({...g, children: g.children.filter(c => !BA_RECON_HIDDEN.has(c.href))})),
+};
 
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
 export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/transactions/approvals"};
@@ -899,7 +922,7 @@ export function roleMenuRoots(branch, currentUser){
   // Branch scope is still enforced by the top-right switcher.
   // Reconciliation: the Branch Accountant PREPARES the weekly certificates, so
   // the module pill is part of their workspace too (AE/FM/Director sign above).
-  return [MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_APPROVALS, MENU_DECISIONS, taxSectionFor(branch), MENU_SUPPORT];
+  return [MENU_ACCOUNTS, MENU_RECONCILIATION_WEEKLY_ONLY, MENU_APPROVALS, MENU_DECISIONS, taxSectionFor(branch), MENU_SUPPORT];
 }
 
 // Keep ONLY the leaves whose href is in `keep`; drop everything else (containers with

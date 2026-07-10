@@ -27,9 +27,21 @@ describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', (
     expect(hrefs(matching)).toEqual(expect.arrayContaining(MATCHING));
   });
 
-  test('the certificate ladder keeps its own group', () => {
-    const certs = groupByLabel(MENU_RECONCILIATION, 'Certificates & Closing');
-    expect(hrefs(certs)).toEqual(['/reconciliation', '/reconciliation/reports', '/reconciliation/rulebook']);
+  test('Reconcile & Certify: one entry per tier + the Rule Book', () => {
+    const certs = groupByLabel(MENU_RECONCILIATION, 'Reconcile & Certify');
+    expect(hrefs(certs)).toEqual([
+      '/reconciliation/weekly', '/reconciliation/monthly',
+      '/reconciliation/quarterly', '/reconciliation/yearly',
+      '/reconciliation/rulebook',
+    ]);
+  });
+
+  test('Reports: a separate sub head with one report per tier', () => {
+    const reports = groupByLabel(MENU_RECONCILIATION, 'Reports');
+    expect(hrefs(reports)).toEqual([
+      '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
+      '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
+    ]);
   });
 
   test('the Accounts pill carries NO reconciliation screens anymore', () => {
@@ -73,10 +85,13 @@ describe('the Reconciliation pill carries the matching screens in every regime (
     expect(h).toEqual(expect.arrayContaining(MATCHING));
   });
 
-  test('Branch Accountant gets the pill (weekly matching is their prep work)', () => {
+  test('Branch Accountant gets the pill WEEKLY-ONLY (their prep work; central tiers hidden)', () => {
     const menu = getMenu({ code: 'BOM' }, { role: 'Branch Accountant' });
     const h = allHrefs(menu.find((m) => m.label === 'Reconciliation'));
-    expect(h).toEqual(expect.arrayContaining(['/bank-reco', '/reconciliation']));
+    expect(h).toEqual(expect.arrayContaining(['/bank-reco', '/reconciliation/weekly', '/reconciliation/reports/weekly', '/reconciliation/rulebook']));
+    ['/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
+      '/reconciliation/reports/monthly', '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
+    ].forEach((hidden) => expect(h).not.toContain(hidden));
   });
 });
 
