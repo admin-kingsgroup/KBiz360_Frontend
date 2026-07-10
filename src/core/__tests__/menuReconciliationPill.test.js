@@ -19,6 +19,8 @@ describe('Reconciliation · top-level pill', () => {
   test('pill = per-tier certificate pages + per-tier reports + the moved statement-matching screens', () => {
     expect(MENU_RECONCILIATION.label).toBe('Reconciliation');
     expect(allHrefs(MENU_RECONCILIATION)).toEqual([
+      // Reconciliation Hub — the full-view dashboard, one entry per tier (first)
+      '/reconciliation/hub/weekly', '/reconciliation/hub/monthly', '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly',
       // Certification — one entry per tier, Rule Book last
       '/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
       '/reconciliation/rulebook',
@@ -57,6 +59,7 @@ describe('Reconciliation · top-level pill', () => {
     const pill = cockpit.find((p) => p && p.label === 'Reconciliation');
     expect(pill).toBeTruthy();
     expect(allHrefs(pill)).toEqual([
+      '/reconciliation/hub/weekly', '/reconciliation/hub/monthly', '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly',
       '/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
       '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
       '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
@@ -71,6 +74,7 @@ describe('Reconciliation · top-level pill', () => {
   });
 
   test('breadcrumbs resolve under the Reconciliation pill', () => {
+    expect(crumbsFor('/reconciliation/hub/weekly').map((c) => c.label)).toEqual(['Reconciliation', 'Reconciliation Hub', 'Weekly Reconciliation']);
     expect(crumbsFor('/reconciliation/weekly').map((c) => c.label)).toEqual(['Reconciliation', 'Certification', 'Weekly Certification']);
     expect(crumbsFor('/reconciliation/reports/monthly').map((c) => c.label)).toEqual(['Reconciliation', 'Reports', 'Monthly Report']);
     expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Certification', 'Rule Book & Process']);

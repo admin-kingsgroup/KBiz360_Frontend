@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { getLimits, proposeLimits } from './api/limits';
+import { getLimits, setBranchLimits, proposeBranchLimits } from './api/limits';
+import { isOwner } from './utils/owner';
 import { Button, Input, LoadingState, PageSection } from '../../shell/primitives';
 
 // ─── TK GROUP CENTRAL · Thresholds & Limits (Owner-editable) ─────────────────
@@ -44,8 +45,15 @@ export function LimitsAdmin() {
     });
     if (bad.length) { setMsg(`Enter a valid number for: ${bad.join(', ')}.`); return; }
     try {
-      await proposeLimits(clean);
-      setMsg('Threshold changes submitted for Owner approval — they apply once the Owner approves.');
+      // This page edits the GROUP DEFAULT (all branches). Per-branch overrides live on
+      // the Control Panel · Limits screen. Owner saves live; others propose.
+      if (isOwner()) {
+        await setBranchLimits('default', clean);
+        setMsg('Group-default thresholds saved — applied live across all branches.');
+      } else {
+        await proposeBranchLimits('default', clean);
+        setMsg('Threshold changes submitted for Owner approval — they apply once the Owner approves.');
+      }
     } catch (e2) { setMsg((e2 && e2.message) || 'Failed to submit.'); }
   }, [fields, values]);
 
@@ -84,7 +92,7 @@ export function LimitsAdmin() {
           )}
           <div className="flex justify-center border-t border-surface-border bg-surface-alt px-4 py-3">
             <Button type="submit" variant="success" size="sm">
-              Submit changes for Owner approval
+              {isOwner() ? 'Save group-default thresholds' : 'Submit changes for Owner approval'}
             </Button>
           </div>
         </PageSection>

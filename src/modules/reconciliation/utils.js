@@ -76,11 +76,14 @@ export const TIERS = [
 ];
 export const tierOf = (key) => TIERS.find((t) => t.key === key) || TIERS[0];
 
-// Each tier is its OWN menu entry + page pair now (Certification ▸ the
-// four tier pages · Reports ▸ the four tier reports) — the tier is chosen from
-// the menu, never from tabs inside a page.
+// Each tier is its OWN menu entry + page now. THREE per-tier page families, each
+// chosen from the menu (never from tabs inside a page):
+//   • Reconciliation Hub  → /reconciliation/hub/<tier>      — full-view dashboard
+//   • Certification       → /reconciliation/<tier>          — the sign-off register
+//   • Reports             → /reconciliation/reports/<tier>  — the tier's report
 export const TIER_PATHS = { weekly: 'weekly', month: 'monthly', quarter: 'quarterly', year: 'yearly' };
-export const hubPathFor = (tierKey) => `/reconciliation/${TIER_PATHS[tierKey] || 'weekly'}`;
+export const hubPathFor = (tierKey) => `/reconciliation/hub/${TIER_PATHS[tierKey] || 'weekly'}`;
+export const certPathFor = (tierKey) => `/reconciliation/${TIER_PATHS[tierKey] || 'weekly'}`;
 export const reportPathFor = (tierKey) => `/reconciliation/reports/${TIER_PATHS[tierKey] || 'weekly'}`;
 // Page headings match the MENU ENTRY the user clicked (Weekly/Monthly/Quarterly/
 // Yearly …) — tier.short stays the tier's formal name (Month-End, Year-End) on
@@ -101,8 +104,11 @@ export function canEditCycleConfig(role) {
   return /finance\s*manager|(^|[^a-z])fm([^a-z]|$)|director|owner|super[\s_-]*admin/i.test(String(role || ''));
 }
 
-// Certificate status → Badge tone + label.
+// Certificate status → Badge tone + label. `pending` is a HUB-only synthetic
+// status: the ledger is in scope but its certificate has not been generated yet
+// (amber = outstanding / not started) — the sign-off register never shows it.
 export const STATUS_META = {
+  pending:    { tone: 'warning', label: 'Pending' },
   open:       { tone: 'neutral', label: 'Open' },
   reconciled: { tone: 'info',    label: 'Reconciled' },
   signed:     { tone: 'success', label: 'Signed' },

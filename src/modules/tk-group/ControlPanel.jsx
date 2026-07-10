@@ -6,6 +6,7 @@ import { useConfigValue } from '../../core/useAccounting';
 import { isOwner } from './utils/owner';
 import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
+import { BranchLimitsEditor } from './BranchLimitsEditor';
 import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
 import { Badge } from '../../shell/primitives';
@@ -214,28 +215,7 @@ export function ControlPanel({ setRoute }) {
           </>
         );
       case 'limits':
-        return (
-          <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The numbers that bound each power. Blank = inactive; nothing is capped until you set a value.</p>
-            <div className="grid gap-3 tablet:grid-cols-2">
-              {[['Escalate to Finance Manager', '₹', 'Above this, an approval must be Faiz-level.'],
-                ['Dual control → Owner co-sign', '₹', 'Above this, Afshin must co-sign.'],
-                ['Cash payment cap', '₹', 'Max single cash payment before escalation.'],
-                ['Cash-on-hand ceiling', '₹', 'A cash receipt breaching this is flagged.'],
-                ['Back-date window (days)', '', 'Older than this needs central approval.'],
-                ['Decision threshold · India', '₹', 'Credit / funds decision escalates to Owner above this.'],
-                ['Decision threshold · Africa', '$', 'Same, in the USD branches.'],
-                ['Approval limit · per user', '₹', 'A user may approve up to this amount.']].map(([lab, cur, hint]) => (
-                <div key={lab} className="rounded-brand border border-surface-border bg-surface p-3.5">
-                  <div className="text-[12.5px] font-semibold text-ink">{lab}</div>
-                  <div className="text-[11px] text-ink-muted">{hint}</div>
-                  <div className="mt-2 flex items-center gap-2">{cur && <span className="font-mono text-[12px] text-ink-subtle">{cur}</span>}<input disabled placeholder="none" className="w-32 rounded-md border border-surface-border bg-surface-alt px-2.5 py-1.5 font-mono text-[12px] text-ink-subtle" /></div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>📐</span><span>Set these on <button className="underline" onClick={() => go('/tk/limits')}>Thresholds &amp; Limits</button> (Owner-approved). The guard already <b>enforces</b> them once set — escalate-to-FM · dual-control-to-Owner · cash caps · cash-on-hand · back-date are live checks in the policy guard.</span></div>
-          </>
-        );
+        return <BranchLimitsEditor go={go} />;
       case 'roles':
         return (
           <>

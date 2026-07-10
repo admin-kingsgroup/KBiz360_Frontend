@@ -654,6 +654,16 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
 // matching screens stay under Accounts ▸ Reconciliation — this module is the
 // certificate/sign-off layer above them.
 export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight, children:[
+  // Reconciliation Hub — the read-only FULL VIEW / dashboard of a tier: every
+  // ledger in scope + its live status, branch-wise readiness and the attention
+  // list. One entry per tier (the menu is the tier switch). This is where you
+  // WATCH; Certification below is where you sign off.
+  {label:"Reconciliation Hub", children:[
+    {label:"Weekly Reconciliation",    href:"/reconciliation/hub/weekly"},
+    {label:"Monthly Reconciliation",   href:"/reconciliation/hub/monthly"},
+    {label:"Quarterly Reconciliation", href:"/reconciliation/hub/quarterly"},
+    {label:"Yearly Reconciliation",    href:"/reconciliation/hub/yearly"},
+  ]},
   // The certificate ladder — ONE menu entry per tier (the menu IS the tier
   // switch; each page renders tier-locked and branch-wise, never mixed).
   {label:"Certification", children:[
@@ -689,6 +699,7 @@ export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight,
 // only — Month/Quarter/Year entries are hidden (those closings are worked from
 // TK Group Central by AE/FM/Director/Owner; the pages also self-guard).
 const BA_RECON_HIDDEN = new Set([
+  "/reconciliation/hub/monthly", "/reconciliation/hub/quarterly", "/reconciliation/hub/yearly",
   "/reconciliation/monthly", "/reconciliation/quarterly", "/reconciliation/yearly",
   "/reconciliation/reports/monthly", "/reconciliation/reports/quarterly", "/reconciliation/reports/yearly",
 ]);
@@ -851,6 +862,7 @@ function cleanDividers(children){
 const LEGACY_HIDDEN_ALIASES = {
   '/reconciliation': ['/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly'],
   '/reconciliation/reports': ['/reconciliation/reports/weekly', '/reconciliation/reports/monthly', '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly'],
+  '/reconciliation/hub': ['/reconciliation/hub/weekly', '/reconciliation/hub/monthly', '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly'],
 };
 export function expandHidden(list){
   const out = new Set(Array.isArray(list) ? list : []);
@@ -858,6 +870,7 @@ export function expandHidden(list){
   // The legacy URLs render the WEEKLY pages — hiding weekly must block them too.
   if (out.has('/reconciliation/weekly')) out.add('/reconciliation');
   if (out.has('/reconciliation/reports/weekly')) out.add('/reconciliation/reports');
+  if (out.has('/reconciliation/hub/weekly')) out.add('/reconciliation/hub');
   return out;
 }
 

@@ -9,6 +9,13 @@ jest.mock('../api/flags', () => ({
   setFlag: jest.fn().mockResolvedValue({ flags: { 'core.policy_guard': { enabled: true, label: 'Master control — engage the TK Group guard' } }, enabled: ['core.policy_guard'] }),
 }));
 jest.mock('../../../core/useAccounting', () => ({ useConfigValue: () => ({ data: {} }) }));
+// BranchLimitsEditor (rendered on the Limits screen) pulls api/limits → core/api
+// (import.meta) → mock the api layer so the panel imports cleanly under jest.
+jest.mock('../api/limits', () => ({
+  getLimits: jest.fn().mockResolvedValue({ store: { default: {}, branches: {} }, fields: [], defaults: {}, limits: {} }),
+  setBranchLimits: jest.fn().mockResolvedValue({ store: { default: {}, branches: {} }, fields: [], defaults: {}, limits: {} }),
+  proposeBranchLimits: jest.fn().mockResolvedValue({}),
+}));
 // Master-switch confirm — default to "confirmed" so the happy-path flip proceeds; a
 // test overrides it to assert cancellation blocks the flip.
 jest.mock('../../../core/ux/confirm', () => ({ confirmDialog: jest.fn().mockResolvedValue({ confirmed: true }) }));

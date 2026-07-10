@@ -102,6 +102,13 @@ export function controlCockpitMenu(focus, currentUser) {
     // pages carry their own branch chips, so everything stays BRANCHWISE, never blended.
     { label: 'Reconciliation', icon: ArrowLeftRight, children: [
       // One entry per tier — the menu is the tier switch (pages are tier-locked).
+      // Reconciliation Hub = the full-view dashboard; Certification = sign-off.
+      { label: 'Reconciliation Hub', children: [
+        { label: 'Weekly Reconciliation', href: '/reconciliation/hub/weekly' },
+        { label: 'Monthly Reconciliation', href: '/reconciliation/hub/monthly' },
+        { label: 'Quarterly Reconciliation', href: '/reconciliation/hub/quarterly' },
+        { label: 'Yearly Reconciliation', href: '/reconciliation/hub/yearly' },
+      ] },
       { label: 'Certification', children: [
         { label: 'Weekly Certification', href: '/reconciliation/weekly' },
         { label: 'Monthly Certification', href: '/reconciliation/monthly' },

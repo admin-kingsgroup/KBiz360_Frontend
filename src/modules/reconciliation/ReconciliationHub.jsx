@@ -1,167 +1,228 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2 } from 'lucide-react';
-import { getTree, getSummary, getPending, generateCertificates } from './api';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ClipboardCheck, ChevronRight, CalendarClock, BookOpenCheck, ListChecks, AlertTriangle, Sparkles } from 'lucide-react';
+import { getScopeTree, getSummary, getPending } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, hubPathFor, reportPathFor, tierMenuName } from './utils';
-import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, visibleTiers, certPathFor, hubPathFor, reportPathFor, tierMenuName } from './utils';
+import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../shell/primitives';
 import { CertificateDrawer } from './CertificateDrawer';
-import { CycleLedgerDrawer } from './CycleLedgerDrawer';
 
-// ─── Reconciliation — one page per tier ──────────────────────────────────────
-// Branch-wise (Rule 06: one branch at a time, never mixed). The TIER is fixed
-// by the route — Certification ▸ Weekly / Monthly / Quarterly / Yearly
-// Certification are separate menu entries rendering this page tier-locked.
-// Per-ledger register grouped Parent Group → Sub-group → ledger — one
-// certificate per ledger (Rule 01). Opening a row works the certificate in a
-// drawer: freeze → attach → exceptions → sign chain → (physical) scan-back.
+// ─── Reconciliation Hub — the full-view dashboard, one page per tier ─────────
+// The read-only OVERVIEW of a tier: every ledger that must reconcile this period
+// and its live status (Pending → Reconciled → Signed → Locked), the branch-wise
+// readiness across the group, and the attention list of what's still outstanding.
+// The Hub is where you WATCH; the Certification register (certPathFor) is where
+// you WORK — every drill-in links across. The tier is fixed by the route
+// (Reconciliation Hub ▸ Weekly / Monthly / Quarterly / Yearly Reconciliation);
+// branch scope follows the top TK sub-branch selector, never an in-page picker.
 
-function TierCard({ tier, counts, period }) {
-  const p = tierProgress(counts);
+function Kpi({ label, value, sub, tone = 'ink', title }) {
+  const toneClass = { ink: 'text-ink', danger: 'text-danger', warning: 'text-warning', success: 'text-success', muted: 'text-ink-subtle' }[tone] || 'text-ink';
   return (
-    <div className="rounded-brand border border-navy bg-navy/5 p-4 text-left shadow-card">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-bold uppercase tracking-wider text-ink-subtle">{tier.short}</span>
-        <Badge tone={tier.tone} size="sm">{tier.mode === 'digital' ? 'Digital' : 'Physical'}</Badge>
-      </div>
-      <div className="mt-2 text-2xl font-bold tabular-nums text-ink">{p.done}<span className="text-base font-semibold text-ink-subtle"> / {p.total}</span></div>
-      <div className="mt-0.5 truncate text-xs text-ink-muted">{period || '—'} · {p.pct}% signed</div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-alt">
-        <div className="h-full rounded-full bg-navy transition-all" style={{ width: `${p.pct}%` }} />
-      </div>
+    <div className="rounded-brand border border-surface-border bg-surface p-3 text-left shadow-card" title={title}>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-ink-subtle">{label}</div>
+      <div className={`mt-1 text-2xl font-bold tabular-nums ${toneClass}`}>{value}</div>
+      {sub ? <div className="mt-0.5 truncate text-xs text-ink-muted">{sub}</div> : null}
     </div>
   );
 }
 
-// The tier is FIXED by the route (Certification ▸ Weekly / Monthly /
-// Quarterly / Yearly Certification) — the menu is the tier switch, the page
-// never mixes tiers.
+// Reason a ledger is on the attention list (most urgent first).
+function attentionReason(c) {
+  const openEx = (c.exceptions || []).filter((e) => !e.resolved).length;
+  if (openEx > 0) return { tone: 'danger', label: `${openEx} open exception${openEx === 1 ? '' : 's'}` };
+  if (c.snapshot && c.snapshot.frozenAt && Number(c.snapshot.difference) !== 0) return { tone: 'danger', label: 'difference ≠ 0' };
+  if (c.status === 'pending') return { tone: 'warning', label: 'not generated' };
+  if (c.status === 'open') return { tone: 'warning', label: 'not reconciled' };
+  if (c.status === 'reconciled') return { tone: 'info', label: 'awaiting signatures' };
+  return null;
+}
+
 export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, tier: fixedTier }) {
-  const appCode = branchCodeOf(appBranch); // app passes a branch OBJECT (or 'ALL')
-  // Branch scope: a real branch context (top-right selector) wins; otherwise the
-  // top TK sub-branch selector (cockpit Focus) scopes the register — no in-page
-  // selector, same contract as every Control Tower lens. 'ALL' focus defaults to
-  // BOM because the register is single-branch by Rule 06.
+  const appCode = branchCodeOf(appBranch);
   const focus = useCockpitFocus();
+  // Group mode = no specific branch spotlighted up top → show the branch-wise
+  // matrix and default the single-branch checklist to BOM. A spotlighted branch
+  // scopes the whole page to it.
+  const groupMode = !appCode && (!BRANCHES.includes(focus));
   const branch = appCode || (BRANCHES.includes(focus) ? focus : 'BOM');
+  const summaryBranch = appCode || (BRANCHES.includes(focus) ? focus : 'ALL');
   const tierKey = TIERS.some((t) => t.key === fixedTier) ? fixedTier : 'weekly';
-  const [openId, setOpenId] = useState(null);
-  const [showCycleCfg, setShowCycleCfg] = useState(false);
-  // Per-(branch,tier) period override — '' means "the current period". Lets the
-  // team work the BACKLOG (Apr/May/Jun 2026 month-ends, FY2025-26 / CY2025
-  // year-end) from the same register, not just the running period.
-  const [periodSel, setPeriodSel] = useState({});
-  const qc = useQueryClient();
   const tier = tierOf(tierKey);
+  const [openId, setOpenId] = useState(null);
 
-  // Follow the app-wide branch selector — the module must never show a
-  // different branch than the rest of the ERP (branch-isolation convention).
-
-  // Branch Accountant works the WEEKLY cycle only (Month/Quarter/Year are done
-  // from TK Group Central by AE/FM/Director/Owner — backend enforces it too).
-  // An explicit Page-Visibility GRANT of this tier's page opens it read-mostly
-  // (the backend still refuses BA writes on central tiers) — otherwise the
-  // admin's grant toggle would promise a page the guard refuses.
+  // Branch Accountant sees the WEEKLY hub only — central tiers are worked from
+  // TK Group Central. An explicit Page-Visibility grant opens a tier read-only.
   const tiers = visibleTiers(currentUser?.role);
   const granted = Array.isArray(currentUser?.granted) ? currentUser.granted : [];
   const tierAllowed = tiers.some((t) => t.key === tierKey) || granted.includes(hubPathFor(tierKey));
 
-  // Queries stay idle behind the tier guard — a guarded page must not fetch.
-  const { data: summary } = useQuery({ queryKey: ['recon-certs', 'summary', branch], queryFn: () => getSummary({ branch }), enabled: tierAllowed });
-  const { data: pendingData } = useQuery({ queryKey: ['recon-certs', 'pending', branch], queryFn: () => getPending({ branch }), enabled: tierAllowed });
-  const currentPeriod = summary?.periods?.[tierKey];
-  const options = periodOptions(tierKey, currentPeriod, pendingData?.rows);
-  const period = periodSel[`${branch}:${tierKey}`] || currentPeriod;
-  const setPeriod = (p) => setPeriodSel((s) => ({ ...s, [`${branch}:${tierKey}`]: p }));
+  const { data: summary } = useQuery({ queryKey: ['recon-certs', 'summary', summaryBranch], queryFn: () => getSummary({ branch: summaryBranch }), enabled: tierAllowed });
+  const { data: pendingData } = useQuery({ queryKey: ['recon-certs', 'pending', summaryBranch], queryFn: () => getPending({ branch: summaryBranch }), enabled: tierAllowed });
+  const period = summary?.periods?.[tierKey];
 
-  const { data: treeData, isLoading, isError, refetch } = useQuery({
-    queryKey: ['recon-certs', 'tree', branch, tierKey, period || ''],
-    queryFn: () => getTree({ branch, tier: tierKey, period }),
-    enabled: tierAllowed && !!period,
-  });
-  const groups = treeData?.groups || [];
-  const empty = !isLoading && !isError && groups.length === 0;
-
-  const gen = useMutation({
-    mutationFn: () => generateCertificates({ branch, tier: tierKey, period }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['recon-certs'] });
-    },
+  const { data: scope, isLoading, isError, refetch } = useQuery({
+    queryKey: ['recon-certs', 'scope', branch, tierKey, period || ''],
+    queryFn: () => getScopeTree({ branch, tier: tierKey, period }),
+    enabled: tierAllowed,
   });
 
-  // Direct-URL guard: a Branch Accountant landing on a central closing tier
-  // gets the rule, not a broken page (the menu already hides these entries).
+  // Direct-URL guard — a Branch Accountant on a central tier gets the rule,
+  // not a broken page (the menu already hides these entries).
   if (!tierAllowed) {
     return (
       <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
-        <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Certification</h1>
+        <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Reconciliation</h1>
         <EmptyState title="Central closing tier"
-          hint="The Branch Accountant works the WEEKLY cycle only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
-          action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Open Weekly Certification</Button>} />
+          hint="The Branch Accountant watches the WEEKLY cycle only — Month-End, Quarterly and Year-End are overseen from TK Group Central by AE / FM / Director / Owner."
+          action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/hub/weekly')}>Open Weekly Reconciliation</Button>} />
       </div>
     );
   }
+
+  const counts = scope?.counts || {};
+  const total = counts.total || 0;
+  const done = counts.done || 0;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const groups = scope?.groups || [];
+  const empty = !isLoading && !isError && total === 0;
+
+  // Weekly cycles carry a Friday deadline — surface it (and whether it's overdue).
+  const today = new Date().toISOString().slice(0, 10);
+  const tierRows = (pendingData?.rows || []).filter((r) => r.tier === tierKey);
+  const dueRow = tierRows.find((r) => !r.upcoming) || tierRows[0];
+  const overdue = !!(dueRow && dueRow.dueOn && dueRow.dueOn < today && done < total);
+
+  // Attention list — flatten the scope tree, keep only ledgers that still need
+  // something, most urgent first (exceptions / non-zero difference → not started).
+  const flat = groups.flatMap((g) => g.subGroups.flatMap((sg) => sg.items));
+  const attention = flat
+    .map((c) => ({ c, r: attentionReason(c) }))
+    .filter((x) => x.r)
+    .sort((a, b) => ({ danger: 0, warning: 1, info: 2 }[a.r.tone] - { danger: 0, warning: 1, info: 2 }[b.r.tone]))
+    .slice(0, 8);
+
+  const rowClick = (c) => (c._id ? setOpenId(c._id) : setRoute && setRoute(certPathFor(tierKey)));
 
   return (
     <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Certification</h1>
-          <p className="text-sm text-ink-muted">One certificate per ledger · {tier.mode === 'digital' ? 'digital sign chain' : 'physical certificate + scan-back'} · branch-wise, never mixed.</p>
+          <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Reconciliation</h1>
+          <p className="text-sm text-ink-muted">Full view — every ledger in scope and its live status. Watch here; sign off in Certification.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" icon={ClipboardCheck} onClick={() => setRoute && setRoute(certPathFor(tierKey))}>Open {tierMenuName(tierKey)} Certification</Button>
           <Button variant="ghost" icon={CalendarClock} onClick={() => setRoute && setRoute(reportPathFor(tierKey))}>{tierMenuName(tierKey)} Report</Button>
-          {tierKey === 'weekly' && canEditCycleConfig(currentUser?.role) && (
-            <Button variant="ghost" icon={Settings2} onClick={() => setShowCycleCfg(true)}>Cycle ledgers</Button>
-          )}
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/reconciliation/rulebook')}>Rule Book</Button>
-          <Button variant="secondary" icon={RefreshCcw} loading={gen.isPending} onClick={() => gen.mutate()}>
-            Generate {tier.short} certificates
-          </Button>
         </div>
       </div>
 
-      {/* branch chips — the register is always a single branch (Rule 06) */}
+      {/* branch scope */}
       <div className="flex flex-wrap items-center gap-2" data-testid="recon-branch-scope">
-        <span className="rounded-full bg-navy px-3.5 py-1.5 text-sm font-semibold text-white">{branch} <span className="text-xs opacity-70">{currencyOf(branch)}</span></span>
-        <span className="text-xs italic text-ink-subtle">
-          Scoped by the top TK branch selector — branch-wise, data is never mixed across branches.
-          {!appCode && !BRANCHES.includes(focus) ? ' Focus is ALL, defaulting to BOM — spotlight a branch up top to switch.' : ''}
+        <span className="rounded-full bg-navy px-3.5 py-1.5 text-sm font-semibold text-white">
+          {groupMode ? 'All branches' : `${branch} `}
+          {!groupMode && <span className="text-xs opacity-70">{currencyOf(branch)}</span>}
         </span>
+        <span className="text-xs italic text-ink-subtle">
+          Scoped by the top TK branch selector — branch-wise, never mixed.
+          {groupMode ? ' Showing the group readiness matrix; the checklist below defaults to BOM — spotlight a branch up top to drill in.' : ''}
+        </span>
+        {overdue && <Badge tone="danger" size="sm" dot>Overdue — was due {dueRow.dueOn}</Badge>}
       </div>
 
-      {/* this tier's progress card — switching tiers happens from the menu
-          (Certification ▸ Weekly / Monthly / Quarterly / Yearly) */}
-      <div className="grid grid-cols-1 gap-3 tablet:max-w-sm">
-        <TierCard tier={tier} counts={summary?.tiers?.[tierKey]} period={summary?.periods?.[tierKey]} />
+      {isError && <ErrorState title="Couldn’t load the reconciliation status" message="The reconciliation service didn’t respond. Check the connection and retry." onRetry={() => refetch()} />}
+
+      {/* KPI tiles — scope-driven, so PENDING (not-yet-generated) ledgers count */}
+      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-3 desktop:grid-cols-6">
+        <Kpi label="In scope" value={total} sub={`${period || '—'}`} title="Ledgers that must reconcile this period" />
+        <Kpi label="Released" value={done} tone={done === total && total > 0 ? 'success' : 'ink'} sub={`${pct}% signed`} />
+        <Kpi label="Pending" value={counts.pending || 0} tone={(counts.pending || 0) > 0 ? 'warning' : 'muted'} title="In scope but no certificate generated yet" />
+        <Kpi label="In progress" value={(counts.open || 0) + (counts.reconciled || 0)} tone="muted" sub="frozen / reconciled" />
+        <Kpi label="Difference ≠ 0" value={counts.diffOpen || 0} tone={(counts.diffOpen || 0) > 0 ? 'danger' : 'muted'} title="Frozen certificates whose difference is not yet cleared" />
+        <Kpi label="Open exceptions" value={counts.exceptions || 0} tone={(counts.exceptions || 0) > 0 ? 'danger' : 'muted'} />
       </div>
-      {tiers.length === 1 && (
-        <p className="text-xs text-ink-subtle">Month-End, Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner.</p>
+
+      {/* progress bar */}
+      <div>
+        <div className="mb-1 flex items-center justify-between text-xs text-ink-muted">
+          <span>{tier.label}{dueRow?.dueOn ? ` · due ${dueRow.dueOn}` : ''}</span>
+          <span className="tabular-nums">{done} / {total} released · {pct}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-surface-alt">
+          <div className={`h-full rounded-full transition-all ${overdue ? 'bg-danger' : 'bg-navy'}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      {/* branch-wise readiness matrix — only in group mode (all 4 tiers, at a glance) */}
+      {groupMode && Array.isArray(summary?.byBranch) && (
+        <PageSection title="Branch-wise readiness" subtitle="Released / in scope per tier — each branch under its own regime, never blended (Rule 06).">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-surface-border text-left text-xs uppercase tracking-wider text-ink-subtle">
+                  <th className="px-3 py-2 font-bold">Branch</th>
+                  {TIERS.map((t) => <th key={t.key} className="px-3 py-2 text-center font-bold">{t.short}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {summary.byBranch.map((row) => (
+                  <tr key={row.branch} className="border-b border-surface-border last:border-0">
+                    <td className="px-3 py-2 font-semibold text-ink">{row.branch}</td>
+                    {TIERS.map((t) => {
+                      const p = tierProgress(row.tiers?.[t.key]);
+                      const tone = p.total === 0 ? 'text-ink-subtle' : p.done >= p.total ? 'text-success' : 'text-warning';
+                      return (
+                        <td key={t.key} className="px-3 py-2 text-center tabular-nums">
+                          <span className={`font-semibold ${tone}`}>{p.total === 0 ? '—' : `${p.done}/${p.total}`}</span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-ink-subtle">Counts are of generated certificates; open the tier's Certification register to generate and sign.</p>
+        </PageSection>
       )}
 
-      {/* register */}
-      <PageSection
-        title={`${tier.label} — ${branch} · ${period || ''}`}
-        subtitle={`${tier.scope} · Signers: ${tier.chain.map((s) => s.role).join(' → ')}`}
-        actions={options.length > 1 && (
-          <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
-            Period
-            <Select value={period || ''} onChange={(e) => setPeriod(e.target.value)} aria-label="Register period">
-              {options.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+      {/* attention list — what still needs something, most urgent first */}
+      {!isLoading && !empty && (
+        <PageSection title="Needs attention" subtitle="The ledgers still standing between this period and a clean close." icon={AlertTriangle}>
+          {attention.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-brand border border-success/30 bg-success/5 px-4 py-3 text-sm text-ink">
+              <Sparkles size={16} className="text-success" aria-hidden="true" />
+              All clear — every ledger in scope is reconciled and released for {branch} · {period || 'this period'}.
+            </div>
+          ) : (
+            <ul className="grid gap-1.5">
+              {attention.map(({ c, r }) => (
+                <li key={c._id || c.ledger.code}>
+                  <button type="button" onClick={() => rowClick(c)}
+                    className="flex w-full items-center gap-3 rounded-brand border border-surface-border px-3 py-2 text-left hover:bg-surface-alt/60">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-ink">{c.ledger.name}</span>
+                      <span className="font-mono text-xs text-ink-subtle">{c.ledger.code}</span>
+                    </span>
+                    <Badge tone={r.tone} size="sm" dot>{r.label}</Badge>
+                    <ChevronRight size={15} className="text-ink-subtle" aria-hidden="true" />
+                  </button>
+                </li>
               ))}
-            </Select>
-          </label>
-        )}>
-        {gen.isError && <p className="mb-3 text-sm text-danger">Couldn’t generate certificates: {gen.error?.message}</p>}
-        {gen.isSuccess && gen.data && <p className="mb-3 text-sm text-success">Generated {gen.data.created ?? 0} new certificate{(gen.data.created ?? 0) === 1 ? '' : 's'} ({gen.data.total ?? 0} in scope).</p>}
-        {isLoading && <LoadingState label="Loading register…" />}
-        {isError && <ErrorState title="Couldn’t load the register" message="The reconciliation service didn’t respond. Check the connection and retry." onRetry={() => refetch()} />}
+            </ul>
+          )}
+        </PageSection>
+      )}
+
+      {/* the full checklist — every in-scope ledger + its status */}
+      <PageSection title={`Ledger checklist — ${branch} · ${period || ''}`}
+        subtitle={`${total} in scope · ${tier.scope}`} icon={ListChecks}>
+        {isLoading && <LoadingState label="Loading the reconciliation status…" />}
         {empty && (
-          <EmptyState title={`No ${tier.short} certificates for ${branch} · ${period || 'this period'}`}
-            hint="Generate the period's certificates — one per ledger in this tier's scope."
-            action={<Button variant="primary" loading={gen.isPending} onClick={() => gen.mutate()}>Generate certificates</Button>} />
+          <EmptyState title={`No ${tier.short} ledgers in scope for ${branch}`}
+            hint="Nothing reconciles on this tier for this branch — check the cycle-ledger config or the branch selector." />
         )}
         <div className="grid gap-4">
           {groups.map((g) => (
@@ -177,15 +238,15 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
                       const meta = statusMeta(c.status);
                       const prog = chainProgress(c);
                       return (
-                        <li key={c._id}>
-                          <button type="button" onClick={() => setOpenId(c._id)}
+                        <li key={c._id || c.ledger.code}>
+                          <button type="button" onClick={() => rowClick(c)}
                             className="flex w-full items-center gap-3 border-b border-surface-border px-4 py-2.5 text-left last:border-0 hover:bg-surface-alt/60">
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-ink">{c.ledger.name}</span>
                               <span className="font-mono text-xs text-ink-subtle">{c.ledger.code}</span>
                             </span>
                             <span className="hidden text-xs tabular-nums text-ink-muted tablet:block">
-                              {c.snapshot?.frozenAt ? `diff ${fmtAmt(c.snapshot.difference, c.branch)}` : 'not frozen'}
+                              {c.snapshot?.frozenAt ? `diff ${fmtAmt(c.snapshot.difference, c.branch || branch)}` : (c.status === 'pending' ? 'not generated' : 'not frozen')}
                             </span>
                             <span className="text-xs tabular-nums text-ink-muted">{prog.done}/{prog.total} signed</span>
                             <Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge>
@@ -203,7 +264,6 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
       </PageSection>
 
       {openId && <CertificateDrawer id={openId} branch={branch} setRoute={setRoute} onClose={() => setOpenId(null)} />}
-      {showCycleCfg && <CycleLedgerDrawer branch={branch} onClose={() => setShowCycleCfg(false)} />}
     </div>
   );
 }
