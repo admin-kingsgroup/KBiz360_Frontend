@@ -3,7 +3,7 @@
 // certificate ladder) lives under the TOP-LEVEL Reconciliation pill — the
 // Accounts pill carries none of them anymore. Tax/GST reconciliation stays
 // grouped under the regime-aware Taxation pill, exactly as before.
-import { MENU_ACCOUNTS, MENU_RECONCILIATION, getMenu } from '../core/menus';
+import { MENU_ACCOUNTS, MENU_RECONCILIATION, getMenu, expandHidden } from '../core/menus';
 import { TAX_INDIA } from '../core/data';
 import { crumbsFor } from '../core/routeMeta';
 
@@ -42,6 +42,20 @@ describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', (
       '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
       '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
     ]);
+  });
+
+  test('stale PRE-SPLIT deny-list keys keep covering the per-tier pages (no silent un-hide on deploy)', () => {
+    const h = expandHidden(['/reconciliation']);
+    ['/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly']
+      .forEach((p) => expect(h.has(p)).toBe(true));
+    const r = expandHidden(['/reconciliation/reports']);
+    ['/reconciliation/reports/weekly', '/reconciliation/reports/monthly', '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly']
+      .forEach((p) => expect(r.has(p)).toBe(true));
+    // …and hiding the weekly replacement blocks the legacy alias that renders it.
+    expect(expandHidden(['/reconciliation/weekly']).has('/reconciliation')).toBe(true);
+    expect(expandHidden(['/reconciliation/reports/weekly']).has('/reconciliation/reports')).toBe(true);
+    // untouched lists pass through
+    expect(expandHidden(['/bank-reco']).size).toBe(1);
   });
 
   test('the Accounts pill carries NO reconciliation screens anymore', () => {

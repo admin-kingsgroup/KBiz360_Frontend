@@ -149,6 +149,23 @@ describe('TK task list · branchwise scoping never mixes (pure)', () => {
     expect(moduleGroups(undefined, undefined)).toEqual([]);
   });
 
+  test('CONSERVATION: By-module view never loses or duplicates a task — group totals equal the flat view, for every scope', () => {
+    const coverage = [
+      { id: 'accounting', name: 'Core Accounting', head: 'Accounting & Ledgers' },
+      { id: 'credit-facilities', name: 'Credit Facilities', head: 'Masters & Parties' },
+      { id: 'tk-group', name: 'TK Group Central', head: 'Governance & Control Tower' },
+    ];
+    // Real-shaped mixed bag: mapped, unmapped, dev, scan, done, per-branch
+    const bag = combineTasks(D, devFindingRows(ALL_ITEMS, {}));
+    [['ALL', 'ALL'], ['BOM', 'ALL'], ['Central', 'Owner'], ['ALL', 'Developer'], ['NBO', 'FM']].forEach(([b, u]) => {
+      const flat = taskRows(bag, b, u);
+      const groups = moduleGroups(bag, coverage, b, u);
+      const gPending = groups.reduce((s, h) => s + h.pending, 0);
+      const gDone = groups.reduce((s, h) => s + h.done, 0);
+      expect(`${b}/${u}: ${gPending}+${gDone}`).toBe(`${b}/${u}: ${flat.pending.length}+${flat.done.length}`);
+    });
+  });
+
   test('partyRows: branch scope keeps details separate — BOM never shows AMD customers or NBO staff', () => {
     expect(partyRows(D, 'ALL').customers.items).toHaveLength(2);
     expect(partyRows(D, 'ALL').employees.items).toHaveLength(2);
