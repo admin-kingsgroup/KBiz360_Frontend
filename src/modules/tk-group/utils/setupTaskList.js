@@ -56,6 +56,7 @@ export function devFindingRows(items = [], trackMap = {}) {
         check: `dev registry = ${meta.label || i.status}${trackedNote}`,
         remark: i.remark || i.note || '—',
         status: isCleared(i, tracked) ? 'done' : 'pending',
+        module: (i.modules && i.modules[0]) || null,
       };
     });
 }
@@ -154,4 +155,51 @@ export function taskKpis(d, tasks, branch = 'ALL', user = 'ALL') {
     { key: 'details', label: 'Master details to fill', value: String(details) },
     { key: 'progress', label: 'Progress', value: `${pct}%` },
   ];
+}
+
+/** Group the scoped tasks module-wise → sub-module-wise, for the "By module"
+ *  view. Works for every user scope (All / FM / Developer / Owner): the same
+ *  branch+user filters apply first, then tasks nest under head module →
+ *  sub-module (names/heads come from the payload's coverage table). Tasks with
+ *  no module id land under "Other configuration". */
+export function moduleGroups(tasks, coverageModules = [], branch = 'ALL', user = 'ALL') {
+  const info = {};
+  (coverageModules || []).forEach((m) => { info[m.id] = m; });
+  const scoped = (tasks || []).filter(
+    (t) => inBranchScope(t, branch) && (user === 'ALL' || t.assignee === user),
+  );
+  const byModule = new Map();
+  scoped.forEach((t) => {
+    const id = t.module && info[t.module] ? t.module : '__other';
+    if (!byModule.has(id)) byModule.set(id, []);
+    byModule.get(id).push(t);
+  });
+  const heads = new Map();
+  byModule.forEach((list, id) => {
+    const meta = info[id] || { head: 'Other configuration', name: 'Unmapped tasks', id: '__other' };
+    if (!heads.has(meta.head)) heads.set(meta.head, []);
+    heads.get(meta.head).push({
+      id: meta.id,
+      name: meta.name,
+      pending: list.filter((t) => t.status !== 'done').map((r, i) => ({ ...r, sr: i + 1 })),
+      done: list.filter((t) => t.status === 'done').map((r, i) => ({ ...r, sr: i + 1 })),
+    });
+  });
+  // Preserve the canonical tree order for heads and sub-modules.
+  const headOrder = [...new Set((coverageModules || []).map((m) => m.head))];
+  const moduleOrder = (coverageModules || []).map((m) => m.id);
+  return [...heads.entries()]
+    .sort((a, b) => {
+      const ia = headOrder.indexOf(a[0]); const ib = headOrder.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    })
+    .map(([head, modules]) => ({
+      head,
+      modules: modules.sort((a, b) => {
+        const ia = moduleOrder.indexOf(a.id); const ib = moduleOrder.indexOf(b.id);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      }),
+      pending: modules.reduce((s, m) => s + m.pending.length, 0),
+      done: modules.reduce((s, m) => s + m.done.length, 0),
+    }));
 }

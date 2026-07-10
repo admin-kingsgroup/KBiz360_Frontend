@@ -692,7 +692,9 @@ const BA_RECON_HIDDEN = new Set([
 ]);
 export const MENU_RECONCILIATION_WEEKLY_ONLY = {
   ...MENU_RECONCILIATION,
-  children: MENU_RECONCILIATION.children.map(g => ({...g, children: g.children.filter(c => !BA_RECON_HIDDEN.has(c.href))})),
+  children: MENU_RECONCILIATION.children.map(g => (g.children
+    ? {...g, children: g.children.filter(c => !BA_RECON_HIDDEN.has(c.href))}
+    : g)), // a direct-href leaf under the pill passes through untouched
 };
 
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
@@ -839,6 +841,24 @@ function cleanDividers(children){
   return out;
 }
 
+// Route splits leave STALE keys in users' saved deny-lists: the combined
+// Reconciliation pages became per-tier pages (2026-07), so a `hidden` entry of
+// '/reconciliation' saved before the split must keep covering its replacements
+// — otherwise the module silently un-hides on deploy. Symmetrically, hiding a
+// replacement also blocks the legacy alias that still renders it.
+const LEGACY_HIDDEN_ALIASES = {
+  '/reconciliation': ['/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly'],
+  '/reconciliation/reports': ['/reconciliation/reports/weekly', '/reconciliation/reports/monthly', '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly'],
+};
+export function expandHidden(list){
+  const out = new Set(Array.isArray(list) ? list : []);
+  for (const k of [...out]) (LEGACY_HIDDEN_ALIASES[k] || []).forEach((h) => out.add(h));
+  // The legacy URLs render the WEEKLY pages — hiding weekly must block them too.
+  if (out.has('/reconciliation/weekly')) out.add('/reconciliation');
+  if (out.has('/reconciliation/reports/weekly')) out.add('/reconciliation/reports');
+  return out;
+}
+
 // Recursively remove hidden leaves; then drop any pure container left with no
 // navigable leaf. A node that is itself navigable (has its own href) survives.
 function pruneNode(node, hiddenSet){
@@ -854,7 +874,7 @@ function pruneNode(node, hiddenSet){
 }
 
 export function applyHidden(menus, currentUser){
-  const hidden=new Set(Array.isArray(currentUser?.hidden)?currentUser.hidden:[]);
+  const hidden=expandHidden(currentUser?.hidden); // incl. legacy-alias coverage
   hidden.delete('/dashboard'); // landing page is never hideable (avoids lockout)
   // The visibility-control link is admin-only: hide it from everyone else, and
   // make sure the admin always keeps it (even if it slipped into their list).

@@ -10,10 +10,10 @@ const PAYLOAD = {
   branches: ['BOM', 'BOMMB', 'AMD', 'NBO', 'DAR', 'FBM'],
   assignees: ['FM', 'Developer', 'Owner'],
   tasks: [
-    { id: 'credit-facilities', branch: 'Central', assignee: 'FM', label: 'Credit Facilities & Limits', section: 'Finance config', link: '/masters/credit-facilities', check: 'creditfacilities = 0', remark: 'Enter every credit line.', status: 'pending' },
-    { id: 'suppliers-drill-BOM', branch: 'BOM', assignee: 'FM', label: 'BOM-scoped example task', section: 'Chart & Codes', link: '/masters/ledgers', check: 'example = 0', remark: 'Branch-scoped row.', status: 'pending' },
-    { id: 'voucher-types', branch: 'Central', assignee: 'FM', label: 'Voucher Types', section: 'Numbering & Docs', link: '/masters/voucher-types', check: 'vouchertypes = 8', remark: 'Seeded.', status: 'done' },
-    { id: 'policy-guard', branch: 'Central', assignee: 'Owner', label: 'Policy-guard go-live', section: 'Governance', link: '/tk/controls', check: "tkflags['core.policy_guard'] = off", remark: 'Dual-approve.', status: 'pending' },
+    { id: 'credit-facilities', module: 'credit-facilities', branch: 'Central', assignee: 'FM', label: 'Credit Facilities & Limits', section: 'Finance config', link: '/masters/credit-facilities', check: 'creditfacilities = 0', remark: 'Enter every credit line.', status: 'pending' },
+    { id: 'suppliers-drill-BOM', module: 'ledgers', branch: 'BOM', assignee: 'FM', label: 'BOM-scoped example task', section: 'Chart & Codes', link: '/masters/ledgers', check: 'example = 0', remark: 'Branch-scoped row.', status: 'pending' },
+    { id: 'voucher-types', module: 'voucher-types', branch: 'Central', assignee: 'FM', label: 'Voucher Types', section: 'Numbering & Docs', link: '/masters/voucher-types', check: 'vouchertypes = 8', remark: 'Seeded.', status: 'done' },
+    { id: 'policy-guard', module: 'tk-group', branch: 'Central', assignee: 'Owner', label: 'Policy-guard go-live', section: 'Governance', link: '/tk/controls', check: "tkflags['core.policy_guard'] = off", remark: 'Dual-approve.', status: 'pending' },
   ],
   summary: { pending: 3, done: 1, total: 4, byAssignee: {} },
   parties: {
@@ -33,6 +33,9 @@ const PAYLOAD = {
     modules: [
       { id: 'accounting', name: 'Core Accounting (journals)', head: 'Accounting & Ledgers', kind: 'op', via: 'scan' },
       { id: 'ledgers', name: 'Chart of Accounts / Ledgers', head: 'Accounting & Ledgers', kind: 'op', via: 'task' },
+      { id: 'voucher-types', name: 'Voucher Types', head: 'Accounting & Ledgers', kind: 'op', via: 'task' },
+      { id: 'credit-facilities', name: 'Credit Facilities', head: 'Masters & Parties', kind: 'op', via: 'task' },
+      { id: 'tk-group', name: 'TK Group Central (approvals & flags)', head: 'Governance & Control Tower', kind: 'op', via: 'task' },
       { id: 'auth', name: 'Authentication', head: 'System · Config · Access', kind: 'sys', via: 'system' },
     ],
   },
@@ -74,7 +77,7 @@ describe('SetupTaskList render (wiring smoke)', () => {
     // Pending table: 3 config pending + every open dev-registry finding
     expect(screen.getByText(`To configure (${3 + openDev})`)).toBeInTheDocument();
     expect(screen.getByText('Configured — moved here automatically (1)')).toBeInTheDocument();
-    expect(screen.getByText('Voucher Types')).toBeInTheDocument(); // in the done table
+    expect(screen.getAllByText('Voucher Types').length).toBeGreaterThanOrEqual(1); // done table + coverage chip
     // Party completeness drill renders with exact missing details
     expect(screen.getByText('NeuIQ Technologies Private Limited')).toBeInTheDocument();
     expect(screen.getByText('Credit limit · GST treatment')).toBeInTheDocument();
@@ -98,6 +101,21 @@ describe('SetupTaskList render (wiring smoke)', () => {
     // No opening-balance surface anywhere — full history imported, nothing to key in
     expect(screen.queryByText(/opening balance/i)).not.toBeInTheDocument();
     expect(mockGetSetupTasks).toHaveBeenCalledTimes(1); // one payload, no per-branch refetch
+  });
+
+  test('By-module view: toggle nests tasks head → sub-module; list view restores', async () => {
+    renderWith();
+    await screen.findByText('Credit Facilities & Limits');
+    fireEvent.click(screen.getByTestId('tk-tasks-view-module'));
+    const mv = screen.getByTestId('tk-tasks-moduleview');
+    expect(mv.textContent).toContain('Masters & Parties'); // head section
+    expect(mv.textContent).toContain('Credit Facilities'); // sub-module block
+    expect(mv.textContent).toContain('1 pending');
+    expect(mv.textContent).toContain('Voucher Types');           // done row visible inside its sub-module
+    expect(mv.textContent).toContain('Other configuration');     // dev-registry rows without module ids
+    expect(screen.queryByText(/To configure \(/)).not.toBeInTheDocument(); // flat tables hidden
+    fireEvent.click(screen.getByTestId('tk-tasks-view-list'));
+    expect(await screen.findByText(/To configure \(/)).toBeInTheDocument();
   });
 
   test('user scoping + Complete → deep-links through setRoute', async () => {

@@ -4,7 +4,7 @@ import { getSetupTasks, getDevFindings } from './api/monitor';
 import {
   TASK_USERS, assigneeLabel, assigneeTone, taskStatusTone, taskStatusLabel,
   devFindingRows, combineTasks, taskRows, userCounts, branchCounts,
-  partyRows, taskKpis,
+  partyRows, taskKpis, moduleGroups,
 } from './utils/setupTaskList';
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
@@ -100,6 +100,7 @@ export function SetupTaskList({ setRoute } = {}) {
   const focus = useCockpitFocus();
   const [branch, setBranch] = useState(focus || 'ALL');
   const [user, setUser] = useState('ALL');
+  const [view, setView] = useState('list'); // 'list' | 'module' — By-module nests tasks head → sub-module
   useEffect(() => { setBranch(focus || 'ALL'); }, [focus]);
 
   // One payload for every scope (branch/user filtering is client-side);
@@ -148,6 +149,9 @@ export function SetupTaskList({ setRoute } = {}) {
             {u === 'ALL' ? 'All users' : assigneeLabel(u)} <span className="tabular-nums opacity-80">{uCounts[u] ?? 0}</span>
           </ScopePill>
         ))}
+        <span className="ml-4 text-[11px] font-bold uppercase tracking-wide text-ink-subtle">View</span>
+        <ScopePill on={view === 'list'} onClick={() => setView('list')} testId="tk-tasks-view-list">List</ScopePill>
+        <ScopePill on={view === 'module'} onClick={() => setView('module')} testId="tk-tasks-view-module">By module</ScopePill>
       </div>
 
       <ResponsiveGrid min="150px" gap="md" data-testid="tk-tasks-kpis">
@@ -165,7 +169,42 @@ export function SetupTaskList({ setRoute } = {}) {
         </p>
       </PageSection>
 
-      <DataTable
+      {view === 'module' && (
+        <div className="grid gap-4" data-testid="tk-tasks-moduleview">
+          {moduleGroups(tasks, (d.coverage || {}).modules, branch, user).map((h) => (
+            <PageSection key={h.head} title={`${h.head} — ${h.pending} to configure · ${h.done} configured`}>
+              <div className="grid gap-3">
+                {h.modules.map((m) => (
+                  <div key={m.id} className="rounded-lg border border-surface-border bg-surface p-3">
+                    <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                      <span className="text-[13px] font-bold text-ink">{m.name}</span>
+                      {m.pending.length > 0 && <Badge tone="warning" size="sm">{m.pending.length} pending</Badge>}
+                      {m.done.length > 0 && <Badge tone="success" size="sm">{m.done.length} configured</Badge>}
+                    </div>
+                    {[...m.pending, ...m.done].map((r) => (
+                      <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-surface-border/60 py-1.5 text-xs">
+                        <Badge tone={r.branch === 'Central' ? 'neutral' : 'info'} size="sm">{r.branch}</Badge>
+                        <Badge tone={assigneeTone(r.assignee)} size="sm">{assigneeLabel(r.assignee)}</Badge>
+                        <span className="min-w-[160px] flex-1 font-medium text-ink">{r.label}</span>
+                        <span className="whitespace-nowrap font-mono text-[11px] text-ink-muted">{r.check}</span>
+                        <Badge tone={taskStatusTone(r.status)} size="sm">{taskStatusLabel(r.status)}</Badge>
+                        {r.status !== 'done' && r.link && (
+                          <button type="button" onClick={() => (setRoute ? setRoute(r.link) : (window.location.href = r.link))}
+                            className="whitespace-nowrap text-[12px] font-semibold text-accent hover:underline">
+                            Complete →
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </PageSection>
+          ))}
+        </div>
+      )}
+
+      {view === 'list' && <DataTable
         title={`To configure (${pending.length})${branch === 'ALL' ? '' : ` · ${branch}`}${user === 'ALL' ? '' : ` · ${assigneeLabel(user)}`}`}
         columns={taskColumns(setRoute, true)}
         rows={pending}
@@ -175,9 +214,9 @@ export function SetupTaskList({ setRoute } = {}) {
         searchable
         showDensityToggle={false}
         zebra
-      />
+      />}
 
-      <DataTable
+      {view === 'list' && <DataTable
         title={`Configured — moved here automatically (${done.length})`}
         columns={taskColumns(setRoute, false)}
         rows={done}
@@ -187,7 +226,7 @@ export function SetupTaskList({ setRoute } = {}) {
         searchable={false}
         showDensityToggle={false}
         zebra
-      />
+      />}
 
       {showParties && (
         <PageSection title="Master completeness — details to fill">

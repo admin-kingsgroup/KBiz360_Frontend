@@ -1,7 +1,7 @@
 import {
   TASK_USERS, assigneeLabel, assigneeTone, taskStatusTone, taskStatusLabel,
   devFindingRows, combineTasks, inBranchScope, taskRows, userCounts, branchCounts,
-  partyRows, taskKpis,
+  partyRows, taskKpis, moduleGroups,
 } from '../utils/setupTaskList';
 import { ALL_ITEMS, isCleared } from '../../devControl/registry';
 
@@ -117,6 +117,36 @@ describe('TK task list · branchwise scoping never mixes (pure)', () => {
     expect(withDetails.BOM).toBe(1 + 2);      // 1 task + BOM customer + BOM employee
     expect(withDetails.Central).toBe(3 + 1);  // 3 central tasks + branch-'ALL' supplier
     expect(branchCounts(tasks, BRANCHES, 'Owner', D).BOM).toBe(0); // details are FM work, not Owner's
+  });
+
+  test('moduleGroups: nests scoped tasks head → sub-module in tree order, for every user scope', () => {
+    const coverage = [
+      { id: 'accounting', name: 'Core Accounting', head: 'Accounting & Ledgers' },
+      { id: 'credit-facilities', name: 'Credit Facilities', head: 'Masters & Parties' },
+      { id: 'tk-group', name: 'TK Group Central', head: 'Governance & Control Tower' },
+    ];
+    const tasks = [
+      { id: 'credit-facilities', module: 'credit-facilities', branch: 'Central', assignee: 'FM', status: 'pending' },
+      { id: 'mod:core-acct:BOM', module: 'accounting', branch: 'BOM', assignee: 'FM', status: 'done' },
+      { id: 'rule-CUS-01', module: 'tk-group', branch: 'Central', assignee: 'Owner', status: 'pending' },
+      { id: 'dev:x', module: null, branch: 'Central', assignee: 'Developer', status: 'pending' }, // unmapped
+    ];
+    const all = moduleGroups(tasks, coverage, 'ALL', 'ALL');
+    // Tree order preserved: Accounting head first, then Masters, then Governance, then Other
+    expect(all.map((h) => h.head)).toEqual(['Accounting & Ledgers', 'Masters & Parties', 'Governance & Control Tower', 'Other configuration']);
+    expect(all[0].modules[0]).toMatchObject({ id: 'accounting', name: 'Core Accounting' });
+    expect(all[0].done).toBe(1);
+    expect(all[1].pending).toBe(1);
+    // User scope composes: Owner sees only the governance group
+    const owner = moduleGroups(tasks, coverage, 'ALL', 'Owner');
+    expect(owner.map((h) => h.head)).toEqual(['Governance & Control Tower']);
+    expect(owner[0].modules[0].pending[0].id).toBe('rule-CUS-01');
+    // Branch scope composes: BOM sees only its scan row
+    const bom = moduleGroups(tasks, coverage, 'BOM', 'ALL');
+    expect(bom).toHaveLength(1);
+    expect(bom[0].modules[0].done[0].id).toBe('mod:core-acct:BOM');
+    // Fail-soft
+    expect(moduleGroups(undefined, undefined)).toEqual([]);
   });
 
   test('partyRows: branch scope keeps details separate — BOM never shows AMD customers or NBO staff', () => {

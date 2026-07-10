@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CalendarClock, AlertTriangle } from 'lucide-react';
 import { getPending, getList, generateCertificates } from './api';
+import { useCockpitFocus } from '../../store/cockpitFocus';
 import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, currencyOf, fmtAmt, chainProgress, pendingStateMeta, fmtDue, visibleTiers, hubPathFor, tierMenuName } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select, FormField } from '../../shell/primitives';
 
@@ -19,13 +20,15 @@ const headCls = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider 
 
 export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tier: fixedTier }) {
   const appCode = branchCodeOf(appBranch); // app passes a branch OBJECT (or 'ALL')
-  const [branch, setBranch] = useState(appCode || 'BOM');
+  // Branch scope: a real branch context (top-right selector) wins; otherwise the
+  // top TK sub-branch selector (cockpit Focus) scopes the report — no in-page
+  // selector, same contract as every Control Tower lens. 'ALL' focus defaults to
+  // BOM because the report is single-branch by Rule 06.
+  const focus = useCockpitFocus();
+  const branch = appCode || (BRANCHES.includes(focus) ? focus : 'BOM');
   const tierKey = TIERS.some((t) => t.key === fixedTier) ? fixedTier : 'weekly';
   const tier = tierOf(tierKey);
   const [statusFilter, setStatusFilter] = useState('');
-
-  // Follow the app-wide branch selector (branch-isolation convention).
-  React.useEffect(() => { if (appCode) setBranch(appCode); }, [appCode]);
 
   // Branch Accountant sees the weekly cycle only — Month/Quarter/Year closings
   // are worked from TK Group Central by AE/FM/Director/Owner.
@@ -74,14 +77,13 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
         <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute(hubPathFor(tierKey))}>Open {tierMenuName(tierKey)} Reconciliation</Button>
       </div>
 
-      {/* branch chips */}
-      <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Branch">
-        {BRANCHES.map((b) => (
-          <button key={b} type="button" role="tab" aria-selected={branch === b} onClick={() => setBranch(b)}
-            className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${branch === b ? 'border-transparent bg-navy text-white' : 'border-surface-border bg-surface text-ink-muted hover:border-ink/20'}`}>
-            {b} <span className="ml-1 text-xs opacity-60">{currencyOf(b)}</span>
-          </button>
-        ))}
+      {/* branch scope — driven by the top TK branch selector, never an in-page picker */}
+      <div className="flex flex-wrap items-center gap-2" data-testid="recon-branch-scope">
+        <span className="rounded-full bg-navy px-3.5 py-1.5 text-sm font-semibold text-white">{branch} <span className="text-xs opacity-70">{currencyOf(branch)}</span></span>
+        <span className="text-xs italic text-ink-subtle">
+          Scoped by the top TK branch selector — branch-wise, data is never mixed across branches.
+          {!appCode && !BRANCHES.includes(focus) ? ' Focus is ALL, defaulting to BOM — spotlight a branch up top to switch.' : ''}
+        </span>
       </div>
 
       {/* 1 · pending closings */}

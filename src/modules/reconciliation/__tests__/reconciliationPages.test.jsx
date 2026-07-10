@@ -67,10 +67,12 @@ describe('ReconciliationHub · render (tier-locked pages — the menu is the tie
     expect(screen.queryByText('Weekly')).not.toBeInTheDocument();
   });
 
-  test('branch prop as an OBJECT (the real app shape) selects that branch', async () => {
+  test('branch prop as an OBJECT (the real app shape) scopes to that branch — no in-page picker', async () => {
     wrap(<ReconciliationHub branch={{ code: 'AMD', city: 'Ahmedabad' }} tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
-    const amdChip = await screen.findByRole('tab', { name: /AMD/ });
-    expect(amdChip).toHaveAttribute('aria-selected', 'true');
+    const scope = await screen.findByTestId('recon-branch-scope');
+    expect(scope.textContent).toContain('AMD');
+    expect(scope.textContent).toContain('Scoped by the top TK branch selector');
+    expect(screen.queryAllByRole('tab')).toHaveLength(0); // the pill bar is gone
   });
 
   test('Branch Accountant: weekly page works + the TK-Group note', async () => {

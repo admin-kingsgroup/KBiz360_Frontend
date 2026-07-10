@@ -16,7 +16,7 @@ import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
 import { lazyModule } from './core/lazyModule';
 import { isOwnerDashboardUser, topLevelPillHrefs } from './core/pageCatalog';
-import { canReachRoute } from './core/menus';
+import { canReachRoute, expandHidden } from './core/menus';
 
 /* ── Route-level code-splitting ───────────────────────────────────────────
    Every page component below is loaded via lazyModule() → one dynamic
@@ -359,10 +359,12 @@ export default function KB360App(){
     // financial statements even by direct URL — send them back to their dashboard.
     if(hideStatements && isStatementHref(route)) return <Navigate to="/accounts/dashboard" replace/>;
 
-    const hiddenPages = Array.isArray(currentUser?.hidden) ? currentUser.hidden : [];
+    // expandHidden also maps LEGACY keys onto their split replacements (e.g. a
+    // pre-split '/reconciliation' deny still covers the four per-tier pages).
+    const hiddenPages = expandHidden(currentUser?.hidden);
     // Top-level pills are structural — never blocked by the deny-list (they can't be
     // hidden from the catalogue either), so a single-page pill like Approvals always works.
-    if(route!=="/dashboard" && route!=="/settings/page-access" && !topLevelPillHrefs().has(route) && hiddenPages.includes(route)){
+    if(route!=="/dashboard" && route!=="/settings/page-access" && !topLevelPillHrefs().has(route) && hiddenPages.has(route)){
       return (
         <div style={{padding:30,maxWidth:560,margin:"40px auto",
           background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>

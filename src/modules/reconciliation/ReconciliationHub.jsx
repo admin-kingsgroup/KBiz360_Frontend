@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2 } from 'lucide-react';
 import { getTree, getSummary, getPending, generateCertificates } from './api';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, reportPathFor, tierMenuName } from './utils';
+import { useCockpitFocus } from '../../store/cockpitFocus';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, hubPathFor, reportPathFor, tierMenuName } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { CertificateDrawer } from './CertificateDrawer';
 import { CycleLedgerDrawer } from './CycleLedgerDrawer';
@@ -37,7 +38,12 @@ function TierCard({ tier, counts, period }) {
 // never mixes tiers.
 export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, tier: fixedTier }) {
   const appCode = branchCodeOf(appBranch); // app passes a branch OBJECT (or 'ALL')
-  const [branch, setBranch] = useState(appCode || 'BOM');
+  // Branch scope: a real branch context (top-right selector) wins; otherwise the
+  // top TK sub-branch selector (cockpit Focus) scopes the register — no in-page
+  // selector, same contract as every Control Tower lens. 'ALL' focus defaults to
+  // BOM because the register is single-branch by Rule 06.
+  const focus = useCockpitFocus();
+  const branch = appCode || (BRANCHES.includes(focus) ? focus : 'BOM');
   const tierKey = TIERS.some((t) => t.key === fixedTier) ? fixedTier : 'weekly';
   const [openId, setOpenId] = useState(null);
   const [showCycleCfg, setShowCycleCfg] = useState(false);
@@ -50,15 +56,19 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
 
   // Follow the app-wide branch selector — the module must never show a
   // different branch than the rest of the ERP (branch-isolation convention).
-  useEffect(() => { if (appCode) setBranch(appCode); }, [appCode]);
 
   // Branch Accountant works the WEEKLY cycle only (Month/Quarter/Year are done
   // from TK Group Central by AE/FM/Director/Owner — backend enforces it too).
+  // An explicit Page-Visibility GRANT of this tier's page opens it read-mostly
+  // (the backend still refuses BA writes on central tiers) — otherwise the
+  // admin's grant toggle would promise a page the guard refuses.
   const tiers = visibleTiers(currentUser?.role);
-  const tierAllowed = tiers.some((t) => t.key === tierKey);
+  const granted = Array.isArray(currentUser?.granted) ? currentUser.granted : [];
+  const tierAllowed = tiers.some((t) => t.key === tierKey) || granted.includes(hubPathFor(tierKey));
 
-  const { data: summary } = useQuery({ queryKey: ['recon-certs', 'summary', branch], queryFn: () => getSummary({ branch }) });
-  const { data: pendingData } = useQuery({ queryKey: ['recon-certs', 'pending', branch], queryFn: () => getPending({ branch }) });
+  // Queries stay idle behind the tier guard — a guarded page must not fetch.
+  const { data: summary } = useQuery({ queryKey: ['recon-certs', 'summary', branch], queryFn: () => getSummary({ branch }), enabled: tierAllowed });
+  const { data: pendingData } = useQuery({ queryKey: ['recon-certs', 'pending', branch], queryFn: () => getPending({ branch }), enabled: tierAllowed });
   const currentPeriod = summary?.periods?.[tierKey];
   const options = periodOptions(tierKey, currentPeriod, pendingData?.rows);
   const period = periodSel[`${branch}:${tierKey}`] || currentPeriod;
@@ -67,7 +77,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
   const { data: treeData, isLoading, isError, refetch } = useQuery({
     queryKey: ['recon-certs', 'tree', branch, tierKey, period || ''],
     queryFn: () => getTree({ branch, tier: tierKey, period }),
-    enabled: !!period,
+    enabled: tierAllowed && !!period,
   });
   const groups = treeData?.groups || [];
   const empty = !isLoading && !isError && groups.length === 0;
@@ -113,14 +123,12 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
       </div>
 
       {/* branch chips — the register is always a single branch (Rule 06) */}
-      <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Branch">
-        {BRANCHES.map((b) => (
-          <button key={b} type="button" role="tab" aria-selected={branch === b} onClick={() => setBranch(b)}
-            className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${branch === b ? 'border-transparent bg-navy text-white' : 'border-surface-border bg-surface text-ink-muted hover:border-ink/20'}`}>
-            {b} <span className="ml-1 text-xs opacity-60">{currencyOf(b)}</span>
-          </button>
-        ))}
-        <span className="ml-auto text-xs italic text-ink-subtle">Branch-wise — data is never mixed across branches</span>
+      <div className="flex flex-wrap items-center gap-2" data-testid="recon-branch-scope">
+        <span className="rounded-full bg-navy px-3.5 py-1.5 text-sm font-semibold text-white">{branch} <span className="text-xs opacity-70">{currencyOf(branch)}</span></span>
+        <span className="text-xs italic text-ink-subtle">
+          Scoped by the top TK branch selector — branch-wise, data is never mixed across branches.
+          {!appCode && !BRANCHES.includes(focus) ? ' Focus is ALL, defaulting to BOM — spotlight a branch up top to switch.' : ''}
+        </span>
       </div>
 
       {/* this tier's progress card — switching tiers happens from the menu
