@@ -10,6 +10,14 @@ describe('normDate', () => {
     expect(normDate('01/05/2026')).toBe('2026-05-01');
     expect(normDate('1-5-26')).toBe('2026-05-01');
   });
+  test('parses alternate formats via Date.parse fallback', () => {
+    expect(normDate('2026/05/01')).toBe('2026-05-01'); // slash-ISO
+    expect(normDate('May 1 2026')).toBe('2026-05-01');
+  });
+  test('returns "" for a genuinely unrecognized date (dropped, not stored garbage)', () => {
+    expect(normDate('not-a-date')).toBe('');
+    expect(normDate('')).toBe('');
+  });
 });
 
 describe('parseSupplierStatement', () => {

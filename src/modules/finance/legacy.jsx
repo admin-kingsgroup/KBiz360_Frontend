@@ -113,7 +113,9 @@ function normDate(v){
   const MON={jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12"};
   m=s.match(/^(\d{1,2})[\-\s]([A-Za-z]{3})[A-Za-z]*[\-\s](\d{2,4})/);
   if(m){ let [,d,mon,y]=m; if(y.length===2) y="20"+y; const mm=MON[mon.toLowerCase()]; if(mm) return `${y}-${mm}-${String(d).padStart(2,"0")}`; }
-  const t=Date.parse(s); if(!isNaN(t)) return new Date(t).toISOString().slice(0,10);
+  // Date.parse treats a bare date as LOCAL midnight — read LOCAL components (not
+  // toISOString, which is UTC and shifts the day back in +ve timezones like IST).
+  const t=Date.parse(s); if(!isNaN(t)){ const d=new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
   return ""; // unrecognized → not a date; don't fabricate one that would never show in a period view
 }
 
