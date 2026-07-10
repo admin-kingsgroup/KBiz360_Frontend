@@ -497,3 +497,49 @@ describe('payment → split (multiple debit legs, different expense ledgers)', (
     expect(s.party).toBe('Blinkit');
   });
 });
+
+// Additive charge legs on a supplier payment: pay the creditor AND book a bank charge
+// in one voucher. The charge rides on lines[] as an extra Dr; total stays the supplier
+// settlement (bill-wise sums to it); the backend lifts the bank credit by the charge.
+describe('payment → supplier + additive charge legs (bank charge etc.)', () => {
+  test.concurrent('toBody: charge legs emitted as extra Dr lines; total = supplier amount only', async () => {
+    const b = PM.toBody({ party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 10000,
+      applyMode: 'onaccount', parkOnAcc: true, alloc: {},
+      hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 50, desc: 'NEFT' }] }, ctx);
+    expect(b.party).toBe('TRIP JACK');
+    expect(b.total).toBe(10000);                 // bill-wise settles the supplier amount, NOT +50
+    expect(b.lines).toEqual([{ ledger: 'Bank Charges', amt: 50, drCr: 'Dr', desc: 'NEFT' }]);
+  });
+
+  test.concurrent('toBody: hasCharges off → no charge legs even if rows linger in state', async () => {
+    const b = PM.toBody({ party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 10000,
+      applyMode: 'onaccount', parkOnAcc: true, alloc: {},
+      hasCharges: false, charges: [{ ledger: 'Bank Charges', amt: 50 }] }, ctx);
+    expect(b.lines).toEqual([]);
+  });
+
+  test.concurrent('toBody: charges never attach to a customer RECEIPT (payment-supplier only)', async () => {
+    const b = RC.toBody({ party: 'Some Debtor', otherType: 'Debtor', bankRef: 'ICICI', amount: 5000,
+      applyMode: 'onaccount', parkOnAcc: true, alloc: {},
+      hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 50 }] }, ctx);
+    expect(b.lines).toEqual([]);
+  });
+
+  test.concurrent('validate: a half-filled charge row blocks save; a complete one is fine', async () => {
+    const base = { party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 10000, applyMode: 'onaccount', parkOnAcc: true, alloc: {} };
+    expect(PM.validate({ ...base, hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 50 }] }).ok).toBe(true);
+    expect(PM.validate({ ...base, hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 0 }] }).ok).toBe(false); // no amount
+    expect(PM.validate({ ...base, hasCharges: true, charges: [{ ledger: '', amt: 50 }] }).ok).toBe(false);           // no ledger
+  });
+
+  test.concurrent('round-trip: a saved supplier payment with a charge reloads with hasCharges + the row', async () => {
+    const b = PM.toBody({ party: 'TRIP JACK', otherType: 'Creditor', bankRef: 'ICICI', amount: 10000,
+      applyMode: 'onaccount', parkOnAcc: true, alloc: {},
+      hasCharges: true, charges: [{ ledger: 'Bank Charges', amt: 50, desc: 'NEFT' }] }, ctx);
+    const s = PM.fromVoucher({ ...b, partyType: 'supplier', party: 'TRIP JACK' });
+    expect(s.party).toBe('TRIP JACK');
+    expect(s.split).toBe(false);
+    expect(s.hasCharges).toBe(true);
+    expect(s.charges.map((l) => [l.ledger, l.amt])).toEqual([['Bank Charges', 50]]);
+  });
+});

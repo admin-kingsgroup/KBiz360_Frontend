@@ -109,10 +109,15 @@ function makeRcptPmt(side) {
       // with partyType 'customer' is a client refund (Debtor settling open receipts).
       const looksParty = !!v.party && (v.partyType === (isReceipt ? 'customer' : 'supplier') || (!isReceipt && v.partyType === 'customer') || (v.allocations || []).length > 0);
       const guessType = isReceipt ? 'Debtor' : (v.partyType === 'customer' ? 'Debtor' : 'Creditor');
-      // Additive charge legs ride on a SUPPLIER payment's lines[] as extra non-bank Dr
-      // legs (the party itself is NOT in lines) — reopen them in the charges editor.
-      const chargeLegs = (!isReceipt && v.party)
-        ? (v.lines || []).filter((l) => l.drCr === 'Dr' && !bankish(l))
+      // Additive charge legs ride on a SUPPLIER payment's lines[] as DR-ONLY legs —
+      // reopen them in the charges editor. Recognised only when NO line is a Cr leg
+      // (a Cr line ⇒ a full/legacy journal whose lines are ignored, not charges).
+      // Exclude by NAME (the party + bank ledgers), NOT the bankish regex: a charge
+      // head like "Bank Charges" contains "bank" and a pattern test would drop it.
+      const norm = (x) => `${x || ''}`.trim().toLowerCase();
+      const hasCrLine = (v.lines || []).some((l) => l.drCr === 'Cr');
+      const chargeLegs = (!isReceipt && v.party && !hasCrLine)
+        ? (v.lines || []).filter((l) => l.drCr === 'Dr' && norm(l.ledger) !== norm(party) && norm(l.ledger) !== norm(bankRef))
         : [];
       return {
         date: v.date || '', party, otherType: looksParty ? guessType : '', bankRef, paymentMode: v.paymentMode || 'NEFT', utr: v.utr || '',
