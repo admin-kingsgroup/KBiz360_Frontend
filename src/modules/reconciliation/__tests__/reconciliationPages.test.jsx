@@ -104,7 +104,7 @@ describe('ReconReportsPage · render (one report per tier)', () => {
 
   test('Yearly Report: only the year-end backlog row', async () => {
     wrap(<ReconReportsPage branch="BOM" tier="year" setRoute={() => {}} currentUser={{ role: 'Director' }} />);
-    expect(await screen.findByText('Year-End Report')).toBeInTheDocument();
+    expect(await screen.findByText('Yearly Report')).toBeInTheDocument(); // H1 matches the menu entry
     expect(await screen.findByText(/Year-End Closing — FY2025-26/)).toBeInTheDocument();
     expect(screen.queryByText(/Weekly Reconciliation — 2026-W29/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Month-End Closing/)).not.toBeInTheDocument();
