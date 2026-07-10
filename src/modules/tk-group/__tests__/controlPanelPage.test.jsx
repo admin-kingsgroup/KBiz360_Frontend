@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // master guard OFF (dormant) so people read Independent.
@@ -15,6 +15,19 @@ jest.mock('../api/limits', () => ({
   getLimits: jest.fn().mockResolvedValue({ store: { default: {}, branches: {} }, fields: [], defaults: {}, limits: {} }),
   setBranchLimits: jest.fn().mockResolvedValue({ store: { default: {}, branches: {} }, fields: [], defaults: {}, limits: {} }),
   proposeBranchLimits: jest.fn().mockResolvedValue({}),
+}));
+// EnforcementMatrix (rendered on the Matrix screen) pulls api/voucherPolicy → core/api.
+jest.mock('../api/voucherPolicy', () => ({
+  getVoucherPolicy: jest.fn().mockResolvedValue({ categories: [], defaults: {}, store: { default: {}, branches: {} }, effective: {} }),
+  setVoucherPolicy: jest.fn().mockResolvedValue({ store: { default: {}, branches: {} }, effective: {} }),
+  proposeVoucherPolicy: jest.fn().mockResolvedValue({}),
+}));
+// UserConfig (Users screen) pulls api/userLimits → core/api.
+jest.mock('../api/userLimits', () => ({
+  getUserLimits: jest.fn().mockResolvedValue({ store: {} }),
+  getRoster: jest.fn().mockResolvedValue([]),
+  setUserLimit: jest.fn().mockResolvedValue({ store: {} }),
+  proposeUserLimit: jest.fn().mockResolvedValue({}),
 }));
 // Master-switch confirm — default to "confirmed" so the happy-path flip proceeds; a
 // test overrides it to assert cancellation blocks the flip.
@@ -113,10 +126,10 @@ describe('Control Panel · Power Console', () => {
     localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin', email: 'afshin@travkings.com' }));
     renderWith(<ControlPanel setRoute={() => {}} />);
     fireEvent.click(await screen.findByRole('switch', { name: /Engage the TK Group guard/ }));
-    // confirmed → live flip: setFlag(key, turningOn=true) — NOT the change-request proposal path
+    // confirmed → live flip: setFlag(key, turningOn=true, branch) — NOT the propose path
     expect(await screen.findByText(/is now ON/)).toBeInTheDocument();
     expect(confirmDialog).toHaveBeenCalledTimes(1);
-    expect(setFlag).toHaveBeenCalledWith('core.policy_guard', true);
+    expect(setFlag).toHaveBeenCalledWith('core.policy_guard', true, 'default');
     expect(proposeFlags).not.toHaveBeenCalled();
   });
 
@@ -145,8 +158,20 @@ describe('Control Panel · Power Console', () => {
     fireEvent.click(screen.getByText('Rights & Locks'));
     fireEvent.click(await screen.findByRole('switch', { name: /Relocate central screens/ }));
     expect(await screen.findByText(/is now ON/)).toBeInTheDocument();
-    expect(setFlag).toHaveBeenCalledWith('branch.central_relocated', true);
+    expect(setFlag).toHaveBeenCalledWith('branch.central_relocated', true, 'default');
     expect(confirmDialog).not.toHaveBeenCalled(); // only the master switch confirms
+  });
+
+  test('OWNER: branch scope — flipping a control targets the selected branch', async () => {
+    const { setFlag } = require('../api/flags');
+    setFlag.mockClear();
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    // scope the panel to BOM, then flip a rule on the Data-Entry screen
+    fireEvent.click(await screen.findByRole('button', { name: /^BOM\b/ }));
+    fireEvent.click(screen.getByText('Data-Entry & Compliance'));
+    fireEvent.click(await screen.findByRole('switch', { name: /Mandatory documents/ }));
+    await waitFor(() => expect(setFlag).toHaveBeenCalledWith('entry.mandatory_docs', true, 'BOM'));
   });
 
   test('OWNER: the status strip reflects the live guard state, not a hard-coded "OFF"', async () => {

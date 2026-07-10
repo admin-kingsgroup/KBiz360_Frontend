@@ -9,7 +9,7 @@ import { LIMIT_BRANCHES, symbolFor, effectiveValue, overrideValue, hasOverride, 
 // Pick a branch, edit its thresholds. The Owner saves live (self-approved); everyone
 // else proposes for the Owner. A blank field inherits the Group default; the guard
 // enforces each branch's own effective values.
-export function BranchLimitsEditor({ go }) {
+export function BranchLimitsEditor({ go, branch: controlledBranch, onBranchChange }) {
   const qc = useQueryClient();
   const owner = isOwner();
   const q = useQuery({ queryKey: ['tk', 'limits'], queryFn: () => getLimits(), staleTime: 30_000 });
@@ -17,7 +17,12 @@ export function BranchLimitsEditor({ go }) {
   const fields = q.data?.fields || [];
   const defaults = q.data?.defaults || {};
 
-  const [branch, setBranch] = useState('default');
+  // Controlled by a parent panel selector when a `branch` prop is passed; otherwise the
+  // editor shows its own branch selector.
+  const controlled = controlledBranch !== undefined;
+  const [internalBranch, setInternalBranch] = useState('default');
+  const branch = controlled ? controlledBranch : internalBranch;
+  const setBranch = controlled ? (onBranchChange || (() => {})) : setInternalBranch;
   const [vals, setVals] = useState({});
   const [msg, setMsg] = useState('');
   const [saving, setSaving] = useState(false);
@@ -67,8 +72,8 @@ export function BranchLimitsEditor({ go }) {
         The numbers that bound each power — <b>set per branch</b>. Pick a branch, edit its limits, and {owner ? 'save (applies live).' : 'submit for the Owner’s approval.'} A field left blank <b>inherits the Group default</b>; the guard enforces each branch’s own values.
       </p>
 
-      {/* branch selector */}
-      <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Branch">
+      {/* branch selector — hidden when a parent panel selector controls the branch */}
+      {!controlled && <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Branch">
         {LIMIT_BRANCHES.map((b) => {
           const n = overrideCount(store, b.code);
           const active = branch === b.code;
@@ -81,7 +86,7 @@ export function BranchLimitsEditor({ go }) {
             </button>
           );
         })}
-      </div>
+      </div>}
 
       {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}
 

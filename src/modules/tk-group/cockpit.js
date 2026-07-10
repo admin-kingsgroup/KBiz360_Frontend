@@ -1,4 +1,4 @@
-import { ArrowLeftRight, LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Rocket, Calculator, ShieldCheck } from 'lucide-react';
+import { ArrowLeftRight, LayoutDashboard, CheckSquare, Lock, Database, Users, BarChart2, Rocket, Calculator, ShieldCheck, Scale } from 'lucide-react';
 import { FULL_SCOPE_ROLES } from '../../core/branchScope';
 import { dashboardsFor, MENU_ACCOUNTS } from '../../core/menus';
 
@@ -100,7 +100,7 @@ export function controlCockpitMenu(focus, currentUser) {
     // Reconciliation — the 4-tier per-ledger certificate ladder (Weekly → Month-End →
     // Quarterly → Year-End). The central view is oversight of the SAME module: the
     // pages carry their own branch chips, so everything stays BRANCHWISE, never blended.
-    { label: 'Reconciliation', icon: ArrowLeftRight, children: [
+    { label: 'Statement Reconciliation', icon: ArrowLeftRight, children: [
       // One entry per tier — the menu is the tier switch (pages are tier-locked).
       // Reconciliation Hub = the full-view dashboard; Certification = sign-off.
       { label: 'Reconciliation Hub', children: [
@@ -129,11 +129,20 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Reconciliation Queue', href: '/finance/reco-queue' },
         { label: 'Supplier Reconciliation', href: '/accounts/supplier-reco' },
         { label: 'Inter-Branch Reconciliation', href: '/accounts/interbranch-reco' },
-        { label: 'Tally Reconciliation', href: '/accounts/tally-reco' },
+        { label: 'Tally Ledger Matcher (per ledger)', href: '/accounts/tally-reco' },
         { label: 'Match Guide', href: '/reconciliation/match-guide' },
       ] },
       { label: 'Govern', children: [
         { label: 'Rule Book & Process', href: '/reconciliation/rulebook' },
+      ] },
+    ] },
+
+    // Tally Reconciliation — whole-books ERP↔Tally tie-out, its own pill (Central
+    // works the Month/Year tie-outs). The menu is the tier switch.
+    { label: 'Tally Reconciliation', icon: Scale, children: [
+      { label: 'Tie-Out', children: [
+        { label: 'Monthly Tie-Out', href: '/tally-reconciliation/monthly' },
+        { label: 'Yearly Tie-Out', href: '/tally-reconciliation/yearly' },
       ] },
     ] },
 
@@ -242,7 +251,7 @@ export function controlCockpitMenu(focus, currentUser) {
 // books/registers, tax) are out of the control mode and bounce back to Control Tower.
 // '/dashboard/' covers the role-segregated dashboards surfaced in the cockpit (incl. the
 // owner-only /dashboard/owner); '/dashboards/' covers the AD Dashboards group.
-const COCKPIT_PREFIXES = ['/tk/', '/dashboard/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/', '/reconciliation/'];
+const COCKPIT_PREFIXES = ['/tk/', '/dashboard/', '/dashboards/', '/masters/', '/hr/', '/settings/', '/support/', '/reconciliation/', '/tally-reconciliation/'];
 // Statement-matching screens (moved out of the Accounts pill) — reachable from
 // Central because Month/Quarter/Year closings are worked here; each page stays
 // branch-wise via its own selectors.

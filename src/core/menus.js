@@ -653,7 +653,7 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
 // physical) + the staff Rule Book. Branch-wise throughout; existing statement-
 // matching screens stay under Accounts ▸ Reconciliation — this module is the
 // certificate/sign-off layer above them.
-export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight, children:[
+export const MENU_RECONCILIATION = {label:"Statement Reconciliation", icon:ArrowLeftRight, children:[
   // Reconciliation Hub — the read-only FULL VIEW / dashboard of a tier: every
   // ledger in scope + its live status, branch-wise readiness and the attention
   // list. One entry per tier (the menu is the tier switch). This is where you
@@ -690,9 +690,18 @@ export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight,
     {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
     {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
     {label:"Inter-Branch Reconciliation", href:"/accounts/interbranch-reco"},
-    {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
+    {label:"Tally Ledger Matcher (per ledger)", href:"/accounts/tally-reco"},
     {label:"Match Guide",              href:"/reconciliation/match-guide"},
   ]},
+]};
+
+// Tally Reconciliation — the WHOLE-BOOKS ERP↔Tally tie-out (its own top-level
+// pill, distinct from Statement Reconciliation above). One entry per tier (the
+// menu is the tier switch): each page puts the ERP's live Trial Balance next to
+// the uploaded Tally TB — every ledger, Balance Sheet and P&L side by side.
+export const MENU_TALLY_RECON = {label:"Tally Reconciliation", icon:Scale, children:[
+  {label:"Monthly Tie-Out", href:"/tally-reconciliation/monthly"},
+  {label:"Yearly Tie-Out",  href:"/tally-reconciliation/yearly"},
 ]};
 
 // Branch-Accountant view of the pill: they PREPARE the weekly certificates
@@ -944,7 +953,7 @@ export function fullMenuRoots(branch, currentUser){
   // branch pill so branches can RAISE credit/funds/onboarding/investment requests.
   // Dev Control is a Super-Admin-only pill — every other role never sees it
   // (and App.jsx blocks the route for them even by direct URL).
-  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
+  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_TALLY_RECON, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
     ...(role === 'Super Admin' ? [MENU_DEV_CONTROL] : [])];
 }
 

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getFlagState, proposeFlags, setFlag } from './api/flags';
-import { withToggled } from './utils/flags';
+import { withBranchToggled, isFlagOn } from './utils/flags';
 import { useConfigValue } from '../../core/useAccounting';
 import { isOwner } from './utils/owner';
 import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
 import { BranchLimitsEditor } from './BranchLimitsEditor';
+import { EnforcementMatrix } from './EnforcementMatrix';
+import { UserConfig } from './UserConfig';
+import { LIMIT_BRANCHES } from './utils/branchLimits';
 import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
 import { Badge } from '../../shell/primitives';
@@ -18,18 +21,8 @@ import { Badge } from '../../shell/primitives';
 // the true state (real flags + approval config) and routes to Control Flags / Limits,
 // where changes are proposed and Owner-approved. Nothing here enforces or disrupts
 // current work.
-const VOUCHER_TYPES = ['SO/PO/GP', 'INB', 'Receipt', 'Payment', 'Contra', 'Journal', 'Purchase Expense', 'Debit Note', 'Refund', 'Reissue', 'ADM', 'ACM'];
-const SENSITIVE = new Set(['Payment', 'Journal', 'Debit Note', 'Refund', 'Reissue', 'ADM', 'ACM']);
 const CAP_GLYPH = { full: '●', cond: '◐', none: '○' };
 const CAP_COLOR = { full: 'text-success', cond: 'text-warning', none: 'text-ink-subtle' };
-const USERS = [
-  { n: 'Sughra', r: 'Accounts Executive', b: 'All branches', lv: 'Verify', setup: 70 },
-  { n: 'Faiz', r: 'Finance Manager', b: 'All branches', lv: 'Approve · Post', setup: 85 },
-  { n: 'Farhan', r: 'Director', b: 'All branches', lv: 'Oversight', setup: 60 },
-  { n: 'Afshin', r: 'Owner', b: 'All branches', lv: 'Full override', setup: 90 },
-  { n: 'BOM Accountant', r: 'Branch Accountant', b: 'BOM', lv: 'Check', setup: 55 },
-  { n: 'NBO Accountant', r: 'Branch Accountant', b: 'NBO', lv: 'Check', setup: 45 },
-];
 
 const Off = () => <Badge tone="neutral" size="sm">Off</Badge>;
 const H3 = ({ children }) => <h3 className="mb-2 mt-5 text-[15px] font-semibold text-ink">{children}</h3>;
@@ -87,8 +80,12 @@ function ChainCard({ k, r, w, n }) {
   );
 }
 
+// Screens whose controls are branch-scoped — the panel branch selector shows on these.
+const BRANCH_SCOPED = new Set(['master', 'approval', 'matrix', 'rights', 'sod', 'entry', 'reports', 'limits', 'users']);
+
 export function ControlPanel({ setRoute }) {
   const [screen, setScreen] = useState('master');
+  const [branch, setBranch] = useState('default');   // panel-wide branch scope for the controls
   const flagsQ = useQuery({ queryKey: ['tk', 'flags'], queryFn: getFlagState, staleTime: 30_000 });
   const verify = useConfigValue('approval.verifyEmails').data;
   const approve = useConfigValue('approval.approveEmails').data;
@@ -98,7 +95,11 @@ export function ControlPanel({ setRoute }) {
   const qc = useQueryClient();
   const [msg, setMsg] = useState('');
   const flags = flagsQ.data?.flags || {};
-  const isOn = (key) => { const f = flags[key] || {}; return f.foundation === true || f.enabled === true; };
+  // Branch-aware: reflects the selected branch's override, falling back to the global
+  // value (and the whole panel scopes to `branch`).
+  const isOn = (key) => isFlagOn(flagsQ.data, key, branch);
+  const branchLabel = (LIMIT_BRANCHES.find((b) => b.code === branch) || {}).label || branch;
+  const scoped = branch !== 'default';
   const owner = isOwner();
   // Flipping a control: the OWNER has full override, so their click applies the flag
   // LIVE (self-approved) and the toggle moves at once — the server returns the new flag
@@ -108,15 +109,16 @@ export function ControlPanel({ setRoute }) {
   // guarded by core.policy_guard until that master switch is itself on.
   const onPropose = async (key) => {
     const turningOn = !isOn(key);
-    // The MASTER switch engages/disengages enforcement company-wide (all 6 branches) —
-    // too consequential for a bare click, so the Owner's live flip is confirmed first.
-    // Every other control stays a one-click instant flip. (Non-Owners only propose.)
+    const where = scoped ? ` for ${branchLabel}` : '';
+    // The MASTER switch engages/disengages enforcement — too consequential for a bare
+    // click, so the Owner's live flip is confirmed first. Every other control stays a
+    // one-click instant flip. (Non-Owners only propose.)
     if (owner && key === 'core.policy_guard') {
       const { confirmed } = await confirmDialog({
-        title: turningOn ? 'Engage the TK Group guard?' : 'Disengage the TK Group guard?',
+        title: turningOn ? `Engage the TK Group guard${where}?` : `Disengage the TK Group guard${where}?`,
         message: turningOn
-          ? 'This turns ON enforcement across all branches immediately — approval chains, segregation-of-duties, cash caps, back-date limits and master-write staging all begin applying to everyone except you. You can switch it back off here at any time.'
-          : 'This turns OFF the whole control layer immediately — nothing is enforced and nobody is blocked. Individual controls keep their settings but stop applying until you re-engage the guard.',
+          ? `This turns ON enforcement ${scoped ? `for ${branchLabel}` : 'across all branches'} immediately — approval chains, segregation-of-duties, cash caps, back-date limits and master-write staging all begin applying to everyone except you. You can switch it back off here at any time.`
+          : `This turns OFF the control layer ${scoped ? `for ${branchLabel}` : '(all branches)'} immediately — nothing is enforced there and nobody is blocked. Individual controls keep their settings but stop applying until you re-engage the guard.`,
         danger: true,
         confirmLabel: turningOn ? 'Engage guard' : 'Disengage guard',
       });
@@ -125,15 +127,15 @@ export function ControlPanel({ setRoute }) {
     setMsg('');
     try {
       if (owner) {
-        const next = await setFlag(key, turningOn);                 // live flip → { flags, enabled }
+        const next = await setFlag(key, turningOn, branch);         // live flip (branch-scoped) → { flags, enabled }
         qc.setQueryData(['tk', 'flags'], next);                     // toggle reflects immediately
         const lab = (next && next.flags && next.flags[key] && next.flags[key].label) || key;
-        toastSuccess(`${lab} — ${turningOn ? 'ON' : 'OFF'}`);
-        setMsg(`“${key}” is now ${turningOn ? 'ON' : 'OFF'}${turningOn && key === 'core.policy_guard' ? ' — the guard is engaged and controls now enforce.' : '.'}`);
+        toastSuccess(`${lab}${where} — ${turningOn ? 'ON' : 'OFF'}`);
+        setMsg(`“${key}”${where} is now ${turningOn ? 'ON' : 'OFF'}${turningOn && key === 'core.policy_guard' ? ` — the guard is engaged${where} and controls now enforce.` : '.'}`);
       } else {
-        await proposeFlags(withToggled(flagsQ.data || { flags: {} }, key));
+        await proposeFlags(withBranchToggled(flagsQ.data || { flags: {} }, key, branch));
         toastInfo('Submitted for the Owner’s approval.');
-        setMsg('Change to “' + key + '” submitted for the Owner’s approval — it applies only once approved.');
+        setMsg(`Change to “${key}”${where} submitted for the Owner’s approval — it applies only once approved.`);
       }
       qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
     } catch (e) {
@@ -151,7 +153,7 @@ export function ControlPanel({ setRoute }) {
             <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The one switch that makes every other setting live. While off, this console is advisory — nobody is blocked, nothing needs approval, your migration continues untouched.</p>
             <Row nm="Engage the TK Group guard (go-live switch)"
               ds="Flip this LAST, once the other screens are set. Then everyone comes under control at once — or ramp per voucher type first."
-              st="core.policy_guard" flag="core.policy_guard" on={v.masterOn} onPropose={onPropose} />
+              st="core.policy_guard" flag="core.policy_guard" on={isOn('core.policy_guard')} onPropose={onPropose} />
             <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🛡️</span><span><b>Nothing is engaged.</b> This console decides who may do what; it takes no action itself. Changes are proposed on Control Flags and Owner-approved. Hand power over slowly — one control, one voucher type, one user at a time.</span></div>
           </>
         );
@@ -175,7 +177,7 @@ export function ControlPanel({ setRoute }) {
               <Row nm="Require Verify (Sughra)" ds="A voucher must be verified before approval." st="verify not required" />
               <Row nm="Require approval before posting" ds="Every voucher starts Pending — nothing hits the books until it's approved; the maker can clear their own until you engage the review chain. Already enforced on all non-booking entries." applied />
               <Row nm="Let Sughra also Approve (AE-approve)" ds="Elevates the AE from verify-only to also give final approval on a branch-accountant voucher."
-                st="Sughra verifies only" flag="approval.ae_can_approve" on={v.aeCanApprove} onPropose={onPropose} />
+                st="Sughra verifies only" flag="approval.ae_can_approve" on={isOn('approval.ae_can_approve')} onPropose={onPropose} />
               <Row nm="Owner co-sign on sensitive types" ds="Refund · reissue · write-off · adjustment JV also need Afshin." st="sensitive" />
             </div>
             <H3>Who is under control</H3>
@@ -193,29 +195,9 @@ export function ControlPanel({ setRoute }) {
           </>
         );
       case 'matrix':
-        return (
-          <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Turn approval on one voucher type at a time — each row independent, all off. Threshold eases in; Effective schedules it; Branch scopes it.</p>
-            <div className="overflow-x-auto rounded-brand border border-surface-border bg-surface">
-              <table className="w-full min-w-[720px] text-[12px]">
-                <thead><tr className="bg-surface-alt text-ink-muted">{['Voucher type', 'Enforce', 'Verify', 'Approve', 'AE-approve', 'Owner co-sign', 'Threshold', 'Effective'].map((h, i) => <th key={h} className={`p-2.5 font-mono text-[9px] font-semibold uppercase tracking-wide ${i ? 'text-center' : 'text-left'}`}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {VOUCHER_TYPES.map((t) => (
-                    <tr key={t} className="border-t border-surface-border/60">
-                      <td className="p-2.5 font-semibold text-ink">{t}{SENSITIVE.has(t) && <span className="ml-1.5 font-mono text-[8.5px] text-danger">sensitive</span>}</td>
-                      {[0, 1, 2, 3, 4].map((c) => <td key={c} className="p-2.5 text-center"><Off /></td>)}
-                      <td className="p-2.5 text-center font-mono text-[11px] text-ink-subtle">₹0</td>
-                      <td className="p-2.5 text-center font-mono text-[11px] text-ink-subtle">—</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>▶</span><span><b>Load-preview, Scheduled &amp; Per-branch</b> live on this row: scope a type to some branches, date it to a future day, and preview the load it routes before it engages.</span></div>
-          </>
-        );
+        return <EnforcementMatrix go={go} branch={branch} />;
       case 'limits':
-        return <BranchLimitsEditor go={go} />;
+        return <BranchLimitsEditor go={go} branch={branch} onBranchChange={setBranch} />;
       case 'roles':
         return (
           <>
@@ -236,25 +218,7 @@ export function ControlPanel({ setRoute }) {
           </>
         );
       case 'users':
-        return (
-          <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Power person-by-person — role, branch, the level they hold, whether they are under control or independent, and how fully each is set up. Switch a user on individually.</p>
-            <div className="grid gap-3 tablet:grid-cols-2">
-              {USERS.map((u) => (
-                <div key={u.n} className="rounded-brand border border-warning/40 bg-surface p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div><div className="text-[16px] font-semibold text-ink">{u.n}</div><div className="text-[11px] text-ink-muted">{u.r} · {u.b}</div></div>
-                    <Badge tone="warning" size="sm">Independent · no approval</Badge>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-muted">
-                    <span>Level: <b className="text-ink">{u.lv}</b></span><span>2FA: <b className="text-ink">off</b></span><span>Setup: <b className="text-ink">{u.setup}%</b></span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🛡️</span><span><b>ERP (Books) login access is now gated:</b> when the master guard is on, a non-Owner granting or revoking someone's Books access is queued for the Owner instead of taking effect. CRM &amp; App toggles stay a direct control. 2FA &amp; session rules remain Planned.</span></div>
-          </>
-        );
+        return <UserConfig go={go} branch={branch} />;
       case 'rights': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Two flags you set independently here (Relocate, Hide-statements). The rest engage automatically with the master guard — <b>Via master guard</b> means a branch write already stages for Owner approval once the guard is on, so you don't wire them separately.</p><ControlList items={CONTROL_LISTS.rights} isOn={isOn} onPropose={onPropose} /></>;
       case 'sod': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Conflict rules — the same person can never both create and clear their own work. Most engage with the master guard; the branch-entry chain is its own live switch.</p><ControlList items={CONTROL_LISTS.sod} isOn={isOn} onPropose={onPropose} /></>;
       case 'security': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Session-level protection at login. Single-device sessions and password strength are <b>already enforced</b>; the Owner has decided not to adopt 2FA, login-hours or IP restrictions.</p><ControlList items={CONTROL_LISTS.security} /></>;
@@ -323,21 +287,43 @@ export function ControlPanel({ setRoute }) {
   };
 
   const activeLabel = POWER_SCREENS.flatMap((g) => g.items).find((i) => i.key === screen)?.label || '';
+  // Branch-resolved state for the selected scope (isOn is branch-aware).
+  const masterOn = isOn('core.policy_guard');
+  const engaged = Object.keys(flags).filter((k) => isOn(k)).length;
+  const showBranchBar = BRANCH_SCOPED.has(screen);
 
   return (
     <div data-testid="tk-control-panel">
-      {/* status strip — reflects the REAL flag state (was hard-coded "Everything OFF") */}
-      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${r.masterOn ? 'border-danger/40 bg-danger-soft' : 'border-warning/40 bg-warning-soft'}`}>
-        <span className={`text-[11px] font-bold uppercase tracking-wide ${r.masterOn ? 'text-danger' : 'text-warning'}`}>Power Console</span>
-        <Badge tone={r.masterOn ? 'danger' : 'warning'}>
-          {r.masterOn ? 'Guard engaged · enforcing' : r.engaged > 0 ? `${r.engaged} control${r.engaged > 1 ? 's' : ''} on · guard dormant` : 'Everything OFF · dormant'}
+      {/* status strip — reflects the REAL flag state for the selected branch scope */}
+      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${masterOn ? 'border-danger/40 bg-danger-soft' : 'border-warning/40 bg-warning-soft'}`}>
+        <span className={`text-[11px] font-bold uppercase tracking-wide ${masterOn ? 'text-danger' : 'text-warning'}`}>Power Console</span>
+        <Badge tone={masterOn ? 'danger' : 'warning'}>
+          {masterOn ? 'Guard engaged · enforcing' : engaged > 0 ? `${engaged} control${engaged > 1 ? 's' : ''} on · guard dormant` : 'Everything OFF · dormant'}
         </Badge>
-        <span className={`text-[12px] ${r.masterOn ? 'text-danger' : 'text-warning'}`}>
-          {r.masterOn ? 'The TK Group guard is on — these controls now enforce.'
+        <span className={`text-[12px] ${masterOn ? 'text-danger' : 'text-warning'}`}>
+          {scoped ? <><b>{branchLabel}</b> scope · </> : null}
+          {masterOn ? `The TK Group guard is on${scoped ? ` for ${branchLabel}` : ''} — these controls now enforce.`
             : owner ? 'Flip any switch to engage it live — your change applies immediately and is logged.'
             : 'Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.'}
         </span>
       </div>
+
+      {/* branch scope selector — every control below applies to the chosen branch */}
+      {showBranchBar && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-brand border border-surface-border bg-surface-alt px-3 py-2">
+          <span className="mr-1 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">Applies to</span>
+          {LIMIT_BRANCHES.map((b) => {
+            const active = branch === b.code;
+            return (
+              <button key={b.code} type="button" onClick={() => setBranch(b.code)}
+                className={`rounded-full border px-3 py-1 text-[11.5px] transition-colors ${active ? 'border-navy bg-navy text-white font-semibold' : 'border-surface-border text-ink-muted hover:bg-navy/5'}`}>
+                {b.label}{b.code !== 'default' && <span className={`ml-1 font-mono text-[9px] ${active ? 'text-white/70' : 'text-ink-subtle'}`}>{b.ccy}</span>}
+              </button>
+            );
+          })}
+          {scoped && <span className="ml-1 text-[11px] text-ink-muted">— overrides fall back to <b>Group default</b> where unset.</span>}
+        </div>
+      )}
 
       {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}
       <div className="grid gap-4 desktop:grid-cols-[230px_1fr]">
