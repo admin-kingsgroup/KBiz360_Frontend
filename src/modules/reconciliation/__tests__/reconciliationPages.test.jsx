@@ -60,10 +60,10 @@ describe('ReconciliationHub · render (tier-locked pages — the menu is the tie
     expect(screen.getByText('Bank Accounts')).toBeInTheDocument();           // sub-group band
   });
 
-  test('monthly page: tier prop locks the page to Month-End', async () => {
+  test('monthly page: tier prop locks the page to Month-End (H1 matches the menu entry)', async () => {
     wrap(<ReconciliationHub branch="BOM" tier="month" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
-    expect(await screen.findByText('Month-End Reconciliation')).toBeInTheDocument();
-    expect(screen.getByText('Month-End')).toBeInTheDocument();
+    expect(await screen.findByText('Monthly Reconciliation')).toBeInTheDocument(); // same words the user clicked
+    expect(screen.getByText('Month-End')).toBeInTheDocument();                     // the tier's formal name on the card
     expect(screen.queryByText('Weekly')).not.toBeInTheDocument();
   });
 

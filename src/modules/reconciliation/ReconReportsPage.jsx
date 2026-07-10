@@ -56,7 +56,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
   if (!tierAllowed) {
     return (
       <div className="grid gap-4">
-        <h1 className="kbiz-page-title">{tier.short} Report</h1>
+        <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Report</h1>
         <EmptyState title="Central closing tier"
           hint="The Branch Accountant works the WEEKLY cycle only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
           action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/reports/weekly')}>Open Weekly Report</Button>} />
@@ -68,10 +68,10 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
     <div className="grid gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="kbiz-page-title">{tier.short} Report</h1>
+          <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Report</h1>
           <p className="text-sm text-ink-muted">{tier.label} — the closing backlog, certificate register and open exceptions. Branch-wise, never mixed.</p>
         </div>
-        <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute(hubPathFor(tierKey))}>Open {tier.short} Reconciliation</Button>
+        <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute(hubPathFor(tierKey))}>Open {tierMenuName(tierKey)} Reconciliation</Button>
       </div>
 
       {/* branch chips */}
