@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getOverview, getGroupHealth, getIntegrity, getTrend, getSetupReadiness, getDevFindings } from './api/monitor';
 import { overviewKpis, streamRows, actorName } from './utils/monitor';
@@ -301,7 +302,15 @@ function Governance() {
 
 export function ControlTower({ setRoute } = {}) {
   const focus = useCockpitFocus();
-  const [tab, setTab] = useState('overview');
+  // Tab lives in the URL (`?tab=`), not plain state, so the header/browser Back
+  // button steps back through tab switches one at a time instead of skipping
+  // straight past this whole page — a bare setState here leaves no history entry,
+  // so Back (which drives real browser history) jumps to whatever page was open
+  // BEFORE Control Tower, ignoring every tab you clicked through on the way here.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const tab = TABS.some((t) => t.id === tabParam) ? tabParam : 'overview';
+  const setTab = (id) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', id); return p; });
   return (
     <div className="grid gap-5">
       <div className="flex gap-1 overflow-x-auto border-b border-surface-border">
