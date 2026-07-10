@@ -27,8 +27,8 @@ describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', (
     expect(hrefs(matching)).toEqual(expect.arrayContaining(MATCHING));
   });
 
-  test('Reconcile & Certify: one entry per tier + the Rule Book', () => {
-    const certs = groupByLabel(MENU_RECONCILIATION, 'Reconcile & Certify');
+  test('Certification: one entry per tier + the Rule Book', () => {
+    const certs = groupByLabel(MENU_RECONCILIATION, 'Certification');
     expect(hrefs(certs)).toEqual([
       '/reconciliation/weekly', '/reconciliation/monthly',
       '/reconciliation/quarterly', '/reconciliation/yearly',

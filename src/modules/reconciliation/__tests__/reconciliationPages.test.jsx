@@ -14,7 +14,7 @@ jest.mock('../api', () => ({
     rows: [
       { tier: 'year', period: 'FY2025-26', label: 'Year-End Closing — FY2025-26 (Apr 2025 – Mar 2026)', state: 'not-started', done: 0, total: 0 },
       { tier: 'month', period: '2026-04', label: 'Month-End Closing — April 2026', state: 'not-started', done: 0, total: 0 },
-      { tier: 'weekly', period: '2026-W29', label: 'Weekly Reconciliation — 2026-W29', dueOn: '2026-07-17', upcoming: true, state: 'not-started', done: 0, total: 0 },
+      { tier: 'weekly', period: '2026-W29', label: 'Weekly Certification — 2026-W29', dueOn: '2026-07-17', upcoming: true, state: 'not-started', done: 0, total: 0 },
     ],
   })),
   getTree: jest.fn(() => Promise.resolve({
@@ -50,7 +50,7 @@ const wrap = (ui) => {
 describe('ReconciliationHub · render (tier-locked pages — the menu is the tier switch)', () => {
   test('weekly page: this tier\'s card ONLY + the grouped ledger register', async () => {
     wrap(<ReconciliationHub branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
-    expect(await screen.findByText('Weekly Reconciliation')).toBeInTheDocument(); // page title
+    expect(await screen.findByText('Weekly Certification')).toBeInTheDocument(); // page title
     expect(screen.getByText('Weekly')).toBeInTheDocument();                   // the tier progress card
     expect(screen.queryByText('Month-End')).not.toBeInTheDocument();          // other tiers live on their own pages
     expect(screen.queryByText('Quarterly')).not.toBeInTheDocument();
@@ -62,7 +62,7 @@ describe('ReconciliationHub · render (tier-locked pages — the menu is the tie
 
   test('monthly page: tier prop locks the page to Month-End (H1 matches the menu entry)', async () => {
     wrap(<ReconciliationHub branch="BOM" tier="month" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
-    expect(await screen.findByText('Monthly Reconciliation')).toBeInTheDocument(); // same words the user clicked
+    expect(await screen.findByText('Monthly Certification')).toBeInTheDocument(); // same words the user clicked
     expect(screen.getByText('Month-End')).toBeInTheDocument();                     // the tier's formal name on the card
     expect(screen.queryByText('Weekly')).not.toBeInTheDocument();
   });
@@ -94,7 +94,7 @@ describe('ReconReportsPage · render (one report per tier)', () => {
   test('Weekly Report: only weekly pending rows + weekly certs; upcoming Friday shown', async () => {
     wrap(<ReconReportsPage branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Director' }} />);
     expect(await screen.findByText('Weekly Report')).toBeInTheDocument();     // page title
-    expect(await screen.findByText(/Weekly Reconciliation — 2026-W29/)).toBeInTheDocument();
+    expect(await screen.findByText(/Weekly Certification — 2026-W29/)).toBeInTheDocument();
     expect(screen.queryByText(/Year-End Closing/)).not.toBeInTheDocument();   // other tiers live on their own reports
     expect(screen.queryByText(/Month-End Closing/)).not.toBeInTheDocument();
     expect(screen.getByText(/opens Fri/)).toBeInTheDocument();               // upcoming = no Generate button
@@ -108,13 +108,13 @@ describe('ReconReportsPage · render (one report per tier)', () => {
     wrap(<ReconReportsPage branch="BOM" tier="year" setRoute={() => {}} currentUser={{ role: 'Director' }} />);
     expect(await screen.findByText('Yearly Report')).toBeInTheDocument(); // H1 matches the menu entry
     expect(await screen.findByText(/Year-End Closing — FY2025-26/)).toBeInTheDocument();
-    expect(screen.queryByText(/Weekly Reconciliation — 2026-W29/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Weekly Certification — 2026-W29/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Month-End Closing/)).not.toBeInTheDocument();
   });
 
   test('Branch Accountant: weekly report works; a central tier report is guarded', async () => {
     wrap(<ReconReportsPage branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
-    expect(await screen.findByText(/Weekly Reconciliation — 2026-W29/)).toBeInTheDocument();
+    expect(await screen.findByText(/Weekly Certification — 2026-W29/)).toBeInTheDocument();
     wrap(<ReconReportsPage branch="BOM" tier="year" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
     expect(await screen.findByText('Central closing tier')).toBeInTheDocument();
   });

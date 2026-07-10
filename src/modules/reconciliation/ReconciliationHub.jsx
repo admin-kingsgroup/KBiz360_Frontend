@@ -10,8 +10,8 @@ import { CycleLedgerDrawer } from './CycleLedgerDrawer';
 
 // ─── Reconciliation — one page per tier ──────────────────────────────────────
 // Branch-wise (Rule 06: one branch at a time, never mixed). The TIER is fixed
-// by the route — Reconcile & Certify ▸ Weekly / Monthly / Quarterly / Yearly
-// Reconciliation are separate menu entries rendering this page tier-locked.
+// by the route — Certification ▸ Weekly / Monthly / Quarterly / Yearly
+// Certification are separate menu entries rendering this page tier-locked.
 // Per-ledger register grouped Parent Group → Sub-group → ledger — one
 // certificate per ledger (Rule 01). Opening a row works the certificate in a
 // drawer: freeze → attach → exceptions → sign chain → (physical) scan-back.
@@ -33,8 +33,8 @@ function TierCard({ tier, counts, period }) {
   );
 }
 
-// The tier is FIXED by the route (Reconcile & Certify ▸ Weekly / Monthly /
-// Quarterly / Yearly Reconciliation) — the menu is the tier switch, the page
+// The tier is FIXED by the route (Certification ▸ Weekly / Monthly /
+// Quarterly / Yearly Certification) — the menu is the tier switch, the page
 // never mixes tiers.
 export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, tier: fixedTier }) {
   const appCode = branchCodeOf(appBranch); // app passes a branch OBJECT (or 'ALL')
@@ -94,10 +94,10 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
   if (!tierAllowed) {
     return (
       <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
-        <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Reconciliation</h1>
+        <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Certification</h1>
         <EmptyState title="Central closing tier"
           hint="The Branch Accountant works the WEEKLY cycle only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
-          action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Open Weekly Reconciliation</Button>} />
+          action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Open Weekly Certification</Button>} />
       </div>
     );
   }
@@ -107,7 +107,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Reconciliation</h1>
+          <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Certification</h1>
           <p className="text-sm text-ink-muted">One certificate per ledger · {tier.mode === 'digital' ? 'digital sign chain' : 'physical certificate + scan-back'} · branch-wise, never mixed.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -132,7 +132,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
       </div>
 
       {/* this tier's progress card — switching tiers happens from the menu
-          (Reconcile & Certify ▸ Weekly / Monthly / Quarterly / Yearly) */}
+          (Certification ▸ Weekly / Monthly / Quarterly / Yearly) */}
       <div className="grid grid-cols-1 gap-3 tablet:max-w-sm">
         <TierCard tier={tier} counts={summary?.tiers?.[tierKey]} period={summary?.periods?.[tierKey]} />
       </div>

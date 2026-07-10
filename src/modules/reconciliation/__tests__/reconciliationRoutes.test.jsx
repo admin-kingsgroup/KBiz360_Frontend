@@ -35,8 +35,8 @@ describe('reconciliation · route table ↔ tier pairing', () => {
     expect(Object.keys(TIER_PATHS).sort()).toEqual(TIERS.map((t) => t.key).sort());
   });
 
-  test('every menu href under Reconcile & Certify + Reports resolves to a route', () => {
-    const menuHrefs = [...group('Reconcile & Certify').children, ...group('Reports').children]
+  test('every menu href under Certification + Reports resolves to a route', () => {
+    const menuHrefs = [...group('Certification').children, ...group('Reports').children]
       .map((c) => c.href);
     menuHrefs.forEach((h) => expect(routePaths).toContain(h));
   });
@@ -58,8 +58,8 @@ describe('reconciliation · route table ↔ tier pairing', () => {
   // Render one hub and one report through their route Elements END-TO-END —
   // the H1 proves the path delivered its own tier, not a transposed one.
   test.each([
-    ['/reconciliation/monthly', 'Monthly Reconciliation'],
-    ['/reconciliation/quarterly', 'Quarterly Reconciliation'],
+    ['/reconciliation/monthly', 'Monthly Certification'],
+    ['/reconciliation/quarterly', 'Quarterly Certification'],
     ['/reconciliation/reports/yearly', 'Yearly Report'],
     ['/reconciliation/reports/weekly', 'Weekly Report'],
   ])('%s renders "%s"', async (path, h1) => {
@@ -70,7 +70,7 @@ describe('reconciliation · route table ↔ tier pairing', () => {
 
   test('route titles match the menu wording (tierMenuName)', () => {
     TIERS.forEach(({ key }) => {
-      expect(routeByPath(hubPathFor(key)).title).toBe(`${tierMenuName(key)} Reconciliation`);
+      expect(routeByPath(hubPathFor(key)).title).toBe(`${tierMenuName(key)} Certification`);
       expect(routeByPath(reportPathFor(key)).title).toBe(`${tierMenuName(key)} Report`);
     });
   });

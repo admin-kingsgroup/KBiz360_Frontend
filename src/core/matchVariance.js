@@ -14,3 +14,14 @@ export function matchVariance(stmtLine, bookLine) {
 export function matchVarianceGroup(stmtLine, bookLines = []) {
   return Math.round((amt(stmtLine) - bookLines.reduce((t, b) => t + amt(b), 0)) * 100) / 100;
 }
+
+// SIGNED group variance, matching each reconciliation module's backend convention.
+// Statement signed is debit − credit; bookSign is +1 when the book side is debit − credit
+// (debtor / tally) or −1 when credit − debit (creditor / supplier). 0 ⇒ the legs settle the
+// line in BOTH amount AND direction (a real split); non-zero ⇒ short / over / wrong-direction.
+// Unlike the magnitude version, picking opposite-direction legs will NOT read as a tie.
+export function matchVarianceSigned(stmtLine, bookLines = [], bookSign = 1) {
+  const sStmt = (Number(stmtLine?.debit) || 0) - (Number(stmtLine?.credit) || 0);
+  const sBook = bookLines.reduce((t, b) => t + bookSign * ((Number(b.debit) || 0) - (Number(b.credit) || 0)), 0);
+  return Math.round((sStmt - sBook) * 100) / 100;
+}

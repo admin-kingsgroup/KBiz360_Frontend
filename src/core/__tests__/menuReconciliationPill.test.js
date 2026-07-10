@@ -19,7 +19,7 @@ describe('Reconciliation · top-level pill', () => {
   test('pill = per-tier certificate pages + per-tier reports + the moved statement-matching screens', () => {
     expect(MENU_RECONCILIATION.label).toBe('Reconciliation');
     expect(allHrefs(MENU_RECONCILIATION)).toEqual([
-      // Reconcile & Certify — one entry per tier, Rule Book last
+      // Certification — one entry per tier, Rule Book last
       '/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
       '/reconciliation/rulebook',
       // Reports — one report per tier
@@ -71,8 +71,8 @@ describe('Reconciliation · top-level pill', () => {
   });
 
   test('breadcrumbs resolve under the Reconciliation pill', () => {
-    expect(crumbsFor('/reconciliation/weekly').map((c) => c.label)).toEqual(['Reconciliation', 'Reconcile & Certify', 'Weekly Reconciliation']);
+    expect(crumbsFor('/reconciliation/weekly').map((c) => c.label)).toEqual(['Reconciliation', 'Certification', 'Weekly Certification']);
     expect(crumbsFor('/reconciliation/reports/monthly').map((c) => c.label)).toEqual(['Reconciliation', 'Reports', 'Monthly Report']);
-    expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Reconcile & Certify', 'Rule Book & Process']);
+    expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Reconciliation', 'Certification', 'Rule Book & Process']);
   });
 });
