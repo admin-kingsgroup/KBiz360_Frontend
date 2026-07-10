@@ -4,7 +4,7 @@ import { getSetupTasks, getDevFindings } from './api/monitor';
 import {
   TASK_USERS, assigneeLabel, assigneeTone, taskStatusTone, taskStatusLabel,
   devFindingRows, combineTasks, taskRows, userCounts, branchCounts,
-  ledgerScope, partyRows, taskKpis, ledgerRows,
+  partyRows, taskKpis,
 } from './utils/setupTaskList';
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
@@ -25,8 +25,6 @@ import { ALL_ITEMS as DEV_ITEMS } from '../devControl/registry';
 // sits under FM, all development issues (from the dev registry, with their
 // remarks) under Developer, the two activations under Owner. Branchwise details
 // never mix — scope rides the TK Group sub-selector like Setup Readiness.
-
-const LEDGER_REMARK = 'Enter Opening Balance + Dr/Cr from the 19-06-2026 cut-off TB. Leave only if genuinely zero, then certify in Reconciliation.';
 
 function taskColumns(setRoute, withActions) {
   const go = (link) => (setRoute ? setRoute(link) : (window.location.href = link));
@@ -62,31 +60,6 @@ function taskColumns(setRoute, withActions) {
       : null) });
   }
   return cols;
-}
-
-function ledgerColumns(setRoute) {
-  const go = () => (setRoute ? setRoute('/masters/ledgers') : (window.location.href = '/masters/ledgers'));
-  return [
-    { key: 'sr', header: 'SR', align: 'right', render: (r) => (
-      <span className="tabular-nums text-[12px] font-semibold text-ink-subtle">{r.sr}</span>
-    ) },
-    { key: 'code', header: 'Code', render: (r) => (
-      <span className="whitespace-nowrap font-mono text-[11.5px] text-ink">{r.code || '—'}</span>
-    ) },
-    { key: 'name', header: 'Ledger', render: (r) => <span className="font-medium text-ink">{r.name}</span> },
-    { key: 'group', header: 'Group / Sub-group', render: (r) => (
-      <span className="text-[11.5px] text-ink-muted">{r.group}{r.subGroup ? ` · ${r.subGroup}` : ''}</span>
-    ) },
-    { key: 'remark', header: 'Remark', render: () => (
-      <span className="text-[11px] text-ink-muted">{LEDGER_REMARK}</span>
-    ) },
-    { key: 'status', header: 'Status', align: 'center', render: () => (
-      <Badge tone="warning" size="sm">No opening set</Badge>
-    ) },
-    { key: 'go', header: '', align: 'right', render: () => (
-      <button type="button" onClick={go} className="whitespace-nowrap text-[12px] font-semibold text-accent hover:underline">Complete →</button>
-    ) },
-  ];
 }
 
 function partyColumns(setRoute, link) {
@@ -129,11 +102,11 @@ export function SetupTaskList({ setRoute } = {}) {
   const [user, setUser] = useState('ALL');
   useEffect(() => { setBranch(focus || 'ALL'); }, [focus]);
 
-  // Branch in the query key → each branch scope fetches its own per-ledger list;
+  // One payload for every scope (branch/user filtering is client-side);
   // 60s refetch keeps it live and a page refresh always re-reads the DB.
   const q = useQuery({
-    queryKey: ['tk', 'monitor', 'setup-tasks', branch],
-    queryFn: () => getSetupTasks(branch),
+    queryKey: ['tk', 'monitor', 'setup-tasks'],
+    queryFn: () => getSetupTasks(),
     staleTime: 30_000,
     refetchInterval: 60_000,
   });
@@ -148,8 +121,7 @@ export function SetupTaskList({ setRoute } = {}) {
   const { pending, done } = taskRows(tasks, branch, user);
   const kpis = taskKpis(d, tasks, branch, user);
   const uCounts = userCounts(tasks, branch);
-  const bCounts = branchCounts(tasks, d.branches || [], user);
-  const lg = ledgerScope(d, branch);
+  const bCounts = branchCounts(tasks, d.branches || [], user, d);
   const parties = partyRows(d, branch);
   const showParties = user === 'ALL' || user === 'FM';
 
@@ -263,44 +235,6 @@ export function SetupTaskList({ setRoute } = {}) {
         </PageSection>
       )}
 
-      <PageSection title="Ledger configuration — opening balances">
-        <p className="mb-3 text-xs text-ink-muted">
-          Editable ledgers still missing an opening balance. Locked <span className="font-mono">~*</span> wired/system
-          heads are posting-driven and correctly excluded. A row clears the moment its opening is saved on the
-          Ledgers master. Scope follows the Branch bar.
-        </p>
-        {lg.mode === 'central' && (
-          <p className="text-xs text-ink-subtle">Opening balances are branch-scoped — pick a branch on the bar above.</p>
-        )}
-        {lg.mode === 'all' && (
-          <ResponsiveGrid min="150px" gap="md" data-testid="tk-tasks-ledgercards">
-            {lg.byBranch.map((b) => (
-              <button key={b.branch} type="button" onClick={() => setBranch(b.branch)}
-                className="rounded-lg border border-surface-border bg-surface p-3 text-left hover:border-accent">
-                <div className="flex items-baseline justify-between gap-2">
-                  <b className="text-[12.5px] text-ink">{b.branch}</b>
-                  <span className="tabular-nums text-[11px] text-ink-subtle">{b.entered}/{b.total} set</span>
-                </div>
-                <div className="mt-1 text-[20px] font-bold tabular-nums text-ink">{b.pending}</div>
-                <div className="text-[10.5px] text-ink-subtle">awaiting opening — click to drill in</div>
-              </button>
-            ))}
-          </ResponsiveGrid>
-        )}
-        {lg.mode === 'branch' && (
-          <DataTable
-            title={`Ledgers awaiting opening balance · ${branch} (${lg.pending})${(d.ledgers || {}).capped ? ' — first page' : ''}`}
-            columns={ledgerColumns(setRoute)}
-            rows={ledgerRows(d)}
-            getRowKey={(r) => `${r.code || r.name}`}
-            loading={q.isLoading}
-            emptyMessage={`Every editable ${branch} ledger has its opening balance. 🎉`}
-            searchable
-            showDensityToggle={false}
-            zebra
-          />
-        )}
-      </PageSection>
     </div>
   );
 }

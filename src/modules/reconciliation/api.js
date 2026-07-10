@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '../../core/api';
+import { apiGet, apiPost, apiDelete } from '../../core/api';
 
 // ─── Reconciliation module · API ─────────────────────────────────────────────
 // Thin wrappers over /api/reconciliation. Reads fail soft (lists → [] / null)
@@ -61,6 +61,25 @@ export function scrutinizeStatement(id, { attachmentId, fileName, rows, statemen
 }
 export function scrutinyEntryAction(id, entryId, { action, classification }) {
   return apiPost(`/api/reconciliation/${id}/scrutiny/entries/${entryId}`, { action, classification });
+}
+// Bulk: one write for select-all classify/confirm.
+export function scrutinyBulkAction(id, { entryIds, action, classification }) {
+  return apiPost(`/api/reconciliation/${id}/scrutiny/bulk`, { entryIds, action, classification });
+}
+// Re-match the stored statement rows against the CURRENT books (after posting
+// a missing charge) — no re-upload needed.
+export function rerunScrutiny(id) {
+  return apiPost(`/api/reconciliation/${id}/scrutiny/rerun`);
+}
+// Weekly cycle-ledger config: wallets / gateway ledgers joining the weekly cycle.
+export async function getCycleLedgers({ branch } = {}) {
+  return (await apiGet('/api/reconciliation/cycle-ledgers', { branch }))?.items || [];
+}
+export function addCycleLedger({ branch, code }) {
+  return apiPost('/api/reconciliation/cycle-ledgers', { branch, code });
+}
+export function removeCycleLedger({ branch, code }) {
+  return apiDelete(`/api/reconciliation/cycle-ledgers/${encodeURIComponent(code)}?branch=${encodeURIComponent(branch)}`);
 }
 export function addException(id, text) {
   return apiPost(`/api/reconciliation/${id}/exceptions`, { text });

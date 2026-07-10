@@ -97,8 +97,10 @@ export function userCounts(tasks, branch = 'ALL') {
   return counts;
 }
 
-/** Per-branch pending counts within the current user scope — the branch pills. */
-export function branchCounts(tasks, branches = [], user = 'ALL') {
+/** Per-branch pending counts within the current user scope — the branch pills.
+ *  Counts open tasks AND incomplete master details, so a branch pill shows its
+ *  full workload (opening balances are NOT tracked — full history was imported). */
+export function branchCounts(tasks, branches = [], user = 'ALL', d = null) {
   const counts = { ALL: 0, Central: 0 };
   branches.forEach((b) => { counts[b] = 0; });
   (tasks || []).forEach((t) => {
@@ -106,18 +108,18 @@ export function branchCounts(tasks, branches = [], user = 'ALL') {
     counts.ALL += 1;
     if (counts[t.branch] != null) counts[t.branch] += 1;
   });
-  return counts;
-}
-
-/** Ledger opening meter scoped to the branch selection. */
-export function ledgerScope(d, branch = 'ALL') {
-  const byBranch = ((d && d.ledgers) || {}).byBranch || [];
-  if (branch === 'Central') return { mode: 'central', pending: 0, byBranch };
-  if (!branch || branch === 'ALL') {
-    return { mode: 'all', pending: byBranch.reduce((s, b) => s + (b.pending || 0), 0), byBranch };
+  if (d && (user === 'ALL' || user === 'FM')) {
+    const p = d.parties || {};
+    ['customers', 'suppliers', 'employees'].forEach((m) => {
+      (((p[m] || {}).items) || []).forEach((i) => {
+        counts.ALL += 1;
+        const b = String(i.branch || '').trim();
+        const key = b === '' || b === 'ALL' ? 'Central' : b;
+        if (counts[key] != null) counts[key] += 1;
+      });
+    });
   }
-  const row = byBranch.find((b) => b.branch === branch) || { branch, pending: 0, total: 0, entered: 0 };
-  return { mode: 'branch', pending: row.pending || 0, row, byBranch };
+  return counts;
 }
 
 /** Party-master incomplete records, branch-scoped so details never mix: a record
@@ -142,7 +144,6 @@ export function partyRows(d, branch = 'ALL') {
  *  reads that branch's completion, not the group's. */
 export function taskKpis(d, tasks, branch = 'ALL', user = 'ALL') {
   const { pending, done } = taskRows(tasks, branch, user);
-  const lg = ledgerScope(d, branch);
   const parties = partyRows(d, branch);
   const details = parties.customers.items.length + parties.suppliers.items.length + parties.employees.items.length;
   const total = pending.length + done.length;
@@ -150,13 +151,7 @@ export function taskKpis(d, tasks, branch = 'ALL', user = 'ALL') {
   return [
     { key: 'pending', label: 'Tasks to configure', value: String(pending.length) },
     { key: 'done', label: 'Configured (auto-verified)', value: String(done.length) },
-    { key: 'ledgers', label: 'Ledgers awaiting opening', value: String(lg.pending) },
     { key: 'details', label: 'Master details to fill', value: String(details) },
     { key: 'progress', label: 'Progress', value: `${pct}%` },
   ];
-}
-
-/** The pending-ledger rows for the drill-in table (branch scope only). */
-export function ledgerRows(d) {
-  return (((d && d.ledgers) || {}).items || []).map((l, i) => ({ ...l, sr: i + 1 }));
 }

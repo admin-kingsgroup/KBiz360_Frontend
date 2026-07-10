@@ -128,6 +128,33 @@ export function fmtAmt(n, branch) {
 /** Count of unresolved exceptions on a certificate. */
 export const openExceptions = (cert) => (cert?.exceptions || []).filter((e) => !e.resolved).length;
 
+// Classification vocabularies by scrutiny perspective: bank statements use the
+// BRS language; supplier/client SOAs ('party') use the trade language. The
+// backend enforces the same split.
+export const BANK_CLASSIFY = [
+  { value: 'unpresented', label: 'Unpresented cheque' },
+  { value: 'in-transit', label: 'Deposit in transit' },
+  { value: 'to-post', label: 'Charge/credit to post' },
+  { value: 'other', label: 'Other reconciling item' },
+];
+export const PARTY_CLASSIFY = [
+  { value: 'invoice-not-received', label: 'Invoice not received' },
+  { value: 'payment-in-transit', label: 'Payment in transit' },
+  { value: 'tds-deduction', label: 'TDS deduction' },
+  { value: 'credit-note-pending', label: 'Credit note / ADM pending' },
+  { value: 'disputed', label: 'Disputed' },
+  { value: 'rate-difference', label: 'Rate difference' },
+  { value: 'other', label: 'Other reconciling item' },
+];
+export const classifyOptionsFor = (perspective) => (perspective === 'party' ? PARTY_CLASSIFY : BANK_CLASSIFY);
+export const classificationLabel = (value) => [...BANK_CLASSIFY, ...PARTY_CLASSIFY].find((c) => c.value === value)?.label || value;
+
+/** Friendly chip text for special match types. */
+export const MATCH_TYPE_LABELS = {
+  ref: 'ref match', 'ref:amount-differs': 'rate difference', learned: 'learned',
+  'explained-deduction': 'TDS-explained', 'carry-cleared': 'carried · cleared',
+};
+
 /** Period choices for a tier's register: the CURRENT period plus every pending
  *  backlog period of that tier (Apr/May/Jun 2026 closings, FY2025-26 / CY2025
  *  year-end…), deduped, backlog first (oldest obligation on top). */

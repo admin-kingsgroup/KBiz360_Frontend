@@ -4,6 +4,7 @@ import {
   BRANCHES, TIERS, tierOf, statusMeta, sourceMeta, tierProgress, chainProgress,
   fmtAmt, currencyOf, openExceptions, GOLDEN_RULES, ROLE_MATRIX,
   pendingStateMeta, fmtDue, periodOptions, visibleTiers, branchCodeOf,
+  classifyOptionsFor, classificationLabel, MATCH_TYPE_LABELS, BANK_CLASSIFY, PARTY_CLASSIFY,
 } from '../utils';
 
 describe('reconciliation · tiers', () => {
@@ -104,6 +105,23 @@ describe('reconciliation · pending board display', () => {
     expect(fmtDue({ tier: 'weekly', dueOn: '2026-07-17', upcoming: true })).toBe('Fri, 17 Jul 2026 (upcoming)');
     expect(fmtDue({ tier: 'month' })).toBe('—');
     expect(fmtDue({ tier: 'weekly' })).toBe('Friday');
+  });
+});
+
+describe('reconciliation · scrutiny classification vocabularies', () => {
+  test('bank vs party (SOA) lists — the perspective switches the vocabulary', () => {
+    expect(classifyOptionsFor('bank')).toBe(BANK_CLASSIFY);
+    expect(classifyOptionsFor('party')).toBe(PARTY_CLASSIFY);
+    expect(classifyOptionsFor(undefined)).toBe(BANK_CLASSIFY);
+    expect(BANK_CLASSIFY.map((c) => c.value)).toEqual(['unpresented', 'in-transit', 'to-post', 'other']);
+    expect(PARTY_CLASSIFY.map((c) => c.value)).toEqual(['invoice-not-received', 'payment-in-transit', 'tds-deduction', 'credit-note-pending', 'disputed', 'rate-difference', 'other']);
+  });
+  test('labels resolve across both vocabularies; match-type chips named', () => {
+    expect(classificationLabel('unpresented')).toBe('Unpresented cheque');
+    expect(classificationLabel('credit-note-pending')).toBe('Credit note / ADM pending');
+    expect(MATCH_TYPE_LABELS['ref:amount-differs']).toBe('rate difference');
+    expect(MATCH_TYPE_LABELS['carry-cleared']).toBe('carried · cleared');
+    expect(MATCH_TYPE_LABELS.learned).toBe('learned');
   });
 });
 

@@ -1,7 +1,7 @@
 import {
   TASK_USERS, assigneeLabel, assigneeTone, taskStatusTone, taskStatusLabel,
   devFindingRows, combineTasks, inBranchScope, taskRows, userCounts, branchCounts,
-  ledgerScope, partyRows, taskKpis, ledgerRows,
+  partyRows, taskKpis,
 } from '../utils/setupTaskList';
 import { ALL_ITEMS, isCleared } from '../../devControl/registry';
 
@@ -20,15 +20,6 @@ const D = {
     { id: 'rule-CUS-01', branch: 'Central', assignee: 'Owner', status: 'pending', link: '/tk/rules' },
     { id: 'core-rules', branch: 'Central', assignee: 'Owner', status: 'done', link: '/tk/rules' },
   ],
-  ledgers: {
-    byBranch: [
-      { branch: 'BOM', pending: 34, total: 34, entered: 0 },
-      { branch: 'BOMMB', pending: 30, total: 34, entered: 4 },
-    ],
-    branch: 'BOM',
-    items: [{ code: 'L1156', name: 'Round Off', group: 'Variable Expenses', subGroup: 'Office Expenses' }],
-    capped: false,
-  },
   parties: {
     customers: { total: 5, incomplete: 2, capped: false, items: [
       { name: 'NeuIQ Technologies', branch: 'BOM', missing: ['Credit limit', 'GST treatment'] },
@@ -121,6 +112,11 @@ describe('TK task list · branchwise scoping never mixes (pure)', () => {
     expect(userCounts(tasks, 'BOM')).toMatchObject({ ALL: 1, FM: 1, Developer: 0 });
     expect(branchCounts(tasks, BRANCHES, 'ALL')).toMatchObject({ ALL: 5, Central: 3, BOM: 1, AMD: 1, NBO: 0 });
     expect(branchCounts(tasks, BRANCHES, 'Owner')).toMatchObject({ ALL: 1, Central: 1, BOM: 0 });
+    // With the payload, pills also count incomplete master details (FM scope only)
+    const withDetails = branchCounts(tasks, BRANCHES, 'ALL', D);
+    expect(withDetails.BOM).toBe(1 + 2);      // 1 task + BOM customer + BOM employee
+    expect(withDetails.Central).toBe(3 + 1);  // 3 central tasks + branch-'ALL' supplier
+    expect(branchCounts(tasks, BRANCHES, 'Owner', D).BOM).toBe(0); // details are FM work, not Owner's
   });
 
   test('partyRows: branch scope keeps details separate — BOM never shows AMD customers or NBO staff', () => {
@@ -138,41 +134,25 @@ describe('TK task list · branchwise scoping never mixes (pure)', () => {
 });
 
 describe('TK task list · ledgers + KPIs (pure)', () => {
-  test('ledgerScope: ALL sums branches, a branch reads its meter, Central has none', () => {
-    expect(ledgerScope(D, 'ALL')).toMatchObject({ mode: 'all', pending: 64 });
-    expect(ledgerScope(D, 'BOM')).toMatchObject({ mode: 'branch', pending: 34 });
-    expect(ledgerScope(D, 'BOMMB').row).toMatchObject({ entered: 4 });
-    expect(ledgerScope(D, 'Central')).toMatchObject({ mode: 'central', pending: 0 });
-    expect(ledgerScope(D, 'NBO')).toMatchObject({ mode: 'branch', pending: 0 }); // absent branch → zero, honest
-  });
-
   test('taskKpis: five scoped tiles — a branch tile never shows the group total', () => {
     const tasks = D.tasks;
     const all = taskKpis(D, tasks, 'ALL', 'ALL');
-    expect(all.map((k) => k.key)).toEqual(['pending', 'done', 'ledgers', 'details', 'progress']);
+    expect(all.map((k) => k.key)).toEqual(['pending', 'done', 'details', 'progress']);
     expect(all[0].value).toBe('4');
-    expect(all[2].value).toBe('64');
-    expect(all[3].value).toBe('5'); // 2 customers + 1 supplier + 2 employees
-    expect(all[4].value).toBe('33%'); // 2 of 6
+    expect(all[2].value).toBe('5'); // 2 customers + 1 supplier + 2 employees
+    expect(all[3].value).toBe('33%'); // 2 of 6
     const bom = taskKpis(D, tasks, 'BOM', 'ALL');
     expect(bom[0].value).toBe('1');
-    expect(bom[2].value).toBe('34');
-    expect(bom[3].value).toBe('2'); // BOM's incomplete customer + employee
-  });
-
-  test('ledgerRows serial-numbers the drill-in items', () => {
-    expect(ledgerRows(D)).toEqual([{ code: 'L1156', name: 'Round Off', group: 'Variable Expenses', subGroup: 'Office Expenses', sr: 1 }]);
+    expect(bom[2].value).toBe('2'); // BOM's incomplete customer + employee
   });
 
   test('fail-soft on empty payload — never a false all-configured', () => {
     expect(taskRows(undefined).pending).toEqual([]);
     expect(userCounts([])).toMatchObject({ ALL: 0 });
     expect(branchCounts(undefined, BRANCHES)).toMatchObject({ ALL: 0, Central: 0 });
-    expect(ledgerScope({}, 'ALL')).toMatchObject({ pending: 0 });
     expect(partyRows({}, 'ALL').customers.items).toEqual([]);
     expect(partyRows({}, 'ALL').employees.items).toEqual([]);
-    expect(taskKpis({}, [], 'ALL', 'ALL')[4].value).toBe('0%');
-    expect(ledgerRows({})).toEqual([]);
+    expect(taskKpis({}, [], 'ALL', 'ALL')[3].value).toBe('0%');
     expect(devFindingRows(undefined, undefined)).toEqual([]);
   });
 });

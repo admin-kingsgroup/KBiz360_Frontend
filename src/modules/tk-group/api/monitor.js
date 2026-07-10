@@ -29,10 +29,9 @@ export async function getSetupReadiness() {
   return (await apiGet('/api/tk/monitor/readiness')) || {};
 }
 // Roll-up getter (does NOT swallow): the Task List must show a real error state,
-// never a false "all configured". branch scopes the per-ledger list server-side.
-export async function getSetupTasks(branch) {
-  const scoped = branch && branch !== 'ALL' && branch !== 'Central' ? { branch } : {};
-  return (await apiGet('/api/tk/monitor/setup-tasks', scoped)) || {};
+// never a false "all configured". One payload; branch/user scoping is client-side.
+export async function getSetupTasks() {
+  return (await apiGet('/api/tk/monitor/setup-tasks')) || {};
 }
 export async function getIntegrity() {
   return (await apiGet('/api/tk/monitor/integrity')) || {};

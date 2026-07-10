@@ -73,7 +73,7 @@ function SnapshotForm({ cert, books, onFreeze, busy, error }) {
   );
 }
 
-export function CertificateDrawer({ id, branch, onClose }) {
+export function CertificateDrawer({ id, branch, onClose, setRoute }) {
   const qc = useQueryClient();
   const [attLabel, setAttLabel] = useState('');
   const [attSource, setAttSource] = useState('download');
@@ -110,6 +110,8 @@ export function CertificateDrawer({ id, branch, onClose }) {
         statementClosing: parsed.statementClosing,
       });
       setParseNote(`Scrutinized ${parsed.rows.length} statement lines against the ledger.`);
+      // Format hint: remember which file type parsed cleanly for this ledger.
+      try { localStorage.setItem(`recon-fmt-${branch}-${(file.name.match(/\.\w+$/) || [''])[0]}`, '1'); } catch { /* optional */ }
     } else if (file && /\.pdf$/i.test(file.name)) {
       setParseNote('PDF stored as evidence — upload the HTML/TXT/Excel version for line-by-line scrutiny.');
     } else if (parsed?.error) {
@@ -316,7 +318,7 @@ export function CertificateDrawer({ id, branch, onClose }) {
 
         </div>
       )}
-      {showScrutiny && cert?.scrutiny && <ScrutinyView cert={cert} onClose={() => setShowScrutiny(false)} />}
+      {showScrutiny && cert?.scrutiny && <ScrutinyView cert={cert} setRoute={setRoute} onClose={() => setShowScrutiny(false)} />}
     </Drawer>
   );
 }

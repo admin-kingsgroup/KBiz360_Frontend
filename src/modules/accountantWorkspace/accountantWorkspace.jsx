@@ -37,7 +37,7 @@ import {
   useClientUnmatch, useSetClientReconStatus, useClearClientStatement, useDeleteClientStatementLine,
 } from '../../core/useClientReco';
 import { parseClientStatement } from '../../core/clientStatementParse';
-import { useInterBranchReco } from '../../core/useInterBranchReco';
+import { useInterBranchReco, useInterBranchLinks } from '../../core/useInterBranchReco';
 import {
   useTallyBook, useTallyRows, useTallyRecoSummary, useImportTally, useTallyAutoMatch,
   useTallyManualMatch, useTallyUnmatch, useSetTallyRecoStatus, useClearTally, useDeleteTallyLine,
@@ -2497,6 +2497,8 @@ export function InterBranchReco({ branch }) {
           ))}
         </tbody>
       </Table>
+      {/* Line level — the exact deal behind a pair mismatch, by INB Link No. */}
+      <InterBranchLinkLevel branch={branch} cur={cur} />
       <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
         Each pair compares branch A's "Travkings Tours and Travels B" ledger against branch B's "Travkings Tours and Travels A" ledger (sub-group <b>Inter Branch</b>). The selling branch books a debtor and the buying branch a creditor, so the two should be equal and opposite (net zero). A non-zero difference means one branch booked the deal and the other hasn't, or the amounts disagree — an agreement check, not an elimination.
       </div>
@@ -2508,6 +2510,45 @@ export function InterBranchReco({ branch }) {
 // Reconcile ANY ERP ledger against an imported Tally ledger export — the in-app
 // version of the per-bank Tally↔ERP recon scripts. Pick a ledger, paste its Tally
 // export, then auto/manual match against the live ERP postings.
+
+// Line-level inter-branch: every INB deal by Link No from the registry — an
+// OPEN link names the exact voucher one side hasn't booked yet, which is the
+// line-level answer behind a non-zero pair difference above.
+function InterBranchLinkLevel({ branch, cur }) {
+  const code = branch && branch !== 'ALL' ? (branch.code || branch) : '';
+  const q = useInterBranchLinks({ branch: code || undefined });
+  const data = q.data || { links: [], totals: {} };
+  const open = (data.unbooked || []).slice(0, 50);
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 6 }}>
+        Line level — by INB Link No
+        <span style={{ marginLeft: 10, fontSize: 11.5, fontWeight: 700, color: (data.totals?.open || 0) ? C.red : C.green }}>
+          {data.totals?.open || 0} open · {data.totals?.booked || 0} booked{(data.totals?.open || 0) ? ` · ${money(cur, data.totals?.openAmount)} unbooked` : ''}
+        </span>
+      </div>
+      <Table>
+        <thead><tr>{['Link No', 'Date', 'From → To', 'Module', 'Total', 'Status'].map((h, i) => <th key={h} style={{ ...th, ...(i === 4 ? rnum : {}) }}>{h}</th>)}</tr></thead>
+        <tbody>
+          {q.isLoading && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>Loading…</td></tr>}
+          {!q.isLoading && open.length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.green, padding: 16 }}>✓ Every INB link is booked on both sides.</td></tr>}
+          {open.map((l) => (
+            <tr key={l.linkNo} style={{ background: '#fdf6f4' }}>
+              <td style={{ ...td, fontWeight: 700 }}>{l.linkNo}</td>
+              <td style={td}>{l.date}</td>
+              <td style={td}>{l.fromBranch} → {l.toBranch}</td>
+              <td style={td}>{l.module || '—'}</td>
+              <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(cur, l.total)}</td>
+              <td style={td}><span style={wbBadge('differences')}>open — one side unbooked</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 6 }}>An <b>open</b> link = the selling branch pushed the deal but the buying branch hasn't booked its purchase leg (or vice-versa) — book the missing leg and the pair above nets to zero. Showing up to 50.</div>
+    </div>
+  );
+}
+
 export function TallyReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const tb = useTrialBalance(branch).data || {};

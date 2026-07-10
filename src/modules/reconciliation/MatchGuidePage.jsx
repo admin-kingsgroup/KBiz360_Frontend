@@ -125,10 +125,33 @@ export function MatchGuidePage({ setRoute }) {
       {/* 5 · engine */}
       <PageSection title="5 · How the engine pairs lines (so its choices make sense)">
         <div className="rounded-brand border border-surface-border bg-surface-alt/50 p-4 text-sm leading-relaxed text-ink-muted">
-          <p><b className="text-ink">Matched</b> = same signed amount + dates within <b>±3 days</b> (or the cheque/UTR/name tokens agree).</p>
-          <p className="mt-1"><b className="text-ink">Probable</b> = same amount, dates within <b>±10 days</b> — or one statement line equals the SUM of up to 4 book entries (a bulk NEFT covering several receipts → shown as <b>1:N</b>).</p>
-          <p className="mt-1">Everything else lands in Statement-only / Book-only for you to explain.</p>
-          <p className="mt-2 text-xs text-ink-subtle">Dates read Indian formats (14/07/2026, 14-Jul-26); amounts understand Dr/Cr columns, signed columns, ₹ symbols and parentheses-negatives.</p>
+          <p><b className="text-ink">Document reference first</b> — an invoice/ticket/PNR/cheque number shared by both sides pairs the lines regardless of date. Same reference but a different amount = a <b>rate difference on a known document</b> (shown with the Δ).</p>
+          <p className="mt-1"><b className="text-ink">Matched</b> = same signed amount + dates within <b>±3 days</b> (or the cheque/UTR/name tokens agree). <b className="text-ink">Learned</b> matches pair instantly from patterns you confirmed before.</p>
+          <p className="mt-1"><b className="text-ink">Probable</b> = same amount, dates within <b>±10 days</b> — or one statement line equals the SUM of up to 4 book entries (bulk NEFT → <b>1:N</b>; if the group includes a TDS entry it's tagged <b>TDS-explained</b>, not an anomaly).</p>
+          <p className="mt-1">Everything else lands in Statement-only / Book-only — each with a <b>suggested</b> classification you can apply in one tap.</p>
+          <p className="mt-2 text-xs text-ink-subtle">Dates read Indian formats (14/07/2026, 14-Jul-26); amounts understand Dr/Cr columns, signed columns, ₹ symbols and parentheses-negatives. Supplier/client SOA scrutinies automatically switch to the trade vocabulary (invoice not received · TDS deduction · credit note pending · disputed…).</p>
+        </div>
+      </PageSection>
+
+      {/* 5b · the four superpowers */}
+      <PageSection title="5b · Four things that do the work for you">
+        <div className="grid gap-3 tablet:grid-cols-2">
+          <div className="rounded-brand border border-surface-border bg-surface p-4">
+            <div className="text-sm font-bold text-ink">Carry-forward — explain an item once, ever</div>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted">A classified item (unpresented cheque, deposit in transit…) automatically appears in next period's scrutiny and <b>clears itself</b> the moment it finally hits a statement. You never re-explain it.</p>
+          </div>
+          <div className="rounded-brand border border-surface-border bg-surface p-4">
+            <div className="text-sm font-bold text-ink">The matcher learns from you</div>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted">Every Probable you Confirm teaches a narration↔party pattern for that ledger. The same pairing lands as <b>Matched (learned)</b> automatically from then on — confirmations shrink every week.</p>
+          </div>
+          <div className="rounded-brand border border-surface-border bg-surface p-4">
+            <div className="text-sm font-bold text-ink">Re-run match</div>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted">Posted the missing bank charge? Press <b>Re-run match</b> on the scrutiny — it re-matches the stored statement against the current books. No re-upload.</p>
+          </div>
+          <div className="rounded-brand border border-surface-border bg-surface p-4">
+            <div className="text-sm font-bold text-ink">Bulk classify</div>
+            <p className="mt-1 text-sm leading-relaxed text-ink-muted">Tick the checkboxes (or select-all), pick a classification once, <b>Apply</b> — one action for a whole pile of unpresented cheques. "Confirm probables" works the same way.</p>
+          </div>
         </div>
       </PageSection>
 
@@ -147,6 +170,29 @@ export function MatchGuidePage({ setRoute }) {
               ))}
             </tbody>
           </table>
+        </div>
+      </PageSection>
+
+      <PageSection title="6b · Cards, wallets, gateways, payroll — where they fit">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px] border-collapse">
+            <thead><tr><th className={headCls}>Channel</th><th className={headCls}>How it reconciles</th></tr></thead>
+            <tbody>
+              <tr><td className={`${cellCls} font-bold whitespace-nowrap`}>Credit cards</td><td className={cellCls}>Card ledgers sit under Bank OD, so they are ALREADY on the weekly cycle — attach the card statement (Excel) to the card certificate and the scrutiny matches it like a bank. Card spends appear as statement debits ↔ our credits, automatically.</td></tr>
+              <tr><td className={`${cellCls} font-bold whitespace-nowrap`}>Supplier wallets</td><td className={cellCls}>TripJack wallet / BSP deposit top-ups &amp; usage: add the wallet ledger via <b>Hub ▸ Cycle ledgers</b> (FM/central only) and it joins weekly generation — then attach the wallet statement export like any other.</td></tr>
+              <tr><td className={`${cellCls} font-bold whitespace-nowrap`}>Payment gateways</td><td className={cellCls}>Settlement batches are one bank credit covering many receipts — the matcher pairs them as 1:N groups (up to 6 parts). Add a dedicated gateway ledger to the cycle if you keep one.</td></tr>
+              <tr><td className={`${cellCls} font-bold whitespace-nowrap`}>Payroll bulk debit</td><td className={cellCls}>Small salary batches match 1:N on the bank scrutiny; large runs: classify the bulk debit and tie it to the payroll run total.</td></tr>
+              <tr><td className={`${cellCls} font-bold whitespace-nowrap`}>Inter-branch (line level)</td><td className={cellCls}>The Inter-Branch Reconciliation screen now lists every OPEN INB Link No — the exact deal one side hasn't booked — under the pair table. Book the missing leg and the pair nets to zero.</td></tr>
+              <tr><td className={`${cellCls} font-bold whitespace-nowrap`}>GSTR-2B / 26AS</td><td className={cellCls}>Tax matching lives under the Taxation pill (2B invoice matching is live there); 26AS line-level lands when the TRACES file lands.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </PageSection>
+
+      <PageSection title="7 · Which file format? (the one-liner)">
+        <div className="rounded-brand border border-success/30 bg-success-soft/30 p-4 text-sm font-semibold text-ink">
+          “Download CSV if the portal offers it, otherwise Excel — and ALWAYS attach the PDF alongside as evidence.”
+          <p className="mt-1 text-xs font-normal text-ink-muted">CSV parses deterministically every time · Excel is the practical default (banks decorate XLS, the parser skips the noise) · HTML/TXT are fine · PDF is a picture of a table — evidence only, never the matching source. And remember: clients who DO send their SOA can be matched too — the Client Reconciliation screen imports and matches client statement lines (reverse match).</p>
         </div>
       </PageSection>
 

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock } from 'lucide-react';
+import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2 } from 'lucide-react';
 import { getTree, getSummary, getPending, generateCertificates } from './api';
 import { BRANCHES, branchCodeOf, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { CertificateDrawer } from './CertificateDrawer';
+import { CycleLedgerDrawer } from './CycleLedgerDrawer';
 
 // ─── Reconciliation Hub — the module's home ─────────────────────────────────
 // Branch-wise (Rule 06: one branch at a time, never mixed), four tier tabs,
@@ -35,6 +36,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
   const [branch, setBranch] = useState(appCode || 'BOM');
   const [tierKey, setTierKey] = useState('weekly');
   const [openId, setOpenId] = useState(null);
+  const [showCycleCfg, setShowCycleCfg] = useState(false);
   // Per-(branch,tier) period override — '' means "the current period". Lets the
   // team work the BACKLOG (Apr/May/Jun 2026 month-ends, FY2025-26 / CY2025
   // year-end) from the same register, not just the running period.
@@ -85,6 +87,9 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" icon={CalendarClock} onClick={() => setRoute && setRoute('/reconciliation/reports')}>Reports &amp; Pending</Button>
+          {tiers.length > 1 && tierKey === 'weekly' && (
+            <Button variant="ghost" icon={Settings2} onClick={() => setShowCycleCfg(true)}>Cycle ledgers</Button>
+          )}
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/reconciliation/rulebook')}>Rule Book</Button>
           <Button variant="secondary" icon={RefreshCcw} loading={gen.isPending} onClick={() => gen.mutate()}>
             Generate {tier.short} certificates
@@ -177,7 +182,8 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser }) 
         </div>
       </PageSection>
 
-      {openId && <CertificateDrawer id={openId} branch={branch} onClose={() => setOpenId(null)} />}
+      {openId && <CertificateDrawer id={openId} branch={branch} setRoute={setRoute} onClose={() => setOpenId(null)} />}
+      {showCycleCfg && <CycleLedgerDrawer branch={branch} onClose={() => setShowCycleCfg(false)} />}
     </div>
   );
 }

@@ -11,24 +11,11 @@ const PAYLOAD = {
   assignees: ['FM', 'Developer', 'Owner'],
   tasks: [
     { id: 'credit-facilities', branch: 'Central', assignee: 'FM', label: 'Credit Facilities & Limits', section: 'Finance config', link: '/masters/credit-facilities', check: 'creditfacilities = 0', remark: 'Enter every credit line.', status: 'pending' },
-    { id: 'opening-balances-BOM', branch: 'BOM', assignee: 'FM', label: 'Opening Balances — BOM', section: 'Chart & Codes', link: '/masters/ledgers', check: '0 / 34 ledgers set', remark: 'Enter from cut-off TB.', status: 'pending' },
+    { id: 'suppliers-drill-BOM', branch: 'BOM', assignee: 'FM', label: 'BOM-scoped example task', section: 'Chart & Codes', link: '/masters/ledgers', check: 'example = 0', remark: 'Branch-scoped row.', status: 'pending' },
     { id: 'voucher-types', branch: 'Central', assignee: 'FM', label: 'Voucher Types', section: 'Numbering & Docs', link: '/masters/voucher-types', check: 'vouchertypes = 8', remark: 'Seeded.', status: 'done' },
     { id: 'policy-guard', branch: 'Central', assignee: 'Owner', label: 'Policy-guard go-live', section: 'Governance', link: '/tk/controls', check: "tkflags['core.policy_guard'] = off", remark: 'Dual-approve.', status: 'pending' },
   ],
   summary: { pending: 3, done: 1, total: 4, byAssignee: {} },
-  ledgers: {
-    byBranch: [
-      { branch: 'BOM', pending: 34, total: 34, entered: 0 },
-      { branch: 'BOMMB', pending: 34, total: 34, entered: 0 },
-      { branch: 'AMD', pending: 34, total: 34, entered: 0 },
-      { branch: 'NBO', pending: 34, total: 34, entered: 0 },
-      { branch: 'DAR', pending: 34, total: 34, entered: 0 },
-      { branch: 'FBM', pending: 34, total: 34, entered: 0 },
-    ],
-    branch: null,
-    items: [],
-    capped: false,
-  },
   parties: {
     customers: { total: 2, incomplete: 1, capped: false, items: [
       { name: 'NeuIQ Technologies Private Limited', branch: 'BOM', missing: ['Credit limit', 'GST treatment'] },
@@ -40,13 +27,6 @@ const PAYLOAD = {
       { name: 'Half Entered', branch: 'BOM', missing: ['Designation', 'Basic salary'] },
     ] },
   },
-};
-
-const BOM_PAYLOAD = {
-  ...PAYLOAD,
-  ledgers: { ...PAYLOAD.ledgers, branch: 'BOM', items: [
-    { code: 'L1156', name: 'Round Off', group: 'Variable Expenses', subGroup: 'Office Expenses' },
-  ] },
 };
 
 const mockGetSetupTasks = jest.fn();
@@ -67,7 +47,8 @@ function renderWith(ui, setRoute) {
 describe('SetupTaskList render (wiring smoke)', () => {
   const openDev = ALL_ITEMS.filter((i) => !isCleared(i, undefined)).length;
   beforeEach(() => {
-    mockGetSetupTasks.mockImplementation(async (branch) => (branch === 'BOM' ? BOM_PAYLOAD : PAYLOAD));
+    mockGetSetupTasks.mockClear();
+    mockGetSetupTasks.mockResolvedValue(PAYLOAD);
   });
 
   test('renders KPI tiles, branch + user bars, and both task tables from the payload', async () => {
@@ -91,21 +72,18 @@ describe('SetupTaskList render (wiring smoke)', () => {
     // Staff completeness drill renders too
     expect(screen.getByText('Employees with missing details (1)')).toBeInTheDocument();
     expect(screen.getByText('Designation · Basic salary')).toBeInTheDocument();
-    // Ledger cards mode at ALL scope — six per-branch cards
-    expect(screen.getByTestId('tk-tasks-ledgercards')).toBeInTheDocument();
   });
 
-  test('branch drill-in: BOM pill refetches with branch and lists its pending ledgers only', async () => {
+  test('branch scoping is client-side: BOM pill filters tasks without mixing Central rows', async () => {
     renderWith();
     await screen.findByText('Credit Facilities & Limits');
     fireEvent.click(screen.getByTestId('tk-tasks-branch-BOM'));
-    // Ledger drill table replaces the cards, fed by the branch-scoped fetch
-    expect(await screen.findByText(/Ledgers awaiting opening balance · BOM/)).toBeInTheDocument();
-    expect(await screen.findByText('Round Off')).toBeInTheDocument();
-    expect(mockGetSetupTasks).toHaveBeenCalledWith('BOM');
+    expect(await screen.findByText('BOM-scoped example task')).toBeInTheDocument();
     // Branchwise never mixes: Central-only config is not in the pending table
     expect(screen.queryByText('Credit Facilities & Limits')).not.toBeInTheDocument();
-    expect(screen.getByText('Opening Balances — BOM')).toBeInTheDocument();
+    // No opening-balance surface anywhere — full history imported, nothing to key in
+    expect(screen.queryByText(/opening balance/i)).not.toBeInTheDocument();
+    expect(mockGetSetupTasks).toHaveBeenCalledTimes(1); // one payload, no per-branch refetch
   });
 
   test('user scoping + Complete → deep-links through setRoute', async () => {
