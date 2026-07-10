@@ -251,8 +251,19 @@ export function BankReco({branch}){
 
   /* ── Manual match: pair one selected book line with one statement line ── */
   const variancePreview=(selBook&&selStmt)?Math.round(((selStmt.credit-selStmt.debit)-(selBook.debit-selBook.credit))*100)/100:0;
-  const confirmMatch=()=>{
+  const confirmMatch=async()=>{
     if(!selBook||!selStmt) return;
+    // Guardrail: a 1:1 match that doesn't tie is usually a SPLIT (one bank line =
+    // several book entries). Warn before saving it as a partial.
+    if(Math.abs(variancePreview)>0.01){
+      const {confirmed}=await confirmDialog({
+        title:"Amounts don’t match — is this a split?",
+        message:`The book entry and the statement line differ by ${f(Math.abs(variancePreview))}.\n\nA single bank line is often several book entries combined (a split). If so, Cancel and match all the legs together.\n\nMatching now records a PARTIAL with this variance.`,
+        confirmLabel:"Match as partial",
+        cancelLabel:"Cancel",
+      });
+      if(!confirmed) return;
+    }
     matchMut.mutate(
       {id:selStmt.id,bookKey:selBook.bookKey,vno:selBook.vno,bookDebit:selBook.debit,bookCredit:selBook.credit},
       {onSuccess:()=>{setSelBook(null);setSelStmt(null);}}
