@@ -56,9 +56,61 @@ export const validParentGroups = (groups = []) => {
 };
 
 const blankFromFields = (fields) => fields.reduce((o, f) => {
-  o[f.key] = f.type === 'bool' ? (f.default ?? false) : f.type === 'tags' ? [] : f.type === 'number' ? (f.default ?? 0) : (f.default ?? '');
+  o[f.key] = f.type === 'bool' ? (f.default ?? false) : (f.type === 'tags' || f.type === 'multiselect') ? [] : f.type === 'number' ? (f.default ?? 0) : (f.default ?? '');
   return o;
 }, {});
+
+// Type-to-search, click-to-add multi-picker over live `options` (array or fn(form)).
+// Already-picked values show as removable chips above the search box; the dropdown
+// only lists NOT-yet-picked matches, so you can keep typing to add more.
+function MultiSelectAutocomplete({ field, value, onChange, form }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+  const raw = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
+  const options = raw.filter((o) => o !== '' && o != null);
+  const selected = Array.isArray(value) ? value : [];
+  const q = query.trim().toLowerCase();
+  const matches = options.filter((o) => !selected.includes(o) && (!q || o.toLowerCase().includes(q)));
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const pick = (name) => { onChange([...selected, name]); setQuery(''); setOpen(false); };
+  const remove = (name) => onChange(selected.filter((s) => s !== name));
+
+  return (
+    <div ref={boxRef} className="relative">
+      {selected.length > 0 && (
+        <div className="mb-1.5 flex flex-wrap gap-1.5">
+          {selected.map((s) => (
+            <span key={s} className="inline-flex items-center gap-1 rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-medium text-ink">
+              <span>{s}</span>
+              <button type="button" onClick={() => remove(s)} className="text-ink-subtle hover:text-danger" aria-label={`Remove ${s}`}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <Input value={query} onFocus={() => setOpen(true)} onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        placeholder={field.placeholder || 'Type to search…'} />
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-surface-border bg-surface shadow-md">
+          {matches.length === 0 && <p className="px-2.5 py-2 text-[11.5px] text-ink-subtle">{field.emptyLabel || 'No matches.'}</p>}
+          {matches.map((o) => (
+            <button key={o} type="button" onClick={() => pick(o)}
+              className="block w-full px-2.5 py-1.5 text-left text-[12.5px] text-ink hover:bg-surface-alt">
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function FieldInput({ field, value, onChange, form }) {
   if (field.type === 'bool') {
@@ -89,6 +141,14 @@ function FieldInput({ field, value, onChange, form }) {
         onChange={(e) => onChange(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
         placeholder="comma, separated, values" />
     );
+  }
+  // Pick-from-list version of 'tags' — for fields that must reference REAL records
+  // (e.g. Drawdown Ledgers → real ledgers) rather than free-typed names that could
+  // typo or drift from the actual master. Type to filter, click to add — a separate
+  // component so its own local (search text / open) state stays out of FieldInput,
+  // which must not call hooks conditionally.
+  if (field.type === 'multiselect') {
+    return <MultiSelectAutocomplete field={field} value={value} onChange={onChange} form={form} />;
   }
   // System-managed fields (e.g. a ledger's auto-generated code) are shown but not
   // editable — render a greyed, read-only box with a hint when there's no value yet.
@@ -498,22 +558,36 @@ export const SuppliersMaster = ({ branch } = {}) => {
 const FACILITY_TYPES = ['Supplier Trade Credit', 'BSP-BG', 'Bank Card', 'Bank OD'];
 export const CreditFacilitiesMaster = ({ branch } = {}) => {
   const scope = partyScope(branchCode(branch));
+  // Drawdown Ledgers must pick from REAL Sundry Creditors (supplier) ledgers, not
+  // free-typed names — a facility can only ever roll up ledgers that actually exist,
+  // so a typo can't silently leave a ledger's drawn balance out of the limit check.
+  const ledgersQ = useMasterList('ledgers');
+  const supplierLedgerNames = (ledgersQ.data || [])
+    .filter((l) => /sundry\s+creditors/i.test(l.group || '') && scope.rowFilter(l))
+    .map((l) => l.name)
+    .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
   return (
   <MasterCrud title="Credit Facilities & Limits" subtitle="Supplier / BSP / card credit lines — drawn is read live from the ledgers" resource="credit-facilities"
     rowFilter={scope.rowFilter}
     fields={[
-      { key: 'name', label: 'Facility', type: 'text', required: true },
-      { key: 'counterparty', label: 'Counterparty', type: 'text' },
+      // Free text, no supplier master lookup — the facility is just a descriptive
+      // label (e.g. "Akbar Travels — Trade Credit"); the actual link to a supplier
+      // is the Drawdown Ledgers picker below (a real ledger picker, not this field).
+      { key: 'name', label: 'Facility', type: 'text', required: true, placeholder: 'e.g. Akbar Travels — Trade Credit' },
+      { key: 'counterparty', label: 'Counterparty', type: 'text', placeholder: 'e.g. Akbar Travels' },
       { key: 'type', label: 'Type', type: 'select', options: FACILITY_TYPES, default: 'Supplier Trade Credit' },
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       { key: 'currency', label: 'Currency', type: 'select', options: ['INR', 'USD'], default: 'INR', table: false },
       { key: 'limit', label: 'Limit', type: 'number' },
-      // Maps the facility to a supplier's ledger(s): one facility → many drawdown ledgers.
-      { key: 'drawdownLedgers', label: 'Drawdown Ledgers', type: 'tags' },
-      { key: 'secured', label: 'Secured (FD-backed)', type: 'bool', default: false, table: false },
-      { key: 'securityLedger', label: 'Security Ledger (FD)', type: 'text', table: false },
-      { key: 'securityAmount', label: 'Security / BG Amount', type: 'number', table: false },
-      { key: 'cycle', label: 'Settlement Cycle', type: 'text', table: false },
+      // Maps the facility to a supplier's ledger(s): one facility → many drawdown
+      // ledgers. Picked from the live Sundry Creditors ledger list (any supplier),
+      // never free-typed.
+      { key: 'drawdownLedgers', label: 'Drawdown Ledgers', type: 'multiselect', options: supplierLedgerNames, emptyLabel: 'No supplier ledgers found for this branch.' },
+      // Security is a Post-Dated Cheque, not an FD/BG — one Yes/No + one amount
+      // (was Secured/Security Ledger/Security-BG-Amount: three fields effectively
+      // asking for the security amount twice).
+      { key: 'pdcGiven', label: 'PDC Cheque Given?', type: 'bool', default: false, table: false },
+      { key: 'pdcAmount', label: 'PDC Amount', type: 'number', table: false, show: (f) => !!f.pdcGiven, required: (f) => !!f.pdcGiven },
       { key: 'reviewDate', label: 'Review Date', type: 'date', table: false },
       { key: 'active', label: 'Active', type: 'bool', default: true },
     ]} />

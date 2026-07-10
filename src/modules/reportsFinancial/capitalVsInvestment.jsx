@@ -492,7 +492,7 @@ export function CapitalVsInvestmentLive({ branch }) {
                           <tbody>
                             {facs.map((f) => (
                               <tr key={f.id}>
-                                <td style={{ ...cell, fontWeight: 700 }}>{f.name}{f.secured ? <span className="tag bs" style={{ marginLeft: 6 }}>FD</span> : null}</td>
+                                <td style={{ ...cell, fontWeight: 700 }}>{f.name}{f.pdcGiven ? <span className="tag bs" style={{ marginLeft: 6 }}>PDC</span> : null}</td>
                                 <td style={{ ...cell, color: 'var(--dim)' }}>{f.type}</td>
                                 <td style={numCell}>{fc(f, f.limit)}</td>
                                 <td style={numCell}>{fc(f, f.drawn)}</td>
