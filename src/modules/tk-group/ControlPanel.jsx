@@ -5,6 +5,7 @@ import { withToggled } from './utils/flags';
 import { useConfigValue } from '../../core/useAccounting';
 import { isOwner } from './utils/owner';
 import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
+import { confirmDialog } from '../../core/ux/confirm';
 import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
 import { Badge } from '../../shell/primitives';
@@ -105,8 +106,22 @@ export function ControlPanel({ setRoute }) {
   // Either way it is written to the audit trail. Dormant-safe: even an engaged flag stays
   // guarded by core.policy_guard until that master switch is itself on.
   const onPropose = async (key) => {
-    setMsg('');
     const turningOn = !isOn(key);
+    // The MASTER switch engages/disengages enforcement company-wide (all 6 branches) —
+    // too consequential for a bare click, so the Owner's live flip is confirmed first.
+    // Every other control stays a one-click instant flip. (Non-Owners only propose.)
+    if (owner && key === 'core.policy_guard') {
+      const { confirmed } = await confirmDialog({
+        title: turningOn ? 'Engage the TK Group guard?' : 'Disengage the TK Group guard?',
+        message: turningOn
+          ? 'This turns ON enforcement across all branches immediately — approval chains, segregation-of-duties, cash caps, back-date limits and master-write staging all begin applying to everyone except you. You can switch it back off here at any time.'
+          : 'This turns OFF the whole control layer immediately — nothing is enforced and nobody is blocked. Individual controls keep their settings but stop applying until you re-engage the guard.',
+        danger: true,
+        confirmLabel: turningOn ? 'Engage guard' : 'Disengage guard',
+      });
+      if (!confirmed) return;                                        // cancelled — no change, no toast
+    }
+    setMsg('');
     try {
       if (owner) {
         const next = await setFlag(key, turningOn);                 // live flip → { flags, enabled }
