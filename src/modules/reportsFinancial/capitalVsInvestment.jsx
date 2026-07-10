@@ -12,7 +12,6 @@ import { bc } from '../../core/styleTokens';
 const DEFAULT_HURDLE = 18; // initial cost-of-capital benchmark % — user-editable on screen
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
 const dmy = (s) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? s : `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`; };
-const fyLabel = (s) => { const d = new Date(s); const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return `${y}–${String(y + 1).slice(-2)}`; };
 
 // Branch-aware money formatters. India branches keep ₹ + Indian grouping (Cr/L);
 // USD branches ($ — NBO/DAR/FBM) use en-US grouping and K/M/B short scale.
@@ -68,7 +67,6 @@ const CSS = `
 .cvd .hurdle input:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
 .cvd .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid var(--line);border-radius:8px;
   background:#fff;font-size:12.5px;font-weight:700;color:var(--ink);cursor:pointer}
-.cvd .btn.pri{background:var(--primary);border-color:var(--primary);color:#fff}
 
 .cvd .content{width:100%;max-width:1600px;margin:0 auto;padding:18px 22px 56px;display:flex;flex-direction:column;gap:16px}
 .cvd .state{padding:48px 20px;text-align:center;color:var(--dim);font-size:14px;background:#fff;border:1px solid var(--line);border-radius:14px}
@@ -96,7 +94,6 @@ const CSS = `
 .cvd .kpi .s{font-size:11px;color:var(--dim);margin-top:2px}
 .cvd .kpi .pill{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .cvd .pill.up{background:#e7f6ec;color:var(--green)}.cvd .pill.warn{background:var(--amber-s);color:var(--amber)}
-.cvd .pill.dn{background:#fdecec;color:var(--red)}
 
 /* capital bridge card */
 .cvd .card{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden}
@@ -316,7 +313,7 @@ export function CapitalVsInvestmentLive({ branch }) {
   ];
   const maxAbs = Math.max(1, ...bridge.map((r) => Math.abs(r.v)));
 
-  // Scroll-spy: highlight the rail link for whatever section is in view.
+  // Scroll-spy: highlight the topbar tab for whatever section is in view.
   useEffect(() => {
     if (isLoading || error || !data) return undefined;
     const ids = NAV.map(([id]) => document.getElementById('cvd-' + id)).filter(Boolean);
