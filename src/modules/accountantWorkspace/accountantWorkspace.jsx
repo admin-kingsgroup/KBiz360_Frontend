@@ -7,6 +7,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { clickable } from '../../core/ux/clickable';
+import { confirmDialog } from '../../core/ux/confirm';
+import { matchVariance } from '../../core/matchVariance';
 import { usePager, Pager } from '../../core/ux/pager';
 import { bc } from '../../core/styles';
 import { apiGet } from '../../core/api';
@@ -56,6 +58,21 @@ const C = { dark: '#1a1c22', gold: '#c2a04a', blue: '#2563eb', red: '#dc2626', g
 // `{...card}` surface in this workspace adopts the premium look without structural change.
 const card = { background: '#fff', border: '1px solid #cdd1d8', borderRadius: 12, boxShadow: '0 1px 2px rgba(16,18,22,0.04), 0 6px 20px -10px rgba(16,18,22,0.12)' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString((cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US');
+
+// Guardrail for manual 1:1 matches: if the statement line and the book entry don't tie,
+// it's usually a SPLIT (one line = several book entries combined). Warn before saving it
+// as a partial so a split never silently looks reconciled. Returns true to proceed.
+async function matchVarianceGate(stmtLine, bookLine, cur) {
+  const variance = matchVariance(stmtLine, bookLine);
+  if (Math.abs(variance) <= 0.01) return true; // ties out — match silently
+  const { confirmed } = await confirmDialog({
+    title: 'Amounts don’t match — is this a split?',
+    message: `The statement line and the book entry differ by ${money(cur, Math.abs(variance))}.\n\nA single line is often several book entries combined (a split). If so, Cancel and match all the legs together.\n\nMatching now records a PARTIAL with this variance.`,
+    confirmLabel: 'Match as partial',
+    cancelLabel: 'Cancel',
+  });
+  return confirmed;
+}
 const brLabel = (b) => (b === 'ALL' || !b ? CONSOLIDATED_LABEL : (b.name || b.code || b));
 
 // Year-month of a voucher date — handles ISO (YYYY-MM-DD) and DD/MM/YYYY (migrated).
@@ -2097,9 +2114,10 @@ export function SupplierReco({ branch, setRoute }) {
   };
 
   const diff = Number(sum.differenceAmount || 0);
-  const matchTo = (s, bookKey) => {
+  const matchTo = async (s, bookKey) => {
     const b = (book.lines || []).find((x) => x.bookKey === bookKey);
     if (!b) return;
+    if (!(await matchVarianceGate(s, b, cur))) return;
     manual.mutate({ id: s.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit });
   };
 
@@ -2166,7 +2184,7 @@ export function SupplierReco({ branch, setRoute }) {
                       <button onClick={() => unmatch.mutate({ id: s.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
                     ) : (
                       <>
-                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(s, e.target.value)}
+                        <select defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ''; if (v) matchTo(s, v); }}
                           style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
                           <option value="">Match to book…</option>
                           {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.credit - b.debit)}</option>)}
@@ -2253,9 +2271,10 @@ export function ClientReco({ branch, setRoute }) {
     if (!client || !parsed.length) return;
     imp.mutate({ client, branch: branch?.code || branch, rows: parsed, fileName: 'pasted' }, { onSuccess: () => setPaste('') });
   };
-  const matchTo = (s, bookKey) => {
+  const matchTo = async (s, bookKey) => {
     const b = (book.lines || []).find((x) => x.bookKey === bookKey);
     if (!b) return;
+    if (!(await matchVarianceGate(s, b, cur))) return;
     manual.mutate({ id: s.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit });
   };
   const exportStatement = () => downloadCSV(`client-reco-${client}.csv`,
@@ -2378,7 +2397,7 @@ export function ClientReco({ branch, setRoute }) {
                       <button onClick={() => unmatch.mutate({ id: s.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
                     ) : (
                       <>
-                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(s, e.target.value)}
+                        <select defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ''; if (v) matchTo(s, v); }}
                           style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
                           <option value="">Match to book…</option>
                           {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.debit - b.credit)}</option>)}
@@ -2578,7 +2597,7 @@ export function TallyReco({ branch }) {
   const diff = Number(sum.differenceAmount || 0);
 
   const doImport = () => { if (!sel || !parsed.length) return; imp.mutate({ ledger: sel, branch: branch?.code || branch, rows: parsed, fileName: 'pasted' }, { onSuccess: () => setPaste('') }); };
-  const matchTo = (t, bookKey) => { const b = (book.lines || []).find((x) => x.bookKey === bookKey); if (!b) return; manual.mutate({ id: t.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit }); };
+  const matchTo = async (t, bookKey) => { const b = (book.lines || []).find((x) => x.bookKey === bookKey); if (!b) return; if (!(await matchVarianceGate(t, b, cur))) return; manual.mutate({ id: t.id, bookKey: b.bookKey, vno: b.vno, bookDebit: b.debit, bookCredit: b.credit }); };
 
   return (
     <Shell title="Tally Reconciliation" sub={`${brLabel(branch)} · import a ledger's Tally export, then match it against the ERP books`}
@@ -2631,7 +2650,7 @@ export function TallyReco({ branch }) {
                       <button onClick={() => unmatch.mutate({ id: t.id })} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
                     ) : (
                       <>
-                        <select defaultValue="" onChange={(e) => e.target.value && matchTo(t, e.target.value)} style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
+                        <select defaultValue="" onChange={(e) => { const v = e.target.value; e.target.value = ''; if (v) matchTo(t, v); }} style={{ padding: '4px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, maxWidth: 200 }}>
                           <option value="">Match to ERP…</option>
                           {unreconciledBook.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, b.debit - b.credit)}</option>)}
                         </select>
