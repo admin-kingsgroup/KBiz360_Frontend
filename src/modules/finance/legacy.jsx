@@ -19,7 +19,7 @@ import { exportToCSV } from '../../core/business-logic';
 import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER, CONSOLIDATED_LABEL } from '../../core/data';
 import { fmt, fmtINR } from '../../core/format';
 import { CUR_MONTH, MONTH_OPTIONS, FY_MONTHS, monthLabel, todayISO, fmtDate, CUR_FY, rangeNote } from '../../core/dates';
-import { BANK_ACCOUNTS_DATA, GratuityRegister, INVESTMENT_DATA, INVESTMENT_SECTIONS, RECO_QUEUE_DATA, _ADVANCES, cardStyle } from '../../core/helpers';
+import { BANK_ACCOUNTS_DATA, GratuityRegister, INVESTMENT_DATA, INVESTMENT_SECTIONS, _ADVANCES, cardStyle } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useChartOfAccounts, useTrialBalance } from '../../core/useAccounting';
 import { useCrud, useAdvances } from '../../core/useRegisters';
@@ -2072,7 +2072,7 @@ export function ReconciliationQueue({branch,setRoute}){
                     <td style={{padding:"8px 10px",textAlign:"right",fontFamily:"monospace",color:it.difference==null?"#9aa3bd":Math.abs(it.difference)<1?"#27500A":"#A32D2D"}}>{it.difference==null?"—":fmtINR(it.difference)}</td>
                     <td style={{padding:"8px 10px"}}><span style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,fontWeight:700,color:st.c,background:st.bg,padding:"3px 9px",borderRadius:20,whiteSpace:"nowrap"}}><span style={{width:7,height:7,borderRadius:"50%",background:st.dot}}/>{st.label}</span></td>
                     <td style={{padding:"8px 10px",color:it.waitingOn?"#0d1326":"#9aa3bd",fontWeight:it.waitingOn?600:400}}>{it.waitingOn||"—"}</td>
-                    <td style={{padding:"8px 10px",textAlign:"center"}}><button onClick={()=>setRoute&&setRoute('/bank-reco')} style={{...btnGh,minHeight:28,fontSize:11}}>Reconcile</button></td>
+                    <td style={{padding:"8px 10px",textAlign:"center"}}><button title="Open the weekly certificate register to reconcile & sign" onClick={()=>setRoute&&setRoute('/reconciliation/weekly')} style={{...btnGh,minHeight:28,fontSize:11}}>Reconcile</button></td>
                   </tr>
                 );
               })}
