@@ -82,10 +82,46 @@ jest.mock('../core/useBankReco', () => ({
   useBankReconSummary: () => ({ data: null }),
   useBankReconAggregate: () => ({ ledgerCount: 0, diffCount: 0, diffAmount: 0, openLines: 0, isLoading: false }),
 }));
+// Supplier + Client reconciliation feed the two-pane matcher: OUR ledger (book) on
+// one side, THEIR imported statement on the other. Fixed data, no network.
+jest.mock('../core/useSupplierReco', () => {
+  const mut = () => ({ mutate: jest.fn(), isPending: false });
+  return {
+    useSupplierBook: () => ({ data: { lines: [
+      { bookKey: 'bk1', date: '2026-05-01', vno: 'PB/001', narration: 'May airfare', party: 'TBO', debit: 0, credit: 1000, reconciled: false, status: 'unreconciled' },
+    ] } }),
+    useSupplierStatement: () => ({ data: [
+      { id: 's1', date: '2026-05-01', invoiceNo: 'INV-77', description: 'May airfare', debit: 1000, credit: 0, status: 'unreconciled' },
+    ] }),
+    useSupplierReconSummary: () => ({ data: { bookOwed: 1000, statementOwed: 1000, differenceAmount: 0, counts: { statementReconciled: 0, statementUnreconciled: 1, statementException: 0, statementPartial: 0 } } }),
+    useImportSupplierStatement: mut, useSupplierAutoMatch: mut, useSupplierManualMatch: mut,
+    useSupplierGroupMatch: mut, useSupplierUnmatch: mut, useSetSupplierReconStatus: mut,
+    useClearSupplierStatement: mut, useDeleteSupplierStatementLine: mut,
+  };
+});
+jest.mock('../core/useClientReco', () => {
+  const mut = () => ({ mutate: jest.fn(), isPending: false });
+  return {
+    useClientList: () => ({ data: { rows: [
+      { client: 'ACME', bookOwed: 1700, statementOwed: 1700, difference: 0, counts: { reconciled: 0, open: 1, exception: 0 }, status: 'not-started', lastReconciledAt: null },
+    ], totals: { clients: 1, bookOwed: 1700, reconciled: 0, differences: 0, notStarted: 1 } } }),
+    useClientBook: () => ({ data: { lines: [
+      { bookKey: 'cb1', date: '2026-05-01', vno: 'SF/001', narration: 'Tour invoice', party: 'ACME', debit: 1700, credit: 0, reconciled: false, status: 'unreconciled' },
+    ] } }),
+    useClientStatement: () => ({ data: [
+      { id: 'cs1', date: '2026-05-01', invoiceNo: 'INV-1', description: 'Tour', debit: 1700, credit: 0, status: 'unreconciled' },
+    ] }),
+    useClientAllocation: () => ({ data: { invoices: [], receipts: [], openInvoices: [], unappliedReceipts: [], totals: {} } }),
+    useClientReconSummary: () => ({ data: { bookOwed: 1700, statementOwed: 1700, differenceAmount: 0 } }),
+    useImportClientStatement: mut, useClientAutoMatch: mut, useClientAutoMatchAll: mut, useClientManualMatch: mut,
+    useClientGroupMatch: mut, useClientUnmatch: mut, useSetClientReconStatus: mut, useClearClientStatement: mut,
+    useDeleteClientStatementLine: mut,
+  };
+});
 
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ymOf, groupBalance, NetAgeing, CollectionsFollowup, DashboardAccountant, MonthEndChecklist, SuspenseClearing } from '../modules/accountantWorkspace';
+import { ymOf, groupBalance, NetAgeing, CollectionsFollowup, DashboardAccountant, MonthEndChecklist, SuspenseClearing, SupplierReco, ClientReco } from '../modules/accountantWorkspace';
 
 describe('accountant workspace — pure helpers', () => {
   test('ymOf handles ISO and DD/MM/YYYY', () => {
@@ -199,5 +235,28 @@ describe('accountant workspace — screens render', () => {
     render(<SuspenseClearing branch={{ code: 'BOM' }} setRoute={() => {}} />);
     expect(screen.getByText('BKG1')).toBeInTheDocument();            // the stuck booking
     expect(screen.getByText('Create Ledger')).toBeInTheDocument();   // self-serve ledger creation
+  });
+});
+
+// The whole point of the redesign: Supplier & Client reco now use the SAME side-by-side
+// two-pane layout as Bank Reco — OUR books on the left, THEIR statement on the right —
+// so an accountant can compare the two directly instead of matching from one list.
+describe('reconciliation — two-pane matcher (Supplier + Client)', () => {
+  test('Supplier Reconciliation shows OUR book entries and THEIR statement side by side', () => {
+    render(<SupplierReco branch={{ code: 'BOM' }} setRoute={() => {}} />);
+    expect(screen.getByText(/Our Book Entries/)).toBeInTheDocument();          // left pane heading
+    expect(screen.getByText(/Their Statement \(vendor SOA\)/)).toBeInTheDocument(); // right pane heading
+    expect(screen.getByText('PB/001')).toBeInTheDocument();                    // a book voucher (left)
+    expect(screen.getByText('INV-77')).toBeInTheDocument();                    // a statement ref (right)
+  });
+
+  test('Client Reconciliation drill-in shows the same two panes', () => {
+    render(<ClientReco branch={{ code: 'BOM' }} setRoute={() => {}} />);
+    // Workbench first → click into the client to reach the statement matcher (default tab).
+    fireEvent.click(screen.getByRole('button', { name: /Reconcile/i }));
+    expect(screen.getByText(/Our Book Entries/)).toBeInTheDocument();
+    expect(screen.getByText(/Their Statement \(client SOA\)/)).toBeInTheDocument();
+    expect(screen.getByText('SF/001')).toBeInTheDocument();                    // a book voucher (left)
+    expect(screen.getByText('INV-1')).toBeInTheDocument();                     // a statement ref (right)
   });
 });
