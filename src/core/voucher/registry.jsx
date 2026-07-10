@@ -55,6 +55,13 @@ function makeRcptPmt(side) {
       date: todayISO(), party: '', otherType: '', bankRef: '', paymentMode: 'NEFT', utr: '',
       amount: '', tds: false, tdsAmt: 0, tdsSection: '194H', remarks: '',
       alloc: {}, applyMode: 'bills', parkOnAcc: false, _billIds: {},
+      // Split (multi-leg) direct entry: several expense/income heads settled by ONE
+      // bank/cash leg. When `split` is on we ignore party/bill-wise/TDS and post each
+      // row as its own Dr (payment) / Cr (receipt) line against the single bank leg.
+      split: false, splitLines: [],
+      // Additive charge legs on a SUPPLIER payment (bank charge, courier…): extra Dr
+      // legs posted alongside the party; the bank parts with the party amount PLUS them.
+      hasCharges: false, charges: [],
     }),
 
     fromVoucher: (v) => {
@@ -69,6 +76,23 @@ function makeRcptPmt(side) {
       const bankish = (l) => /\bbank\b|\bcash\b|petty/i.test(l && l.ledger || '');
       const drLines = lines.filter((l) => l.drCr === 'Dr');
       const crLines = lines.filter((l) => l.drCr === 'Cr');
+      // Multi-leg direct entry (no party): 2+ heads settled by ONE bank/cash leg →
+      // reopen the split editor. (A single head still loads as the ordinary direct
+      // entry below; a party settlement carries no lines and never reaches here.)
+      const nonBankLegs = (isReceipt ? crLines : drLines).filter((l) => !bankish(l));
+      if (!v.party && nonBankLegs.length >= 2) {
+        const bankSideLines = isReceipt ? drLines : crLines;
+        const bLine = bankSideLines.find(bankish) || bankSideLines[0] || null;
+        return {
+          date: v.date || '', party: '', otherType: '',
+          bankRef: bLine ? (bLine.ledger || '') : (v.bankRef || ''),
+          paymentMode: v.paymentMode || 'NEFT', utr: v.utr || '',
+          amount: '', tds: false, tdsAmt: 0, tdsSection: '194H', remarks: v.remarks || '',
+          alloc: {}, applyMode: 'bills', parkOnAcc: false, _billIds: {},
+          split: true,
+          splitLines: nonBankLegs.map((l, i) => ({ _k: 6000 + i, ledger: l.ledger || '', amt: l.amt ?? '', desc: l.desc || '' })),
+        };
+      }
       const bankLines = isReceipt ? drLines : crLines;   // bank/cash leg side
       const partyLines = isReceipt ? crLines : drLines;  // counter-ledger side
       const bankLine = bankLines.find(bankish) || bankLines[0] || null;
@@ -85,10 +109,18 @@ function makeRcptPmt(side) {
       // with partyType 'customer' is a client refund (Debtor settling open receipts).
       const looksParty = !!v.party && (v.partyType === (isReceipt ? 'customer' : 'supplier') || (!isReceipt && v.partyType === 'customer') || (v.allocations || []).length > 0);
       const guessType = isReceipt ? 'Debtor' : (v.partyType === 'customer' ? 'Debtor' : 'Creditor');
+      // Additive charge legs ride on a SUPPLIER payment's lines[] as extra non-bank Dr
+      // legs (the party itself is NOT in lines) — reopen them in the charges editor.
+      const chargeLegs = (!isReceipt && v.party)
+        ? (v.lines || []).filter((l) => l.drCr === 'Dr' && !bankish(l))
+        : [];
       return {
         date: v.date || '', party, otherType: looksParty ? guessType : '', bankRef, paymentMode: v.paymentMode || 'NEFT', utr: v.utr || '',
         amount, tds: (+v.tdsAmt || 0) > 0, tdsAmt: +v.tdsAmt || 0, tdsSection: v.tdsSection || '194H', remarks: v.remarks || '',
         alloc, applyMode: v.applyMode || 'bills', parkOnAcc: (+v.onAccount || 0) > 0, _billIds: billIds,
+        split: false, splitLines: [],
+        hasCharges: chargeLegs.length > 0,
+        charges: chargeLegs.map((l, i) => ({ _k: 8000 + i, ledger: l.ledger || '', amt: l.amt ?? '', desc: l.desc || '' })),
       };
     },
 
@@ -98,9 +130,30 @@ function makeRcptPmt(side) {
     // the client's on-account money — allocations settle their open receipts). ANY OTHER
     // ledger (expense, loan, tax, income…) posts as an explicit Dr/Cr pair, exactly like
     // Tally — the backend's receiptLines/paymentLines post lines with drCr verbatim.
-    isParty: (s) => settleSpec(side, s.otherType).party,
+    // A split (multi-leg) entry is never a bill-wise party settlement.
+    isParty: (s) => !s.split && settleSpec(side, s.otherType).party,
 
     toBody: (s, ctx) => {
+      // Split (multi-leg) direct entry — N expense/income heads, ONE bank/cash leg.
+      // Each row posts as its own Dr (payment) / Cr (receipt); the bank leg carries
+      // the sum on the opposite side. No party / bill-wise / TDS. The engine posts
+      // the lines verbatim (posting.builder → journalLines, since each states its side).
+      if (s.split) {
+        const rows = (s.splitLines || []).filter((l) => l.ledger && (+l.amt || 0) > 0);
+        const total = r2(rows.reduce((a, l) => a + (+l.amt || 0), 0));
+        const legSide = isReceipt ? 'Cr' : 'Dr';
+        const lines = [
+          ...rows.map((l) => ({ ledger: l.ledger, amt: r2(+l.amt || 0), drCr: legSide, desc: l.desc || '' })),
+          { ledger: s.bankRef, amt: total, drCr: isReceipt ? 'Dr' : 'Cr', desc: s.remarks || '' },
+        ];
+        return {
+          type: isReceipt ? 'RV' : 'PMT', category: isReceipt ? 'receipt' : 'payment',
+          branch: ctx.branchCode, date: s.date, bankRef: s.bankRef, paymentMode: s.paymentMode, status: 'saved',
+          party: '', partyType: '',
+          lines, subtotal: total, total, tdsAmt: 0, tdsSection: '', allocations: [], onAccount: 0, applyMode: '',
+          remarks: s.remarks || `Being ${isReceipt ? 'amount received into' : 'amount paid from'} ${s.bankRef} across ${rows.length} head(s) via ${s.paymentMode}${s.utr ? ` ref ${s.utr}` : ''}`,
+        };
+      }
       const net = +s.amount || 0;
       const spec = settleSpec(side, s.otherType);
       const party = spec.party;
@@ -133,13 +186,19 @@ function makeRcptPmt(side) {
       const allocations = Object.entries(s.alloc || {})
         .filter(([, v]) => Math.abs(+v || 0) > 0.001)
         .map(([vno, v]) => ({ billVno: vno, billId: (s._billIds || {})[vno] || '', amount: +v }));
+      // Additive charge legs (SUPPLIER payment only): extra non-bank Dr legs the bank
+      // parts with ON TOP of the supplier amount. `total` stays the supplier settlement
+      // (bill-wise allocations sum to it); the backend lifts the bank credit by these.
+      const chargeRows = (!isReceipt && s.hasCharges ? (s.charges || []) : [])
+        .filter((l) => l.ledger && (+l.amt || 0) > 0)
+        .map((l) => ({ ledger: l.ledger, amt: r2(+l.amt || 0), drCr: 'Dr', desc: l.desc || '' }));
       return {
         ...common, party: s.party, partyType: spec.partyType,
-        // Party model carries NO lines — the journal is inferred from party + bankRef +
-        // total. Emit lines:[] EXPLICITLY so editing a line-model voucher (e.g. a Tally
-        // import stored as Dr/Cr lines) into the party model wipes the stale legs instead
-        // of leaving them on the document (a partial $set update wouldn't clear them).
-        lines: [],
+        // The party leg is inferred from party + bankRef + total; `lines` carries ONLY
+        // the additive charge legs (usually empty). Emitting it EXPLICITLY also wipes the
+        // stale Dr/Cr legs of a line-model voucher edited into the party model (a partial
+        // $set update wouldn't clear them).
+        lines: chargeRows,
         subtotal: net, total: gross, tdsAmt: tds, tdsSection: s.tds ? (s.tdsSection || '') : '',
         allocations, onAccount: sum.onAcc, applyMode: s.applyMode,
         remarks: s.remarks || `Being ${isReceipt ? 'receipt from' : 'payment to'} ${s.party} via ${s.paymentMode}${s.utr ? ` ref ${s.utr}` : ''}`,
@@ -147,6 +206,16 @@ function makeRcptPmt(side) {
     },
 
     validate: (s) => {
+      // Split (multi-leg): need a bank/cash leg and ≥1 complete row; no half-filled rows.
+      if (s.split) {
+        const rows = (s.splitLines || []).filter((l) => l.ledger && (+l.amt || 0) > 0);
+        const partial = (s.splitLines || []).some((l) => (!!l.ledger) !== ((+l.amt || 0) > 0));
+        let hint = '';
+        if (!s.bankRef) hint = '(Pick Bank / Cash)';
+        else if (!rows.length) hint = `(Add at least one ${isReceipt ? 'head' : 'expense head'})`;
+        else if (partial) hint = '(Complete every line — ledger + amount)';
+        return { ok: !!s.bankRef && rows.length >= 1 && !partial, hint };
+      }
       const net = +s.amount || 0;
       const party = settleSpec(side, s.otherType).party;
       let hint = '';
@@ -158,9 +227,12 @@ function makeRcptPmt(side) {
       const tds = s.tds ? (+s.tdsAmt || 0) : 0;
       const gross = r2(net + tds);
       const sum = allocSummary(s.alloc, gross, s.parkOnAcc, s.applyMode);
+      // A half-filled additive charge row (ledger without amount, or vice-versa) blocks save.
+      const chargePartial = !isReceipt && s.hasCharges && (s.charges || []).some((l) => (!!l.ledger) !== ((+l.amt || 0) > 0));
       if (gross <= 0) hint = '(Enter Amount)';
       else if (!sum.valid) hint = s.applyMode === 'bills' ? '(Allocate / On Account)' : '';
-      return { ok: !!s.party && !!s.bankRef && gross > 0 && sum.valid, hint };
+      else if (chargePartial) hint = '(Complete every charge line — ledger + amount)';
+      return { ok: !!s.party && !!s.bankRef && gross > 0 && sum.valid && !chargePartial, hint };
     },
 
     fields: (props) => <ReceiptPaymentFields {...props} side={side} />,
