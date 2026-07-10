@@ -5,15 +5,20 @@ import { BRANCHES } from '../../core/referenceCache';
 import { money } from '../../core/format';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { focusedBranches, isFocused } from './utils/cockpitFocus';
-import { stagePipeline } from './utils/approvalPipeline';
+import { stagePipeline, pipelineEntries } from './utils/approvalPipeline';
 import { curSym } from './utils/currency';
 
 // ─── TK GROUP CENTRAL · Approval stage pipeline ──────────────────────────────
-// Where every pending voucher is waiting NOW, across the five people-stages, in backend
+// Where every pending approval is waiting NOW, across the five people-stages, in backend
 // order: Branch → AE · Sughra → Director · Farhan → Owner · Afshin → FM · Faiz (posts).
-// Bucketed by the real per-voucher stage (reviewStage) — which already reflects whether
+// Bucketed by the real per-entry stage (reviewStage) — which already reflects whether
 // escalation sign-offs are engaged. Sits above the full approval screen (UnifiedApprovals)
 // so the funnel and the JV detail share one page.
+// The screen has THREE disjoint pending queues, each its own collection — gated vouchers
+// (/api/vouchers/approvals), SO/PO/GP booking orders (/api/booking-orders) and INB deals
+// (/api/vouchers?type=INB). The funnel folds all three (pipelineEntries) so its total
+// matches the tabs below; counting each pending item once (the queues never overlap while
+// pending). Previously it read ONLY the gated vouchers, so SO/PO/GP + INB went missing.
 // Counts are currency-neutral (safe to pool); the ₹ value is shown ONLY when a single
 // branch is focused — never blended across currencies branchwise.
 const oldestTone = (d) => (d >= 4 ? 'text-danger' : d >= 2 ? 'text-warning' : 'text-success');
@@ -25,14 +30,35 @@ export function StagePipeline() {
   const focus = useCockpitFocus();
   const view = focusedBranches(focus, BRANCHES);
   const focused = isFocused(focus);
-  const q = useQueries({
+  // One query per source per focused branch. Kept per-branch (not one ALL fetch) so the
+  // count is currency-neutral to pool while the amount stays single-currency under Focus.
+  const vq = useQueries({
     queries: view.map((b) => ({
-      queryKey: ['tk', 'appr-stage', b.code],
+      queryKey: ['tk', 'appr-stage', 'vch', b.code],
       queryFn: () => apiGet('/api/vouchers/approvals', { branch: b.code, status: 'pending' }),
       staleTime: 30_000,
     })),
   });
-  const entries = view.flatMap((b, i) => ((q[i] && q[i].data && q[i].data.entries) || []));
+  const bq = useQueries({
+    queries: view.map((b) => ({
+      queryKey: ['tk', 'appr-stage', 'bkg', b.code],
+      queryFn: () => apiGet('/api/booking-orders', { branch: b.code }),
+      staleTime: 30_000,
+    })),
+  });
+  const iq = useQueries({
+    queries: view.map((b) => ({
+      queryKey: ['tk', 'appr-stage', 'inb', b.code],
+      queryFn: () => apiGet('/api/vouchers', { type: 'INB', branch: b.code }),
+      staleTime: 30_000,
+    })),
+  });
+  const arr = (x) => (Array.isArray(x) ? x : (x && x.data) || []);
+  const entries = view.flatMap((b, i) => pipelineEntries({
+    voucherEntries: (vq[i] && vq[i].data && vq[i].data.entries) || [],
+    bookings: arr(bq[i] && bq[i].data),
+    inbLegs: arr(iq[i] && iq[i].data),
+  }));
   const stages = stagePipeline(entries);
   const total = stages.reduce((s, x) => s + x.n, 0);
   const cur = focused ? curOf(focus) : null; // amount shown only for a single-currency (focused) view

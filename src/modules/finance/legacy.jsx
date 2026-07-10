@@ -10,7 +10,7 @@ import { clickable } from '../../core/ux/clickable';
 import { SampleBanner } from '../../core/ux/SampleBanner';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { AlertTriangle, ChevronDown, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
-import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useUnmatch, useSetReconStatus, useClearStatement, useRefreshBankReco } from '../../core/useBankReco';
+import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useGroupMatch, useUnmatch, useSetReconStatus, useClearStatement, useRefreshBankReco } from '../../core/useBankReco';
 import { usePDCs, usePDCSummary, useCreatePDC, useDepositPDC, useBouncePDC, useRepresentPDC, useDeletePDC } from '../../core/usePDC';
 import { branchCode } from '../../core/useAccounting';
 import { PeriodBar } from '../../core/period';
@@ -213,6 +213,7 @@ export function BankReco({branch}){
   const importMut=useImportStatement();
   const autoMut=useAutoMatch();
   const matchMut=useManualMatch();
+  const groupMut=useGroupMatch();
   const unmatchMut=useUnmatch();
   const statusMut=useSetReconStatus();
   const clearMut=useClearStatement();
@@ -222,7 +223,7 @@ export function BankReco({branch}){
   const {data:brs}=useBankBRS(ledger,branch,range);
   const [view,setView]=useState("detailed");  // detailed | minimal
   const [search,setSearch]=useState("");
-  const [selBook,setSelBook]=useState(null);   // { bookKey, vno, debit, credit }
+  const [selBooks,setSelBooks]=useState([]);   // { bookKey, vno, debit, credit }[] — N book legs → one line (split)
   const [selStmt,setSelStmt]=useState(null);   // statement line
   const [showImport,setShowImport]=useState(false);
 
@@ -249,25 +250,32 @@ export function BankReco({branch}){
   const bookFiltered=bookLines.filter(l=>!q||`${l.date} ${l.vno} ${l.narration} ${l.party}`.toLowerCase().includes(q));
   const stmtFiltered=stmt.filter(l=>!q||`${l.date} ${l.reference} ${l.chequeNo} ${l.utr} ${l.description}`.toLowerCase().includes(q));
 
-  /* ── Manual match: pair one selected book line with one statement line ── */
-  const variancePreview=(selBook&&selStmt)?Math.round(((selStmt.credit-selStmt.debit)-(selBook.debit-selBook.credit))*100)/100:0;
+  /* ── Manual match: pair one or more book lines with one statement line (N:1 split) ── */
+  const toggleBook=(b)=>setSelBooks(p=>p.some(x=>x.bookKey===b.bookKey)?p.filter(x=>x.bookKey!==b.bookKey):[...p,b]);
+  const bookSum=selBooks.reduce((t,b)=>t+(b.debit-b.credit),0);
+  const stmtSigned=selStmt?(selStmt.credit-selStmt.debit):0;
+  const variancePreview=(selBooks.length&&selStmt)?Math.round((stmtSigned-bookSum)*100)/100:0;
+  const clearSel=()=>{setSelBooks([]);setSelStmt(null);};
   const confirmMatch=async()=>{
-    if(!selBook||!selStmt) return;
-    // Guardrail: a 1:1 match that doesn't tie is usually a SPLIT (one bank line =
-    // several book entries). Warn before saving it as a partial.
+    if(!selBooks.length||!selStmt) return;
+    // Guardrail: a match that doesn't tie is usually a SPLIT (one bank line = several
+    // book entries). Warn before saving a partial — otherwise add the remaining legs.
     if(Math.abs(variancePreview)>0.01){
       const {confirmed}=await confirmDialog({
         title:"Amounts don’t match — is this a split?",
-        message:`The book entry and the statement line differ by ${f(Math.abs(variancePreview))}.\n\nA single bank line is often several book entries combined (a split). If so, Cancel and match all the legs together.\n\nMatching now records a PARTIAL with this variance.`,
+        message:`The selected book ${selBooks.length>1?"entries":"entry"} and the statement line differ by ${f(Math.abs(variancePreview))}.\n\nA single bank line is often several book entries combined (a split). If so, select all the legs so they sum to the line. Matching now records a PARTIAL with this variance.`,
         confirmLabel:"Match as partial",
         cancelLabel:"Cancel",
       });
       if(!confirmed) return;
     }
-    matchMut.mutate(
-      {id:selStmt.id,bookKey:selBook.bookKey,vno:selBook.vno,bookDebit:selBook.debit,bookCredit:selBook.credit},
-      {onSuccess:()=>{setSelBook(null);setSelStmt(null);}}
-    );
+    const done={onSuccess:clearSel};
+    if(selBooks.length===1){
+      const b=selBooks[0];
+      matchMut.mutate({id:selStmt.id,bookKey:b.bookKey,vno:b.vno,bookDebit:b.debit,bookCredit:b.credit},done);
+    }else{
+      groupMut.mutate({id:selStmt.id,books:selBooks.map(b=>({bookKey:b.bookKey,vno:b.vno,debit:b.debit,credit:b.credit}))},done);
+    }
   };
   const runAutoMatch=()=>autoMut.mutate({ledger,branch:code,from,to});
 
@@ -305,7 +313,7 @@ export function BankReco({branch}){
           </div>
         </div>
         <div style={{display:"flex",gap:20,flexWrap:"wrap",alignItems:"center"}}>
-          <select value={ledger} onChange={e=>{setLedger(e.target.value);setSelBook(null);setSelStmt(null);}} style={{...inp,width:"auto",minWidth:180,minHeight:32,fontSize:11}}>
+          <select value={ledger} onChange={e=>{setLedger(e.target.value);setSelBooks([]);setSelStmt(null);}} style={{...inp,width:"auto",minWidth:180,minHeight:32,fontSize:11}}>
             {bankLedgers.length===0&&<option value="">{ledgersLoading?"Loading banks…":"No bank ledgers"}</option>}
             {bankLedgers.map(b=><option key={b.code||b.name} value={b.name}>{b.name}{b.currency&&b.currency!=="INR"?` (${b.currency})`:""}</option>)}
           </select>
@@ -369,15 +377,17 @@ export function BankReco({branch}){
           </div>
 
           {/* Manual-match action bar */}
-          {(selBook||selStmt)&&(
+          {(selBooks.length>0||selStmt)&&(
             <div style={{...card,padding:"8px 12px",marginBottom:10,background:"#E6F1FB",border:"1px solid #B5D4F4",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
               <div style={{fontSize:11,color:"#185FA5"}}>
-                <b>Manual match —</b> Book: {selBook?`${selBook.vno} (${f(selBook.debit-selBook.credit)})`:<i>select a book entry</i>} ↔ Statement: {selStmt?`${selStmt.date} (${f(selStmt.credit-selStmt.debit)})`:<i>select a statement line</i>}
-                {selBook&&selStmt&&Math.abs(variancePreview)>0.01&&<span style={{color:"#A32D2D",fontWeight:700}}> · variance {f(variancePreview)} → Partial</span>}
+                <b>Manual match —</b> Book: {selBooks.length>0?`${selBooks.length} ${selBooks.length>1?"entries":"entry"} (${f(bookSum)})`:<i>select one or more book entries</i>} ↔ Statement: {selStmt?`${selStmt.date} (${f(stmtSigned)})`:<i>select a statement line</i>}
+                {selBooks.length>1&&<span style={{color:"#185FA5",fontWeight:700}}> · {selBooks.length}-way split</span>}
+                {selBooks.length>0&&selStmt&&Math.abs(variancePreview)>0.01&&<span style={{color:"#A32D2D",fontWeight:700}}> · variance {f(variancePreview)} → Partial</span>}
+                {selBooks.length>0&&selStmt&&Math.abs(variancePreview)<=0.01&&<span style={{color:"#27500A",fontWeight:700}}> · ties out ✓</span>}
               </div>
               <div style={{display:"flex",gap:6}}>
-                <button onClick={confirmMatch} disabled={!selBook||!selStmt||matchMut.isPending} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#27500A",opacity:(!selBook||!selStmt)?0.5:1}}><Link2 size={12}/> Match</button>
-                <button onClick={()=>{setSelBook(null);setSelStmt(null);}} style={{...btnGh,fontSize:10.5,padding:"4px 10px"}}><X size={12}/> Clear</button>
+                <button onClick={confirmMatch} disabled={!selBooks.length||!selStmt||matchMut.isPending||groupMut.isPending} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#27500A",opacity:(!selBooks.length||!selStmt)?0.5:1}}><Link2 size={12}/> Match</button>
+                <button onClick={clearSel} style={{...btnGh,fontSize:10.5,padding:"4px 10px"}}><X size={12}/> Clear</button>
               </div>
             </div>
           )}
@@ -393,10 +403,10 @@ export function BankReco({branch}){
                     {bookLoading&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
                     {!bookLoading&&bookFiltered.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No book entries for this bank/period.</td></tr>}
                     {bookFiltered.map((l,i)=>{
-                      const sel=selBook?.bookKey===l.bookKey;
+                      const sel=selBooks.some(b=>b.bookKey===l.bookKey);
                       const net=l.debit-l.credit;
                       return (
-                        <tr key={l.bookKey} {...(!l.reconciled ? clickable(()=>{ setSelBook(sel?null:{bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }) : {})}
+                        <tr key={l.bookKey} {...(!l.reconciled ? clickable(()=>{ toggleBook({bookKey:l.bookKey,vno:l.vno,debit:l.debit,credit:l.credit}); }) : {})}
                           style={{borderBottom:"1px solid #dfe2e7",cursor:l.reconciled?"default":"pointer",background:sel?"#FFF4D6":l.reconciled?"#EAF3DE":i%2===0?"#fff":"#fafafa"}}>
                           <td style={{padding:"6px 9px",color:"#5a6691",fontSize:10,whiteSpace:"nowrap"}}>{fmtDate?fmtDate(l.date):l.date}</td>
                           <td style={{padding:"6px 9px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{l.vno}</td>
@@ -456,7 +466,7 @@ export function BankReco({branch}){
               </div>
             </div>
           </div>
-          <p style={{margin:"10px 2px 0",fontSize:9.5,color:"#5a6691"}}>Tip: select one Book entry and one Statement line, then <b>Match</b>. Use <b>Auto-match</b> to pair by amount + date + reference. Reconciliation state is saved server-side and survives voucher edits.</p>
+          <p style={{margin:"10px 2px 0",fontSize:9.5,color:"#5a6691"}}>Tip: select <b>one or more</b> Book entries (tap several that together sum to the line — a split) and one Statement line, then <b>Match</b>. Use <b>Auto-match</b> to pair by amount + date + reference. Reconciliation state is saved server-side and survives voucher edits.</p>
         </div>
       )}
 
