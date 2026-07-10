@@ -496,6 +496,29 @@ describe('payment → split (multiple debit legs, different expense ledgers)', (
     expect(s.split).toBe(false);
     expect(s.party).toBe('Blinkit');
   });
+
+  test.concurrent('fromVoucher: a split leg named "Bank Charges" is NOT dropped (detect by side, not name)', async () => {
+    // Regression: the leg side was filtered by a bankish name regex, so an expense head
+    // containing "bank"/"cash"/"petty" was silently lost on edit.
+    const s = PM.fromVoucher({ party: '', bankRef: 'ICICI Bank', total: 5050, subtotal: 5050, lines: [
+      { ledger: 'Bank Charges', drCr: 'Dr', amt: 50 },
+      { ledger: 'Office Rent', drCr: 'Dr', amt: 5000 },
+      { ledger: 'ICICI Bank', drCr: 'Cr', amt: 5050 },
+    ] });
+    expect(s.split).toBe(true);
+    expect(s.splitLines.map((l) => l.ledger)).toEqual(['Bank Charges', 'Office Rent']); // both kept
+    expect(s.bankRef).toBe('ICICI Bank');
+  });
+
+  test.concurrent('fromVoucher: receipt split with a cash-named income leg keeps every credit leg', async () => {
+    const s = RC.fromVoucher({ party: '', bankRef: 'HDFC', total: 800, subtotal: 800, lines: [
+      { ledger: 'HDFC', drCr: 'Dr', amt: 800 },
+      { ledger: 'Cash Discount Received', drCr: 'Cr', amt: 300 },
+      { ledger: 'Interest Income', drCr: 'Cr', amt: 500 },
+    ] });
+    expect(s.split).toBe(true);
+    expect(s.splitLines.map((l) => l.ledger)).toEqual(['Cash Discount Received', 'Interest Income']);
+  });
 });
 
 // Additive charge legs on a supplier payment: pay the creditor AND book a bank charge

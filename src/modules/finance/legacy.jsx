@@ -377,10 +377,10 @@ export function BankReco({branch}){
               <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Book Entries (Ledger) <span style={{fontWeight:400,color:"#5a6691"}}>· {bookFiltered.length}</span></p>
               <div style={{...card,padding:0,overflow:"hidden"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Voucher","Amount","Status"]:["Date","Voucher","Narration","Debit","Credit","Status"]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Voucher","Amount","Status"]:["Date","Voucher","Narration","Debit","Credit","Balance","Status"]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount"||h==="Balance")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {bookLoading&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
-                    {!bookLoading&&bookFiltered.length===0&&<tr><td colSpan={6} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No book entries for this bank/period.</td></tr>}
+                    {bookLoading&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
+                    {!bookLoading&&bookFiltered.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No book entries for this bank/period.</td></tr>}
                     {bookFiltered.map((l,i)=>{
                       const sel=selBook?.bookKey===l.bookKey;
                       const net=l.debit-l.credit;
@@ -394,6 +394,7 @@ export function BankReco({branch}){
                             ?<td style={{padding:"6px 9px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:net>=0?"#27500A":"#A32D2D"}}>{f(net)}</td>
                             :<><td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{l.debit?f(l.debit):""}</td>
                                <td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{l.credit?f(l.credit):""}</td></>}
+                          {view!=="minimal"&&<td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#5a6691",whiteSpace:"nowrap"}} title="Running book balance">{l.balance!=null?`${f(Math.abs(l.balance))} ${l.balanceSide||""}`.trim():"—"}</td>}
                           <td style={{padding:"6px 9px",textAlign:"center"}}><StatusChip status={l.reconciled?l.status:"unreconciled"}/></td>
                         </tr>
                       );
@@ -408,10 +409,10 @@ export function BankReco({branch}){
               <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Bank Statement <span style={{fontWeight:400,color:"#5a6691"}}>· {stmtFiltered.length}</span></p>
               <div style={{...card,padding:0,overflow:"hidden"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Description","Amount","Status",""]:["Date","Ref / Cheque / UTR","Description","Debit","Credit","Status",""]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Description","Amount","Status",""]:["Date","Ref / Cheque / UTR","Description","Debit","Credit","Balance","Status",""]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount"||h==="Balance")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {stmtLoading&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
-                    {!stmtLoading&&stmtFiltered.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No statement lines. Use <b>Import</b> to load a bank statement (CSV / paste).</td></tr>}
+                    {stmtLoading&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
+                    {!stmtLoading&&stmtFiltered.length===0&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No statement lines. Use <b>Import</b> to load a bank statement (CSV / paste).</td></tr>}
                     {stmtFiltered.map((l,i)=>{
                       const sel=selStmt?.id===l.id;
                       const net=l.credit-l.debit;
@@ -427,6 +428,7 @@ export function BankReco({branch}){
                             ?<td style={{padding:"6px 9px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums",color:net>=0?"#27500A":"#A32D2D"}}>{f(net)}</td>
                             :<><td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#A32D2D"}}>{l.debit?f(l.debit):""}</td>
                                <td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#27500A"}}>{l.credit?f(l.credit):""}</td></>}
+                          {view!=="minimal"&&<td style={{padding:"6px 9px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:"#5a6691",whiteSpace:"nowrap"}} title={l.balance!=null?"Running balance from the imported statement":"Import a statement with a Balance column to populate this"}>{l.balance!=null?f(l.balance):"—"}</td>}
                           <td style={{padding:"6px 9px",textAlign:"center"}}><StatusChip status={l.status}/></td>
                           <td style={{padding:"6px 6px",textAlign:"center",whiteSpace:"nowrap"}}>
                             {(l.status==="reconciled"||l.status==="partial")

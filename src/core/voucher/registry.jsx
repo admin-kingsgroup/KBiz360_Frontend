@@ -77,10 +77,14 @@ function makeRcptPmt(side) {
       const drLines = lines.filter((l) => l.drCr === 'Dr');
       const crLines = lines.filter((l) => l.drCr === 'Cr');
       // Multi-leg direct entry (no party): 2+ heads settled by ONE bank/cash leg →
-      // reopen the split editor. (A single head still loads as the ordinary direct
-      // entry below; a party settlement carries no lines and never reaches here.)
-      const nonBankLegs = (isReceipt ? crLines : drLines).filter((l) => !bankish(l));
-      if (!v.party && nonBankLegs.length >= 2) {
+      // reopen the split editor. The leg side holds the expense/income heads (payment
+      // → Dr, receipt → Cr); the single bank/cash leg sits on the OPPOSITE side. Detect
+      // the leg side by SIDE, not by the bankish name regex — a real expense head like
+      // "Bank Charges" contains "bank" and a name test would drop it, silently losing
+      // that leg on edit. (A single head loads as the ordinary direct entry below; a
+      // party settlement carries no lines and never reaches here.)
+      const legSideLines = isReceipt ? crLines : drLines;
+      if (!v.party && legSideLines.length >= 2) {
         const bankSideLines = isReceipt ? drLines : crLines;
         const bLine = bankSideLines.find(bankish) || bankSideLines[0] || null;
         return {
@@ -90,7 +94,7 @@ function makeRcptPmt(side) {
           amount: '', tds: false, tdsAmt: 0, tdsSection: '194H', remarks: v.remarks || '',
           alloc: {}, applyMode: 'bills', parkOnAcc: false, _billIds: {},
           split: true,
-          splitLines: nonBankLegs.map((l, i) => ({ _k: 6000 + i, ledger: l.ledger || '', amt: l.amt ?? '', desc: l.desc || '' })),
+          splitLines: legSideLines.map((l, i) => ({ _k: 6000 + i, ledger: l.ledger || '', amt: l.amt ?? '', desc: l.desc || '' })),
         };
       }
       const bankLines = isReceipt ? drLines : crLines;   // bank/cash leg side
