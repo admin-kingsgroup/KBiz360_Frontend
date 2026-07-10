@@ -103,7 +103,7 @@ function useOpenBills(party, side) {
 // branch's parties + the Common ('ALL') ones — never another branch's.
 function usePartyMaster(resource, side, brc) {
   const list = useMasterList(resource);
-  const { update } = useMasterMutations(resource);
+  const { update, create } = useMasterMutations(resource);
   const rows = (list.data || []).filter((r) => !brc || !r.branch || r.branch === 'ALL' || r.branch === brc);
 
   const [selectedId, setSelectedId] = useState(null);
@@ -130,31 +130,41 @@ function usePartyMaster(resource, side, brc) {
 
   const dirty = !!form && JSON.stringify(form) !== baseline;
 
+  const saving = update.isPending || create.isPending;
+
   const save = () => {
     if (!form) return;
     setErr('');
     const { id, ...body } = form;
-    update.mutate({ id, body }, {
-      onSuccess: (data) => {
-        const rec = data || form;
-        setForm({ ...rec });
-        setBaseline(JSON.stringify(rec));
-        setSavedAt(Date.now());
-        list.refetch();
-        toast(`${rec.name || 'Record'} saved`);
-      },
-      onError: (e) => { setErr(e.message || 'Save failed'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); },
-    });
+    const onSuccess = (data) => {
+      const rec = data || form;
+      setForm({ ...rec });
+      setBaseline(JSON.stringify(rec));
+      // A create (promoted from a "derived:" row) comes back with a real id, different
+      // from the synthetic one it was selected under — re-point the selection so the
+      // refetch below doesn't strand it (falling back to rows[0]).
+      if (rec.id && rec.id !== id) setSelectedId(rec.id);
+      setSavedAt(Date.now());
+      list.refetch();
+      toast(`${rec.name || 'Record'} saved`);
+    };
+    const onError = (e) => { setErr(e.message || 'Save failed'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); };
+    // "derived:" rows are ledgers the backend surfaces here for visibility (a party
+    // that only exists because a voucher referenced it) — they have no real master
+    // document to PUT to. Saving one must CREATE the real record instead, or the
+    // backend 404s ("Cannot PUT .../derived:...") since there's nothing to update.
+    if (!id || String(id).startsWith('derived:')) create.mutate(body, { onSuccess, onError });
+    else update.mutate({ id, body }, { onSuccess, onError });
   };
 
   // Ctrl/Cmd+Enter saves from anywhere on the (multi-tab) party form, when dirty.
   const liveRef = useRef(null);
-  liveRef.current = { save, dirty, saving: update.isPending };
+  liveRef.current = { save, dirty, saving };
   useHotkey('mod+enter', () => { const s = liveRef.current; if (s && s.dirty && !s.saving) s.save(); }, []);
 
   return {
     list, rows, current, form, setField, setSelectedId, save,
-    saving: update.isPending, err, savedAt, dirty, vouchersQ, openBillsQ,
+    saving, err, savedAt, dirty, vouchersQ, openBillsQ,
   };
 }
 
