@@ -43,6 +43,7 @@ function useReco(fn) {
 export const useImportTally        = () => useReco((body) => apiPost('/api/tally-reconciliation/import', body));
 export const useTallyAutoMatch     = () => useReco((body) => apiPost('/api/tally-reconciliation/auto-match', body));
 export const useTallyManualMatch   = () => useReco(({ id, ...b }) => apiPost(`/api/tally-reconciliation/match/${id}`, b));
+export const useTallyGroupMatch    = () => useReco(({ id, books }) => apiPost(`/api/tally-reconciliation/match-group/${id}`, { books }));
 export const useTallyUnmatch       = () => useReco(({ id }) => apiPost(`/api/tally-reconciliation/unmatch/${id}`));
 export const useSetTallyRecoStatus = () => useReco(({ id, status }) => apiPost(`/api/tally-reconciliation/status/${id}`, { status }));
 export const useClearTally         = () => useReco(({ ledger, branch }) => apiDelete(`/api/tally-reconciliation/tally?${new URLSearchParams({ ledger, ...(branch ? { branch: branchCode(branch) } : {}) })}`));

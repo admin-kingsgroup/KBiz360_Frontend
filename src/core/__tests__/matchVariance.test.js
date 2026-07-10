@@ -1,4 +1,4 @@
-import { matchVariance } from '../matchVariance';
+import { matchVariance, matchVarianceGroup } from '../matchVariance';
 
 // Phase 1 split guardrail: matchVariance is the signal used to decide whether a
 // manual 1:1 match should warn ("looks like a split") before saving a partial.
@@ -24,5 +24,21 @@ describe('matchVariance — manual-match split signal', () => {
   test('handles missing / blank sides', () => {
     expect(matchVariance({ credit: 1000 }, { debit: 1000 })).toBe(0);
     expect(matchVariance({}, {})).toBe(0);
+  });
+});
+
+describe('matchVarianceGroup — N book legs vs one line', () => {
+  test('legs that sum to the line tie out to 0', () => {
+    expect(matchVarianceGroup({ debit: 0, credit: 1000 }, [
+      { debit: 400, credit: 0 }, { debit: 350, credit: 0 }, { debit: 250, credit: 0 },
+    ])).toBe(0);
+  });
+  test('short legs leave a positive residual', () => {
+    expect(matchVarianceGroup({ debit: 0, credit: 1000 }, [
+      { debit: 400, credit: 0 }, { debit: 350, credit: 0 },
+    ])).toBe(250);
+  });
+  test('no legs = full line as variance', () => {
+    expect(matchVarianceGroup({ debit: 0, credit: 1000 }, [])).toBe(1000);
   });
 });
