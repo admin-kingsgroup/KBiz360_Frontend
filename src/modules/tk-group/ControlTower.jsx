@@ -12,6 +12,7 @@ import { BandError } from './BandError';
 import { GroupHealth } from './GroupHealth';
 import { SetupReadiness } from './SetupReadiness';
 import { SetupTaskList } from './SetupTaskList';
+import { ModulesHealth } from './ModulesHealth';
 import { IntegritySummary } from './IntegritySummary';
 import { ScrutinyTrend } from './ScrutinyTrend';
 // Development findings share the Dev Control registry + tracking rows — the SAME
@@ -38,6 +39,7 @@ const TABS = [
   { id: 'dev', label: 'Development' },
   { id: 'gov', label: 'Governance' },
   { id: 'tasks', label: 'Task List' },
+  { id: 'modules-health', label: 'Modules Health' },
 ];
 
 // ── Development findings — Dev Control's open items surfaced as a Tower lens ──
@@ -319,6 +321,7 @@ export function ControlTower({ setRoute } = {}) {
       {tab === 'dev' && <DevelopmentLens setRoute={setRoute} />}
       {tab === 'gov' && <Governance />}
       {tab === 'tasks' && <SetupTaskList setRoute={setRoute} />}
+      {tab === 'modules-health' && <ModulesHealth setRoute={setRoute} />}
     </div>
   );
 }
