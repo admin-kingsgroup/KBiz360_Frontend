@@ -287,10 +287,14 @@ export function ControlPanel({ setRoute }) {
   };
 
   const activeLabel = POWER_SCREENS.flatMap((g) => g.items).find((i) => i.key === screen)?.label || '';
-  // Branch-resolved state for the selected scope (isOn is branch-aware).
-  const masterOn = isOn('core.policy_guard');
-  const engaged = Object.keys(flags).filter((k) => isOn(k)).length;
   const showBranchBar = BRANCH_SCOPED.has(screen);
+  // The status strip reflects the selected branch ONLY on branch-scoped screens; on the
+  // display-only screens it shows the global state (so it never claims "BOM scope" on a
+  // screen that ignores the branch selector).
+  const stripBranch = showBranchBar ? branch : 'default';
+  const stripScoped = showBranchBar && scoped;
+  const masterOn = isFlagOn(flagsQ.data, 'core.policy_guard', stripBranch);
+  const engaged = Object.keys(flags).filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length;
 
   return (
     <div data-testid="tk-control-panel">
@@ -301,8 +305,8 @@ export function ControlPanel({ setRoute }) {
           {masterOn ? 'Guard engaged · enforcing' : engaged > 0 ? `${engaged} control${engaged > 1 ? 's' : ''} on · guard dormant` : 'Everything OFF · dormant'}
         </Badge>
         <span className={`text-[12px] ${masterOn ? 'text-danger' : 'text-warning'}`}>
-          {scoped ? <><b>{branchLabel}</b> scope · </> : null}
-          {masterOn ? `The TK Group guard is on${scoped ? ` for ${branchLabel}` : ''} — these controls now enforce.`
+          {stripScoped ? <><b>{branchLabel}</b> scope · </> : null}
+          {masterOn ? `The TK Group guard is on${stripScoped ? ` for ${branchLabel}` : ''} — these controls now enforce.`
             : owner ? 'Flip any switch to engage it live — your change applies immediately and is logged.'
             : 'Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.'}
         </span>

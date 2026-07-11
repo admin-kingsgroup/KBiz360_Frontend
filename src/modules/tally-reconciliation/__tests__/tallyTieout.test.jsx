@@ -2,7 +2,7 @@
 // carries the two tier tie-outs, its routes resolve, and the board renders the
 // three side-by-side views from mocked tie-out data (incl. an only-in-Tally row).
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 jest.mock('../api', () => ({
@@ -14,6 +14,16 @@ jest.mock('../api', () => ({
     summary: { total: 1, byType: { 'missing-in-erp': 1 } },
     defects: [{ ledger: 'HDFC Bank A/c', date: '2026-07-09', ref: '', desc: 'Bank charge', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: -5000, variance: 0, side: 'tally' }],
   })),
+  getTallyCert: jest.fn(() => Promise.resolve({
+    certificate: null,
+    chain: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
+    progress: { done: 0, total: 4, next: { role: 'AE' } },
+    canSign: { ok: false, reason: 'freeze the tie-out first' },
+  })),
+  freezeTallyCert: jest.fn(),
+  signTallyCert: jest.fn(),
+  acceptVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
+  clearVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
   getLedgerVouchers: jest.fn(() => Promise.resolve({
     ledger: 'HDFC Bank A/c', branch: 'BOM', period: '2026-07', tier: 'month', from: '2026-07-01', to: '2026-07-31',
     erpBalance: 810000, tallyImported: 2, summary: { total: 1 },
@@ -86,7 +96,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
   test('Defects tab shows the classified Defect Register (Phase 2)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
-    fireEvent.click(screen.getByText('Defects'));
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab (word also appears in the certificate message)
     expect(await screen.findByText(/In Tally, not ERP: 1/)).toBeInTheDocument(); // summary chip
     expect(screen.getByText('3 off ledgers')).toBeInTheDocument();
   });
@@ -98,5 +108,39 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(await screen.findByText(/Voucher-by-voucher/)).toBeInTheDocument();
     expect(await screen.findByText('BSP settlement')).toBeInTheDocument();
     expect(screen.getByText('Bank charge')).toBeInTheDocument();
+  });
+
+  test('certificate panel gates the close — blocked while ledgers are off (Phase 3)', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText('Month-End Tally Certificate')).toBeInTheDocument();
+    // Board mock has 4 off (3 off + 1 only-in-Tally) → not certifiable, no sign yet.
+    expect(await screen.findByText(/Not certifiable yet/)).toBeInTheDocument();
+    expect(screen.getByText(/close gate/)).toBeInTheDocument();
+  });
+
+  test('non-central role (Branch Accountant) is guarded from the board', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Branch Accountant' }} />);
+    expect(await screen.findByText('Central control')).toBeInTheDocument();
+    expect(screen.queryByText('HDFC Bank A/c')).not.toBeInTheDocument(); // no board leak
+  });
+
+  test('TB footer shows "Not balanced" when a side does not self-balance (no false all-clear)', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', counts: { total: 1, tied: 1, off: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: false }, imported: { count: 1 },
+      rows: [{ ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 100, tally: 100, diff: 0, status: 'tied' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText('Not balanced')).toBeInTheDocument();
+    expect(screen.getByText('Dr ≠ Cr')).toBeInTheDocument();
+  });
+
+  test('accept an explained variance from the drill drawer (Phase 4)', async () => {
+    const { acceptVariance } = require('../api');
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByText('HDFC Bank A/c')); // off ledger → drawer
+    fireEvent.click(await screen.findByText('Accept variance'));
+    await waitFor(() => expect(acceptVariance).toHaveBeenCalledWith(expect.objectContaining({ ledger: 'HDFC Bank A/c', period: '2026-07' })));
   });
 });

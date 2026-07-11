@@ -16,20 +16,42 @@ export function fmt(v, cur) {
   if (v === 0) return '0';
   return `${Math.abs(v).toLocaleString(localeOf(cur), { maximumFractionDigits: 2 })} ${v >= 0 ? 'Dr' : 'Cr'}`;
 }
-/** Plain grouped magnitude (no side) — for difference/variance cells. */
-export const grp = (v, cur) => Math.abs(Number(v) || 0).toLocaleString(localeOf(cur), { maximumFractionDigits: 2 });
+// Zero-vs-absent reads as tied — mirrors the backend `statusOf` (a zero-balance
+// ledger the Tally export omits is not a blocking difference).
+export const statusOf = (e, t) => {
+  const ev = e === null ? 0 : e; const tv = t === null ? 0 : t;
+  if (round2(ev - tv) === 0) return 'tied';
+  if (e === null) return 'only-tally';
+  if (t === null) return 'only-erp';
+  return 'off';
+};
 
-export const statusOf = (e, t) => (e === null ? 'only-tally' : t === null ? 'only-erp' : round2((e || 0) - (t || 0)) === 0 ? 'tied' : 'off');
+// Tally reconciliation is a CENTRAL Month/Year control (AE / FM / Director /
+// Owner). Mirrors the backend role gate — used to self-guard the board on a
+// direct URL for a role that shouldn't reach it (e.g. a Branch Accountant).
+export const isCentralRole = (role) => /account.*(exec|executive)|(^|[^a-z])ae([^a-z]|$)|finance\s*manager|(^|[^a-z])fm([^a-z]|$)|director|owner|super[\s_-]*admin/i.test(String(role || ''));
 
 export const STATUS_META = {
   tied: { tone: 'success', label: 'Tied' },
   off: { tone: 'danger', label: 'Off' },
+  accepted: { tone: 'info', label: 'Accepted' },
   matched: { tone: 'success', label: 'Matched' },
   'amount-diff': { tone: 'danger', label: 'Amount differs' },
   'only-erp': { tone: 'warning', label: 'Only in ERP' },
   'only-tally': { tone: 'warning', label: 'Only in Tally' },
 };
 export const statusMeta = (s) => STATUS_META[s] || STATUS_META.tied;
+
+// Accepted-variance reasons (why an off ledger is explained, not chased).
+export const REASONS = [
+  { value: 'inter-branch', label: 'Inter-branch (reconciled by hand)' },
+  { value: 'timing', label: 'Timing difference' },
+  { value: 'fx-rounding', label: 'FX rounding' },
+  { value: 'rate-difference', label: 'Rate difference' },
+  { value: 'migration', label: 'Migration / opening item' },
+  { value: 'other', label: 'Other (explain in the note)' },
+];
+export const reasonLabel = (v) => (REASONS.find((r) => r.value === v) || {}).label || v;
 
 // Defect type → tone + short label (Defect Register).
 export const DEFECT_META = {
