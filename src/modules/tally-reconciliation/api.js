@@ -33,6 +33,11 @@ export function freezeTallyCert({ branch, period, tier }) {
 export function signTallyCert({ branch, period, tier }) {
   return apiPost('/api/tally-tieout/certificate/sign', { branch, period, tier });
 }
+// Re-open a certified period (Director/Owner) so corrected Tally data can be
+// re-uploaded and the chain re-signed. Clears the signatures; requires a reason.
+export function reopenTallyCert({ branch, period, tier, reason }) {
+  return apiPost('/api/tally-tieout/certificate/reopen', { branch, period, tier, reason });
+}
 // Phase 4 — accept / un-accept an off ledger's difference (explained variance).
 export function acceptVariance({ branch, period, tier, ledger, code, reason, note }) {
   return apiPost('/api/tally-tieout/accept', { branch, period, tier, ledger, code, reason, note });

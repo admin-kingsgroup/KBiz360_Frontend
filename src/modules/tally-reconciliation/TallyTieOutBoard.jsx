@@ -167,6 +167,19 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     queryFn: () => getDayBookStatus({ branch, period, tier }),
     enabled: central,
   });
+  // TB and Day Book are two independent uploads from Tally. Warn when they've drifted
+  // out of sync so a correction re-uploads BOTH from the same export: (a) TB present
+  // but Day Book missing → the drill/Defects will be empty; (b) both present but
+  // uploaded > 24h apart → likely different exports.
+  const dbSync = useMemo(() => {
+    if (!imported.count) return null; // nothing uploaded yet — the onboarding copy covers it
+    if (!(dbStatus?.vouchers > 0)) return { tone: 'warn', msg: 'A Tally TB is uploaded but no Day Book — the voucher drill and Defect Register will be empty. Upload the Day Book for this period too.' };
+    if (imported.at && dbStatus?.at) {
+      const gapH = Math.abs(new Date(imported.at) - new Date(dbStatus.at)) / 3.6e6;
+      if (gapH > 24) return { tone: 'info', msg: `The TB and Day Book were uploaded ${Math.round(gapH / 24)} day(s) apart — re-upload BOTH from the same Tally export after any correction so they stay consistent.` };
+    }
+    return null;
+  }, [imported.count, imported.at, dbStatus?.vouchers, dbStatus?.at]);
 
   // TB import source: once a file is PICKED it is authoritative — even if it parsed
   // to 0 rows / errored (→ button stays disabled), so we never silently upload the
@@ -267,6 +280,14 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         )}
       </div>
 
+      {/* TB ↔ Day Book out-of-sync notice */}
+      {dbSync && (
+        <div className={`flex items-start gap-2 rounded-brand border px-4 py-2.5 text-sm ${dbSync.tone === 'warn' ? 'border-warning/40 bg-warning/10 text-ink' : 'border-surface-border bg-surface-muted text-ink-muted'}`} data-testid="db-sync-warning">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+          <span>{dbSync.msg}</span>
+        </div>
+      )}
+
       {/* Trial Balance import — pick a file (Excel/CSV/XML) OR paste */}
       {showImport && (
         <PageSection title="Upload Tally Trial Balance" subtitle={`The ${branch} · ${period} Trial Balance from Tally — export it as Excel/CSV (or paste below). Columns: Ledger, Closing Dr, Closing Cr.`}>
@@ -338,7 +359,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           once uploaded, show the certificate close gate. Deferred until the board
           has loaded so the gate never flashes a wrong state (U4). */}
       {!empty && !isLoading && (imported.count
-        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} />
+        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} staleAccepted={counts.staleAccepted || 0} currentUser={currentUser} />
         : (
           <PageSection icon={Upload} title={`No Tally Trial Balance uploaded — ${branch} · ${period}`}
             subtitle="Until you upload the period's Tally TB, every ERP ledger below shows as unmatched. This is the starting point, not an error.">
@@ -403,7 +424,8 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                               <td className="px-4 py-2"><span className="block font-semibold text-ink">{r.ledger}
                                 {r.interBranch ? <span className="ml-1.5 align-middle rounded-full bg-info/10 px-1.5 text-[10px] font-semibold text-info">IB</span> : null}</span>
                                 {r.code ? <span className="font-mono text-xs text-ink-subtle">{r.code}</span> : null}
-                                {acc ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info">✓ accepted · {reasonLabel(r.acceptedReason)}</span>
+                                {acc ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info">✓ accepted · {reasonLabel(r.acceptedReason)}
+                                  {r.acceptanceStale ? <span className="ml-1 rounded-full bg-warning/15 px-1.5 font-bold text-warning" title={`Accepted for ${fmt(r.acceptedAmount, cur)}, now ${fmt(r.diff, cur)} — re-review`}>⚠ changed</span> : null}</span>
                                   : off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}</td>
                               <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.erp === null ? 'text-ink-subtle' : ''}`}>{fmt(r.erp, cur)}</td>
                               <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.tally === null ? 'text-ink-subtle' : ''}`}>{fmt(r.tally, cur)}</td>

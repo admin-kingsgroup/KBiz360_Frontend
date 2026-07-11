@@ -25,6 +25,7 @@ jest.mock('../api', () => ({
   })),
   freezeTallyCert: jest.fn(),
   signTallyCert: jest.fn(),
+  reopenTallyCert: jest.fn(() => Promise.resolve({ certificate: { status: 'open', signatures: [] } })),
   acceptVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
   clearVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
   getLedgerVouchers: jest.fn(() => Promise.resolve({
@@ -50,6 +51,7 @@ jest.mock('../api', () => ({
 }));
 
 import { TallyTieOutBoard } from '../TallyTieOutBoard';
+import { CertifyPanel } from '../CertifyPanel';
 import { TallyGuidePage } from '../TallyGuidePage';
 import { tallyReconRoutes } from '../routes';
 import { MENU_TALLY_RECON, getMenu } from '../../../core/menus';
@@ -246,5 +248,52 @@ describe('Tally Reconciliation · tie-out board render', () => {
     // 2025-01 inception → FY2024-25 (Jan–Mar 2025 belongs to the prior FY) through current.
     expect(values).toContain('FY2024-25');
     expect(values.every((v) => /^FY\d{4}-\d{2}$/.test(v))).toBe(true);
+  });
+
+  test('TB uploaded but no Day Book → out-of-sync warning', async () => {
+    const { getDayBookStatus } = require('../api');
+    getDayBookStatus.mockResolvedValue({ vouchers: 0, ledgers: 0 }); // board mock TB has imported.count 4
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByTestId('db-sync-warning')).toHaveTextContent(/no Day Book/i);
+    getDayBookStatus.mockResolvedValue({ vouchers: 0, ledgers: 0 }); // reset default
+  });
+});
+
+describe('Tally Reconciliation · certificate re-open + stale acceptance', () => {
+  const lockedCert = {
+    certificate: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { frozenAt: '2026-07-05' } },
+    chain: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
+    progress: { done: 4, total: 4, next: null },
+    canSign: { ok: false, reason: 'certificate is locked' },
+  };
+
+  test('an approver (Owner) sees Re-open on a certified period; a reason is required to confirm', async () => {
+    const { getTallyCert, reopenTallyCert } = require('../api');
+    getTallyCert.mockResolvedValue(lockedCert);
+    wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} currentUser={{ role: 'Owner' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Re-open to correct/ }));
+    const confirm = await screen.findByRole('button', { name: /Confirm re-open/ });
+    expect(confirm).toBeDisabled(); // no reason yet
+    fireEvent.change(screen.getByLabelText(/Reason for re-opening/), { target: { value: 'BSP closing was wrong in Tally' } });
+    expect(confirm).not.toBeDisabled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(reopenTallyCert).toHaveBeenCalledWith(expect.objectContaining({ branch: 'BOM', period: '2026-07', reason: 'BSP closing was wrong in Tally' })));
+    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
+  });
+
+  test('a non-approver (AE) does NOT see Re-open on a certified period', async () => {
+    const { getTallyCert } = require('../api');
+    getTallyCert.mockResolvedValue(lockedCert);
+    wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} currentUser={{ role: 'AE' }} />);
+    expect(await screen.findByText(/close gate is satisfied/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Re-open to correct/ })).not.toBeInTheDocument();
+    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
+  });
+
+  test('stale accepted variances raise a re-review warning on the certificate', async () => {
+    const { getTallyCert } = require('../api');
+    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false } });
+    wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} staleAccepted={2} currentUser={{ role: 'Owner' }} />);
+    expect(await screen.findByText(/2 accepted variances changed/)).toBeInTheDocument();
   });
 });
