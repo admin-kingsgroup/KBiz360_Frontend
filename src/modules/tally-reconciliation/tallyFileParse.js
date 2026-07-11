@@ -11,9 +11,11 @@ const num = (v) => {
   const raw = String(v ?? '');
   const s = raw.replace(/USD|INR|KES|TZS/gi, '').replace(/[₹$,\s]/g, '');
   const paren = /^\(.*\)$/.test(s);
-  // Detect the Cr/Dr suffix on the RAW string — stripping spaces first would fuse
-  // "9000 Cr" into "9000Cr" and kill the \bcr\b word boundary (dropping the sign).
-  const cr = /\bcr\b/i.test(raw); const dr = /\bdr\b/i.test(raw);
+  // Cr/Dr suffix — match it on the space-stripped `s` so BOTH "9000 Cr" and the
+  // no-space "9000Cr" are caught (a \bcr\b test on the raw string misses the
+  // digit-adjacent no-space form). Fall back to a word-boundary test on the raw.
+  const cr = /cr\.?$/i.test(s) || /\bcr\b/i.test(raw);
+  const dr = /dr\.?$/i.test(s) || /\bdr\b/i.test(raw);
   const n = Number(s.replace(/[()]/g, '').replace(/[a-z]/gi, ''));
   if (!Number.isFinite(n)) return null;
   const mag = Math.abs(n);
@@ -31,7 +33,9 @@ export function toISODate(v) {
   m = s.match(/^(\d{4})(\d{2})(\d{2})$/); // Tally XML compact YYYYMMDD
   if (m && +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31) return `${m[1]}-${m[2]}-${m[3]}`;
   m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/);
-  if (m) { const y = m[3].length === 2 ? `20${m[3]}` : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; }
+  // DD/MM/YYYY (Tally India). Range-check so a US-style MM/DD ("07/14/2026")
+  // doesn't emit the invalid ISO "2026-14-07" — reject it as not-a-date instead.
+  if (m && +m[1] >= 1 && +m[1] <= 31 && +m[2] >= 1 && +m[2] <= 12) { const y = m[3].length === 2 ? `20${m[3]}` : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; }
   const MO = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
   m = s.match(/^(\d{1,2})[ /-]([A-Za-z]{3})[a-z]*[ /-](\d{2,4})$/);
   if (m && MO[m[2].toLowerCase()]) { const y = m[3].length === 2 ? `20${m[3]}` : m[3]; return `${y}-${MO[m[2].toLowerCase()]}-${m[1].padStart(2, '0')}`; }
@@ -73,8 +77,11 @@ export function normalizeDayBook(matrix = []) {
     if (d) curDate = d;
     const v = cols.vno !== undefined ? String(r[cols.vno] ?? '').trim() : '';
     if (v) curVno = v;
-    const ledger = String(r[cols.ledger] ?? '').trim();
-    if (!ledger || /^(total|grand total|opening balance|closing balance|by |to )/i.test(ledger)) continue;
+    // A Tally columnar Day Book prefixes contra legs with "To "/"By " (e.g.
+    // "To ICICI Bank A/c") — strip the prefix to recover the real ledger name
+    // rather than dropping the leg (which would unbalance the voucher).
+    const ledger = String(r[cols.ledger] ?? '').trim().replace(/^(to|by)\s+/i, '');
+    if (!ledger || /^(total|grand total|opening balance|closing balance)/i.test(ledger)) continue;
     const debit = cols.debit !== undefined ? Math.abs(num(r[cols.debit]) || 0) : 0;
     const credit = cols.credit !== undefined ? Math.abs(num(r[cols.credit]) || 0) : 0;
     if (!debit && !credit) continue; // a subtotal / narration-only line
@@ -131,7 +138,10 @@ function splitLine(line, d) {
 function delimitedToMatrix(text) {
   const lines = String(text).split(/\r?\n/).filter((l) => l.trim() !== '');
   if (!lines.length) return [];
-  const sample = lines.slice(0, 25).join('\n');
+  // Blank out quoted regions before counting delimiters so a comma INSIDE a quoted
+  // field (e.g. "Smith, John";1000) doesn't fool the auto-detector. splitLine still
+  // honours the quotes when actually splitting.
+  const sample = lines.slice(0, 25).join('\n').replace(/"[^"]*"/g, '""');
   const delim = [',', '\t', '|', ';'].map((d) => ({ d, n: (sample.match(new RegExp(`\\${d}`, 'g')) || []).length })).sort((a, b) => b.n - a.n)[0];
   if (!delim.n) return lines.map((l) => [l]);
   return lines.map((l) => splitLine(l, delim.d));
@@ -166,7 +176,10 @@ export function parseTallyXmlDayBook(text) {
       rows.push({ date, vno, ledger, debit: amt < 0 ? Math.abs(amt) : 0, credit: amt > 0 ? amt : 0, narration });
     }
   }
-  return { rows: rows.filter((r) => r.date), error: rows.length ? '' : 'XML parsed but no ledger entries found.' };
+  // Base the error on rows we KEPT (dated) — an all-undated file must not read as a
+  // silent success with 0 rows.
+  const kept = rows.filter((r) => r.date);
+  return { rows: kept, error: kept.length ? '' : (rows.length ? 'XML parsed but no dated ledger entries found.' : 'XML parsed but no ledger entries found.') };
 }
 
 async function fileToMatrix(file) {

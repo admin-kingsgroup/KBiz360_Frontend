@@ -11,6 +11,8 @@ describe('toISODate', () => {
     expect(toISODate('14-07-26')).toBe('2026-07-14');
     expect(toISODate('14-Jul-2026')).toBe('2026-07-14');
     expect(toISODate('1.4.2026')).toBe('2026-04-01');
+    expect(toISODate('20260714')).toBe('2026-07-14'); // Tally compact
+    expect(toISODate('07/14/2026')).toBe('');          // US MM/DD — month 14 invalid, rejected not mangled
     expect(toISODate('not a date')).toBe('');
     expect(toISODate('')).toBe('');
   });
@@ -41,6 +43,19 @@ describe('normalizeDayBook', () => {
     expect(rows).toHaveLength(0);
     expect(error).toMatch(/No Day Book header/);
   });
+
+  test('columnar "To/By" contra legs keep the ledger (prefix stripped, not dropped)', () => {
+    const matrix = [
+      ['Date', 'Particulars', 'Vch No', 'Debit', 'Credit'],
+      ['2-Jul-2026', 'ICICI Bank A/c', 'PAY/1', '', '200000'],  // primary leg (no prefix)
+      ['', 'To BSP / IATA', '', '200000', ''],                   // contra leg prefixed "To "
+      ['', 'By Rounding', '', '0.5', ''],                        // another contra "By "
+      ['', 'Grand Total', '', '200000.5', '200000'],             // summary — still skipped
+    ];
+    const { rows } = normalizeDayBook(matrix);
+    expect(rows.map((r) => r.ledger)).toEqual(['ICICI Bank A/c', 'BSP / IATA', 'Rounding']);
+    expect(rows.every((r) => r.date === '2026-07-02' && r.vno === 'PAY/1')).toBe(true);
+  });
 });
 
 describe('normalizeTB', () => {
@@ -58,17 +73,21 @@ describe('normalizeTB', () => {
     ]);
   });
 
-  test('single signed Closing column (Cr / parentheses → negative)', () => {
+  test('single signed Closing column (Cr / parentheses / no-space Cr → negative)', () => {
     const matrix = [
       ['Ledger', 'Closing Balance'],
       ['ICICI Bank A/c', '1245300 Dr'],
       ['BSP / IATA', '9000 Cr'],
+      ['HDFC Bank A/c', '805000Dr'],  // no space before Dr
+      ['Airline Payable', '4200Cr'],  // no space before Cr
       ['Suspense', '(500)'],
     ];
     const { rows } = normalizeTB(matrix);
     expect(rows).toEqual([
       { ledger: 'ICICI Bank A/c', closing: 1245300 },
       { ledger: 'BSP / IATA', closing: -9000 },
+      { ledger: 'HDFC Bank A/c', closing: 805000 },
+      { ledger: 'Airline Payable', closing: -4200 },
       { ledger: 'Suspense', closing: -500 },
     ]);
   });

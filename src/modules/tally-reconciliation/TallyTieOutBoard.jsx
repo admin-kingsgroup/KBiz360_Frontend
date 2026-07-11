@@ -117,8 +117,10 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     enabled: central,
   });
 
-  // TB import — a parsed file if one was picked, else the pasted rows.
-  const tbRows = () => (tbFile && tbFile.rows.length ? tbFile.rows : parseTB(paste));
+  // TB import source: once a file is PICKED it is authoritative — even if it parsed
+  // to 0 rows / errored (→ button stays disabled), so we never silently upload the
+  // leftover paste. Paste is used only when no file has been picked.
+  const tbRows = () => (tbFile ? tbFile.rows : parseTB(paste));
   const imp = useMutation({
     mutationFn: () => importTB({ branch, period, tier, rows: tbRows() }),
     onSuccess: () => { setPaste(''); setTbFile(null); qc.invalidateQueries({ queryKey: ['tally-tieout'] }); },
@@ -221,6 +223,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             <FileUp size={18} className="text-accent" aria-hidden="true" />
             <span className="text-sm font-semibold text-ink">Choose Trial Balance file</span>
             <input type="file" accept=".xlsx,.xls,.csv,.tsv,.txt,.xml,.html,.htm" data-testid="tb-file"
+              onClick={(e) => { e.currentTarget.value = ''; }}
               onChange={(e) => pickFile(e.target.files?.[0], 'tb')} className="text-xs text-ink-muted" />
             <span className="text-xs text-ink-subtle">Excel, CSV, TSV or Tally XML/HTML export.</span>
           </label>
@@ -250,6 +253,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             <FileUp size={18} className="text-accent" aria-hidden="true" />
             <span className="text-sm font-semibold text-ink">Choose Day Book file</span>
             <input type="file" accept=".xlsx,.xls,.csv,.tsv,.txt,.xml,.html,.htm" data-testid="db-file"
+              onClick={(e) => { e.currentTarget.value = ''; }}
               onChange={(e) => pickFile(e.target.files?.[0], 'db')} className="text-xs text-ink-muted" />
             <span className="text-xs text-ink-subtle">Excel, CSV, TSV or Tally XML/HTML export.</span>
           </label>
@@ -287,7 +291,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         : (
           <PageSection icon={Upload} title={`No Tally Trial Balance uploaded — ${branch} · ${period}`}
             subtitle="Until you upload the period's Tally TB, every ERP ledger below shows as unmatched. This is the starting point, not an error.">
-            <Button variant="primary" icon={Upload} onClick={() => setShowImport(true)}>Upload Tally TB</Button>
+            <Button variant="primary" icon={Upload} onClick={() => { setShowImport(true); setShowDayBook(false); }}>Upload Tally TB</Button>
           </PageSection>
         ))}
 
@@ -312,7 +316,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         {empty && (
           <EmptyState title={`No ledgers to tie out for ${branch} · ${period}`}
             hint="Upload the period's Tally Trial Balance and the ERP will put its live numbers next to it."
-            action={<Button variant="primary" icon={Upload} onClick={() => setShowImport(true)}>Upload Tally TB</Button>} />
+            action={<Button variant="primary" icon={Upload} onClick={() => { setShowImport(true); setShowDayBook(false); }}>Upload Tally TB</Button>} />
         )}
         {!isLoading && !empty && (
           <div className="overflow-x-auto">
