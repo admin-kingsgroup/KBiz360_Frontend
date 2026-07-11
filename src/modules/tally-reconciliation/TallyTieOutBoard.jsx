@@ -115,8 +115,13 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const [drill, setDrill] = useState(null); // off ledger being drilled (Phase 2)
 
   const { data: periodsData } = useQuery({ queryKey: ['tally-tieout', 'periods', branch], queryFn: () => getPeriods({ branch }), enabled: central });
-  // Earliest posted date for this branch → the selector spans inception..now.
-  const { data: inceptionFrom } = useQuery({ queryKey: ['tally-tieout', 'inception', branch], queryFn: () => getInception({ branch }), enabled: central });
+  // Earliest posted date for this branch → the selector spans inception..now. Fall
+  // back to the COMPANY inception (min across all branches) so a branch with no
+  // entries yet (e.g. a not-yet-onboarded Africa branch) still offers the same
+  // period range as the books, not an arbitrary window.
+  const { data: branchInception } = useQuery({ queryKey: ['tally-tieout', 'inception', branch], queryFn: () => getInception({ branch }), enabled: central });
+  const { data: globalInception } = useQuery({ queryKey: ['tally-tieout', 'inception', 'ALL'], queryFn: () => getInception({}), enabled: central });
+  const inceptionFrom = branchInception || globalInception;
   const period = periodSel[`${branch}:${tier}`] || defaultPeriod(tier, branch);
   const setPeriod = (p) => setPeriodSel((s) => ({ ...s, [`${branch}:${tier}`]: p }));
   const periodOptions = useMemo(() => {
