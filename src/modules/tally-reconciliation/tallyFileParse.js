@@ -5,7 +5,9 @@
 //   • Day Book → { date, vno, ledger, debit, credit, narration }  (one per leg)
 //   • Trial Balance → { ledger, closingDebit, closingCredit }
 // File routing mirrors the bank/statement importer; header detection is
-// Tally-specific (Particulars = the ledger, Vch No, Dr/Cr, Closing).
+// Tally-specific (Particulars = the ledger, Vch No, Dr/Cr, Closing). Tally writes
+// its XML as UTF-16LE and its TB with an UNLABELLED ledger column, so the readers
+// below are deliberately tolerant of both.
 
 const num = (v) => {
   const raw = String(v ?? '');
@@ -41,6 +43,27 @@ export function toISODate(v) {
   if (m && MO[m[2].toLowerCase()]) { const y = m[3].length === 2 ? `20${m[3]}` : m[3]; return `${y}-${MO[m[2].toLowerCase()]}-${m[1].padStart(2, '0')}`; }
   return '';
 }
+
+// ── Tally group / total rows (dropped from a TB upload) ──────────────────────
+// A grouped Trial Balance print carries GROUP subtotal rows (e.g. "Loans
+// (Liability)") interleaved with their ledgers, plus a Grand Total. Importing a
+// group row double-counts against the ledger tie-out, so we drop the reserved
+// Tally group names — only the compound / parenthesised ones no ledger would ever
+// be named (a real ledger "Investments" / "Closing Stock" / "Suspense Account" is
+// left ALONE, never silently dropped). The proper fix is a ledger-wise export
+// (Tally: F5 on the Trial Balance) — surfaced as a note when a group row is seen.
+const TALLY_GROUP_NAMES = new Set([
+  'capital account', 'reserves & surplus', 'loans (liability)', 'bank od accounts',
+  'secured loans', 'unsecured loans', 'current liabilities', 'duties & taxes',
+  'provisions', 'sundry creditors', 'fixed assets', 'current assets', 'bank accounts',
+  'cash-in-hand', 'deposits (asset)', 'loans & advances (asset)', 'stock-in-hand',
+  'sundry debtors', 'sales accounts', 'direct income', 'purchase accounts',
+  'direct expenses', 'indirect expenses', 'indirect income', 'misc. expenses (asset)',
+  'branch / divisions', 'profit & loss a/c',
+]);
+const gkey = (s) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+const isTallyGroupRow = (name) => TALLY_GROUP_NAMES.has(gkey(name));
+const isTBNoiseRow = (name) => /^(grand\s*total|sub[\s-]*total|total|opening\s*balance|closing\s*balance|difference\s*in\s*opening(\s*balance)?)$/i.test(String(name ?? '').trim());
 
 // Find the header row anywhere in the first 25 lines, mapping our fields to columns.
 function findHeader(matrix, HDR, requireEvery) {
@@ -91,29 +114,78 @@ export function normalizeDayBook(matrix = []) {
   return { rows, error: rows.length ? '' : 'Header found but no voucher rows parsed.' };
 }
 
-const TB_HDR = {
-  ledger: /^(ledger(\s*name)?|particulars|account(\s*name)?|name)$/i,
-  closingDebit: /^(closing\s*(debit|dr)|closing\s*balance\s*dr|debit\s*closing)$/i,
-  closingCredit: /^(closing\s*(credit|cr)|closing\s*balance\s*cr|credit\s*closing)$/i,
-  closing: /^(closing(\s*balance)?|balance)$/i,
-  openingDebit: /^(opening\s*(debit|dr))$/i,
-  openingCredit: /^(opening\s*(credit|cr))$/i,
-  debit: /^(debit|dr)$/i,
-  credit: /^(credit|cr)$/i,
-};
+// ── Trial Balance columnar header (Excel / CSV / HTML) ────────────────────────
+// Tally's TB print is terse: the ledger column has NO header text, and BOTH the
+// opening and closing columns are labelled just "Balance". So we classify columns
+// row-by-row and (a) infer the ledger column when it's blank, (b) treat the
+// RIGHTMOST balance/closing column as the closing (the left "Balance" is opening).
+const TB_COLS = [
+  ['closingDebit', /^(closing\s*(debit|dr)|closing\s*balance\s*(debit|dr)|debit\s*closing)$/i],
+  ['closingCredit', /^(closing\s*(credit|cr)|closing\s*balance\s*(credit|cr)|credit\s*closing)$/i],
+  ['closing', /^closing(\s*balance)?$/i],
+  ['openingDebit', /^(opening\s*(debit|dr)|opening\s*balance\s*(debit|dr))$/i],
+  ['openingCredit', /^(opening\s*(credit|cr)|opening\s*balance\s*(credit|cr))$/i],
+  ['opening', /^opening(\s*balance)?$/i],
+  ['debit', /^(debit|dr)(\s*amount)?$/i],
+  ['credit', /^(credit|cr)(\s*amount)?$/i],
+];
+const TB_LEDGER = /^(ledger(\s*name)?|particulars|account(\s*name)?|name)$/i;
+const TB_BALANCE = /^balance$/i; // bare "Balance" — Tally uses it for opening AND closing
+
+function classifyTBHeaderRow(row = []) {
+  const cols = {};
+  const balances = [];
+  let amtMatches = 0;
+  row.forEach((cell, i) => {
+    const c = String(cell ?? '').trim();
+    if (!c) return;
+    if (cols.ledger === undefined && TB_LEDGER.test(c)) { cols.ledger = i; return; }
+    if (TB_BALANCE.test(c)) { balances.push(i); amtMatches += 1; return; }
+    for (const [k, re] of TB_COLS) if (re.test(c)) { if (cols[k] === undefined) cols[k] = i; amtMatches += 1; break; }
+  });
+  // Resolve bare "Balance" columns → closing (rightmost) / opening (an earlier one),
+  // unless an explicit closing/opening column was already labelled.
+  if (balances.length) {
+    if (cols.closing === undefined && cols.closingDebit === undefined && cols.closingCredit === undefined) cols.closing = balances[balances.length - 1];
+    if (cols.opening === undefined && cols.openingDebit === undefined && cols.openingCredit === undefined && balances.length > 1) cols.opening = balances[0];
+  }
+  return { cols, amtMatches };
+}
+
+function findTBHeader(matrix) {
+  let best = null;
+  for (let i = 0; i < Math.min(matrix.length, 25); i++) {
+    const { cols, amtMatches } = classifyTBHeaderRow(matrix[i] || []);
+    const hasClose = cols.closingDebit !== undefined || cols.closingCredit !== undefined || cols.closing !== undefined || cols.debit !== undefined;
+    // The header must carry at least one closing/debit column. Prefer the row with
+    // the MOST amount columns so a stray "Balance" in a preamble line never wins.
+    if (hasClose && (!best || amtMatches > best.amtMatches)) best = { idx: i, cols, amtMatches };
+  }
+  if (!best) return { idx: -1, cols: null };
+  // Ledger column unlabelled (Tally leaves it blank) → the first column not already
+  // claimed by an amount column, defaulting to 0.
+  if (best.cols.ledger === undefined) {
+    const used = new Set(Object.entries(best.cols).filter(([k]) => k !== 'ledger').map(([, v]) => v));
+    let li = 0; while (used.has(li)) li += 1;
+    best.cols.ledger = li;
+  }
+  return best;
+}
 
 /** Matrix → Trial Balance rows in the shape importTB understands (a signed
- *  `closing`, or separate closingDebit/closingCredit). Handles a single
- *  Closing column (Dr/Cr suffix) or two closing columns. */
+ *  `closing`, or separate closingDebit/closingCredit). Handles a single Closing
+ *  column (Dr/Cr suffix), two closing columns, or Tally's terse opening/closing
+ *  "Balance" pair with an unlabelled ledger column. Group subtotals are dropped. */
 export function normalizeTB(matrix = []) {
-  const { idx, cols } = findHeader(matrix, TB_HDR, ['ledger']);
-  const hasClose = cols && (cols.closingDebit !== undefined || cols.closingCredit !== undefined || cols.closing !== undefined || cols.debit !== undefined);
-  if (idx < 0 || !hasClose) return { rows: [], error: 'No Trial Balance header found (need a Ledger column + a Closing/Debit/Credit column).' };
+  const { idx, cols } = findTBHeader(matrix);
+  if (idx < 0 || !cols) return { rows: [], error: 'No Trial Balance header found (need a Ledger column + a Closing/Debit/Credit column).' };
   const rows = [];
+  let droppedGroups = 0;
   for (let i = idx + 1; i < matrix.length; i++) {
     const r = matrix[i] || [];
     const ledger = String(r[cols.ledger] ?? '').trim();
-    if (!ledger || /^(total|grand total|difference in opening|opening balance)$/i.test(ledger)) continue;
+    if (!ledger || isTBNoiseRow(ledger)) continue;
+    if (isTallyGroupRow(ledger)) { droppedGroups += 1; continue; }
     let row = null;
     if (cols.closingDebit !== undefined || cols.closingCredit !== undefined) {
       row = { ledger, closingDebit: Math.abs(num(r[cols.closingDebit]) || 0), closingCredit: Math.abs(num(r[cols.closingCredit]) || 0) };
@@ -126,10 +198,12 @@ export function normalizeTB(matrix = []) {
     }
     if (row && (row.closingDebit || row.closingCredit || row.closing || row.debit || row.credit || row.opening)) rows.push(row);
   }
-  return { rows, error: rows.length ? '' : 'Header found but no ledger rows parsed.' };
+  return { rows, error: rows.length ? '' : 'Header found but no ledger rows parsed.', note: groupedNote(droppedGroups) };
 }
 
-// ── File → matrix (CSV / TXT / Excel / HTML) + Tally XML → Day Book ──────────
+const groupedNote = (n) => (n ? `Skipped ${n} group subtotal row${n > 1 ? 's' : ''}. For the cleanest tie-out, export the Trial Balance ledger-wise (in Tally, press F5 on the Trial Balance) so group totals don't double-count.` : '');
+
+// ── File → matrix (CSV / TXT / Excel / HTML) + Tally XML → Day Book / TB ──────
 function splitLine(line, d) {
   const out = []; let cur = ''; let q = false;
   for (const ch of line) { if (ch === '"') q = !q; else if (ch === d && !q) { out.push(cur); cur = ''; } else cur += ch; }
@@ -158,15 +232,44 @@ async function excelToMatrix(arrayBuffer) {
   const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
   return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
 }
+
+/** Decode a file's bytes to text, honouring a UTF-16/UTF-8 BOM. Tally writes its
+ *  XML as UTF-16LE, which the browser's File.text() (always UTF-8) would mojibake
+ *  into an unparseable soup — hence reading the ArrayBuffer and picking the codec. */
+export function decodeBuffer(buf) {
+  const b = new Uint8Array(buf);
+  let enc = 'utf-8';
+  if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) enc = 'utf-16le';
+  else if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) enc = 'utf-16be';
+  else if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) enc = 'utf-8';
+  else if (b.length >= 4 && b[1] === 0x00 && b[3] === 0x00) enc = 'utf-16le'; // BOM-less UTF-16LE (ASCII payload)
+  else if (b.length >= 4 && b[0] === 0x00 && b[2] === 0x00) enc = 'utf-16be';
+  let out;
+  try { out = new TextDecoder(enc).decode(buf); }
+  catch { out = new TextDecoder('utf-8').decode(buf); }
+  return out.replace(/^﻿/, ''); // strip any residual BOM char so DOMParser sees a clean root
+}
+const readText = async (file) => decodeBuffer(await file.arrayBuffer());
+
+async function fileToMatrix(file) {
+  const name = (file?.name || '').toLowerCase();
+  if (/\.(xlsx?|xlsm)$/.test(name)) return excelToMatrix(await file.arrayBuffer());
+  const text = await readText(file);
+  if (/\.(html?|htm)$/.test(name) || /^\s*<(!doctype\s+html|html|table)/i.test(text)) return htmlToMatrix(text);
+  return delimitedToMatrix(text);
+}
 /** Tally native XML Day Book: each <VOUCHER> carries a date/number + ledger legs
- *  (<ALLLEDGERENTRIES.LIST> with LEDGERNAME + AMOUNT; NEGATIVE amount = debit). */
+ *  (<ALLLEDGERENTRIES.LIST> / <LEDGERENTRIES.LIST> with LEDGERNAME + AMOUNT;
+ *  NEGATIVE amount = debit). Deleted/cancelled vouchers are skipped. */
 export function parseTallyXmlDayBook(text) {
   const doc = new DOMParser().parseFromString(String(text), 'application/xml');
   const vouchers = [...doc.querySelectorAll('VOUCHER')];
   if (!vouchers.length) return { rows: [], error: 'No <VOUCHER> elements found in the XML.' };
   const txt = (el, tag) => { const n = el.querySelector(tag); return n ? n.textContent.trim() : ''; };
+  const yes = (el, tag) => /^yes$/i.test(txt(el, tag));
   const rows = [];
   for (const v of vouchers) {
+    if (yes(v, 'ISDELETED') || yes(v, 'ISCANCELLED')) continue; // a struck-off voucher doesn't post
     const date = toISODate(txt(v, 'DATE'));
     const vno = txt(v, 'VOUCHERNUMBER');
     const narration = txt(v, 'NARRATION');
@@ -182,30 +285,56 @@ export function parseTallyXmlDayBook(text) {
   return { rows: kept, error: kept.length ? '' : (rows.length ? 'XML parsed but no dated ledger entries found.' : 'XML parsed but no ledger entries found.') };
 }
 
-async function fileToMatrix(file) {
-  const name = (file?.name || '').toLowerCase();
-  if (/\.(xlsx?|xlsm)$/.test(name)) return excelToMatrix(await file.arrayBuffer());
-  const text = await file.text();
-  if (/\.(html?|htm)$/.test(name) || /^\s*<(!doctype\s+html|html|table)/i.test(text)) return htmlToMatrix(text);
-  return delimitedToMatrix(text);
+/** Tally native XML Trial Balance: an <ENVELOPE> of <DSPACCNAME><DSPDISPNAME>
+ *  (ledger) rows each followed by a sibling <DSPACCINFO> whose <DSPCLAMTA> is the
+ *  closing balance. Tally's sign there is POSITIVE = Credit, NEGATIVE = Debit, so
+ *  our signed closing (Dr +, Cr −) = −DSPCLAMTA. Group subtotals are dropped. */
+export function parseTallyXmlTB(text) {
+  const doc = new DOMParser().parseFromString(String(text), 'application/xml');
+  const names = [...doc.querySelectorAll('DSPACCNAME')];
+  if (!names.length) return { rows: [], error: 'No <DSPACCNAME> ledger rows found — this is not a Tally Trial Balance XML export (export the TB, or use Excel/CSV).' };
+  const rows = [];
+  let droppedGroups = 0;
+  for (const n of names) {
+    const nameNode = n.querySelector('DSPDISPNAME');
+    const ledger = (nameNode ? nameNode.textContent : '').trim();
+    if (!ledger || isTBNoiseRow(ledger)) continue;
+    if (isTallyGroupRow(ledger)) { droppedGroups += 1; continue; }
+    // The amounts sit in the <DSPACCINFO> element that follows this <DSPACCNAME>.
+    let info = n.nextElementSibling;
+    while (info && info.tagName !== 'DSPACCINFO') info = info.nextElementSibling;
+    const clNode = info ? info.querySelector('DSPCLAMTA') : null;
+    const cl = num(clNode ? clNode.textContent.trim() : '');
+    if (cl === null || cl === 0) continue; // empty/zero closing (e.g. a pass-through group) — no tie-out signal
+    rows.push({ ledger, closing: -cl });
+  }
+  return { rows, error: rows.length ? '' : 'Trial Balance XML parsed but no ledger closing balances were found.', note: groupedNote(droppedGroups) };
 }
-const isXml = (name, text) => /\.xml$/.test(name) || /^\s*<\?xml|<ENVELOPE|<VOUCHER/i.test(text);
+
+const isXml = (name, text) => /\.xml$/.test(name) || /^\s*(?:<\?xml|<ENVELOPE|<VOUCHER|<DSPACCNAME)/i.test(text);
 
 /** Pick a Day Book file → normalized voucher rows. XML routes to the Tally parser. */
 export async function parseDayBookFile(file) {
   const name = (file?.name || '').toLowerCase();
   if (/\.pdf$/.test(name)) return { rows: [], error: 'PDF can’t be parsed — export the Day Book as Excel / CSV / XML.' };
-  if (/\.xml$/.test(name)) return parseTallyXmlDayBook(await file.text());
+  if (/\.xml$/.test(name)) return parseTallyXmlDayBook(await readText(file));
   if (!/\.(xlsx?|xlsm|html?|htm|csv|txt|tsv)$/.test(name)) {
-    const text = await file.text();
+    const text = await readText(file);
     if (isXml(name, text)) return parseTallyXmlDayBook(text);
   }
   return normalizeDayBook(await fileToMatrix(file));
 }
 
-/** Pick a Trial Balance file → normalized TB rows (importTB shape). */
+/** Pick a Trial Balance file → normalized TB rows (importTB shape). Tally XML
+ *  routes to the DSPACCNAME parser; Excel/CSV/HTML to the columnar normaliser. */
 export async function parseTBFile(file) {
   const name = (file?.name || '').toLowerCase();
-  if (/\.pdf$/.test(name)) return { rows: [], error: 'PDF can’t be parsed — export the Trial Balance as Excel / CSV.' };
-  return normalizeTB(await fileToMatrix(file));
+  if (/\.pdf$/.test(name)) return { rows: [], error: 'PDF can’t be parsed — export the Trial Balance as Excel / CSV / XML.' };
+  if (/\.xml$/.test(name)) return parseTallyXmlTB(await readText(file));
+  if (/\.(xlsx?|xlsm)$/.test(name)) return normalizeTB(await excelToMatrix(await file.arrayBuffer()));
+  // A non-standard extension that actually holds XML (Tally sometimes writes .txt).
+  const text = await readText(file);
+  if (isXml(name, text)) return parseTallyXmlTB(text);
+  if (/\.(html?|htm)$/.test(name) || /^\s*<(!doctype\s+html|html|table)/i.test(text)) return normalizeTB(htmlToMatrix(text));
+  return normalizeTB(delimitedToMatrix(text));
 }

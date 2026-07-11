@@ -11,7 +11,7 @@ const cell = 'px-3 py-2.5 text-sm border-b border-surface-border align-top';
 const head = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-ink-muted bg-surface-alt border-b border-surface-border whitespace-nowrap';
 
 const UPLOADS = [
-  ['Trial Balance', 'Tally ▸ Trial Balance (the period, all ledgers — Opening/Debit/Credit/Closing)', 'Tie-Out board ▸ “Upload Tally TB”', 'Builds every balance you see — the Trial Balance, Balance Sheet and P&L side-by-side.'],
+  ['Trial Balance', 'Tally ▸ Trial Balance (the period, all ledgers) — press F5 for the ledger-wise view so group subtotals don’t double-count, then Export as Excel / CSV / XML', 'Tie-Out board ▸ “Upload Tally TB”', 'Builds every balance you see — the Trial Balance, Balance Sheet and P&L side-by-side.'],
   ['Day Book', 'Tally ▸ Day Book / a ledger’s vouchers (for a ledger that’s off)', 'Ledger Matcher (Day Book)', 'Lets you drill an OFF ledger to the exact voucher that differs.'],
 ];
 

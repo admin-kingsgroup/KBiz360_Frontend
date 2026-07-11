@@ -200,7 +200,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const pickFile = async (file, kind) => {
     if (!file) return;
     setParsing(kind);
-    try { const r = await (kind === 'db' ? parseDayBookFile(file) : parseTBFile(file)); (kind === 'db' ? setDbFile : setTbFile)({ rows: r.rows || [], error: r.error || '', name: file.name }); }
+    try { const r = await (kind === 'db' ? parseDayBookFile(file) : parseTBFile(file)); (kind === 'db' ? setDbFile : setTbFile)({ rows: r.rows || [], error: r.error || '', note: r.note || '', name: file.name }); }
     catch (e) { (kind === 'db' ? setDbFile : setTbFile)({ rows: [], error: e.message, name: file.name }); }
     finally { setParsing(''); }
   };
@@ -311,6 +311,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           {tbFile && (tbFile.error
             ? <p className="mt-2 text-sm text-danger">Couldn’t read {tbFile.name}: {tbFile.error}</p>
             : <p className="mt-2 text-sm text-success">{tbFile.name} — {tbFile.rows.length} ledger rows ready.</p>)}
+          {tbFile && !tbFile.error && tbFile.note && <p className="mt-1 text-xs text-warning">{tbFile.note}</p>}
           <p className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wider text-ink-subtle">…or paste</p>
           <textarea value={paste} onChange={(e) => { setPaste(e.target.value); if (tbFile) setTbFile(null); }} rows={6}
             placeholder={'ICICI Bank A/c\t1245300\t0\nHDFC Bank A/c\t805000\t0\nBSP / IATA\t0\t9000'}
@@ -341,6 +342,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           {dbFile && (dbFile.error
             ? <p className="mt-2 text-sm text-danger">Couldn’t read {dbFile.name}: {dbFile.error}</p>
             : <p className="mt-2 text-sm text-success">{dbFile.name} — {dbFile.rows.length} voucher legs ready.</p>)}
+          {dbFile && !dbFile.error && dbFile.note && <p className="mt-1 text-xs text-warning">{dbFile.note}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button variant="primary" icon={FileUp} loading={impDB.isPending} disabled={!dbFile || dbFile.rows.length === 0} onClick={() => impDB.mutate()}>
               Upload Day Book ({dbFile ? dbFile.rows.length : 0} legs)
