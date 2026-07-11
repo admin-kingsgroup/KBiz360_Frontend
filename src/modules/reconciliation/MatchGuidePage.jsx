@@ -31,7 +31,6 @@ const SCREENS = [
   ['👤 Client Reconciliation', 'Clients rarely send statements — this screen works OUR open items: open invoices, on-account receipts, and the receipt↔invoice allocation view.', 'Client receipts settle to bills MANUALLY — the system never auto-FIFOs them. You choose which invoice a receipt knocks off.'],
   ['📋 Reconciliation Queue', 'The worklist across all matching: what is imported, part-matched, or carrying exceptions. Start your day here — it shows where the open lines are.', ''],
   ['🔁 Inter-Branch Reconciliation', 'Each branch pair keeps two mirror accounts (BOM’s "Travkings NBO" vs NBO’s "Travkings BOM"). This screen checks the pair NETS TO ZERO. USD↔₹ legs are tied by hand — the system flags, you match.', ''],
-  ['📗 Tally Reconciliation', 'Compares an ERP ledger against an imported Tally export — a migration-era check for data entered in both systems. Only compare dates up to the branch cutoff (BOM: 19-06-2026); after cutoff the ERP is live and Tally simply doesn’t have the entries — that is not a mismatch.', 'Tally is import-only history — the ERP books are the truth. Reconcile TO the ERP, not the other way.'],
 ];
 
 const PITFALLS = [
@@ -107,8 +106,8 @@ export function MatchGuidePage({ setRoute }) {
         </div>
       </PageSection>
 
-      {/* 4 · the six screens */}
-      <PageSection title="4 · The six screens, one by one" subtitle="All under ⇄ Reconciliation ▸ Statement Matching.">
+      {/* 4 · the statement-matching screens */}
+      <PageSection title="4 · The five screens, one by one" subtitle="All under ⇄ Statement Reconciliation ▸ Statement Matching.">
         <div className="grid gap-3">
           {SCREENS.map(([name, text, warn]) => (
             <div key={name} className="rounded-brand border border-surface-border bg-surface p-4">
@@ -120,6 +119,9 @@ export function MatchGuidePage({ setRoute }) {
             </div>
           ))}
         </div>
+        <p className="mt-3 rounded-brand bg-accent-soft px-3 py-2 text-xs font-semibold text-accent">
+          📗 ERP↔Tally reconciliation moved to its own pill — see <b>Tally Reconciliation ▸ Help ▸ Tally Reconciliation Guide</b> (the per-ledger Day Book matcher is under Tally Reconciliation ▸ Vouchers).
+        </p>
       </PageSection>
 
       {/* 5 · engine */}

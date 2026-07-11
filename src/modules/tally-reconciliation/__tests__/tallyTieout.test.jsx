@@ -47,8 +47,10 @@ jest.mock('../api', () => ({
 }));
 
 import { TallyTieOutBoard } from '../TallyTieOutBoard';
+import { TallyGuidePage } from '../TallyGuidePage';
 import { tallyReconRoutes } from '../routes';
 import { MENU_TALLY_RECON, getMenu } from '../../../core/menus';
+import { crumbsFor } from '../../../core/routeMeta';
 
 const wrap = (ui) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -57,18 +59,34 @@ const wrap = (ui) => {
 const allHrefs = (n, out = []) => { if (!n) return out; if (n.href) out.push(n.href); (n.children || []).forEach((c) => allHrefs(c, out)); return out; };
 
 describe('Tally Reconciliation · pill + routes', () => {
-  test('the pill carries the monthly + yearly tie-outs', () => {
+  test('the pill consolidates everything Tally — tie-outs, the Day Book matcher, and the guide', () => {
     expect(MENU_TALLY_RECON.label).toBe('Tally Reconciliation');
-    expect(allHrefs(MENU_TALLY_RECON)).toEqual(['/tally-reconciliation/monthly', '/tally-reconciliation/yearly']);
+    expect(allHrefs(MENU_TALLY_RECON)).toEqual([
+      '/tally-reconciliation/monthly', '/tally-reconciliation/yearly', // Tie-Out
+      '/accounts/tally-reco',                                          // Vouchers · Day Book matcher (moved in)
+      '/tally-reconciliation/guide',                                   // Help · staff guide
+    ]);
   });
   test('appears in the full menu for a Super Admin', () => {
     const labels = getMenu('ALL', { role: 'Super Admin' }).map((m) => m.label);
     expect(labels).toContain('Tally Reconciliation');
   });
-  test('every pill href resolves to a route (+ bare path)', () => {
+  test('every /tally-reconciliation pill href resolves to a route (+ bare path)', () => {
     const paths = tallyReconRoutes.map((r) => r.path);
-    allHrefs(MENU_TALLY_RECON).forEach((h) => expect(paths).toContain(h));
+    // The Ledger Matcher keeps its legacy /accounts/tally-reco route (App.jsx), so
+    // only the module's own /tally-reconciliation/* hrefs live in this route table.
+    allHrefs(MENU_TALLY_RECON).filter((h) => h.startsWith('/tally-reconciliation')).forEach((h) => expect(paths).toContain(h));
+    expect(paths).toContain('/tally-reconciliation/guide');
     expect(paths).toContain('/tally-reconciliation');
+  });
+  test('breadcrumbs resolve the moved leaf + the guide under the Tally Reconciliation pill', () => {
+    expect(crumbsFor('/accounts/tally-reco').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Vouchers', 'Ledger Matcher (Day Book)']);
+    expect(crumbsFor('/tally-reconciliation/guide').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Help', 'Tally Reconciliation Guide']);
+  });
+  test('the staff Guide page renders', () => {
+    wrap(<TallyGuidePage setRoute={() => {}} />);
+    expect(screen.getByText('Tally Reconciliation Guide')).toBeInTheDocument();
+    expect(screen.getByText(/What to export from Tally/i)).toBeInTheDocument();
   });
 });
 

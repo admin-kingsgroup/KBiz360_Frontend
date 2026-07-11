@@ -51,7 +51,6 @@ const EXTRA = {
   '/transactions/approvals/debit-note': ['Finance', 'Approvals', 'Debit Note'],
   '/transactions/approvals/adm': ['Finance', 'Approvals', 'ADM'],
   '/transactions/approvals/acm': ['Finance', 'Approvals', 'ACM'],
-  '/accounts/tally-reco': ['Accounts', 'Reconciliation', 'Tally Reconciliation'],
   '/finance/reco-queue': ['Accounts', 'Reconciliation', 'Reconciliation Queue'],
   '/import': ['Admin', 'Import / Export', 'Data Import'],
   '/search': ['Search'],

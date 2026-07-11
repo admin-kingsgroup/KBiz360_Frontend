@@ -11,7 +11,7 @@ import { Badge, Button, Select, LoadingState, ErrorState } from '../../shell/pri
 // reconciled by hand — timing, FX rounding), accept it with a reason so it stops
 // blocking the certificate. The real difference is still shown; nothing is hidden.
 
-export function VoucherDrawer({ branch, period, tier, row, cur, onClose }) {
+export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClose }) {
   const ledger = typeof row === 'string' ? row : (row && row.ledger);
   const rowStatus = row && row.status;
   const accepted = rowStatus === 'accepted';
@@ -73,7 +73,11 @@ export function VoucherDrawer({ branch, period, tier, row, cur, onClose }) {
           {isError && <ErrorState title="Couldn’t load the vouchers" message="The service didn’t respond." onRetry={() => refetch()} />}
           {noDayBook && (
             <div className="m-5 rounded-brand border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink">
-              No Tally <b>Day Book</b> imported for this ledger yet — import it in the <b>Tally Ledger Matcher</b> to drill to the voucher that's off. You can still <b>accept</b> the balance gap below when it's an explained (e.g. inter-branch) difference.
+              No Tally <b>Day Book</b> imported for this ledger yet — import it in the{' '}
+              <button type="button" onClick={() => { onClose(); setRoute && setRoute('/accounts/tally-reco'); }}
+                className="font-semibold text-accent underline underline-offset-2 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent rounded">
+                Ledger Matcher (Day Book)
+              </button>{' '}to drill to the voucher that's off. You can still <b>accept</b> the balance gap below when it's an explained (e.g. inter-branch) difference.
             </div>
           )}
           {!isLoading && !noDayBook && lines.length > 0 && (
