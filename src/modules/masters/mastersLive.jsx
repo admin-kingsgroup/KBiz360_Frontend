@@ -12,7 +12,7 @@ import { Plus, Pencil, Trash2, Download, Printer, Ban, RotateCcw } from 'lucide-
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import {
   SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
-  SETTLE_CYCLES, PAY_METHODS, CUST_TYPES, CUST_SOURCES,
+  SETTLE_CYCLES, PAY_METHODS, CUST_TYPES, CUST_SOURCES, PAY_TERMS,
 } from '../../core/partyEnums';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { SourceBadge } from '../../core/LedgerLabel';
