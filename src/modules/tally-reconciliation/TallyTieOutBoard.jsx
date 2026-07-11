@@ -34,6 +34,18 @@ function periodLabel(p) {
   return String(p || '');
 }
 
+// Profit / (Loss) shown the ACCOUNTING way: a profit is plain, a LOSS is in
+// parentheses. `np` is the TRUE net profit (income − expense; + = profit), NOT a
+// Dr/Cr-signed balance — so a loss never reads as a positive "Dr" figure (the whole
+// point of this line's confusion). Pair with plTone() for green-profit / red-loss.
+function plText(np, cur) {
+  const n = round2(np);
+  if (!n) return '0';
+  const s = Math.abs(n).toLocaleString(localeOf(cur), { maximumFractionDigits: 2 });
+  return n > 0 ? s : `(${s})`;
+}
+const plTone = (np) => (round2(np) > 0 ? 'text-success' : round2(np) < 0 ? 'text-danger' : 'text-ink-subtle');
+
 // The selectable months, newest→oldest, from the books' inception month to the
 // current month. `fromISO` is the earliest posted date ('YYYY-MM-DD'); when it's
 // unknown we still offer a sensible 24-month window so the picker is never empty.
@@ -261,9 +273,13 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     // Net Profit belongs to Capital on the BS — inject it ONLY when the P&L has rows
     // (never a spurious "Profit · 0" line on a branch with no P&L activity).
     const hasPL = rows.some((r) => r.statement === 'PL');
-    const np = { ledger: 'Profit for the period', code: '(from P&L)', parentGroup: 'Capital Account', synthetic: true,
-      erp: round2(-(counts.netProfitErp || 0)), tally: round2(-(counts.netProfitTally || 0)) };
-    np.diff = round2((np.erp || 0) - (np.tally || 0)); np.status = statusOf(np.erp, np.tally);
+    const np = { ledger: 'Profit / (Loss) for the period', code: '(from P&L)', parentGroup: 'Capital Account', synthetic: true,
+      // erp/tally stay Dr/Cr-signed (profit = Cr −, loss = Dr +) so the Balance Sheet
+      // total still nets to zero; plErp/plTally carry the TRUE profit (+ = profit) for
+      // a clear display — a loss shows as "(1,40,700)", never a positive "1,40,700 Dr".
+      erp: round2(-(counts.netProfitErp || 0)), tally: round2(-(counts.netProfitTally || 0)),
+      plErp: round2(counts.netProfitErp || 0), plTally: round2(counts.netProfitTally || 0) };
+    np.diff = round2((np.plErp || 0) - (np.plTally || 0)); np.status = statusOf(np.erp, np.tally);
     return [
       { label: 'Liabilities & Capital', rows: [...rows.filter((r) => r.nature === 'liability'), ...(hasPL ? [np] : [])] },
       { label: 'Assets', rows: rows.filter((r) => r.nature === 'asset') },
@@ -275,7 +291,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     // undefined) so the footer can show "Balanced ✓" vs "Dr ≠ Cr" — never a false
     // all-clear when a side doesn't balance.
     if (tab === 'tb') return { label: 'Trial Balance — Dr = Cr', type: 'balance', erpBalanced: data?.erpTotals?.balanced, tallyBalanced: data?.tallyTotals?.balanced };
-    if (tab === 'pl') return { label: 'Net Profit', type: 'amount', erp: counts.netProfitErp || 0, tally: counts.netProfitTally || 0 };
+    if (tab === 'pl') return { label: 'Net Profit / (Loss)', type: 'pl', erp: counts.netProfitErp || 0, tally: counts.netProfitTally || 0 };
     const shown = sections.flatMap((s) => s.rows);
     const se = round2(shown.reduce((a, r) => a + (r.erp || 0), 0));
     const st = round2(shown.reduce((a, r) => a + (r.tally || 0), 0));
@@ -493,8 +509,8 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                                 {acc ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info">✓ accepted · {reasonLabel(r.acceptedReason)}
                                   {r.acceptanceStale ? <span className="ml-1 rounded-full bg-warning/15 px-1.5 font-bold text-warning" title={`Accepted for ${fmt(r.acceptedAmount, cur)}, now ${fmt(r.diff, cur)} — re-review`}>⚠ changed</span> : null}</span>
                                   : off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}</td>
-                              <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.erp === null ? 'text-ink-subtle' : ''}`}>{fmt(r.erp, cur)}</td>
-                              <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.tally === null ? 'text-ink-subtle' : ''}`}>{fmt(r.tally, cur)}</td>
+                              <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plErp) : r.erp === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plErp, cur) : fmt(r.erp, cur)}</td>
+                              <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plTally) : r.tally === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plTally, cur) : fmt(r.tally, cur)}</td>
                               <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${r.diff === 0 ? 'text-ink-subtle' : acc ? 'text-info' : 'text-danger'}`} title={r.diff > 0 ? 'ERP higher' : r.diff < 0 ? 'Tally higher' : ''}>{r.diff === 0 ? '0' : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(localeOf(cur))}`}</td>
                               <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
                             </tr>
@@ -512,6 +528,14 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                       <td className={`px-4 py-3 text-right ${foot.tallyBalanced ? 'text-success' : 'text-danger'}`}>{foot.tallyBalanced ? 'Balanced ✓' : 'Dr ≠ Cr'}</td>
                       <td className="px-4 py-3 text-right text-ink-subtle">—</td>
                       <td className="px-4 py-3 text-right"><Badge tone={foot.erpBalanced && foot.tallyBalanced ? 'success' : 'danger'} size="sm" dot>{foot.erpBalanced && foot.tallyBalanced ? 'Balanced' : 'Not balanced'}</Badge></td>
+                    </>
+                  ) : foot.type === 'pl' ? (
+                    <>
+                      {/* Net Profit / (Loss): a loss shows in parentheses + red, never a positive Dr. */}
+                      <td className={`px-4 py-3 text-right font-mono tabular-nums ${plTone(foot.erp)}`}>{plText(foot.erp, cur)}</td>
+                      <td className={`px-4 py-3 text-right font-mono tabular-nums ${plTone(foot.tally)}`}>{plText(foot.tally, cur)}</td>
+                      <td className="px-4 py-3 text-right font-mono tabular-nums text-danger">{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
+                      <td className="px-4 py-3 text-right"><Badge tone={round2(foot.erp - foot.tally) === 0 ? 'success' : 'danger'} size="sm" dot>{round2(foot.erp - foot.tally) === 0 ? 'Tied' : 'Off'}</Badge></td>
                     </>
                   ) : (
                     <>

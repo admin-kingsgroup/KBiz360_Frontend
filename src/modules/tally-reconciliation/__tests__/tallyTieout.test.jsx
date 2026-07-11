@@ -127,6 +127,22 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText('HDFC Bank A/c')).not.toBeInTheDocument();
   });
 
+  test('the net-profit line reads Profit / (Loss) — a loss is parenthesised, not a positive Dr', async () => {
+    // Mock: netProfitTally -3,24,000 (a LOSS). It must NEVER read as a positive "3,24,000 Dr".
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    // P&L view: footer relabelled + the loss shown parenthesised.
+    fireEvent.click(screen.getByText('Profit & Loss'));
+    expect(await screen.findByText('Net Profit / (Loss)')).toBeInTheDocument();
+    expect(screen.getByText('(3,24,000)')).toBeInTheDocument();
+    // Balance Sheet view: same loss on the Capital line — parenthesised, and the old
+    // misleading "3,24,000 Dr" (a loss shown as a positive Dr) is gone.
+    fireEvent.click(screen.getByText('Balance Sheet'));
+    expect(await screen.findByText('Profit / (Loss) for the period')).toBeInTheDocument();
+    expect(screen.getByText('(3,24,000)')).toBeInTheDocument();
+    expect(screen.queryByText('3,24,000 Dr')).not.toBeInTheDocument();
+  });
+
   test('yearly board renders its own title', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="year" currentUser={{ role: 'Super Admin' }} />);
     expect(await screen.findByText('Tally Reconciliation · Yearly Tie-Out')).toBeInTheDocument();
