@@ -37,6 +37,14 @@ export function clearVariance({ branch, period, tier, ledger }) {
 export function importTB({ branch, period, tier, rows }) {
   return apiPost('/api/tally-tieout/import', { branch, period, tier, rows });
 }
+// Full Day Book upload (all ledgers at once) + how much is currently loaded.
+export function importDayBook({ branch, period, tier, rows }) {
+  return apiPost('/api/tally-tieout/daybook', { branch, period, tier, rows });
+}
+export async function getDayBookStatus({ branch, period, tier } = {}) {
+  try { return (await apiGet('/api/tally-tieout/daybook', { branch, period, tier })) || { vouchers: 0, ledgers: 0 }; }
+  catch { return { vouchers: 0, ledgers: 0 }; }
+}
 export function clearTB({ branch, period }) {
   return apiDelete(`/api/tally-tieout?branch=${encodeURIComponent(branch)}&period=${encodeURIComponent(period)}`);
 }

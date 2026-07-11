@@ -9,6 +9,8 @@ jest.mock('../api', () => ({
   getPeriods: jest.fn(() => Promise.resolve([{ period: '2026-07', tier: 'month', ledgers: 4 }])),
   importTB: jest.fn(),
   clearTB: jest.fn(),
+  importDayBook: jest.fn(() => Promise.resolve({ inserted: 0, ledgers: 0 })),
+  getDayBookStatus: jest.fn(() => Promise.resolve({ vouchers: 0, ledgers: 0 })),
   getDefects: jest.fn(() => Promise.resolve({
     branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 3,
     summary: { total: 1, byType: { 'missing-in-erp': 1 } },
@@ -178,5 +180,33 @@ describe('Tally Reconciliation · tie-out board render', () => {
     fireEvent.click(await screen.findByText('HDFC Bank A/c')); // off ledger → drawer
     fireEvent.click(await screen.findByText('Accept variance'));
     await waitFor(() => expect(acceptVariance).toHaveBeenCalledWith(expect.objectContaining({ ledger: 'HDFC Bank A/c', period: '2026-07' })));
+  });
+
+  test('both upload buttons live on the board; Day Book panel opens a file picker', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    // Both full-upload buttons sit in the header (TB button also appears as onboarding CTA → getAllBy).
+    expect(screen.getAllByText('Upload Tally TB').length).toBeGreaterThan(0);
+    expect(screen.getByText('Upload Day Book')).toBeInTheDocument();
+    // Opening the Day Book panel reveals the file input; the TB panel's stays hidden.
+    fireEvent.click(screen.getByText('Upload Day Book'));
+    expect(await screen.findByText('Upload Tally Day Book')).toBeInTheDocument();
+    expect(screen.getByTestId('db-file')).toBeInTheDocument();
+    expect(screen.queryByTestId('tb-file')).not.toBeInTheDocument(); // the two panels are mutually exclusive
+  });
+
+  test('TB upload panel offers a file picker alongside paste', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getAllByText('Upload Tally TB')[0]); // header button toggles the TB panel
+    expect(await screen.findByTestId('tb-file')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/ICICI Bank/)).toBeInTheDocument(); // the paste box is still offered
+  });
+
+  test('Day Book status line shows how many vouchers are loaded', async () => {
+    const { getDayBookStatus } = require('../api');
+    getDayBookStatus.mockResolvedValueOnce({ vouchers: 274, ledgers: 63 });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText(/Day Book · 274 vouchers · 63 ledgers/)).toBeInTheDocument();
   });
 });

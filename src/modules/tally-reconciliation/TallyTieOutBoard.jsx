@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, RefreshCcw, AlertTriangle, BookOpenCheck } from 'lucide-react';
-import { getTieOut, getPeriods, importTB, getDefects } from './api';
+import { Upload, RefreshCcw, AlertTriangle, BookOpenCheck, FileUp } from 'lucide-react';
+import { getTieOut, getPeriods, importTB, getDefects, importDayBook, getDayBookStatus } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { VoucherDrawer } from './VoucherDrawer';
 import { CertifyPanel } from './CertifyPanel';
+import { parseTBFile, parseDayBookFile } from './tallyFileParse';
 import { BRANCHES, AFRICA, CUR, localeOf, round2, branchCodeOf, fmt, statusOf, statusMeta, defectMeta, reasonLabel, isCentralRole } from './format';
 
 // ─── Tally Reconciliation — the whole-books tie-out board (one page per tier) ──
@@ -73,8 +74,12 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 
   const [tab, setTab] = useState('tb');
   const [periodSel, setPeriodSel] = useState({});
-  const [showImport, setShowImport] = useState(false);
+  const [showImport, setShowImport] = useState(false);   // Trial Balance panel
+  const [showDayBook, setShowDayBook] = useState(false);  // Day Book panel
   const [paste, setPaste] = useState('');
+  const [tbFile, setTbFile] = useState(null);   // { rows, name, error } — parsed TB file
+  const [dbFile, setDbFile] = useState(null);   // { rows, name, error } — parsed Day Book file
+  const [parsing, setParsing] = useState('');    // 'tb' | 'db' while a file parses
   const [drill, setDrill] = useState(null); // off ledger being drilled (Phase 2)
 
   const { data: periodsData } = useQuery({ queryKey: ['tally-tieout', 'periods', branch], queryFn: () => getPeriods({ branch }), enabled: central });
@@ -105,13 +110,31 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     queryFn: () => getDefects({ branch, period, tier }),
     enabled: central && tab === 'defects',
   });
-
-  const imp = useMutation({
-    // Keep the panel OPEN on success so the "Uploaded N ledgers" confirmation is
-    // seen; just clear the paste and refresh every tally-tieout surface.
-    mutationFn: () => importTB({ branch, period, tier, rows: parseTB(paste) }),
-    onSuccess: () => { setPaste(''); qc.invalidateQueries({ queryKey: ['tally-tieout'] }); },
+  // How much Day Book (vouchers) is loaded for this period — the drill needs it.
+  const { data: dbStatus } = useQuery({
+    queryKey: ['tally-tieout', 'daybook', branch, tier, period],
+    queryFn: () => getDayBookStatus({ branch, period, tier }),
+    enabled: central,
   });
+
+  // TB import — a parsed file if one was picked, else the pasted rows.
+  const tbRows = () => (tbFile && tbFile.rows.length ? tbFile.rows : parseTB(paste));
+  const imp = useMutation({
+    mutationFn: () => importTB({ branch, period, tier, rows: tbRows() }),
+    onSuccess: () => { setPaste(''); setTbFile(null); qc.invalidateQueries({ queryKey: ['tally-tieout'] }); },
+  });
+  // Full Day Book import — the whole book, all ledgers, from one file.
+  const impDB = useMutation({
+    mutationFn: () => importDayBook({ branch, period, tier, rows: dbFile ? dbFile.rows : [] }),
+    onSuccess: () => { setDbFile(null); qc.invalidateQueries({ queryKey: ['tally-tieout'] }); },
+  });
+  const pickFile = async (file, kind) => {
+    if (!file) return;
+    setParsing(kind);
+    try { const r = await (kind === 'db' ? parseDayBookFile(file) : parseTBFile(file)); (kind === 'db' ? setDbFile : setTbFile)({ rows: r.rows || [], error: r.error || '', name: file.name }); }
+    catch (e) { (kind === 'db' ? setDbFile : setTbFile)({ rows: [], error: e.message, name: file.name }); }
+    finally { setParsing(''); }
+  };
 
   const sections = useMemo(() => {
     if (tab === 'tb') return [{ label: null, rows }];
@@ -166,7 +189,8 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           <p className="text-sm text-ink-muted">ERP live books vs uploaded Tally — every ledger, Balance Sheet &amp; P&amp;L side by side. Branch-wise, never blended.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" icon={Upload} onClick={() => setShowImport((s) => !s)}>Upload Tally TB</Button>
+          <Button variant="secondary" icon={Upload} onClick={() => { setShowImport((s) => !s); setShowDayBook(false); }}>Upload Tally TB</Button>
+          <Button variant="secondary" icon={FileUp} onClick={() => { setShowDayBook((s) => !s); setShowImport(false); }}>Upload Day Book</Button>
           <Button variant="ghost" icon={RefreshCcw} onClick={() => refetch()}>Refresh</Button>
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/tally-reconciliation/guide')}>Guide</Button>
         </div>
@@ -183,21 +207,63 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         <span className="text-xs italic text-ink-subtle">
           {imported.count ? `Tally TB uploaded · ${imported.count} ledgers` : 'No Tally TB uploaded for this period yet — click “Upload Tally TB”.'}
         </span>
+        {dbStatus?.vouchers > 0 && (
+          <span className="rounded-full bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent" title="Full Day Book loaded for this period">
+            Day Book · {dbStatus.vouchers} vouchers · {dbStatus.ledgers} ledgers
+          </span>
+        )}
       </div>
 
-      {/* import panel */}
+      {/* Trial Balance import — pick a file (Excel/CSV/XML) OR paste */}
       {showImport && (
-        <PageSection title="Upload Tally Trial Balance" subtitle={`Paste the ${branch} · ${period} Trial Balance from Tally — one ledger per line: Ledger, Closing Dr, Closing Cr (tab or comma separated).`}>
-          <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={7}
+        <PageSection title="Upload Tally Trial Balance" subtitle={`The ${branch} · ${period} Trial Balance from Tally — export it as Excel/CSV (or paste below). Columns: Ledger, Closing Dr, Closing Cr.`}>
+          <label className="flex flex-wrap items-center gap-3 rounded-brand border border-dashed border-surface-border bg-surface-muted p-3">
+            <FileUp size={18} className="text-accent" aria-hidden="true" />
+            <span className="text-sm font-semibold text-ink">Choose Trial Balance file</span>
+            <input type="file" accept=".xlsx,.xls,.csv,.tsv,.txt,.xml,.html,.htm" data-testid="tb-file"
+              onChange={(e) => pickFile(e.target.files?.[0], 'tb')} className="text-xs text-ink-muted" />
+            <span className="text-xs text-ink-subtle">Excel, CSV, TSV or Tally XML/HTML export.</span>
+          </label>
+          {parsing === 'tb' && <p className="mt-2 text-sm text-ink-muted">Reading file…</p>}
+          {tbFile && (tbFile.error
+            ? <p className="mt-2 text-sm text-danger">Couldn’t read {tbFile.name}: {tbFile.error}</p>
+            : <p className="mt-2 text-sm text-success">{tbFile.name} — {tbFile.rows.length} ledger rows ready.</p>)}
+          <p className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wider text-ink-subtle">…or paste</p>
+          <textarea value={paste} onChange={(e) => { setPaste(e.target.value); if (tbFile) setTbFile(null); }} rows={6}
             placeholder={'ICICI Bank A/c\t1245300\t0\nHDFC Bank A/c\t805000\t0\nBSP / IATA\t0\t9000'}
             className="w-full rounded-brand border border-surface-border bg-surface p-3 font-mono text-xs text-ink" />
-          <div className="mt-2 flex items-center gap-3">
-            <Button variant="primary" loading={imp.isPending} disabled={parseTB(paste).length === 0} onClick={() => imp.mutate()}>
-              Parse &amp; upload ({parseTB(paste).length} rows)
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <Button variant="primary" loading={imp.isPending} disabled={tbRows().length === 0} onClick={() => imp.mutate()}>
+              Upload ({tbRows().length} rows)
             </Button>
             {imp.isError && <span className="text-sm text-danger">{imp.error?.message}</span>}
             {imp.isSuccess && <span className="text-sm text-success">Uploaded {imp.data?.inserted ?? 0} ledgers.</span>}
             <span className="text-xs text-ink-subtle">Re-uploading replaces this period's Tally TB.</span>
+          </div>
+        </PageSection>
+      )}
+
+      {/* Full Day Book import — one file, every ledger's vouchers for the period */}
+      {showDayBook && (
+        <PageSection title="Upload Tally Day Book" subtitle={`The whole ${branch} · ${period} Day Book from Tally — every voucher, every ledger. Export as Excel/CSV (or Tally XML). Columns: Date, Vch No, Ledger, Debit, Credit.`}>
+          <label className="flex flex-wrap items-center gap-3 rounded-brand border border-dashed border-surface-border bg-surface-muted p-3">
+            <FileUp size={18} className="text-accent" aria-hidden="true" />
+            <span className="text-sm font-semibold text-ink">Choose Day Book file</span>
+            <input type="file" accept=".xlsx,.xls,.csv,.tsv,.txt,.xml,.html,.htm" data-testid="db-file"
+              onChange={(e) => pickFile(e.target.files?.[0], 'db')} className="text-xs text-ink-muted" />
+            <span className="text-xs text-ink-subtle">Excel, CSV, TSV or Tally XML/HTML export.</span>
+          </label>
+          {parsing === 'db' && <p className="mt-2 text-sm text-ink-muted">Reading file…</p>}
+          {dbFile && (dbFile.error
+            ? <p className="mt-2 text-sm text-danger">Couldn’t read {dbFile.name}: {dbFile.error}</p>
+            : <p className="mt-2 text-sm text-success">{dbFile.name} — {dbFile.rows.length} voucher legs ready.</p>)}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button variant="primary" icon={FileUp} loading={impDB.isPending} disabled={!dbFile || dbFile.rows.length === 0} onClick={() => impDB.mutate()}>
+              Upload Day Book ({dbFile ? dbFile.rows.length : 0} legs)
+            </Button>
+            {impDB.isError && <span className="text-sm text-danger">{impDB.error?.message}</span>}
+            {impDB.isSuccess && <span className="text-sm text-success">Loaded {impDB.data?.inserted ?? 0} voucher legs across {impDB.data?.ledgers ?? 0} ledgers.</span>}
+            <span className="text-xs text-ink-subtle">Only rows dated within {period} are kept; re-uploading replaces this period's Day Book.</span>
           </div>
         </PageSection>
       )}
