@@ -8,7 +8,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, Download, Printer, Ban, RotateCcw, Ban } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Printer, Ban, RotateCcw } from 'lucide-react';
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import {
   SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
@@ -235,9 +235,6 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   // every row; export/print below still build over the full `rows`.
   const pg = usePager(rows);
   const cols = fields.filter((f) => f.table !== false);
-  // Only masters that actually model an Active flag (Suppliers/Customers) get the
-  // Deactivate shortcut — nothing to toggle on a master with no such field.
-  const hasActiveField = fields.some((f) => f.key === 'active');
   const isDerivedRow = (r) => !r.id || String(r.id).startsWith('derived:');
 
   const openNew = () => { setErr(''); setEditing({ __new: true, ...blankFromFields(fields) }); };
@@ -281,8 +278,10 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   };
 
   // Safe alternative to delete, offered on every master that carries an `active`
-  // flag: the record keeps its history/postings but is marked Inactive (and, where
-  // the backend filters — ledgers, cost centres — leaves the pickers). Reversible.
+  // flag: the record keeps its history/postings but is marked Inactive — reversible,
+  // so a mistaken Deactivate isn't a dead end (Reactivate flips it back). A derived
+  // row has no master document yet, so deactivating it PROMOTES it to a real one
+  // (same rule Save uses) rather than PUTting to an id that doesn't exist.
   const hasActive = fields.some((f) => f.key === 'active');
   const toggleActive = async (r) => {
     const makeActive = r.active === false;
@@ -294,24 +293,13 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
       });
       if (!confirmed) return;
     }
-    update.mutate({ id: r.id, body: { active: makeActive } }, {
-      onSuccess: () => toast(`${r.name || 'Record'} ${makeActive ? 'reactivated' : 'deactivated'}`),
-      onError: (e) => toast(`Could not ${makeActive ? 'reactivate' : 'deactivate'} — ${e.message}`, 'error'),
-    });
-  };
-
-  // Deactivate: the safe, always-available alternative to Delete — keeps the record
-  // (and its transaction history) but flips Active off. A derived row has no master
-  // document yet, so deactivating it PROMOTES it to a real one (same rule Save uses).
-  const deactivate = (r) => {
-    if (r.active === false) return; // nothing to do — button is disabled for this case
-    const onSuccess = () => { toast(`${r.name || 'Record'} deactivated`); list.refetch(); };
-    const onError = (e) => toast(`Could not deactivate — ${e.message}`, 'error');
+    const onSuccess = () => toast(`${r.name || 'Record'} ${makeActive ? 'reactivated' : 'deactivated'}`);
+    const onError = (e) => toast(`Could not ${makeActive ? 'reactivate' : 'deactivate'} — ${e.message}`, 'error');
     if (isDerivedRow(r)) {
-      const { id, ...body } = { ...blankFromFields(fields), ...r, active: false };
+      const { id, ...body } = { ...blankFromFields(fields), ...r, active: makeActive };
       create.mutate(body, { onSuccess, onError });
     } else {
-      const { id, ...body } = { ...r, active: false };
+      const { id, ...body } = { ...r, active: makeActive };
       update.mutate({ id, body }, { onSuccess, onError });
     }
   };
@@ -431,13 +419,6 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
                             style={{ background: 'none', border: 'none', padding: 4, cursor: isDerivedRow(r) ? 'not-allowed' : 'pointer', color: isDerivedRow(r) ? '#c2c8d6' : RED }}>
                             <Trash2 size={14} />
                           </button>
-                          {hasActiveField && (
-                            <button onClick={() => deactivate(r)} disabled={r.active === false}
-                              title={r.active === false ? 'Already inactive' : 'Deactivate'}
-                              style={{ background: 'none', border: 'none', padding: 4, cursor: r.active === false ? 'not-allowed' : 'pointer', color: r.active === false ? '#c2c8d6' : '#b45309' }}>
-                              <Ban size={14} />
-                            </button>
-                          )}
                         </>)}
                   </td>
                 </tr>
