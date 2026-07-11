@@ -301,8 +301,10 @@ export function parseTallyXmlTB(text) {
     if (!ledger || isTBNoiseRow(ledger)) continue;
     if (isTallyGroupRow(ledger)) { droppedGroups += 1; continue; }
     // The amounts sit in the <DSPACCINFO> element that follows this <DSPACCNAME>.
+    // Stop if we reach the NEXT ledger first (adjacent DSPACCNAMEs) so a name row
+    // never borrows the following ledger's amounts.
     let info = n.nextElementSibling;
-    while (info && info.tagName !== 'DSPACCINFO') info = info.nextElementSibling;
+    while (info && info.tagName !== 'DSPACCINFO') { if (info.tagName === 'DSPACCNAME') { info = null; break; } info = info.nextElementSibling; }
     const clNode = info ? info.querySelector('DSPCLAMTA') : null;
     const cl = num(clNode ? clNode.textContent.trim() : '');
     if (cl === null || cl === 0) continue; // empty/zero closing (e.g. a pass-through group) — no tie-out signal
