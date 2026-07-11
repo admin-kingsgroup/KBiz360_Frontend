@@ -240,7 +240,9 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       clearTB({ branch, period, tier }),
       clearDayBook({ branch, period, tier }),
     ]),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['tally-tieout'] }),
+    // Settle (not just success): if one leg fails after the other cleared, refresh
+    // anyway so the board reflects the TRUE state rather than stale counts.
+    onSettled: () => qc.invalidateQueries({ queryKey: ['tally-tieout'] }),
   });
   const pickFile = async (file, kind) => {
     if (!file) return;
@@ -309,7 +311,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             <Button variant="danger" icon={Trash2} loading={clr.isPending}
               disabled={periodCertified}
               title={periodCertified ? 'This period is certified — re-open the certificate to clear' : `Remove the uploaded Tally TB & Day Book for ${branch} · ${periodLabel(period)}`}
-              onClick={() => { if (window.confirm(`Clear the uploaded Tally data for ${branch} · ${periodLabel(period)}?\n\nThis removes only this month's Trial Balance and Day Book upload — no other month is affected, and your live ERP books are untouched.`)) clr.mutate(); }}>
+              onClick={() => { const n = tier === 'year' ? 'year' : 'month'; if (window.confirm(`Clear the uploaded Tally data for ${branch} · ${periodLabel(period)}?\n\nThis removes only this ${n}'s Trial Balance and Day Book upload — no other ${n} is affected, and your live ERP books are untouched.`)) clr.mutate(); }}>
               Clear Upload
             </Button>
           )}
@@ -352,7 +354,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 
       {/* Trial Balance import — pick a file (Excel/CSV/XML) OR paste */}
       {showImport && (
-        <PageSection title="Upload Tally Trial Balance" subtitle={`The ${branch} · ${period} Trial Balance from Tally — export it as Excel/CSV (or paste below). Columns: Ledger, Closing Dr, Closing Cr.`}>
+        <PageSection title="Upload Tally Trial Balance" subtitle={`The ${branch} · ${periodLabel(period)} Trial Balance from Tally — export it as Excel/CSV (or paste below). Columns: Ledger, Closing Dr, Closing Cr.`}>
           <label className="flex flex-wrap items-center gap-3 rounded-brand border border-dashed border-surface-border bg-surface-muted p-3">
             <FileUp size={18} className="text-accent" aria-hidden="true" />
             <span className="text-sm font-semibold text-ink">Choose Trial Balance file</span>
@@ -383,7 +385,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 
       {/* Full Day Book import — one file, every ledger's vouchers for the period */}
       {showDayBook && (
-        <PageSection title="Upload Tally Day Book" subtitle={`The whole ${branch} · ${period} Day Book from Tally — every voucher, every ledger. Export as Excel/CSV (or Tally XML). Columns: Date, Vch No, Ledger, Debit, Credit.`}>
+        <PageSection title="Upload Tally Day Book" subtitle={`The whole ${branch} · ${periodLabel(period)} Day Book from Tally — every voucher, every ledger. Export as Excel/CSV (or Tally XML). Columns: Date, Vch No, Ledger, Debit, Credit.`}>
           <label className="flex flex-wrap items-center gap-3 rounded-brand border border-dashed border-surface-border bg-surface-muted p-3">
             <FileUp size={18} className="text-accent" aria-hidden="true" />
             <span className="text-sm font-semibold text-ink">Choose Day Book file</span>
@@ -425,7 +427,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       {!empty && !isLoading && (imported.count
         ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} staleAccepted={counts.staleAccepted || 0} currentUser={currentUser} />
         : (
-          <PageSection icon={Upload} title={`No Tally Trial Balance uploaded — ${branch} · ${period}`}
+          <PageSection icon={Upload} title={`No Tally Trial Balance uploaded — ${branch} · ${periodLabel(period)}`}
             subtitle="Until you upload the period's Tally TB, every ERP ledger below shows as unmatched. This is the starting point, not an error.">
             <Button variant="primary" icon={Upload} onClick={() => { setShowImport(true); setShowDayBook(false); }}>Upload Tally TB</Button>
           </PageSection>
@@ -442,7 +444,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         ))}
       </div>
 
-      <PageSection title={tab === 'defects' ? `Defect Register — ${branch} · ${period}` : `${branch} · ${period}`}
+      <PageSection title={tab === 'defects' ? `Defect Register — ${branch} · ${periodLabel(period)}` : `${branch} · ${periodLabel(period)}`}
         subtitle={tab === 'defects' ? 'Every off ledger drilled to its voucher defects — click a row to see the vouchers.' : 'Left: ERP (live) · Middle: Tally (upload) · Right: difference. Click an off ledger to drill its vouchers.'}>
         {tab === 'defects' ? (
           <DefectRegister data={defectsData} loading={defectsLoading} error={defectsError} onRetry={refetchDefects} cur={cur} onDrill={setDrill} />
@@ -450,7 +452,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         {isLoading && <LoadingState label="Computing the tie-out…" />}
         {isError && <ErrorState title="Couldn’t load the tie-out" message="The service didn’t respond. Check the connection and retry." onRetry={() => refetch()} />}
         {empty && (
-          <EmptyState title={`No ledgers to tie out for ${branch} · ${period}`}
+          <EmptyState title={`No ledgers to tie out for ${branch} · ${periodLabel(period)}`}
             hint="Upload the period's Tally Trial Balance and the ERP will put its live numbers next to it."
             action={<Button variant="primary" icon={Upload} onClick={() => { setShowImport(true); setShowDayBook(false); }}>Upload Tally TB</Button>} />
         )}
