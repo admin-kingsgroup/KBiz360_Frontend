@@ -8,7 +8,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, Download, Printer } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Printer, Ban } from 'lucide-react';
 import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
 import {
   SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
@@ -235,6 +235,10 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   // every row; export/print below still build over the full `rows`.
   const pg = usePager(rows);
   const cols = fields.filter((f) => f.table !== false);
+  // Only masters that actually model an Active flag (Suppliers/Customers) get the
+  // Deactivate shortcut — nothing to toggle on a master with no such field.
+  const hasActiveField = fields.some((f) => f.key === 'active');
+  const isDerivedRow = (r) => !r.id || String(r.id).startsWith('derived:');
 
   const openNew = () => { setErr(''); setEditing({ __new: true, ...blankFromFields(fields) }); };
   const openEdit = (r) => { setErr(''); setEditing({ ...blankFromFields(fields), ...r }); };
@@ -265,9 +269,31 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   };
 
   const del = async (r) => {
+    // "derived:" rows are ledgers the backend surfaces here for visibility (a party
+    // that only exists because a voucher referenced it) — there is no master
+    // document to delete (the backend 404s "Cannot DELETE .../derived:..."), and its
+    // real record — the ledger — usually can't be deleted either once it has posted
+    // vouchers. Delete is disabled for these in the UI; Deactivate is the real option.
+    if (isDerivedRow(r)) return;
     const { confirmed } = await confirmDialog({ title: `Delete "${r.name}"?`, message: 'This cannot be undone.', danger: true, confirmLabel: 'Delete' });
     if (!confirmed) return;
     remove.mutate(r.id, { onSuccess: () => toast(`${r.name || 'Record'} deleted`), onError: (e) => toast(`Could not delete — ${e.message}`, 'error') });
+  };
+
+  // Deactivate: the safe, always-available alternative to Delete — keeps the record
+  // (and its transaction history) but flips Active off. A derived row has no master
+  // document yet, so deactivating it PROMOTES it to a real one (same rule Save uses).
+  const deactivate = (r) => {
+    if (r.active === false) return; // nothing to do — button is disabled for this case
+    const onSuccess = () => { toast(`${r.name || 'Record'} deactivated`); list.refetch(); };
+    const onError = (e) => toast(`Could not deactivate — ${e.message}`, 'error');
+    if (isDerivedRow(r)) {
+      const { id, ...body } = { ...blankFromFields(fields), ...r, active: false };
+      create.mutate(body, { onSuccess, onError });
+    } else {
+      const { id, ...body } = { ...r, active: false };
+      update.mutate({ id, body }, { onSuccess, onError });
+    }
   };
 
   // Export every record (all fields, not just the table-visible ones) to Excel.
@@ -325,6 +351,12 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     // A wired/system ledger (locked) carries the `~*` marker on its name — ~ = engine-
     // wired, * = non-editable/non-deletable (changed only in the database).
     if (f.key === 'name' && r.locked) return (<>{v || '—'} <span title="Wired ledger — locked; editable only directly in the database" style={{ color: '#dc2626', fontWeight: 800, fontSize: 11 }}>~*</span></>);
+    // A derived row has no master document — it's synthesized because past vouchers
+    // still reference this name (deleting/never-creating the real record doesn't erase
+    // history). Flag it so it doesn't look identical to a live record: without this, a
+    // Delete that removes the real master document but leaves this placeholder behind
+    // (the name still shows up here) reads as "delete silently failed".
+    if (f.key === 'name' && isDerivedRow(r)) return (<>{v || '—'} <span title="No master record — this name only appears because past transactions reference it. Edit to create a real record, or leave as-is." style={{ color: DIM, fontWeight: 700, fontSize: 11 }}>(historic)</span></>);
     return v || '—';
   };
 
@@ -370,7 +402,18 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
                       ? <span title="Locked" style={{ color: '#c2c8d6', fontSize: 13 }}>🔒</span>
                       : (<>
                           <button onClick={() => openEdit(r)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 4 }}><Pencil size={14} /></button>
-                          <button onClick={() => del(r)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, padding: 4 }}><Trash2 size={14} /></button>
+                          <button onClick={() => del(r)} disabled={isDerivedRow(r)}
+                            title={isDerivedRow(r) ? "Can't delete — no master record exists yet (past transactions still reference this name). Edit to create one, or Deactivate." : 'Delete'}
+                            style={{ background: 'none', border: 'none', padding: 4, cursor: isDerivedRow(r) ? 'not-allowed' : 'pointer', color: isDerivedRow(r) ? '#c2c8d6' : RED }}>
+                            <Trash2 size={14} />
+                          </button>
+                          {hasActiveField && (
+                            <button onClick={() => deactivate(r)} disabled={r.active === false}
+                              title={r.active === false ? 'Already inactive' : 'Deactivate'}
+                              style={{ background: 'none', border: 'none', padding: 4, cursor: r.active === false ? 'not-allowed' : 'pointer', color: r.active === false ? '#c2c8d6' : '#b45309' }}>
+                              <Ban size={14} />
+                            </button>
+                          )}
                         </>)}
                   </td>
                 </tr>

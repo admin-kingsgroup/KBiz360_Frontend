@@ -105,6 +105,18 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => {
     if (response.status === 204) return null;
+    // A 2xx status doesn't guarantee success — some routes report a LOGICAL failure
+    // (e.g. "can't delete, this supplier has posted vouchers — deactivate instead")
+    // as HTTP 200 with { success: false, message }. Treating status alone as success
+    // silently swallowed these: the mutation resolved, the UI toasted "deleted", and
+    // the record stayed put since nothing was actually removed. Route this through
+    // the same reject path as a real HTTP error so the caller's onError/toast fires.
+    const body = response.data;
+    if (body && typeof body === 'object' && body.success === false) {
+      const msg = errMessage(body);
+      handleAuthFailure(response.status, msg);
+      return Promise.reject(new Error(msg || 'Request failed.'));
+    }
     // Unwrap { success, data } but PRESERVE top-level siblings (e.g. gp-bills byBranch)
     // by hanging them on the returned value — see apiEnvelope.js.
     return unwrapEnvelope(response.data);
