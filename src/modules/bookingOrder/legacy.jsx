@@ -649,7 +649,6 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         try { const approveRes = await apiPost('/api/booking-orders/' + booking.id + '/approve'); Object.assign(booking, approveRes); reapproved = true; }
         catch (e) { reapproveErr = e.message || 'Re-approve failed'; }
       }
-      setResult({ ...booking, _approved: reapproved, _edited: editing });
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
       if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
       if (reapproveErr) toast(`Voucher ${booking.bookingNo || ''} saved — but auto re-approve failed (${reapproveErr}); approve it manually from Pending`, 'error');
@@ -660,6 +659,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         try { await bookInb.mutateAsync({ id: inbId, purchaseVno: booking.bookingNo }); setInbLinkNo(''); setInbId(''); }
         catch (_) { /* link stays open; surfaced in the INB reconciliation */ }
       }
+      // poOnly (the Approved tab's compact PO-only modal) closes straight back to the
+      // caller on success instead of falling through to the full-page "result" screen
+      // below — that screen isn't wrapped in the modal's backdrop, so it left the table
+      // underneath clickable and a second "Edit PO" click reused this same mounted
+      // instance (stale customer/supplier/lines state) instead of getting a fresh one.
+      if (poOnly) { if (onDone) onDone(); return; }
+      setResult({ ...booking, _approved: reapproved, _edited: editing });
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
@@ -2519,7 +2525,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       {/* Approved tab's "Edit PO" — same compact modal, but autoApprove re-posts &
           re-approves on save so the booking stays Approved (never drops to Pending). */}
       {editingPO && (
-        <SoPoGpVoucherEntry poOnly autoApprove branch={branch} setRoute={setRoute} editBooking={editingPO}
+        <SoPoGpVoucherEntry key={editingPO.id} poOnly autoApprove branch={branch} setRoute={setRoute} editBooking={editingPO}
           onDone={() => { setEditingPO(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }} />
       )}
     </div>
