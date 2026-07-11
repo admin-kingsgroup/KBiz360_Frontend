@@ -704,6 +704,17 @@ export const MENU_TALLY_RECON = {label:"Tally Reconciliation", icon:Scale, child
     {label:"Monthly Tie-Out", href:"/tally-reconciliation/monthly"},
     {label:"Yearly Tie-Out",  href:"/tally-reconciliation/yearly"},
   ]},
+  // The certification register — the "which period is certified" overview per tier
+  // (status · sign chain · frozen snapshot). Sign-off ACTION lives on the board.
+  {label:"Certification", children:[
+    {label:"Monthly Certification", href:"/tally-reconciliation/certification/monthly"},
+    {label:"Yearly Certification",  href:"/tally-reconciliation/certification/yearly"},
+  ]},
+  // Per-tier report: pending closings · certificate register · open blockers.
+  {label:"Reports", children:[
+    {label:"Monthly Report", href:"/tally-reconciliation/reports/monthly"},
+    {label:"Yearly Report",  href:"/tally-reconciliation/reports/yearly"},
+  ]},
   // Per-ledger voucher matcher — where the Tally Day Book is imported (feeds the
   // tie-out board's voucher drill). Route kept as /accounts/tally-reco.
   {label:"Vouchers", children:[

@@ -101,6 +101,25 @@ describe('normalizeTB', () => {
     expect(note).toMatch(/group subtotal/i); // grouped export warned about
   });
 
+  test('keeps "Profit & Loss A/c" (a real b/f balance) while dropping true group rows', () => {
+    // A monthly Tally TB carries a "Profit & Loss A/c" brought-forward line (the
+    // prior-period accumulated P&L). It is NOT a group subtotal — it must survive so
+    // it reconciles against the ERP's own P&L b/f.
+    const matrix = [
+      ['', 'Balance', 'Debit', 'Credit', 'Balance'],
+      ['Current Liabilities', '', '68000.00', '68000.00', ''], // group → dropped
+      ['ND Loan', '', '', '390700.00', '390700.00 Cr'],        // ledger → kept
+      ['Rent', '', '68000.00', '', '68000.00 Dr'],             // P&L ledger → kept (month)
+      ['Profit & Loss A/c', '140700.00 Dr', '', '', '140700.00 Dr'], // b/f → KEPT
+      ['Grand Total', '', '', '', ''],
+    ];
+    const { rows } = normalizeTB(matrix);
+    const names = rows.map((r) => r.ledger);
+    expect(names).toContain('Profit & Loss A/c');
+    expect(rows.find((r) => r.ledger === 'Profit & Loss A/c').closing).toBe(140700);
+    expect(names).not.toContain('Current Liabilities'); // true group still dropped
+  });
+
   test('single signed Closing column (Cr / parentheses / no-space Cr → negative)', () => {
     const matrix = [
       ['Ledger', 'Closing Balance'],

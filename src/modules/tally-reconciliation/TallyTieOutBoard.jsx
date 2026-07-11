@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, RefreshCcw, AlertTriangle, BookOpenCheck, FileUp } from 'lucide-react';
-import { getTieOut, getPeriods, importTB, getDefects, importDayBook, getDayBookStatus, getInception } from './api';
+import { Upload, RefreshCcw, AlertTriangle, BookOpenCheck, FileUp, Trash2 } from 'lucide-react';
+import { getTieOut, getPeriods, importTB, getDefects, importDayBook, getDayBookStatus, getInception, clearTB, clearDayBook } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { VoucherDrawer } from './VoucherDrawer';
@@ -22,6 +22,17 @@ function currentYearKey(branch) {
   return d.getMonth() >= 3 ? `FY${y}-${String((y + 1) % 100).padStart(2, '0')}` : `FY${y - 1}-${String(y % 100).padStart(2, '0')}`;
 }
 const defaultPeriod = (tier, branch) => (tier === 'year' ? currentYearKey(branch) : currentMonthKey());
+
+// Human label for a period KEY (the key itself stays the machine value sent to the
+// API): month 'YYYY-MM' → 'Sep 25' (matching the app-wide month:'short' format);
+// FY2026-27 → 'FY 2026-27'; CY2026 → 'CY 2026'. Unknown shapes pass through.
+function periodLabel(p) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(p || ''));
+  if (m) return `${new Date(+m[1], +m[2] - 1, 1).toLocaleString('en', { month: 'short' })} ${m[1].slice(-2)}`;
+  if (/^FY/.test(p)) return String(p).replace(/^FY/, 'FY ');
+  if (/^CY/.test(p)) return String(p).replace(/^CY/, 'CY ');
+  return String(p || '');
+}
 
 // The selectable months, newest→oldest, from the books' inception month to the
 // current month. `fromISO` is the earliest posted date ('YYYY-MM-DD'); when it's
@@ -124,11 +135,26 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const inceptionFrom = branchInception || globalInception;
   const period = periodSel[`${branch}:${tier}`] || defaultPeriod(tier, branch);
   const setPeriod = (p) => setPeriodSel((s) => ({ ...s, [`${branch}:${tier}`]: p }));
+  // The Certification Register / Report hand a period to this board via sessionStorage
+  // ("Open in Tie-Out") — pick it up once on mount for this branch+tier.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('tally-open-period');
+      if (!raw) return;
+      const o = JSON.parse(raw);
+      sessionStorage.removeItem('tally-open-period');
+      if (o && o.branch === branch && o.tier === tier && o.period) setPeriod(o.period);
+    } catch { /* ignore */ }
+  }, [branch, tier]); // eslint-disable-line react-hooks/exhaustive-deps
   const periodOptions = useMemo(() => {
     const current = defaultPeriod(tier, branch);
-    // How many Tally ledgers are uploaded per period (annotate the range with it).
-    const uploaded = new Map();
-    (periodsData || []).filter((p) => p.tier === tier).forEach((p) => uploaded.set(p.period, p.ledgers));
+    // How many Tally ledgers are uploaded per period + its certificate status, so
+    // the selector shows at a glance which months are certified (🔒).
+    const uploaded = new Map(); const certOf = new Map();
+    (periodsData || []).filter((p) => p.tier === tier).forEach((p) => {
+      uploaded.set(p.period, p.ledgers);
+      if (p.certStatus && p.certStatus !== 'none') certOf.set(p.period, p.certStatus);
+    });
     // The full range from the books' inception to now, PLUS the current period and
     // any uploaded period that falls outside the range (e.g. a stray future upload).
     const base = tier === 'year' ? yearOptionsFrom(inceptionFrom, branch) : monthOptionsFrom(inceptionFrom);
@@ -137,10 +163,12 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     add(current); base.forEach(add);
     [...uploaded.keys()].sort().reverse().forEach(add);
     order.sort().reverse(); // newest first (string-sortable within a tier)
-    return order.map((value) => ({
-      value,
-      label: uploaded.has(value) ? `${value} · ${uploaded.get(value)} ledgers` : (value === current ? `${value} · current` : value),
-    }));
+    const CERT_MARK = { locked: ' · 🔒 Certified', signed: ' · ✍ signing', reconciled: ' · ✓ ready' };
+    return order.map((value) => {
+      const lbl = periodLabel(value);
+      const base2 = uploaded.has(value) ? `${lbl} · ${uploaded.get(value)} ledgers` : (value === current ? `${lbl} · current` : lbl);
+      return { value, label: base2 + (CERT_MARK[certOf.get(value)] || '') };
+    });
   }, [periodsData, inceptionFrom, tier, period, branch]);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -196,6 +224,17 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const impDB = useMutation({
     mutationFn: () => importDayBook({ branch, period, tier, rows: dbFile ? dbFile.rows : [] }),
     onSuccess: () => { setDbFile(null); qc.invalidateQueries({ queryKey: ['tally-tieout'] }); },
+  });
+  // Clear Upload — wipe THIS month's uploaded Tally data (TB + full Day Book) for
+  // this branch only. Both deletes are period-scoped and the BE refuses a certified
+  // period, so a signed month is never touched. Runs both regardless of which is
+  // present (a missing side just deletes 0 rows).
+  const clr = useMutation({
+    mutationFn: () => Promise.all([
+      clearTB({ branch, period, tier }),
+      clearDayBook({ branch, period, tier }),
+    ]),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tally-tieout'] }),
   });
   const pickFile = async (file, kind) => {
     if (!file) return;
@@ -260,6 +299,15 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         <div className="flex items-center gap-2">
           <Button variant="secondary" icon={Upload} disabled={periodCertified} title={periodCertified ? 'This period is certified — re-open the certificate to re-upload' : undefined} onClick={() => { setShowImport((s) => !s); setShowDayBook(false); }}>Upload Tally TB</Button>
           <Button variant="secondary" icon={FileUp} disabled={periodCertified} title={periodCertified ? 'This period is certified — re-open the certificate to re-upload' : undefined} onClick={() => { setShowDayBook((s) => !s); setShowImport(false); }}>Upload Day Book</Button>
+          {(imported.count > 0 || dbStatus?.vouchers > 0) && (
+            <Button variant="danger" icon={Trash2} loading={clr.isPending}
+              disabled={periodCertified}
+              title={periodCertified ? 'This period is certified — re-open the certificate to clear' : `Remove the uploaded Tally TB & Day Book for ${branch} · ${periodLabel(period)}`}
+              onClick={() => { if (window.confirm(`Clear the uploaded Tally data for ${branch} · ${periodLabel(period)}?\n\nThis removes only this month's Trial Balance and Day Book upload — no other month is affected, and your live ERP books are untouched.`)) clr.mutate(); }}>
+              Clear Upload
+            </Button>
+          )}
+          {clr.isError && <span className="text-sm text-danger">{clr.error?.message || 'Could not clear this period.'}</span>}
           <Button variant="ghost" icon={RefreshCcw} onClick={() => qc.invalidateQueries({ queryKey: ['tally-tieout'] })}>Refresh</Button>
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/tally-reconciliation/guide')}>Guide</Button>
         </div>

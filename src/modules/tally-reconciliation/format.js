@@ -61,6 +61,18 @@ export const STATUS_META = {
 };
 export const statusMeta = (s) => STATUS_META[s] || STATUS_META.tied;
 
+// Certificate lifecycle status → badge (shared by the Register + Report pages and
+// the period-selector marker). 'none' = no certificate started for the period.
+export const CERT_META = {
+  locked:     { tone: 'navy',    label: 'Certified',        icon: '🔒' },
+  signed:     { tone: 'success', label: 'Signing…',         icon: '✍' },
+  reconciled: { tone: 'info',    label: 'Ready to certify', icon: '✓' },
+  open:       { tone: 'warning', label: 'Not tied',         icon: '•' },
+  none:       { tone: 'muted',   label: 'Not started',      icon: '–' },
+};
+export const certMeta = (s) => CERT_META[s] || CERT_META.none;
+export const TALLY_CHAIN = ['AE', 'FM', 'Director', 'Owner'];
+
 // Accepted-variance reasons (why an off ledger is explained, not chased).
 export const REASONS = [
   { value: 'inter-branch', label: 'Inter-branch (reconciled by hand)' },

@@ -70,6 +70,19 @@ describe('EnforcementMatrix', () => {
     expect(screen.getByText('Inter-Branch (INB)')).toBeInTheDocument();
   });
 
+  test('defaults an unset row to amount 0 and today’s effective date', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    getVoucherPolicy.mockResolvedValue({
+      categories: [{ key: 'journal', label: 'Journal' }],
+      defaults: { enforce: false, threshold: 0, effectiveDate: '' },
+      store: { default: {}, branches: {} },
+      effective: {},
+    });
+    renderWith(<EnforcementMatrix branch="default" />);
+    expect(await screen.findByLabelText('Journal threshold')).toHaveValue(0);
+    expect(screen.getByLabelText('Journal effective date')).toHaveValue(today);
+  });
+
   test('rejects a negative threshold before saving', async () => {
     localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
     renderWith(<EnforcementMatrix branch="default" />);

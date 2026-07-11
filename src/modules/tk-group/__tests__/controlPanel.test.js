@@ -46,18 +46,27 @@ describe('approvalChainView', () => {
     expect(v.aeCanApprove).toBe(true);
   });
 
-  test('master guard OFF => both people INDEPENDENT, no approval required', () => {
+  test('master guard OFF => all five roles INDEPENDENT, no approval required', () => {
     const v = approvalChainView({ flags: { flags: { 'core.policy_guard': { enabled: false } } } });
     expect(v.masterOn).toBe(false);
+    expect(v.people).toHaveLength(5);
+    expect(v.people.map((p) => p.key)).toEqual(['branch_accountant', 'ae', 'fm', 'director', 'owner']);
     expect(v.people.every((p) => p.independent)).toBe(true);
-    expect(v.people.find((p) => p.key === 'sughra').status).toMatch(/Independent/);
-    expect(v.people.find((p) => p.key === 'faiz').status).toMatch(/Independent/);
+    expect(v.people.find((p) => p.key === 'ae').status).toMatch(/Independent/);
+    expect(v.people.find((p) => p.key === 'fm').status).toMatch(/Independent/);
   });
 
-  test('master guard ON => both under control', () => {
+  test('master guard ON => all five under control', () => {
     const v = approvalChainView({ flags: { flags: { 'core.policy_guard': { enabled: true } } } });
     expect(v.masterOn).toBe(true);
     expect(v.people.every((p) => !p.independent)).toBe(true);
-    expect(v.people.find((p) => p.key === 'faiz').status).toBe('Under control');
+    expect(v.people.find((p) => p.key === 'fm').status).toBe('Under control');
+  });
+
+  test('a per-role switch brings ONLY that role under control (master guard off)', () => {
+    const v = approvalChainView({ flags: { flags: { 'control.role.fm': { enabled: true } } } });
+    expect(v.masterOn).toBe(false);
+    expect(v.people.find((p) => p.key === 'fm').independent).toBe(false);   // FM switched under control
+    expect(v.people.find((p) => p.key === 'ae').independent).toBe(true);    // others still independent
   });
 });

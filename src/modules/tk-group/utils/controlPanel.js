@@ -8,6 +8,24 @@
 const DEFAULT_VERIFY = ['sughra@travkings.com'];   // AE — mirrors shared/approvalChain
 const DEFAULT_APPROVE = ['faiz@travkings.com'];    // FM
 
+// The five roles that can be individually switched "under control" (walk the approval
+// chain) vs left "independent" — Enforcement-Matrix-style, independent of the master
+// guard. `flag` is the backing control.role.* flag (mirrors backend roles.ROLE_CONTROL_FLAG
+// + the flag catalogue). Order is top-to-bottom of the chain.
+export const ROLE_SWITCHES = [
+  { key: 'branch_accountant', name: 'Branch Accountant', role: 'Branch Accountant', duty: 'Enters vouchers · Check (level 1)', flag: 'control.role.branch_accountant' },
+  { key: 'ae', name: 'Sughra', role: 'Accounts Executive', duty: 'Verify (level 2)', flag: 'control.role.ae' },
+  { key: 'fm', name: 'Faiz', role: 'Finance Manager', duty: 'Approve & post (level 3)', flag: 'control.role.fm' },
+  { key: 'director', name: 'Farhan', role: 'Director', duty: 'Oversight · escalation sign-off', flag: 'control.role.director' },
+  { key: 'owner', name: 'Afshin', role: 'Owner', duty: 'Final authority · sensitive co-sign', flag: 'control.role.owner' },
+];
+
+/** Is a flag ON in a raw flag-state payload ({ flags: { <key>: {enabled|foundation} } })? */
+function flagOnGlobal(flags, key) {
+  const f = ((flags && flags.flags) || {})[key];
+  return !!f && (f.foundation === true || f.enabled === true);
+}
+
 /** Normalise an app-config value (array | comma/space string | null) to a clean,
  *  lower-cased email list, falling back to the built-in default when empty. Mirrors
  *  approvalChain.asEmailList so the panel matches what the server actually enforces. */
@@ -36,18 +54,19 @@ export function approvalChainView(cfg = {}) {
   const aeCanApprove = aeFlagOn || verify.some((e) => approve.includes(e));
   const mOn = masterOn(cfg.flags);
 
-  // Per-person control state. When NO control applies to a person (all toggles off —
-  // today that means the master guard is dormant), they act INDEPENDENTLY: no approval
-  // required, they react on their own. When the guard is engaged they operate within
-  // the chain. This is what the Control Panel shows against each name.
-  const people = [
-    { key: 'sughra', name: 'Sughra', role: 'Accounts Executive', duty: 'Verify (level 2)', extra: aeCanApprove ? 'can also Approve' : '' },
-    { key: 'faiz',   name: 'Faiz',   role: 'Finance Manager',    duty: 'Approve & post (level 3)', extra: '' },
-  ].map((p) => ({
-    ...p,
-    independent: !mOn,
-    status: mOn ? 'Under control' : 'Independent — no approval required',
-  }));
+  // Per-role control state across all FIVE roles. A role is "under control" (walks the
+  // approval chain) when EITHER the master guard is on OR its own control.role.* switch is
+  // on (the switches enforce independently of the master guard, like the Enforcement
+  // Matrix). Otherwise the role is INDEPENDENT — no approval required, acts on its own.
+  const people = ROLE_SWITCHES.map((rs) => {
+    const under = mOn || flagOnGlobal(cfg.flags, rs.flag);
+    return {
+      key: rs.key, name: rs.name, role: rs.role, duty: rs.duty, flag: rs.flag,
+      extra: rs.key === 'ae' && aeCanApprove ? 'can also Approve' : '',
+      independent: !under,
+      status: under ? 'Under control' : 'Independent — no approval required',
+    };
+  });
 
   return {
     levels: [
@@ -104,49 +123,49 @@ export const POWER_SCREEN_KEYS = POWER_SCREENS.flatMap((g) => g.items.map((i) =>
 // the component renders them generically and they are testable.
 export const CONTROL_LISTS = {
   rights: [
-    { nm: 'Relocate central screens off branch', ds: 'Masters · approvals · money-out move to TK Group only.', flag: 'branch.central_relocated' },
-    { nm: 'Hide branch statements (P&L / Balance Sheet)', ds: 'ON = P&L / GP / MIS hidden from Branch Accountants; central always sees.', flag: 'branch.hide_statements' },
-    { nm: 'Master-creation lock', ds: "Branch ledger / party writes route to Owner approval (masterGuard).", guarded: true },
-    { nm: 'Field locks (PAN · bank · credit-limit)', ds: 'Party-field changes from a branch stage for Owner approval.', guarded: true },
-    { nm: 'Period lock', ds: 'No posting into a closed / filed period. Set specific periods on Period Locks.', guarded: true },
-    { nm: 'Numbering lock (auto only)', ds: 'Voucher numbers are always system-generated — no manual resets.', applied: true },
-    { nm: 'Wired-ledger lock', ds: 'Module / tax / inter-branch heads locked for everyone.', applied: true },
+    { nm: 'Relocate central screens off branch', ds: 'ON = masters · approvals · money-out · period-close live in TK Group Central only (removed from the Branch surface). OFF = branches keep those screens inline.', flag: 'branch.central_relocated' },
+    { nm: 'Hide branch statements (P&L / Balance Sheet)', ds: 'ON = P&L / GP / MIS hidden from Branch Accountants (central always sees). OFF = branches see their own statements.', flag: 'branch.hide_statements' },
+    { nm: 'Master-creation lock', ds: 'Not a switch — engages automatically with the master guard: once ON, a branch ledger / party write stages for Owner approval (masterGuard).', guarded: true },
+    { nm: 'Field locks (PAN · bank · credit-limit)', ds: 'Not a switch — engages with the master guard: a branch PAN / bank / credit-limit change stages for Owner approval.', guarded: true },
+    { nm: 'Period lock', ds: 'Not a switch — engages with the master guard: no posting into a closed / filed period. Set specific periods on Period Locks.', guarded: true },
+    { nm: 'Numbering lock (auto only)', ds: 'Already active: voucher numbers are always system-generated — no manual resets. Nothing to switch.', applied: true },
+    { nm: 'Wired-ledger lock', ds: 'Already active: module / tax / inter-branch heads are locked for everyone. Nothing to switch.', applied: true },
   ],
   sod: [
-    { nm: 'A maker cannot approve their own voucher', ds: 'Barred from its approval — enforced by the guard (isMaker check).', guarded: true },
-    { nm: 'Verifier ≠ Approver on the same voucher', ds: 'Check → Verify → Approve pass through different hands (relaxable via AE-approve).', guarded: true },
-    { nm: 'Master create ≠ Master approve', ds: 'Faiz creates; the Owner approves — never the same hand (locked meta-rule).', applied: true },
-    { nm: 'Payment prepared ≠ Payment released', ds: 'Money-out starts Pending and the maker is barred from approving it (SoD) — so a different person must release it.', guarded: true, crit: true },
-    { nm: 'Branch entries walk Check → Verify → Approve', ds: 'A branch-accountant ERP voucher goes Check (entry) → Verify (Sughra) → Approve (Faiz) — not the maker single-step approving their own. Central-role entries use SoD. Dormant until engaged.', flag: 'approval.chain_branch_entries' },
-    { nm: 'Large-voucher escalation sign-offs', ds: 'Over the escalate ceiling a voucher also needs a Director (Farhan) sign-off; over the dual ceiling, an Owner (Afshin) sign-off too — before Faiz’s final approval posts. FM-approve alone is enough while off.', flag: 'approval.escalation_signoffs' },
+    { nm: 'A maker cannot approve their own voucher', ds: 'Not a switch — engages with the master guard: the maker is barred from its own approval (isMaker check).', guarded: true },
+    { nm: 'Verifier ≠ Approver on the same voucher', ds: 'Not a switch — engages with the master guard: Check → Verify → Approve pass through different hands (relaxable via AE-approve).', guarded: true },
+    { nm: 'Master create ≠ Master approve', ds: 'Already active: Faiz creates, the Owner approves — never the same hand (locked meta-rule). Nothing to switch.', applied: true },
+    { nm: 'Payment prepared ≠ Payment released', ds: 'Not a switch — engages with the master guard: money-out starts Pending and the maker is barred from releasing it, so a different person must.', guarded: true, crit: true },
+    { nm: 'Branch entries walk Check → Verify → Approve', ds: 'ON = a branch-accountant ERP voucher goes Check (entry) → Verify (Sughra) → Approve (Faiz), not the maker single-step approving their own. OFF = maker single-step approve (today). Independent of the master switch.', flag: 'approval.chain_branch_entries' },
+    { nm: 'Large-voucher escalation sign-offs', ds: 'ON = over the escalate ceiling a voucher also needs a Director (Farhan) sign-off, and over the dual ceiling an Owner (Afshin) sign-off, before Faiz’s final approval posts. OFF = FM-approve alone is enough.', flag: 'approval.escalation_signoffs' },
   ],
   security: [
-    { nm: 'Single active session per user', ds: 'Already enforced — a new Books login invalidates every earlier session (per-app login floor), so other devices are signed out on their next request.', applied: true },
-    { nm: 'Password strength (minimum length)', ds: 'A minimum length is enforced on every new / changed password, and a password change signs the account out on every device (both apps).', applied: true },
-    { nm: 'Password rotation (force periodic reset)', ds: 'Not adopted — the Owner does not require scheduled password resets.', declined: true },
-    { nm: 'Require 2-factor authentication', ds: 'Not required — the Owner has decided against a second login factor.', declined: true },
-    { nm: 'Login working-hours window', ds: 'Not adopted — logins are not restricted by time of day (branches span four timezones).', declined: true },
-    { nm: 'IP / location allow-list', ds: 'Not adopted — logins are not restricted to office IPs.', declined: true },
+    { nm: 'Single active session per user', ds: 'Already active: a new Books login invalidates every earlier session, so other devices are signed out on their next request. Nothing to switch.', applied: true },
+    { nm: 'Password strength (minimum length)', ds: 'Already active: a minimum length is enforced on every new / changed password, and a change signs the account out on every device. Nothing to switch.', applied: true },
+    { nm: 'Password rotation (force periodic reset)', ds: 'Not adopted (Owner’s decision): scheduled password resets are not required.', declined: true },
+    { nm: 'Require 2-factor authentication', ds: 'Not adopted (Owner’s decision): no second login factor.', declined: true },
+    { nm: 'Login working-hours window', ds: 'Not adopted (Owner’s decision): logins are not restricted by time of day (branches span four timezones).', declined: true },
+    { nm: 'IP / location allow-list', ds: 'Not adopted (Owner’s decision): logins are not restricted to office IPs.', declined: true },
   ],
   entry: [
-    { nm: 'Block future-dated entries', ds: 'No posting beyond today — already a two-layer guard (travel dates excepted).', applied: true },
-    { nm: 'Duplicate detection', ds: 'Warn / block a repeat of the same invoice / voucher.', planned: true },
-    { nm: 'GP-floor block', ds: 'A booking under the GP floor needs central approval.', planned: true },
-    { nm: 'Mandatory documents', ds: "A money-out / expense / ADM-ACM voucher can't be created without a supporting attachment.", flag: 'entry.mandatory_docs' },
-    { nm: 'Tax filing lock', ds: 'A filed period locks — no edits after filing (via period lock).', guarded: true },
-    { nm: 'Reconciliation before close', ds: "A period can't hard-close until bank / client / supplier reconciliation is signed off (no open lines through the period end).", flag: 'close.require_recon' },
-    { nm: 'Integrity before close', ds: "A period can't hard-close while any Control-Tower integrity gate is failing (journal drift, suspense, self-approvals, sub-ledger ↔ GL, …). Clear them on the Control Tower first.", flag: 'close.require_integrity' },
+    { nm: 'Block future-dated entries', ds: 'Already active: no posting beyond today (two-layer guard; travel dates excepted). Nothing to switch.', applied: true },
+    { nm: 'Duplicate detection', ds: 'Not built yet (roadmap): would warn / block a repeat of the same invoice / voucher.', planned: true },
+    { nm: 'GP-floor block', ds: 'Not built yet (roadmap): a booking under the GP floor would need central approval.', planned: true },
+    { nm: 'Mandatory documents', ds: "ON = a money-out / expense / ADM-ACM voucher can't be created without a supporting attachment. OFF = attachment optional.", flag: 'entry.mandatory_docs' },
+    { nm: 'Tax filing lock', ds: 'Not a switch — engages with the master guard: a filed period locks (no edits after filing, via period lock).', guarded: true },
+    { nm: 'Reconciliation before close', ds: "ON = a period can't hard-close until bank / client / supplier reconciliation is signed off (no open lines through period end). OFF = close not gated on recon.", flag: 'close.require_recon' },
+    { nm: 'Integrity before close', ds: "ON = a period can't hard-close while any Control-Tower integrity gate is failing (journal drift, suspense, self-approvals, sub-ledger ↔ GL, …). OFF = close not gated on integrity.", flag: 'close.require_integrity' },
   ],
   notifications: [
-    { nm: 'Approval-request alerts', ds: 'Pending work already surfaces on the Alerts feed and the Inbox badge for the next approver.', applied: true },
-    { nm: 'Stale-approval SLA + escalation', ds: 'Change-requests are aged against the clearance SLA — on-time / at-risk / breached — on the governance queue.', applied: true },
-    { nm: 'Exception & risk alerts', ds: 'GP≤0 · negative cash · over-limit — already surface on the Alerts feed.', applied: true },
-    { nm: 'Daily digest to Owner / Director', ds: 'One scheduled email summary of pending, exceptions and close status.', planned: true },
+    { nm: 'Approval-request alerts', ds: 'Already active: pending work surfaces on the Alerts feed and the Inbox badge for the next approver. Nothing to switch.', applied: true },
+    { nm: 'Stale-approval SLA + escalation', ds: 'Already active: change-requests are aged against the clearance SLA — on-time / at-risk / breached — on the governance queue.', applied: true },
+    { nm: 'Exception & risk alerts', ds: 'Already active: GP≤0 · negative cash · over-limit surface on the Alerts feed. Nothing to switch.', applied: true },
+    { nm: 'Daily digest to Owner / Director', ds: 'Not built yet (roadmap): one scheduled email summary of pending, exceptions and close status.', planned: true },
   ],
   reports: [
-    { nm: 'Restrict export of sensitive data', ds: 'Only permitted roles may export ledgers / registers / P&L — a view-only user is blocked at the shared export helper.', flag: 'reports.restrict_export' },
-    { nm: 'Log every export', ds: 'Who exported what, when — every export (allowed or blocked) is recorded to the central export trail.', flag: 'reports.log_exports' },
-    { nm: 'Block branch export of group reports', ds: 'A branch-scoped user cannot export a consolidated (group) report.', flag: 'reports.block_branch_group_export' },
+    { nm: 'Restrict export of sensitive data', ds: 'ON = only permitted roles may export ledgers / registers / P&L (a view-only user is blocked at the shared export helper). OFF = export open to anyone with view access.', flag: 'reports.restrict_export' },
+    { nm: 'Log every export', ds: 'ON = every export (allowed or blocked) is recorded to the central export trail — who exported what, when. OFF = exports are not logged.', flag: 'reports.log_exports' },
+    { nm: 'Block branch export of group reports', ds: 'ON = a branch-scoped user cannot export a consolidated (group) report. OFF = branch users may export group reports.', flag: 'reports.block_branch_group_export' },
   ],
 };
 

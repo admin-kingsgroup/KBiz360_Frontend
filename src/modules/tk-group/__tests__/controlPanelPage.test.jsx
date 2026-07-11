@@ -67,7 +67,7 @@ describe('Control Panel · Power Console', () => {
     fireEvent.click(screen.getByText('Approval & Verification'));
     expect(await screen.findByText(/sughra@travkings.com/)).toBeInTheDocument();
     expect(screen.getByText(/faiz@travkings.com/)).toBeInTheDocument();
-    expect(screen.getAllByText(/Independent · no approval/).length).toBe(2); // Sughra + Faiz
+    expect(screen.getAllByText(/Independent · no approval/).length).toBe(5); // all 5 roles, master guard off
   });
 
   test('navigating to ERP Config shows the readiness + security gauges', async () => {
@@ -114,7 +114,8 @@ describe('Control Panel · Power Console', () => {
   test('honest states: SoD enforced by the guard; Security is Active + Owner-declined', async () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     fireEvent.click(screen.getByText('Segregation of Duties'));
-    expect(await screen.findByText(/enforced by the guard/)).toBeInTheDocument();     // maker≠approver
+    expect(await screen.findByText(/the maker is barred from its own approval/)).toBeInTheDocument();     // maker≠approver
+    expect(screen.getAllByText(/engages with the master guard/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Via master guard').length).toBeGreaterThanOrEqual(1);
     fireEvent.click(screen.getByText('Access & Security'));
     // single-session + password strength are really enforced; 2FA / hours / IP / rotation are Owner-declined

@@ -10,6 +10,12 @@ export function getTieOut({ branch, period, tier } = {}) {
 export async function getPeriods({ branch } = {}) {
   return (await apiGet('/api/tally-tieout/periods', { branch }))?.items || [];
 }
+// Certification register — every period + its cert status / sign chain / snapshot.
+// Powers the Certification Register + Report pages. Fail-soft to an empty list.
+export async function getRegister({ branch, tier } = {}) {
+  try { return (await apiGet('/api/tally-tieout/register', { branch, tier }))?.items || []; }
+  catch { return []; }
+}
 // Earliest posted date in the branch's books — drives the period selector's range
 // (months/years back to the books' inception, not just the current period).
 export async function getInception({ branch } = {}) {
@@ -58,4 +64,9 @@ export async function getDayBookStatus({ branch, period, tier } = {}) {
 }
 export function clearTB({ branch, period, tier = 'month' }) {
   return apiDelete(`/api/tally-tieout?branch=${encodeURIComponent(branch)}&period=${encodeURIComponent(period)}&tier=${encodeURIComponent(tier)}`);
+}
+// Remove a period's full Day Book upload (companion to clearTB — the "Clear Upload"
+// button wipes both the TB and the Day Book for the selected month).
+export function clearDayBook({ branch, period, tier = 'month' }) {
+  return apiDelete(`/api/tally-tieout/daybook?branch=${encodeURIComponent(branch)}&period=${encodeURIComponent(period)}&tier=${encodeURIComponent(tier)}`);
 }

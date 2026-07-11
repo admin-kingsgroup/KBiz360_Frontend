@@ -13,7 +13,7 @@ import { ChangeLog } from './ChangeLog';
 import { Delegation } from './Delegation';
 import { BreakGlass } from './BreakGlass';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
-import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS } from './utils/controlPanel';
+import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
 import { Badge } from '../../shell/primitives';
 
@@ -86,6 +86,19 @@ function ChainCard({ k, r, w, n }) {
 // Screens whose controls are branch-scoped — the panel branch selector shows on these.
 const BRANCH_SCOPED = new Set(['master', 'approval', 'matrix', 'rights', 'sod', 'entry', 'reports', 'limits', 'users']);
 
+// The control flags each nav screen directly toggles — so its pill can show a REAL "N on"
+// count for the selected branch instead of a blanket hard-coded "off". Screens not listed
+// have no directly-toggled flags (they use other stores or are display-only), so they show
+// no pill rather than a misleading state.
+const SCREEN_FLAGS = {
+  master: ['core.policy_guard'],
+  approval: ['approval.ae_can_approve', 'approval.owner_cosign_sensitive', 'control.role.branch_accountant', 'control.role.ae', 'control.role.fm', 'control.role.director', 'control.role.owner'],
+  rights: ['branch.central_relocated', 'branch.hide_statements'],
+  sod: ['approval.chain_branch_entries', 'approval.escalation_signoffs'],
+  entry: ['entry.mandatory_docs', 'close.require_recon', 'close.require_integrity'],
+  reports: ['reports.restrict_export', 'reports.log_exports', 'reports.block_branch_group_export'],
+};
+
 export function ControlPanel({ setRoute }) {
   const [screen, setScreen] = useState('master');
   const [branch, setBranch] = useState('default');   // panel-wide branch scope for the controls
@@ -155,7 +168,7 @@ export function ControlPanel({ setRoute }) {
           <>
             <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The one switch that makes every other setting live. While off, this console is advisory — nobody is blocked, nothing needs approval, your migration continues untouched.</p>
             <Row nm="Engage the TK Group guard (go-live switch)"
-              ds="Flip this LAST, once the other screens are set. Then everyone comes under control at once — or ramp per voucher type first."
+              ds="ON = enforcement engages for this scope — approval chains, segregation-of-duties, cash caps, back-date limits and master-write staging all begin applying to everyone except you. OFF = advisory only; nobody is blocked and your migration continues untouched. Flip this LAST, once the other screens are set."
               st="core.policy_guard" flag="core.policy_guard" on={isOn('core.policy_guard')} onPropose={onPropose} />
             <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🛡️</span><span><b>Nothing is engaged.</b> This console decides who may do what; it takes no action itself. Changes are proposed on Control Flags and Owner-approved. Hand power over slowly — one control, one voucher type, one user at a time.</span></div>
           </>
@@ -163,7 +176,7 @@ export function ControlPanel({ setRoute }) {
       case 'approval':
         return (
           <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The three-level chain and the rights on it. Each level switchable; a person with no control on them acts independently.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The three-level chain and the rights on it. Switch each <b>role</b> under control one at a time below — a role with its switch off acts independently (no approval required).</p>
             <div className="flex flex-wrap items-stretch gap-2">
               {v.levels.map((l, i) => (
                 <React.Fragment key={l.n}>
@@ -177,11 +190,20 @@ export function ControlPanel({ setRoute }) {
               ))}
             </div>
             <div className="mt-3 grid gap-2.5">
-              <Row nm="Require Verify (Sughra)" ds="A voucher must be verified before approval." st="verify not required" />
-              <Row nm="Require approval before posting" ds="Every voucher starts Pending — nothing hits the books until it's approved; the maker can clear their own until you engage the review chain. Already enforced on all non-booking entries." applied />
-              <Row nm="Let Sughra also Approve (AE-approve)" ds="Elevates the AE from verify-only to also give final approval on a branch-accountant voucher."
+              <Row nm="Require approval before posting" ds="Already active: every voucher starts Pending — nothing hits the books until it's approved; the maker can clear their own until a review chain is engaged. Enforced on all non-booking entries. Nothing to switch." applied />
+              <Row nm="Let Sughra also Approve (AE-approve)" ds="ON = the Accounts Executive (Sughra) may give final approval on a branch-accountant voucher, not just verify. OFF = Sughra verifies only; Faiz (FM) gives final approval."
                 st="Sughra verifies only" flag="approval.ae_can_approve" on={isOn('approval.ae_can_approve')} onPropose={onPropose} />
-              <Row nm="Owner co-sign on sensitive types" ds="Refund · reissue · write-off · adjustment JV also need Afshin." st="sensitive" />
+              <Row nm="Owner co-sign on sensitive types" ds="ON = a refund / reissue additionally needs the Owner (Afshin) to sign before final approval — routed through the chain, no self-clear. OFF = they approve like any other voucher."
+                st="refund · reissue" flag="approval.owner_cosign_sensitive" on={isOn('approval.owner_cosign_sensitive')} onPropose={onPropose} />
+            </div>
+            <H3>Roles under control</H3>
+            <p className="mb-2 max-w-[82ch] text-[12.5px] text-ink-muted">Switch a role ON to route <b>its</b> entries through Check → Verify → Approve — <b>independently of the Master Switch</b> (like the Enforcement Matrix). OFF = that role acts on its own, no approval required.</p>
+            <div className="grid gap-2.5 tablet:grid-cols-2">
+              {ROLE_SWITCHES.map((rs) => (
+                <Row key={rs.flag} nm={rs.name === rs.role ? rs.role : `${rs.role} · ${rs.name}`}
+                  ds={`ON = ${rs.name}'s entries walk the approval chain (${rs.duty}). OFF = acts independently — no approval required.${rs.key === 'owner' ? ' Note: a Super Admin can still override the chain.' : ''}`}
+                  st={rs.duty} flag={rs.flag} on={isOn(rs.flag)} onPropose={onPropose} />
+              ))}
             </div>
             <H3>Who is under control</H3>
             <div className="grid gap-3 tablet:grid-cols-2">
@@ -191,7 +213,7 @@ export function ControlPanel({ setRoute }) {
                     <div><div className="text-[16px] font-semibold text-ink">{p.name}</div><div className="text-[11px] text-ink-muted">{p.role} · {p.duty}</div></div>
                     {p.independent ? <Badge tone="warning" size="sm">Independent · no approval</Badge> : <Badge tone="success" size="sm">Under control</Badge>}
                   </div>
-                  <p className="mt-2 text-[11px] text-ink-muted">{p.independent ? 'All controls off — reacts independently, no approval required.' : 'Operates within the approval chain.'}</p>
+                  <p className="mt-2 text-[11px] text-ink-muted">{p.independent ? 'Switched off — reacts independently, no approval required.' : `Operates within the approval chain${p.extra ? ` (${p.extra})` : ''}.`}</p>
                 </div>
               ))}
             </div>
@@ -328,13 +350,21 @@ export function ControlPanel({ setRoute }) {
           {POWER_SCREENS.map((grp) => (
             <div key={grp.group} className="mb-2">
               <div className="px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-ink-subtle">{grp.group}</div>
-              {grp.items.map((it) => (
-                <button key={it.key} onClick={() => setScreen(it.key)}
-                  className={`flex w-full items-center justify-between gap-2 rounded-lg border-l-[3px] px-2.5 py-2 text-left text-[12.5px] transition-colors ${screen === it.key ? 'border-l-gold bg-navy/5 font-semibold text-navy' : 'border-l-transparent text-ink-muted hover:bg-navy/5 hover:text-navy'}`}>
-                  <span className="truncate">{it.label}</span>
-                  <span className="rounded-full bg-surface-alt px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase text-ink-subtle">off</span>
-                </button>
-              ))}
+              {grp.items.map((it) => {
+                // Real per-screen state: how many of THIS screen's flags are on for the
+                // selected branch. `null` = we don't track this screen via flags (show no pill).
+                const keys = SCREEN_FLAGS[it.key];
+                const onN = keys ? keys.filter((k) => isOn(k)).length : null;
+                return (
+                  <button key={it.key} onClick={() => setScreen(it.key)}
+                    className={`flex w-full items-center justify-between gap-2 rounded-lg border-l-[3px] px-2.5 py-2 text-left text-[12.5px] transition-colors ${screen === it.key ? 'border-l-gold bg-navy/5 font-semibold text-navy' : 'border-l-transparent text-ink-muted hover:bg-navy/5 hover:text-navy'}`}>
+                    <span className="truncate">{it.label}</span>
+                    {onN === null ? null : onN > 0
+                      ? <span className="rounded-full bg-success-soft px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase text-success">{onN} on</span>
+                      : <span className="rounded-full bg-surface-alt px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase text-ink-subtle">off</span>}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </nav>

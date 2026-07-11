@@ -59,7 +59,10 @@ const TALLY_GROUP_NAMES = new Set([
   'cash-in-hand', 'deposits (asset)', 'loans & advances (asset)', 'stock-in-hand',
   'sundry debtors', 'sales accounts', 'direct income', 'purchase accounts',
   'direct expenses', 'indirect expenses', 'indirect income', 'misc. expenses (asset)',
-  'branch / divisions', 'profit & loss a/c',
+  'branch / divisions',
+  // NOTE: 'Profit & Loss A/c' is deliberately NOT here — in a monthly Tally TB it is
+  // a real brought-forward balance (the prior-period accumulated P&L) that must
+  // reconcile against the ERP's own P&L b/f, not a group subtotal to drop.
 ]);
 const gkey = (s) => String(s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 const isTallyGroupRow = (name) => TALLY_GROUP_NAMES.has(gkey(name));
