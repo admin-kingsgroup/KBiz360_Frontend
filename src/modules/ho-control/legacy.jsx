@@ -6,8 +6,10 @@
    Period Locking, Banking API, Statutory Filing Register, Delegations Manager.
    ════════════════════════════════════════════════════════════════════ */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, ChevronDown, Download, Lock, Plus, Save, Settings } from 'lucide-react';
+import { useConfigValue, useSaveConfigValue } from '../../core/useAccounting';
+import { toast } from '../../core/ux/toast';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, EXP_ACTUALS, FX_RATES, GP_BILLS } from '../../core/data';
@@ -441,51 +443,84 @@ export function PeriodLocking({branch,setRoute}){
 }
 
 
+/* Banking API — credentials persist via the existing /api/app-config mechanism
+   (key 'integration.banking'); the integration itself stays DORMANT (no bank
+   aggregator contract yet): Test Connection / enable stay disabled. Secrets are
+   stored as entered (single-company internal tool) but masked in the UI after
+   save — leaving a secret blank on re-save keeps the stored one. */
+const BANKING_CONFIG_KEY='integration.banking';
+const BANKING_AWAITING='Awaiting bank API / aggregator provider contract — Test Connection and live sync stay disabled until then.';
+
 export function BankingApiSettings({branch,setRoute}){
   const mob=useMobile();
-  const BANK_INTEGRATIONS=[];
-  const connected=BANK_INTEGRATIONS.filter(b=>b.status==="Connected").length;
+  const q=useConfigValue(BANKING_CONFIG_KEY);
+  const saved=q.data||{};
+  const saveCfg=useSaveConfigValue();
+  const [form,setForm]=useState({bankName:"",provider:"",apiBase:"",clientId:"",accountNo:"",clientSecret:"",apiKey:""});
+  const [dirty,setDirty]=useState(false);
+  useEffect(()=>{
+    if(!q.data||dirty)return;
+    setForm(f=>({...f,bankName:q.data.bankName||"",provider:q.data.provider||"",apiBase:q.data.apiBase||"",clientId:q.data.clientId||"",accountNo:q.data.accountNo||""}));
+  },[q.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set=(k)=>(e)=>{setDirty(true);setForm(f=>({...f,[k]:e.target.value}));};
+  const configured=!!(saved.apiBase||saved.clientId||saved.bankName);
+
+  const onSave=()=>{
+    const value={
+      ...saved,
+      bankName:form.bankName.trim(),provider:form.provider.trim(),apiBase:form.apiBase.trim(),
+      clientId:form.clientId.trim(),accountNo:form.accountNo.trim(),
+      ...(form.clientSecret?{clientSecret:form.clientSecret}:{}),   // blank = keep stored secret
+      ...(form.apiKey?{apiKey:form.apiKey}:{}),
+      enabled:false, // dormant until a provider contract exists
+      updatedAt:new Date().toISOString(),
+    };
+    saveCfg.mutate({key:BANKING_CONFIG_KEY,value,description:'Banking API credentials (integration dormant — awaiting provider contract)'},{
+      onSuccess:()=>{toast('Banking API settings saved');setForm(f=>({...f,clientSecret:"",apiKey:""}));setDirty(false);},
+      onError:(e)=>toast('Could not save — '+(e?.message||'unknown error'),'error'),
+    });
+  };
+
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
+  const secretHint=(k)=>saved[k]?"••••••••  (saved)":"not set";
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
-      <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🏦 Banking API Integration</h2>
-      <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Real-time bank balance · Auto-reconciliation · Bulk NEFT/RTGS initiation</p>
-
-      <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        <div style={{...card,borderTop:"3px solid #27500A"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Connected Banks</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#27500A"}}>{connected}</p></div>
-        <div style={{...card,borderTop:"3px solid #854F0B"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#854F0B"}}>{BANK_INTEGRATIONS.filter(b=>b.status==="Pending").length}</p></div>
-        <div style={{...card,borderTop:"3px solid #5a6691"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Manual Only</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#5a6691"}}>{BANK_INTEGRATIONS.filter(b=>b.status==="Manual").length}</p></div>
-        <div style={{...card,borderTop:"3px solid #185FA5"}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>Live Balance Total</p><p style={{margin:"4px 0 0",fontSize:mob?16:20,fontWeight:800,color:"#185FA5"}} title="Live bank-balance aggregation isn’t wired on this screen yet">—</p><p style={{margin:0,fontSize:10,color:"#5a6691"}}>Aggregated INR</p></div>
+    <div style={{padding:"12px 10px",maxWidth:900,margin:"0 auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10}}>
+        <div>
+          <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>🏦 Banking API Integration</h2>
+          <p style={{margin:"4px 0 14px",fontSize:11.5,color:"#5a6691"}}>Real-time bank balance · Auto-reconciliation · Bulk NEFT/RTGS — credentials persist here; sync goes live once a provider is contracted</p>
+        </div>
+        <span style={{fontSize:10,padding:"3px 10px",borderRadius:999,fontWeight:700,background:configured?"#FAEEDA":"#f3f4f8",color:configured?"#854F0B":"#5a6691"}}>
+          {configured?"● Credentials saved — integration dormant":"○ Not configured"}
+        </span>
       </div>
 
-      <div style={{...card,padding:0,overflow:"hidden"}}>
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-            <thead style={{background:"#0d1326",color:"#d4a437"}}><tr>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Bank / Integration</th>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Branch</th>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Account #</th>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Status</th>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Last Sync</th>
-              <th style={{padding:"9px 8px",textAlign:"left"}}>Features</th>
-              <th style={{padding:"9px 8px",textAlign:"center"}}>Action</th>
-            </tr></thead>
-            <tbody>
-              {BANK_INTEGRATIONS.map((b,i)=>(
-                <tr key={i} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
-                  <td style={{padding:"7px 8px",fontWeight:600}}>{b.bank}</td>
-                  <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{b.branch}</td>
-                  <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{b.account}</td>
-                  <td style={{padding:"7px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:10,fontSize:9.5,fontWeight:700,background:b.status==="Connected"?"#EAF3DE":b.status==="Pending"?"#FAEEDA":"#f3f4f8",color:b.status==="Connected"?"#27500A":b.status==="Pending"?"#854F0B":"#5a6691"}}>{b.status==="Connected"?"●":b.status==="Pending"?"⏱":"○"} {b.status}</span></td>
-                  <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{b.lastSync}</td>
-                  <td style={{padding:"7px 8px",fontSize:10,color:"#5a6691"}}>{b.features.join(" · ")}</td>
-                  <td style={{padding:"7px 8px",textAlign:"center"}}><button style={{padding:"3px 10px",border:b.status==="Connected"?"1px solid #185FA5":"none",background:b.status==="Connected"?"#fff":"#d4a437",color:b.status==="Connected"?"#185FA5":"#0d1326",borderRadius:6,fontSize:10,fontWeight:700,cursor:"pointer"}}>{b.status==="Connected"?"⚙ Configure":"+ Connect"}</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600}}>
+        🔌 {BANKING_AWAITING} Nothing is transmitted anywhere — this page only persists the credentials (app-config <code>{BANKING_CONFIG_KEY}</code>).
+      </div>
+
+      <div style={{...card,marginBottom:12}}>
+        <p style={{margin:"0 0 12px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Provider credentials</p>
+        <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:12}}>
+          <FL label="Bank"><input value={form.bankName} onChange={set('bankName')} placeholder="e.g. HDFC Bank" style={inp}/></FL>
+          <FL label="Aggregator / API provider"><input value={form.provider} onChange={set('provider')} placeholder="e.g. bank direct API, Setu, Falcon…" style={inp}/></FL>
+          <FL label="API endpoint (base URL)"><input value={form.apiBase} onChange={set('apiBase')} placeholder="https://…" style={{...inp,fontFamily:"monospace",fontSize:11}}/></FL>
+          <FL label="Account number"><input value={form.accountNo} onChange={set('accountNo')} placeholder="account no." style={{...inp,fontFamily:"monospace",fontSize:11}}/></FL>
+          <FL label="Client ID"><input value={form.clientId} onChange={set('clientId')} placeholder="client id" style={{...inp,fontFamily:"monospace",fontSize:11}} autoComplete="off"/></FL>
+          <FL label="Client secret"><input type="password" value={form.clientSecret} onChange={set('clientSecret')} placeholder={secretHint('clientSecret')} style={{...inp,fontFamily:"monospace",fontSize:11}} autoComplete="new-password"/></FL>
+          <FL label="API key"><input type="password" value={form.apiKey} onChange={set('apiKey')} placeholder={secretHint('apiKey')} style={{...inp,fontFamily:"monospace",fontSize:11}} autoComplete="new-password"/></FL>
         </div>
+        <p style={{margin:"8px 0 0",fontSize:10,color:"#5a6691"}}>Secrets are masked after save — leave a secret blank to keep the stored one, type to replace it.</p>
+        <div style={{display:"flex",gap:8,alignItems:"center",marginTop:14,flexWrap:"wrap"}}>
+          <button onClick={onSave} disabled={saveCfg.isPending} style={{...btnG,fontSize:11.5,opacity:saveCfg.isPending?0.6:1}}><Save size={13}/> {saveCfg.isPending?"Saving…":"Save credentials"}</button>
+          <button disabled title={BANKING_AWAITING} aria-disabled="true" style={{...btnGh,fontSize:11.5,opacity:0.5,cursor:"not-allowed"}}>Test connection</button>
+          <span title={BANKING_AWAITING} style={{fontSize:10,padding:"3px 10px",borderRadius:999,fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}>Live sync: awaiting provider contract</span>
+        </div>
+      </div>
+
+      <div style={{...card,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10,color:"#185FA5"}}>
+        Once a bank API / aggregator contract exists: live balances land on the dashboard bank/cash tiles, statement lines feed auto-reconciliation against the Cash/Bank Book, and payment runs can initiate bulk NEFT/RTGS. Until then, bank balances stay manual via the Bank Book.
       </div>
     </div>
   );

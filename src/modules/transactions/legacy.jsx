@@ -21,7 +21,9 @@ import { SampleBanner } from '../../core/ux/SampleBanner';
 import { useLivePurchaseRegistry, useLiveSalesTickets } from '../../core/useVouchers';
 import { fmt, fmtINR } from '../../core/format';
 import { todayISO, CUR_MONTH, MONTH_OPTIONS } from '../../core/dates';
-import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, RECURRING_DATA, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, VTD, VTH, _ACM_LIST, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../../core/helpers';
+import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, REFUNDS_DATA, Recruitment, STATUS_FLOW, TAB_Page, TRow, VTD, VTH, _ACM_LIST, _ADM_LIST, _TICKET_CTRL, cardStyle, tabPanel } from '../../core/helpers';
+import { useQueryClient } from '@tanstack/react-query';
+import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { triggerSaveRefresh, useMobile } from '../../core/hooks';
 import { useVNo } from '../../core/useNextNo';
 import { ARow, B, DBtn, FL, RPT_tdStyle, RPT_thStyle, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
@@ -4121,15 +4123,47 @@ export function SalesHoliday({branch,setRoute}){
    VENDOR TERMS MASTER — ENHANCED
    ════════════════════════════════════════════════════════════════ */
 
+/* LIVE (2026-07-10): templates persist via /api/recurring-vouchers; "Post" creates a
+   REAL voucher (JV/RV/PMT series) through the universal pending gate — the approver
+   still signs off each occurrence. A daily backend cron (RECURRING_CRON) also posts
+   due templates automatically. */
 export function RecurringVouchers({branch}){
   const mob=useMobile();
-  const [templates,setTemplates]=useState(RECURRING_DATA);
+  const qc=useQueryClient();
+  const { data: masterRows = [] } = useMasterList('recurring-vouchers');
+  const { create, update } = useMasterMutations('recurring-vouchers');
+  const CAT_LABEL={journal:"Journal",payment:"Payment",receipt:"Receipt"};
+  const templates=(masterRows||[]).map(t=>({...t,type:CAT_LABEL[t.category]||t.category,lastRun:t.lastRun||"—"}));
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
+  const [posting,setPosting]=useState(false);
   const [form,setForm]=useState({name:"",type:"Journal",freq:"Monthly",day:1,dr:"",cr:"",amt:0});
+  // LedgerSelect carries the registry id — postings join by NAME, so resolve at save.
+  const ledgerReg=useLedgerRegistry(branch).data||[];
+  const ledgerNameOf=(id)=>((ledgerReg.find(l=>l.id===id)||{}).name)||id;
   const TODAY=todayISO();
   const due=templates.filter(t=>t.active&&t.nextRun<=TODAY);
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
-  const run=id=>setTemplates(ts=>ts.map(t=>t.id===id?{...t,lastRun:TODAY,nextRun:TODAY.replace(/-\d\d$/,"-01").replace(/\d{4}/,(y)=>t.freq==="Monthly"?y:String(parseInt(y)+1))}:t));
+  const refresh=()=>qc.invalidateQueries({queryKey:['master','recurring-vouchers']});
+  const run=async(id)=>{
+    setPosting(true);
+    try{
+      const { apiPost } = await import('../../core/api');
+      const r=await apiPost(`/api/recurring-vouchers/${id}/post`);
+      toast(`Voucher ${r.vno} created (pending approval) · next run ${r.nextRun}`);
+      refresh(); triggerSaveRefresh();
+    }catch(e){ toast(e?.message||"Posting failed","error"); }
+    finally{ setPosting(false); }
+  };
+  const runAll=async()=>{
+    setPosting(true);
+    try{
+      const { apiPost } = await import('../../core/api');
+      const r=await apiPost('/api/recurring-vouchers/post-due');
+      toast(`${r.posted.length}/${r.due} due templates posted as pending vouchers${r.failed.length?` · ${r.failed.length} failed`:""}`);
+      refresh(); triggerSaveRefresh();
+    }catch(e){ toast(e?.message||"Posting failed","error"); }
+    finally{ setPosting(false); }
+  };
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
@@ -4147,7 +4181,7 @@ export function RecurringVouchers({branch}){
       {due.length>0&&<div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#fbeedb",border:"1px solid #f3d9a8",fontSize:10.5,color:"#d97706",fontWeight:600,display:"flex",gap:8,flexWrap:"wrap"}}>
         <Clock size={14}/> {due.length} recurring voucher{due.length>1?"s":""} due for posting:
         {due.map(t=><span key={t.id} style={{padding:"1px 7px",borderRadius:999,background:"#d97706",color:"#fff",fontSize:9.5}}>{t.name}</span>)}
-        <button onClick={()=>due.forEach(t=>run(t.id))} style={{...btnG,padding:"2px 10px",fontSize:9.5,background:"#d97706",marginLeft:"auto"}}>Post All Now</button>
+        <button onClick={runAll} disabled={posting} style={{...btnG,padding:"2px 10px",fontSize:9.5,background:"#d97706",marginLeft:"auto",opacity:posting?0.5:1}}>{posting?"Posting…":"Post All Now"}</button>
       </div>}
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
@@ -4169,8 +4203,8 @@ export function RecurringVouchers({branch}){
               <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:t.active?"#e8f6ed":"#f4f5f7",color:t.active?"#16a34a":"#5b616e"}}>{t.active?"Active":"Paused"}</span></td>
               <td style={{padding:"8px 12px"}}>
                 <div style={{display:"flex",gap:4}}>
-                  {t.active&&t.nextRun<=TODAY&&<button onClick={()=>run(t.id)} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#16a34a"}}>Post</button>}
-                  <button onClick={()=>setTemplates(ts=>ts.map(x=>x.id===t.id?{...x,active:!x.active}:x))} style={{...btnGh,padding:"2px 8px",fontSize:9.5}}>{t.active?"Pause":"Resume"}</button>
+                  {t.active&&t.nextRun<=TODAY&&<button onClick={()=>run(t.id)} disabled={posting} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#16a34a",opacity:posting?0.5:1}}>Post</button>}
+                  <button onClick={()=>update.mutate({id:t.id,body:{active:!t.active}})} style={{...btnGh,padding:"2px 8px",fontSize:9.5}}>{t.active?"Pause":"Resume"}</button>
                 </div>
               </td>
             </tr>
@@ -4193,14 +4227,19 @@ export function RecurringVouchers({branch}){
                 <FL label="Day of month"><input type="number" min={1} max={31} value={form.day} onChange={e=>setForm(f=>({...f,day:+e.target.value}))} style={inp}/></FL>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:10}}>
-                <FL label="Debit ledger"><input value={form.dr} onChange={e=>setForm(f=>({...f,dr:e.target.value}))} style={inp} placeholder="e.g. Office Rent"/></FL>
-                <FL label="Credit ledger"><input value={form.cr} onChange={e=>setForm(f=>({...f,cr:e.target.value}))} style={inp} placeholder="e.g. HDFC Bank"/></FL>
+                <FL label="Debit ledger"><LedgerSelect value={form.dr} onChange={v=>setForm(f=>({...f,dr:v}))} placeholder="e.g. Office Rent"/></FL>
+                <FL label="Credit ledger"><LedgerSelect value={form.cr} onChange={v=>setForm(f=>({...f,cr:v}))} placeholder="e.g. HDFC Bank"/></FL>
               </div>
               <FL label="Amount (₹)"><input type="number" value={form.amt} onChange={e=>setForm(f=>({...f,amt:+e.target.value}))} style={inp}/></FL>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={()=>{const id=`REC${String(templates.length+1).padStart(3,"0")}`;setTemplates(ts=>[...ts,{...form,id,lastRun:"—",nextRun:`2026-06-${String(form.day).padStart(2,"0")}`,active:true}]);setModal(false);}} style={btnG}>Create Template</button>
+              <button disabled={!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)||create.isPending}
+                onClick={()=>create.mutate(
+                  {name:form.name.trim(),category:form.type.toLowerCase(),freq:form.freq,day:form.day,dr:ledgerNameOf(form.dr),cr:ledgerNameOf(form.cr),amt:form.amt,
+                   branch:branch&&branch!=="ALL"&&branch.code?branch.code:"BOM",active:true},
+                  {onSuccess:()=>{setModal(false);setForm({name:"",type:"Journal",freq:"Monthly",day:1,dr:"",cr:"",amt:0});toast("Recurring template saved.");}})}
+                style={{...btnG,opacity:!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)?0.5:1}}>{create.isPending?"Saving…":"Create Template"}</button>
             </div>
           </div>
         </div>
@@ -4528,48 +4567,85 @@ export function VoucherEntryTabbed(){
    2. MULTI-CURRENCY SINGLE VOUCHER
    ════════════════════════════════════════════════════════════════════ */
 
+/* LIVE (2026-07-10): converts FCY→INR from the live forex-rates master and posts ONE
+   balanced 4-line JV (Dr Customer / Cr Sales · Dr Cost / Cr Supplier) via /api/vouchers —
+   pending until approved. Manual JVs to Sales ledgers are an audited, supported path
+   (they land in the Sales-Reconciliation "Other / Manual" bucket). */
 export function MultiCurrencyVoucher(){
-  const [saleAmt,setSaleAmt]=useState(850000);
-  const [costAmt,setCostAmt]=useState(620000);
-  const saleCur="INR", costCur="INR";
-  const saleINR=Math.round(saleAmt);
-  const costINR=Math.round(costAmt);
+  const [saleAmt,setSaleAmt]=useState(0);
+  const [costAmt,setCostAmt]=useState(0);
+  const [saleCur,setSaleCur]=useState("INR");
+  const [costCur,setCostCur]=useState("INR");
+  const [date,setDate]=useState(todayISO());
+  const [brCode,setBrCode]=useState("BOM");
+  const [picks,setPicks]=useState({customer:"",sales:"",cost:"",supplier:""});
+  const [narr,setNarr]=useState("");
+  const createVoucher=useCreateVoucher();
+  const { data: fxRows = [] } = useMasterList('forex-rates');
+  const ledgerReg=useLedgerRegistry({code:brCode}).data||[];
+  const nameOf=(id)=>((ledgerReg.find(l=>l.id===id)||{}).name)||"";
+  const rateOf=(cur)=>{
+    if(!cur||cur==="INR")return 1;
+    const rows=(fxRows||[]).filter(r=>String(r.from).toUpperCase()===cur&&String(r.to).toUpperCase()==="INR");
+    if(!rows.length)return null;
+    return rows.reduce((a,b)=>(a.date>b.date?a:b)).rate;
+  };
+  const saleRate=rateOf(saleCur), costRate=rateOf(costCur);
+  const saleINR=saleRate==null?0:Math.round(saleAmt*saleRate);
+  const costINR=costRate==null?0:Math.round(costAmt*costRate);
   const gpINR=saleINR-costINR;
-  const gpPct=(gpINR/saleINR*100).toFixed(1);
+  const gpPct=saleINR>0?(gpINR/saleINR*100).toFixed(1):"0.0";
+  const missingRate=(saleRate==null?saleCur:null)||(costRate==null?costCur:null);
+  const ready=saleINR>0&&costINR>0&&picks.customer&&picks.sales&&picks.cost&&picks.supplier&&!missingRate;
+  const save=()=>{
+    const narration=[`Multi-currency GP: sale ${saleCur} ${saleAmt}${saleCur!=="INR"?` @${saleRate}`:""} / cost ${costCur} ${costAmt}${costCur!=="INR"?` @${costRate}`:""}`,narr].filter(Boolean).join(" · ");
+    createVoucher.mutate({
+      category:"journal",type:"JV",branch:brCode,date,narration,total:saleINR+costINR,
+      lines:[
+        {ledger:nameOf(picks.customer),amt:saleINR,drCr:"Dr"},
+        {ledger:nameOf(picks.sales),amt:saleINR,drCr:"Cr"},
+        {ledger:nameOf(picks.cost),amt:costINR,drCr:"Dr"},
+        {ledger:nameOf(picks.supplier),amt:costINR,drCr:"Cr"},
+      ],
+    },{onSuccess:(v)=>{toast(`Voucher ${v?.vno||""} created (pending approval).`);setSaleAmt(0);setCostAmt(0);setPicks({customer:"",sales:"",cost:"",supplier:""});setNarr("");}, onError:(e)=>toast(e?.message||"Save failed","error")});
+  };
   const inp={padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12};
 
   return (
-    <PHASE2_Page title="Gross Profit Voucher" subtitle="Single voucher · sale and cost in INR · auto GP calculation">
+    <PHASE2_Page title="Multi-Currency GP Voucher" subtitle="Sale and cost in any currency · converted at the live forex rate · posts one balanced JV (pending approval)">
       <div style={{padding:12,background:"#e8f0ff",border:"1px solid #cfe0f8",borderLeft:"3px solid #2563eb",borderRadius:6,marginBottom:14,fontSize:11.5,color:"#2e323c"}}>
-        <b>How it works:</b> Enter the sale amount billed to the customer and the cost paid to the supplier — both in INR. KBiz360 calculates gross profit and GP% automatically.
+        <b>How it works:</b> Enter the sale billed to the customer and the cost paid to the supplier in their own currencies. KBiz360 converts both at the latest forex rate on file, computes GP, and posts ONE balanced journal voucher (Dr Customer / Cr Sales · Dr Cost / Cr Supplier) that waits in the approval queue like any other entry.
       </div>
+      {missingRate&&<div style={{padding:"9px 14px",borderRadius:9,background:"#FFF8E1",border:"1px solid #F1E3B0",fontSize:11,color:"#854F0B",marginBottom:12}}>⚠ No {missingRate}→INR rate on file — add it under Masters ▸ Forex Rates before saving.</div>}
       <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:20}}>
         {/* Header */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:14,marginBottom:18,paddingBottom:14,borderBottom:"1px solid #dfe2e7"}}>
-          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Voucher Type</label><select style={{...inp,width:"100%"}}><option>Sales Voucher</option><option>Mixed Purchase-Sale</option></select></div>
-          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Date</label><input type="date" defaultValue={todayISO()} style={{...inp,width:"100%"}}/></div>
-          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select style={{...inp,width:"100%"}}><option>BOMMB</option><option>BOM</option><option>AMD</option></select></div>
+          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{...inp,width:"100%"}}/></div>
+          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Branch</label><select value={brCode} onChange={e=>setBrCode(e.target.value)} style={{...inp,width:"100%"}}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></div>
+          <div><label style={{fontSize:11,color:"#5b616e",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Narration</label><input value={narr} onChange={e=>setNarr(e.target.value)} placeholder="optional" style={{...inp,width:"100%"}}/></div>
         </div>
 
         {/* Revenue side */}
         <div style={{padding:14,background:"#f0fff4",border:"1px solid #bbf7d0",borderRadius:6,marginBottom:10}}>
           <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#16a34a"}}>📄 Revenue side (Sale)</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:10,alignItems:"flex-end"}}>
-            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Customer</label><input placeholder="Customer" style={{...inp,width:"100%"}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
-            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Amount (₹)</label><input type="number" value={saleAmt} onChange={e=>setSaleAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>INR Value</label><input readOnly value={"₹"+saleINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#e8f6ed",fontFamily:"monospace",fontWeight:700,color:"#16a34a"}}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,180px),1fr))",gap:10,alignItems:"flex-end"}}>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Customer (Dr)</label><LedgerSelect value={picks.customer} onChange={v=>setPicks(p=>({...p,customer:v}))} branch={{code:brCode}} placeholder="Customer ledger"/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Sales ledger (Cr)</label><LedgerSelect value={picks.sales} onChange={v=>setPicks(p=>({...p,sales:v}))} branch={{code:brCode}} placeholder="Sales ledger"/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select value={saleCur} onChange={e=>setSaleCur(e.target.value)} style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Amount ({saleCur})</label><input type="number" value={saleAmt} onChange={e=>setSaleAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>INR Value{saleCur!=="INR"&&saleRate!=null?` @${saleRate}`:""}</label><input readOnly value={saleRate==null?"rate missing":"₹"+saleINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#e8f6ed",fontFamily:"monospace",fontWeight:700,color:"#16a34a"}}/></div>
           </div>
         </div>
 
         {/* Cost side */}
         <div style={{padding:14,background:"#fff5f5",border:"1px solid #f3c9c9",borderRadius:6,marginBottom:10}}>
           <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#dc2626"}}>📥 Cost side (Purchase)</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:10,alignItems:"flex-end"}}>
-            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Supplier</label><input defaultValue="Marriott Group (Bali)" style={{...inp,width:"100%"}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
-            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Amount (₹)</label><input type="number" value={costAmt} onChange={e=>setCostAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
-            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>INR Value</label><input readOnly value={"₹"+costINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#fbe9e9",fontFamily:"monospace",fontWeight:700,color:"#dc2626"}}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,180px),1fr))",gap:10,alignItems:"flex-end"}}>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Cost ledger (Dr)</label><LedgerSelect value={picks.cost} onChange={v=>setPicks(p=>({...p,cost:v}))} branch={{code:brCode}} placeholder="Purchase/cost ledger"/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Supplier (Cr)</label><LedgerSelect value={picks.supplier} onChange={v=>setPicks(p=>({...p,supplier:v}))} branch={{code:brCode}} placeholder="Supplier ledger"/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Currency</label><select value={costCur} onChange={e=>setCostCur(e.target.value)} style={{...inp,width:"100%"}}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>Amount ({costCur})</label><input type="number" value={costAmt} onChange={e=>setCostAmt(+e.target.value)} style={{...inp,width:"100%",fontFamily:"monospace",fontWeight:700}}/></div>
+            <div><label style={{fontSize:10.5,color:"#5b616e",fontWeight:700,display:"block",marginBottom:3}}>INR Value{costCur!=="INR"&&costRate!=null?` @${costRate}`:""}</label><input readOnly value={costRate==null?"rate missing":"₹"+costINR.toLocaleString("en-IN")} style={{...inp,width:"100%",background:"#fbe9e9",fontFamily:"monospace",fontWeight:700,color:"#dc2626"}}/></div>
           </div>
         </div>
 
@@ -4589,17 +4665,16 @@ export function MultiCurrencyVoucher(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5,marginBottom:14}}>
           <thead style={{background:"#f7f8fb"}}><tr><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Narration</th><th style={{...RPT_thStyle,textAlign:"right"}}>Debit (₹)</th><th style={{...RPT_thStyle,textAlign:"right"}}>Credit (₹)</th></tr></thead>
           <tbody>
-            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Customer (Receivable)</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Sample package</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
-            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Sales — Bali Holidays</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Package sale</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td></tr>
-            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Tour Cost — Hotels</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Supplier cost</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
-            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>Marriott Group (Payable)</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Marriott Bali, 3 nights</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td></tr>
+            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>{nameOf(picks.customer)||"Customer (pick above)"}</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Sale {saleCur} {saleAmt||0}{saleCur!=="INR"&&saleRate!=null?` @${saleRate}`:""}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
+            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>{nameOf(picks.sales)||"Sales ledger (pick above)"}</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Sale value</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{saleINR.toLocaleString("en-IN")}</td></tr>
+            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>{nameOf(picks.cost)||"Cost ledger (pick above)"}</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Cost {costCur} {costAmt||0}{costCur!=="INR"&&costRate!=null?` @${costRate}`:""}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td><td style={RPT_tdStyle}/></tr>
+            <tr style={{borderBottom:"1px solid #dfe2e7"}}><td style={RPT_tdStyle}>{nameOf(picks.supplier)||"Supplier (pick above)"}</td><td style={{...RPT_tdStyle,color:"#5b616e"}}>Supplier cost</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{costINR.toLocaleString("en-IN")}</td></tr>
           </tbody>
           <tfoot style={{background:"#fafbfd",fontWeight:700}}><tr><td style={{...RPT_tdStyle,fontWeight:700}}>TOTAL</td><td style={RPT_tdStyle}/><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #cdd1d8"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,borderTop:"2px solid #cdd1d8"}}>{(saleINR+costINR).toLocaleString("en-IN")}</td></tr></tfoot>
         </table>
         <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
-          <button style={{padding:"8px 16px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Print Preview</button>
-          <button style={{padding:"8px 16px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Submit for Approval</button>
-          <button style={{padding:"8px 18px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Voucher</button>
+          <button onClick={()=>openPrintPreview({selector:'main',title:'Multi-Currency GP Voucher',recommend:'portrait'})} style={{padding:"8px 16px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Print Preview</button>
+          <button onClick={save} disabled={!ready||createVoucher.isPending} style={{padding:"8px 18px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:ready?"pointer":"not-allowed",opacity:ready?1:0.5}}>💾 {createVoucher.isPending?"Saving…":"Save Voucher (pending approval)"}</button>
         </div>
       </div>
     </PHASE2_Page>
@@ -4610,38 +4685,64 @@ export function MultiCurrencyVoucher(){
    3. VOUCHER COMMENTS THREAD
    ════════════════════════════════════════════════════════════════════ */
 
+/* LIVE (2026-07-10): loads a real voucher by number and reads/writes its persisted
+   comment thread (GET/POST /api/vouchers/:id/comments — append-only, audit-tracked). */
 export function VoucherCommentsDemo(){
   const mob=useMobile();
   const [comment,setComment]=useState("");
-  const THREAD=[];
-  const voucherInfo={no:"PV-BOM/2026/0892",date:"2026-05-17",type:"Payment Voucher",party:"Air India Ltd. (BSP)",amount:285000,status:"Approved"};
+  const [vnoInput,setVnoInput]=useState("");
+  const [voucher,setVoucher]=useState(null);
+  const [thread,setThread]=useState([]);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  const AVATAR_CLRS=["#2563eb","#d97706","#16a34a","#dc2626","#7c3aed"];
+  const colorOf=(u)=>AVATAR_CLRS[(String(u).charCodeAt(0)||0)%AVATAR_CLRS.length];
+  const STATUS_STYLE={approved:{bg:"#e8f6ed",fg:"#16a34a",label:"✓ Approved"},pending:{bg:"#fbeedb",fg:"#d97706",label:"⏳ Pending"},rejected:{bg:"#fbe9e9",fg:"#dc2626",label:"✕ Rejected"}};
+  const load=async()=>{
+    const vno=vnoInput.trim(); if(!vno)return;
+    setBusy(true); setErr(""); setVoucher(null); setThread([]);
+    try{
+      const { apiGet } = await import('../../core/api');
+      const rows=await apiGet('/api/vouchers',{vno});
+      const v=Array.isArray(rows)?rows[0]:(rows?.rows?.[0]||null);
+      if(!v){ setErr(`No voucher found with number "${vno}".`); return; }
+      setVoucher(v);
+      setThread(await apiGet(`/api/vouchers/${v.id||v._id}/comments`)||[]);
+    }catch(e){ setErr(e?.message||"Load failed"); }
+    finally{ setBusy(false); }
+  };
+  const send=async()=>{
+    const msg=comment.trim(); if(!msg||!voucher)return;
+    setBusy(true);
+    try{
+      const { apiPost } = await import('../../core/api');
+      setThread(await apiPost(`/api/vouchers/${voucher.id||voucher._id}/comments`,{msg})||[]);
+      setComment("");
+    }catch(e){ toast(e?.message||"Comment failed","error"); }
+    finally{ setBusy(false); }
+  };
+  const st=STATUS_STYLE[String(voucher?.status||"").toLowerCase()]||{bg:"#f4f5f7",fg:"#5b616e",label:voucher?.status||"—"};
 
   return (
-    <PHASE2_Page title="Voucher Comments Thread" subtitle="Collaborate on a voucher before approval · all comments are audit-tracked">
-      <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1.7fr",gap:14}}>
+    <PHASE2_Page title="Voucher Comments Thread" subtitle="Collaborate on a voucher before approval · comments persist on the voucher and are audit-tracked">
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        <input value={vnoInput} onChange={e=>setVnoInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")load();}} placeholder="Voucher number, e.g. JV/BOM/26/0012" style={{...inpStd,maxWidth:320,fontFamily:"monospace"}}/>
+        <button onClick={load} disabled={busy||!vnoInput.trim()} style={{...btnG,fontSize:11,opacity:busy||!vnoInput.trim()?0.5:1}}>{busy?"Loading…":"Load voucher"}</button>
+        {err&&<span style={{alignSelf:"center",fontSize:11,color:"#A32D2D",fontWeight:600}}>{err}</span>}
+      </div>
+      {!voucher&&!err&&<p style={{fontSize:11.5,color:"#5b616e"}}>Enter a voucher number to open its comment thread.</p>}
+      {voucher&&<div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1.7fr",gap:14}}>
         {/* Voucher summary panel */}
         <div>
           <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:16,marginBottom:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
               <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>Voucher Details</p>
-              <span style={{padding:"3px 10px",background:"#e8f6ed",color:"#16a34a",borderRadius:4,fontSize:10.5,fontWeight:700}}>✓ Approved</span>
+              <span style={{padding:"3px 10px",background:st.bg,color:st.fg,borderRadius:4,fontSize:10.5,fontWeight:700}}>{st.label}</span>
             </div>
-            {[{l:"Voucher No.",v:voucherInfo.no},{l:"Date",v:voucherInfo.date},{l:"Type",v:voucherInfo.type},{l:"Party",v:voucherInfo.party},{l:"Amount",v:fmtINR(voucherInfo.amount)}].map((f,i)=>(
+            {[{l:"Voucher No.",v:voucher.vno},{l:"Date",v:voucher.date},{l:"Type",v:voucher.type||voucher.category},{l:"Party",v:voucher.party||"—"},{l:"Amount",v:fmtINR(voucher.total||0)},{l:"Branch",v:voucher.branch}].map((f,i)=>(
               <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7"}}>
                 <span style={{fontSize:11,color:"#5b616e",fontWeight:600}}>{f.l}</span>
                 <span style={{fontSize:11.5,color:"#1a1c22",fontWeight:600,fontFamily:f.l.includes("No.")||f.l==="Amount"?"monospace":"inherit"}}>{f.v}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,padding:14}}>
-            <p style={{margin:"0 0 8px",fontSize:12,fontWeight:700,color:"#1a1c22"}}>Approval Timeline</p>
-            {[].map((t,i)=>(
-              <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:10}}>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
-                  <div style={{width:28,height:28,borderRadius:"50%",background:t.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700}}>{t.user.substring(0,2).toUpperCase()}</div>
-                  {i<3&&<div style={{width:2,height:16,background:"#e6e8ec",marginTop:2}}/>}
-                </div>
-                <div style={{paddingTop:4}}><p style={{margin:0,fontSize:11.5,fontWeight:600,color:"#1a1c22"}}>{t.user}</p><p style={{margin:0,fontSize:10.5,color:"#5b616e"}}>{t.action} · {t.ts}</p></div>
               </div>
             ))}
           </div>
@@ -4651,26 +4752,22 @@ export function VoucherCommentsDemo(){
         <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,display:"flex",flexDirection:"column"}}>
           <div style={{padding:"12px 16px",borderBottom:"1px solid #cdd1d8",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
             <p style={{margin:0,fontSize:13,fontWeight:700,color:"#1a1c22"}}>💬 Comment Thread</p>
-            <span style={{fontSize:11,color:"#5b616e"}}>{THREAD.length} messages · 1 day ago</span>
+            <span style={{fontSize:11,color:"#5b616e"}}>{thread.length} message{thread.length===1?"":"s"}</span>
           </div>
           <div style={{flex:1,padding:16,overflowY:"auto",maxHeight:440}}>
-            {THREAD.map((c,i)=>(
+            {thread.length===0&&<p style={{fontSize:11.5,color:"#5b616e"}}>No comments yet — start the thread below.</p>}
+            {thread.map((c,i)=>(
               <div key={i} style={{marginBottom:14}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                  <div style={{width:34,height:34,borderRadius:"50%",background:c.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0}}>{c.user.substring(0,2).toUpperCase()}</div>
+                  <div style={{width:34,height:34,borderRadius:"50%",background:colorOf(c.user),color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0}}>{String(c.user||"?").substring(0,2).toUpperCase()}</div>
                   <div style={{flex:1}}>
                     <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:4}}>
                       <span style={{fontSize:12.5,fontWeight:700,color:"#1a1c22"}}>{c.user}</span>
                       <span style={{fontSize:10.5,color:"#5b616e"}}>{c.role}</span>
-                      <span style={{fontSize:10,color:"#5b616e",marginLeft:"auto"}}>{c.ts}</span>
+                      <span style={{fontSize:10,color:"#5b616e",marginLeft:"auto"}}>{String(c.ts||"").replace("T"," ").slice(0,16)}</span>
                     </div>
-                    <div style={{padding:"10px 12px",background:i%2===0?"#f7f8fb":"#f0f4f8",borderRadius:6,fontSize:12,color:"#1a1c22",lineHeight:1.5,borderLeft:"3px solid "+c.color}}>
+                    <div style={{padding:"10px 12px",background:i%2===0?"#f7f8fb":"#f0f4f8",borderRadius:6,fontSize:12,color:"#1a1c22",lineHeight:1.5,borderLeft:"3px solid "+colorOf(c.user)}}>
                       {c.msg}
-                      {c.attachment&&(
-                        <div style={{marginTop:8,padding:"5px 8px",background:"#fff",borderRadius:4,border:"1px solid #cdd1d8",display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer"}}>
-                          <span>📎</span><span style={{fontSize:10.5,color:"#c2a04a",fontWeight:600}}>{c.attachment}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -4679,13 +4776,15 @@ export function VoucherCommentsDemo(){
           </div>
           <div style={{padding:"10px 14px",borderTop:"1px solid #cdd1d8"}}>
             <div style={{display:"flex",gap:8}}>
-              <textarea value={comment} onChange={e=>setComment(e.target.value)} placeholder="Add a comment… (Shift+Enter for new line, Enter to send)" rows={2} style={{flex:1,padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,resize:"none",fontFamily:"inherit"}}/>
-              <button className="max-tablet:min-h-[44px]" style={{padding:"8px 14px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"flex-end"}}>Send</button>
+              <textarea value={comment} onChange={e=>setComment(e.target.value)}
+                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+                placeholder="Add a comment… (Shift+Enter for new line, Enter to send)" rows={2} style={{flex:1,padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,resize:"none",fontFamily:"inherit"}}/>
+              <button onClick={send} disabled={busy||!comment.trim()} className="max-tablet:min-h-[44px]" style={{padding:"8px 14px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"flex-end",opacity:busy||!comment.trim()?0.5:1}}>Send</button>
             </div>
-            <p style={{margin:"5px 0 0",fontSize:10,color:"#5b616e"}}>📎 Attach file · @mention · All comments are audit-logged</p>
+            <p style={{margin:"5px 0 0",fontSize:10,color:"#5b616e"}}>Comments persist on the voucher and are append-only (audit-tracked).</p>
           </div>
         </div>
-      </div>
+      </div>}
     </PHASE2_Page>
   );
 }
@@ -4694,21 +4793,65 @@ export function VoucherCommentsDemo(){
    4. PRINT PREVIEW BEFORE SAVING
    ════════════════════════════════════════════════════════════════════ */
 
+/* LIVE (2026-07-10): formal print layout of a REAL voucher, loaded by number from
+   /api/vouchers?vno=… . The old inert "Save & Post" is gone — posting happens in
+   Voucher Approvals; this screen renders and prints. */
+const _ONES=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+const _TENS=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+function _two(n){return n<20?_ONES[n]:(_TENS[Math.floor(n/10)]+(n%10?" "+_ONES[n%10]:""));}
+function _three(n){return (n>99?_ONES[Math.floor(n/100)]+" Hundred"+(n%100?" ":""):"")+(n%100?_two(n%100):"");}
+export function amountInWordsINR(n){
+  n=Math.round(Math.abs(Number(n)||0)); if(!n)return "Zero";
+  const parts=[];
+  const crore=Math.floor(n/1e7); n%=1e7;
+  const lakh=Math.floor(n/1e5);  n%=1e5;
+  const thousand=Math.floor(n/1e3); n%=1e3;
+  if(crore)parts.push(_three(crore)+" Crore");
+  if(lakh)parts.push(_two(lakh)+" Lakh");
+  if(thousand)parts.push(_two(thousand)+" Thousand");
+  if(n)parts.push(_three(n));
+  return parts.join(" ");
+}
 export function PrintPreviewDemo(){
-  const [show,setShow]=useState(true);
-  const voucher={no:"PV-BOM/2026/0893",date:"20 May 2026",type:"Payment Voucher",branch:"BOM — Mumbai",payTo:"Air India Ltd. (BSP)",bank:"HDFC Bank BOM A/c ...4321",mode:"NEFT",refNo:"NEFT2605120024",amount:285000,amountWords:"Indian Rupees Two Lakhs Eighty-Five Thousand Only",narration:"BSP settlement April 2026 — SURC included as per Board minute 2026-03-15",lines:[{ledger:"Air India BSP Payable",dr:285000,cr:0},{ledger:"HDFC Bank BOM Current A/c",dr:0,cr:285000}]};
+  const [vnoInput,setVnoInput]=useState("");
+  const [live,setLive]=useState(null);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  const load=async()=>{
+    const vno=vnoInput.trim(); if(!vno)return;
+    setBusy(true); setErr(""); setLive(null);
+    try{
+      const { apiGet } = await import('../../core/api');
+      const rows=await apiGet('/api/vouchers',{vno});
+      const v=Array.isArray(rows)?rows[0]:(rows?.rows?.[0]||null);
+      if(!v){ setErr(`No voucher found with number "${vno}".`); return; }
+      setLive(v);
+    }catch(e){ setErr(e?.message||"Load failed"); }
+    finally{ setBusy(false); }
+  };
+  const CAT_LABEL={journal:"Journal Voucher",payment:"Payment Voucher",receipt:"Receipt Voucher",contra:"Contra Voucher",sale:"Sales Voucher",purchase:"Purchase Voucher","purchase-expense":"Purchase Expense Voucher","debit-note":"Debit Note",refund:"Refund Voucher",reissue:"Reissue Voucher"};
+  const voucher=live?{
+    no:live.vno,date:live.date,type:CAT_LABEL[live.category]||live.type||"Voucher",branch:live.branch,
+    payTo:live.party||((live.lines||[])[0]||{}).ledger||"—",
+    mode:live.paymentMode||"—",refNo:live.bankRef||live.sourceRef||"—",bank:live.bank||"—",
+    amount:live.total||0,amountWords:`Indian Rupees ${amountInWordsINR(live.total||0)} Only`,
+    narration:live.narration||"—",status:live.status,
+    lines:(live.lines||[]).map(l=>({ledger:l.ledger,dr:l.drCr==="Dr"?l.amt:0,cr:l.drCr==="Cr"?l.amt:0})),
+  }:null;
 
   const printPage = {background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,maxWidth:740,margin:"0 auto",padding:"30px 36px",fontFamily:"Georgia, serif"};
 
   return (
-    <PHASE2_Page title="Print Preview Before Saving" subtitle="Review the formatted voucher before committing · matches the actual printout">
-      <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginBottom:12}}>
-        <button style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>← Edit Voucher</button>
-        <button onClick={()=>openPrintPreview({ selector:'main', title:'Voucher', recommend:'portrait' })} style={{padding:"7px 14px",background:"#fff",border:"1px solid #1a1c22",color:"#1a1c22",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>🖨 Print</button>
-        <button style={{padding:"7px 14px",background:"#c2a04a",color:"#1a1c22",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>✓ Save & Post</button>
+    <PHASE2_Page title="Voucher Print View" subtitle="Load any voucher by number and print the formal layout — pending vouchers print with a PENDING watermark note">
+      <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+        <input value={vnoInput} onChange={e=>setVnoInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")load();}} placeholder="Voucher number, e.g. PMT/BOM/26/0031" style={{...inpStd,maxWidth:320,fontFamily:"monospace"}}/>
+        <button onClick={load} disabled={busy||!vnoInput.trim()} style={{...btnG,fontSize:11,opacity:busy||!vnoInput.trim()?0.5:1}}>{busy?"Loading…":"Load voucher"}</button>
+        {voucher&&<button onClick={()=>openPrintPreview({ selector:'main', title:`Voucher ${voucher.no}`, recommend:'portrait' })} style={{padding:"7px 14px",background:"#fff",border:"1px solid #1a1c22",color:"#1a1c22",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer",marginLeft:"auto"}}>🖨 Print</button>}
+        {err&&<span style={{alignSelf:"center",fontSize:11,color:"#A32D2D",fontWeight:600}}>{err}</span>}
       </div>
-
-      <div style={printPage}>
+      {!voucher&&!err&&<p style={{fontSize:11.5,color:"#5b616e"}}>Enter a voucher number to render its print layout.</p>}
+      {voucher&&voucher.status==="pending"&&<p style={{maxWidth:740,margin:"0 auto 10px",fontSize:11,color:"#d97706",fontWeight:700}}>⏳ This voucher is PENDING approval — it has no books impact yet.</p>}
+      {voucher&&<div style={printPage}>
         {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:18,paddingBottom:14,borderBottom:"2px solid #1a1c22"}}>
           <div>
@@ -4763,7 +4906,7 @@ export function PrintPreviewDemo(){
             </div>
           ))}
         </div>
-      </div>
+      </div>}
     </PHASE2_Page>
   );
 }

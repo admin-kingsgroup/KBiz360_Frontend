@@ -12,6 +12,15 @@ export function getTree({ branch, tier, period } = {}) {
   return apiGet('/api/reconciliation/tree', { branch, tier, period });
 }
 
+// The FULL in-scope ledger checklist for a tier + its live status — every ledger
+// that must reconcile this period, whether or not its certificate exists yet
+// (un-generated ledgers come back status:'pending'). Powers the Reconciliation
+// Hub full view. THROWS on failure — a dead backend must never read as "nothing
+// pending" on a compliance board.
+export function getScopeTree({ branch, tier, period } = {}) {
+  return apiGet('/api/reconciliation/scope-tree', { branch, tier, period });
+}
+
 export function getCertificate(id) {
   return apiGet(`/api/reconciliation/${id}`);
 }

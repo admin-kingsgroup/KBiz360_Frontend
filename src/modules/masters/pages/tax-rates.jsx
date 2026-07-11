@@ -9,7 +9,7 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Ban, RotateCcw } from 'lucide-react';
 import { confirmDialog } from '../../../core/ux/confirm';
 import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { PageLayout } from '../../../shell/PageLayout';
@@ -79,6 +79,17 @@ export function MastersTaxRates() {
   };
   const delHsn = async (r) => { const { confirmed } = await confirmDialog({ title: `Delete HSN/SAC "${r.code} — ${r.service}"?`, danger: true, confirmLabel: 'Delete' }); if (confirmed) gstMut.remove.mutate(r.id); };
   const savingHsn = gstMut.create.isPending || gstMut.update.isPending;
+  // Deactivate = safe alternative to delete: the code stays on record (and on old
+  // invoices) but is flagged Inactive; the toggle reverses it any time.
+  const toggleRow = async (mut, r, label) => {
+    const makeActive = r.active === false;
+    if (!makeActive) {
+      const { confirmed } = await confirmDialog({ title: `Deactivate ${label}?`, message: 'The record is kept with its history but flagged Inactive. You can reactivate it any time.', confirmLabel: 'Deactivate' });
+      if (!confirmed) return;
+    }
+    mut.update.mutate({ id: r.id, body: { active: makeActive } });
+  };
+  const inactivePill = <span className="ml-1.5 rounded-full bg-[#f3f4f8] px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wide text-[#5b616e]">Inactive</span>;
 
   // ── Africa VAT (live CRUD, mirrors the GST tab; VAT is one rate per branch) ──
   const openNewVat = () => { setVatErr(''); setEditVat({ __new: true, ...blankVat }); };
@@ -106,7 +117,7 @@ export function MastersTaxRates() {
 
   const gstColumns = [
     { key: 'code', header: 'HSN / SAC Code', className: 'font-mono font-bold text-[#2563eb]', hideable: false },
-    { key: 'service', header: 'Service', className: 'text-navy' },
+    { key: 'service', header: 'Service', className: 'text-navy', render: (r, v) => <>{v}{r.active === false && inactivePill}</> },
     { key: 'module', header: 'Module', render: (r, v) => (v ? <StatusPill tone="info" size="sm">{v}</StatusPill> : null) },
     { key: 'basis', header: 'Taxable Basis', className: 'text-ink-muted' },
     { key: 'rate', header: 'GST %', num: true, align: 'center', render: (r, v) => <span className="rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={{ background: rateBg[v] || '#f3f4f8', color: rateColor[v] || '#5b616e' }}>{v}%</span> },
@@ -115,6 +126,9 @@ export function MastersTaxRates() {
     { key: '__act', header: '', align: 'right', sortable: false, exportable: false, hideable: false, render: (r) => (r.id ? (
       <span className="inline-flex gap-1">
         <button onClick={() => openEditHsn(r)} title="Edit" className="p-1 text-[#2563eb] hover:text-[#134d85]"><Pencil size={14} /></button>
+        {r.active === false
+          ? <button onClick={() => toggleRow(gstMut, r, `HSN/SAC "${r.code}"`)} title="Reactivate" className="p-1 text-[#16a34a] hover:opacity-80"><RotateCcw size={14} /></button>
+          : <button onClick={() => toggleRow(gstMut, r, `HSN/SAC "${r.code}"`)} title="Deactivate — keeps the record and its history; use instead of Delete" className="p-1 text-[#b45309] hover:opacity-80"><Ban size={14} /></button>}
         <button onClick={() => delHsn(r)} title="Delete" className="p-1 text-maroon hover:opacity-80"><Trash2 size={14} /></button>
       </span>
     ) : <span title="Built-in default — seed the HSN/SAC master to edit (npm run seed:hsn)" className="text-ink-subtle">🔒</span>) },
@@ -127,13 +141,16 @@ export function MastersTaxRates() {
     { key: 'applicability', header: 'When it applies', className: 'text-role-hr' },
   ];
   const vatColumns = [
-    { key: 'branch', header: 'Branch', className: 'font-bold text-navy', hideable: false },
+    { key: 'branch', header: 'Branch', className: 'font-bold text-navy', hideable: false, render: (r, v) => <>{v}{r.active === false && inactivePill}</> },
     { key: 'rate', header: 'VAT %', num: true, align: 'center', render: (r, v) => <span className="rounded-full bg-[#e8f6ed] px-2 py-0.5 text-[11px] font-extrabold text-[#16a34a]">{v}%</span> },
     { key: 'authority', header: 'Authority' }, { key: 'tin', header: 'VAT Reg No', className: 'font-mono' },
     { key: 'deadline', header: 'Return Deadline' }, { key: 'input', header: 'Input Credit', align: 'center' }, { key: 'wht', header: 'WHT — Services', align: 'center' },
     { key: '__act', header: '', align: 'right', sortable: false, exportable: false, hideable: false, render: (r) => (r.id ? (
       <span className="inline-flex gap-1">
         <button onClick={() => openEditVat(r)} title="Edit" className="p-1 text-[#2563eb] hover:text-[#134d85]"><Pencil size={14} /></button>
+        {r.active === false
+          ? <button onClick={() => toggleRow(vatMut, r, `the ${r.branch} VAT rate`)} title="Reactivate" className="p-1 text-[#16a34a] hover:opacity-80"><RotateCcw size={14} /></button>
+          : <button onClick={() => toggleRow(vatMut, r, `the ${r.branch} VAT rate`)} title="Deactivate — keeps the record and its history; use instead of Delete" className="p-1 text-[#b45309] hover:opacity-80"><Ban size={14} /></button>}
         <button onClick={() => delVat(r)} title="Delete" className="p-1 text-maroon hover:opacity-80"><Trash2 size={14} /></button>
       </span>
     ) : <span title="Built-in default — seed the VAT master to edit (npm run seed:vat-rates or add a branch)" className="text-ink-subtle">🔒</span>) },

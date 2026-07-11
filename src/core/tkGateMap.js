@@ -161,7 +161,8 @@ export const PENDING_MIGRATION = new Set([
   '/masters/budgets',
   '/masters/scenarios',
   // Money-out / period-close / control items under Accounts
-  '/accounts/payment-run',
+  // ('/accounts/payment-run' removed from the branch surface — bulk-pay feature
+  //  disabled by policy; its CENTRAL classification above is kept for re-enable)
   '/accounting/vendor-advances',
   '/accounts/suspense',
   '/accounting/year-close',

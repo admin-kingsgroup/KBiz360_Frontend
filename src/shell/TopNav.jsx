@@ -267,7 +267,7 @@ export function TopNav({ branch, setBranch, route, setRoute, currentUser, switch
                 }}>
                 {item.icon && <item.icon size={15} style={{ flexShrink: 0, color: active || isOpen ? FIORI_BLUE : '#64748b', transition: 'color 0.15s' }} />}
                 <span style={{ whiteSpace: 'nowrap' }}>{item.label}</span>
-                {item.label === 'Reconciliation' && reco.pending > 0 && (
+                {item.label === 'Statement Reconciliation' && reco.pending > 0 && (
                   <span title={reco.overdue ? `${reco.overdue} weekly cycle(s) overdue` : `${reco.pending} reconciliation item(s) pending`}
                     style={{ minWidth: 16, height: 16, padding: '0 5px', borderRadius: 9, fontSize: 9.5, fontWeight: 800,
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, flexShrink: 0,

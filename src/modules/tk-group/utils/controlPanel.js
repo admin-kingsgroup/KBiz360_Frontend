@@ -135,6 +135,7 @@ export const CONTROL_LISTS = {
     { nm: 'Mandatory documents', ds: "A money-out / expense / ADM-ACM voucher can't be created without a supporting attachment.", flag: 'entry.mandatory_docs' },
     { nm: 'Tax filing lock', ds: 'A filed period locks — no edits after filing (via period lock).', guarded: true },
     { nm: 'Reconciliation before close', ds: "A period can't hard-close until bank / client / supplier reconciliation is signed off (no open lines through the period end).", flag: 'close.require_recon' },
+    { nm: 'Integrity before close', ds: "A period can't hard-close while any Control-Tower integrity gate is failing (journal drift, suspense, self-approvals, sub-ledger ↔ GL, …). Clear them on the Control Tower first.", flag: 'close.require_integrity' },
   ],
   notifications: [
     { nm: 'Approval-request alerts', ds: 'Pending work already surfaces on the Alerts feed and the Inbox badge for the next approver.', applied: true },

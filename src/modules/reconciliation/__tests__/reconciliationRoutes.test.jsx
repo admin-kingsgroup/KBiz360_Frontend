@@ -1,8 +1,9 @@
 // Pins the ROUTE-TABLE seam the menu tests and page tests both stop short of:
 // (1) every per-tier path the menu links to exists in the route table, and the
-// helpers (hubPathFor/reportPathFor) produce exactly those paths; (2) each
-// route's Element really renders the TIER its path names — a transposed tier
-// in routes/index.jsx would pass every other suite and 404/mis-tier the app.
+// helpers (hubPathFor/certPathFor/reportPathFor) produce exactly those paths;
+// (2) each route's Element really renders the TIER + FAMILY its path names — a
+// transposed tier or a Hub/Certification mix-up in routes/index.jsx would pass
+// every other suite and 404/mis-tier the app.
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -11,6 +12,7 @@ jest.mock('../api', () => ({
   getSummary: jest.fn(() => Promise.resolve({ periods: {}, tiers: {} })),
   getPending: jest.fn(() => Promise.resolve({ rows: [] })),
   getTree: jest.fn(() => Promise.resolve({ groups: [] })),
+  getScopeTree: jest.fn(() => Promise.resolve({ groups: [], counts: { total: 0 } })),
   getList: jest.fn(() => Promise.resolve([])),
   getRulebook: jest.fn(() => Promise.resolve({ periods: {} })),
   getCertificate: jest.fn(() => Promise.resolve(null)),
@@ -19,7 +21,7 @@ jest.mock('../api', () => ({
 }));
 
 import { reconciliationRoutes } from '../routes';
-import { TIERS, TIER_PATHS, hubPathFor, reportPathFor, tierMenuName } from '../utils';
+import { TIERS, TIER_PATHS, hubPathFor, certPathFor, reportPathFor, tierMenuName } from '../utils';
 import { MENU_RECONCILIATION } from '../../../core/menus';
 
 const routePaths = reconciliationRoutes.map((r) => r.path);
@@ -27,16 +29,17 @@ const routeByPath = (p) => reconciliationRoutes.find((r) => r.path === p);
 const group = (label) => MENU_RECONCILIATION.children.find((g) => g.label === label);
 
 describe('reconciliation · route table ↔ tier pairing', () => {
-  test('hubPathFor/reportPathFor cover every tier and land on real routes', () => {
+  test('hubPathFor/certPathFor/reportPathFor cover every tier and land on real routes', () => {
     TIERS.forEach(({ key }) => {
       expect(routePaths).toContain(hubPathFor(key));
+      expect(routePaths).toContain(certPathFor(key));
       expect(routePaths).toContain(reportPathFor(key));
     });
     expect(Object.keys(TIER_PATHS).sort()).toEqual(TIERS.map((t) => t.key).sort());
   });
 
-  test('every menu href under Certification + Reports resolves to a route', () => {
-    const menuHrefs = [...group('Certification').children, ...group('Reports').children]
+  test('every menu href under Reconciliation Hub + Certification + Reports resolves to a route', () => {
+    const menuHrefs = [...group('Reconciliation Hub').children, ...group('Certification').children, ...group('Reports').children]
       .map((c) => c.href);
     menuHrefs.forEach((h) => expect(routePaths).toContain(h));
   });
@@ -44,6 +47,7 @@ describe('reconciliation · route table ↔ tier pairing', () => {
   test('legacy combined paths still route (old bookmarks land on weekly)', () => {
     expect(routePaths).toContain('/reconciliation');
     expect(routePaths).toContain('/reconciliation/reports');
+    expect(routePaths).toContain('/reconciliation/hub');
   });
 
   const wrap = (ui) => {
@@ -55,9 +59,12 @@ describe('reconciliation · route table ↔ tier pairing', () => {
     );
   };
 
-  // Render one hub and one report through their route Elements END-TO-END —
-  // the H1 proves the path delivered its own tier, not a transposed one.
+  // Render one of each family through their route Elements END-TO-END — the H1
+  // proves the path delivered its own tier AND its own family (Hub vs
+  // Certification vs Report), not a transposed one.
   test.each([
+    ['/reconciliation/hub/weekly', 'Weekly Reconciliation'],
+    ['/reconciliation/hub/monthly', 'Monthly Reconciliation'],
     ['/reconciliation/monthly', 'Monthly Certification'],
     ['/reconciliation/quarterly', 'Quarterly Certification'],
     ['/reconciliation/reports/yearly', 'Yearly Report'],
@@ -70,7 +77,8 @@ describe('reconciliation · route table ↔ tier pairing', () => {
 
   test('route titles match the menu wording (tierMenuName)', () => {
     TIERS.forEach(({ key }) => {
-      expect(routeByPath(hubPathFor(key)).title).toBe(`${tierMenuName(key)} Certification`);
+      expect(routeByPath(hubPathFor(key)).title).toBe(`${tierMenuName(key)} Reconciliation`);
+      expect(routeByPath(certPathFor(key)).title).toBe(`${tierMenuName(key)} Certification`);
       expect(routeByPath(reportPathFor(key)).title).toBe(`${tierMenuName(key)} Report`);
     });
   });

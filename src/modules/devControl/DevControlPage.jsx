@@ -33,7 +33,7 @@ import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 import { getAuthToken, API_BASE, apiGet, apiPost } from '../../core/api';
 import { APP_ROUTES } from '../../core/routeManifest.generated';
-import { DEV_REGISTRY, ALL_ITEMS, STATUS_META, TRACK_META, SEVERITY_ORDER, RUNBOOK, KNOWN_ISSUES, HEALTH_CHECKS, isCleared, moduleRollup, VERDICT_META } from './registry';
+import { DEV_REGISTRY, ALL_ITEMS, STATUS_META, TRACK_META, SEVERITY_ORDER, RUNBOOK, KNOWN_ISSUES, HEALTH_CHECKS, isCleared, isDormant, moduleRollup, VERDICT_META } from './registry';
 
 const isSuperAdmin = (u) => ['Super Admin', 'super_admin'].includes(u?.role || '');
 
@@ -249,6 +249,7 @@ function ModuleStatusSection({ trackMap, setRoute }) {
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{m.area}</span>
                 <span className="ml-auto flex shrink-0 items-center gap-3">
                   <span className="text-[11px] tabular-nums text-ink-subtle">{m.cleared}/{m.total} items working</span>
+                  {(m.dormant || []).length > 0 && <Badge tone="info" size="sm">{m.dormant.length} dormant by design</Badge>}
                   {m.open.length > 0 && <Badge tone={m.verdict === 'broken' ? 'danger' : 'warning'} size="sm">{m.open.length} to fix</Badge>}
                 </span>
               </button>
@@ -306,24 +307,29 @@ export function DevControlPage({ setRoute, currentUser }) {
   const trackMap = useMemo(() => { const m = {}; (trackQ.data || []).forEach((r) => { m[r.itemId] = r; }); return m; }, [trackQ.data]);
   const save = useMutation({ mutationFn: saveDevStatus, onSuccess: () => qc.invalidateQueries({ queryKey: ['dev-control', 'status'] }) });
 
-  /* Split the registry into the pending board vs cleared, Control-Tower style. */
-  const { pending, cleared, inProgress } = useMemo(() => {
-    const p = []; const c = []; let ip = 0;
+  /* Split the registry into the pending board vs dormant-by-design vs cleared,
+     Control-Tower style. Dormant = built, intentionally OFF until go-live — a
+     go-live switch, not developer work, so it gets its own section. */
+  const { pending, dormant, cleared, inProgress } = useMemo(() => {
+    const p = []; const d = []; const c = []; let ip = 0;
     for (const item of ALL_ITEMS) {
       const t = trackMap[item.id];
       if (isCleared(item, t)) c.push(item);
+      else if (isDormant(item)) d.push(item);
       else { p.push(item); if (t?.status === 'in-progress') ip += 1; }
     }
     p.sort((a, b) => (SEVERITY_ORDER[a.status] ?? 9) - (SEVERITY_ORDER[b.status] ?? 9));
-    return { pending: p, cleared: c, inProgress: ip };
+    return { pending: p, dormant: d, cleared: c, inProgress: ip };
   }, [trackMap]);
 
-  const completionPct = Math.round((cleared.length / ALL_ITEMS.length) * 100);
+  /* Dormant features are COMPLETE from the developer's side (built + verified,
+     awaiting the go-live switch), so they count toward completion. */
+  const completionPct = Math.round(((cleared.length + dormant.length) / ALL_ITEMS.length) * 100);
 
   /* Per-area completion — worst first, like branch close-readiness cards. */
   const areaCards = useMemo(() => DEV_REGISTRY.map((a) => {
     const total = a.items.length;
-    const done = a.items.filter((i) => isCleared(i, trackMap[i.id])).length;
+    const done = a.items.filter((i) => isCleared(i, trackMap[i.id]) || isDormant(i)).length;
     return { area: a.area, total, done, open: total - done, pct: Math.round((done / total) * 100) };
   }).sort((x, y) => x.pct - y.pct), [trackMap]);
 
@@ -362,10 +368,11 @@ export function DevControlPage({ setRoute, currentUser }) {
 
         {/* ── headline KPIs ── */}
         <ResponsiveGrid min="150px" gap="md" data-testid="dev-kpis">
-          <KpiTile label="ERP completion" value={`${completionPct}%`} sub={`${cleared.length} of ${ALL_ITEMS.length} cleared`} color={completionPct >= 80 ? '#1a7f37' : '#9a6700'} />
+          <KpiTile label="ERP completion" value={`${completionPct}%`} sub={`${cleared.length + dormant.length} of ${ALL_ITEMS.length} cleared`} color={completionPct >= 80 ? '#1a7f37' : '#9a6700'} />
           <KpiTile label="Pending from developer" value={pending.length} sub="findings on the board" color={pending.length ? '#cf222e' : '#1a7f37'} />
           <KpiTile label="In progress" value={inProgress} sub="assigned & being worked" color="#0969da" />
           <KpiTile label="Wired live" value={ALL_ITEMS.filter((i) => i.status === 'live').length} sub="verified end-to-end" color="#1a7f37" />
+          <KpiTile label="Dormant by design" value={dormant.length} sub="built — awaiting go-live switch" color="#0969da" />
           <KpiTile label="Needs audit" value={pending.filter((i) => i.status === 'audit').length} sub="wiring unverified" color="#57606a" />
         </ResponsiveGrid>
 
@@ -420,6 +427,23 @@ export function DevControlPage({ setRoute, currentUser }) {
             </p>
           )}
         </PageSection>
+
+        {/* ── dormant by design — built, awaiting the go-live switch ── */}
+        {dormant.length > 0 && (
+          <PageSection
+            title={`Dormant by design — built, switched off until go-live (${dormant.length})`}
+            subtitle="No developer work pending on these: each is fully built and deliberately disabled behind a flag/config recorded in its note. Engage the switch at go-live."
+          >
+            <DataTable
+              columns={REF_COLS(setRoute)}
+              rows={dormant}
+              getRowKey={(r) => r.id}
+              emptyMessage="Nothing dormant."
+              showDensityToggle={false}
+              zebra
+            />
+          </PageSection>
+        )}
 
         {/* ── cleared (done / won't-do / live) ── */}
         <PageSection

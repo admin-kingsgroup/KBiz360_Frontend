@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CalendarClock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CalendarClock, AlertTriangle, LayoutDashboard } from 'lucide-react';
 import { getPending, getList, generateCertificates } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, currencyOf, fmtAmt, chainProgress, pendingStateMeta, fmtDue, visibleTiers, hubPathFor, reportPathFor, tierMenuName } from './utils';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, currencyOf, fmtAmt, chainProgress, pendingStateMeta, fmtDue, visibleTiers, certPathFor, hubPathFor, reportPathFor, tierMenuName } from './utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select, FormField } from '../../shell/primitives';
 
 // ─── Reconciliation · per-tier Report ────────────────────────────────────────
@@ -78,7 +78,10 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
           <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Report</h1>
           <p className="text-sm text-ink-muted">{tier.label} — the closing backlog, certificate register and open exceptions. Branch-wise, never mixed.</p>
         </div>
-        <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute(hubPathFor(tierKey))}>Open {tierMenuName(tierKey)} Certification</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" icon={LayoutDashboard} onClick={() => setRoute && setRoute(hubPathFor(tierKey))}>{tierMenuName(tierKey)} Hub</Button>
+          <Button variant="ghost" icon={ArrowLeft} onClick={() => setRoute && setRoute(certPathFor(tierKey))}>Open {tierMenuName(tierKey)} Certification</Button>
+        </div>
       </div>
 
       {/* branch scope — driven by the top TK branch selector, never an in-page picker */}
@@ -131,7 +134,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
                           ? <Button size="xs" variant="secondary" loading={busy} onClick={() => gen.mutate({ tier: r.tier, period: r.period })}>Generate</Button>
                           : r.upcoming
                             ? <span className="text-xs text-ink-subtle">opens {fmtDue(r).replace(' (upcoming)', '')}</span>
-                            : <Button size="xs" variant="ghost" onClick={() => setRoute && setRoute(hubPathFor(tierKey))}>Open</Button>}
+                            : <Button size="xs" variant="ghost" onClick={() => setRoute && setRoute(certPathFor(tierKey))}>Open</Button>}
                       </td>
                     </tr>
                   );

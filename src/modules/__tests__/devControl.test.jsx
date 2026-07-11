@@ -84,7 +84,10 @@ describe('module rollup + shared clearing (Dev Control ↔ Control Tower contrac
     expect(rollup.length).toBe(DEV_REGISTRY.length);
     for (const m of rollup) {
       expect(Object.keys(VERDICT_META)).toContain(m.verdict);
-      expect(m.cleared + m.open.length).toBe(m.total);
+      // cleared + open findings + dormant-by-design partition the area exactly
+      expect(m.cleared + m.open.length + m.dormant.length).toBe(m.total);
+      // dormant items are never open findings — they are a go-live switch, not dev work
+      expect(m.open.some((i) => i.status === 'dormant')).toBe(false);
     }
   });
 

@@ -349,7 +349,9 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   ]},
   {label:"Payables & Suppliers", children:[
     {label:"Payables (Ageing + Settle)",  href:"/reports/pay"},
-    {label:"Payment Run / Batch Pay",     href:"/accounts/payment-run"},
+    // Payment Run / Batch Pay removed — bulk supplier payment is disabled by
+    // policy; enter payments individually (Daily Entry ▸ Payment). The screen
+    // (modules/payments/paymentRun.jsx) + BE endpoint are kept for re-enable.
     {label:"Vendor Advances",             href:"/accounting/vendor-advances"},
     {label:"Payment Register",            href:"/finance/payment-register"},
     {label:"Supplier 360 View",              href:"/reports/supplier-360"},
@@ -651,7 +653,17 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
 // physical) + the staff Rule Book. Branch-wise throughout; existing statement-
 // matching screens stay under Accounts ▸ Reconciliation — this module is the
 // certificate/sign-off layer above them.
-export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight, children:[
+export const MENU_RECONCILIATION = {label:"Statement Reconciliation", icon:ArrowLeftRight, children:[
+  // Reconciliation Hub — the read-only FULL VIEW / dashboard of a tier: every
+  // ledger in scope + its live status, branch-wise readiness and the attention
+  // list. One entry per tier (the menu is the tier switch). This is where you
+  // WATCH; Certification below is where you sign off.
+  {label:"Reconciliation Hub", children:[
+    {label:"Weekly Reconciliation",    href:"/reconciliation/hub/weekly"},
+    {label:"Monthly Reconciliation",   href:"/reconciliation/hub/monthly"},
+    {label:"Quarterly Reconciliation", href:"/reconciliation/hub/quarterly"},
+    {label:"Yearly Reconciliation",    href:"/reconciliation/hub/yearly"},
+  ]},
   // The certificate ladder — ONE menu entry per tier (the menu IS the tier
   // switch; each page renders tier-locked and branch-wise, never mixed).
   {label:"Certification", children:[
@@ -678,15 +690,25 @@ export const MENU_RECONCILIATION = {label:"Reconciliation", icon:ArrowLeftRight,
     {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
     {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
     {label:"Inter-Branch Reconciliation", href:"/accounts/interbranch-reco"},
-    {label:"Tally Reconciliation (ERP vs Tally)", href:"/accounts/tally-reco"},
+    {label:"Tally Ledger Matcher (per ledger)", href:"/accounts/tally-reco"},
     {label:"Match Guide",              href:"/reconciliation/match-guide"},
   ]},
+]};
+
+// Tally Reconciliation — the WHOLE-BOOKS ERP↔Tally tie-out (its own top-level
+// pill, distinct from Statement Reconciliation above). One entry per tier (the
+// menu is the tier switch): each page puts the ERP's live Trial Balance next to
+// the uploaded Tally TB — every ledger, Balance Sheet and P&L side by side.
+export const MENU_TALLY_RECON = {label:"Tally Reconciliation", icon:Scale, children:[
+  {label:"Monthly Tie-Out", href:"/tally-reconciliation/monthly"},
+  {label:"Yearly Tie-Out",  href:"/tally-reconciliation/yearly"},
 ]};
 
 // Branch-Accountant view of the pill: they PREPARE the weekly certificates
 // only — Month/Quarter/Year entries are hidden (those closings are worked from
 // TK Group Central by AE/FM/Director/Owner; the pages also self-guard).
 const BA_RECON_HIDDEN = new Set([
+  "/reconciliation/hub/monthly", "/reconciliation/hub/quarterly", "/reconciliation/hub/yearly",
   "/reconciliation/monthly", "/reconciliation/quarterly", "/reconciliation/yearly",
   "/reconciliation/reports/monthly", "/reconciliation/reports/quarterly", "/reconciliation/reports/yearly",
 ]);
@@ -849,6 +871,7 @@ function cleanDividers(children){
 const LEGACY_HIDDEN_ALIASES = {
   '/reconciliation': ['/reconciliation/weekly', '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly'],
   '/reconciliation/reports': ['/reconciliation/reports/weekly', '/reconciliation/reports/monthly', '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly'],
+  '/reconciliation/hub': ['/reconciliation/hub/weekly', '/reconciliation/hub/monthly', '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly'],
 };
 export function expandHidden(list){
   const out = new Set(Array.isArray(list) ? list : []);
@@ -856,6 +879,7 @@ export function expandHidden(list){
   // The legacy URLs render the WEEKLY pages — hiding weekly must block them too.
   if (out.has('/reconciliation/weekly')) out.add('/reconciliation');
   if (out.has('/reconciliation/reports/weekly')) out.add('/reconciliation/reports');
+  if (out.has('/reconciliation/hub/weekly')) out.add('/reconciliation/hub');
   return out;
 }
 
@@ -929,7 +953,7 @@ export function fullMenuRoots(branch, currentUser){
   // branch pill so branches can RAISE credit/funds/onboarding/investment requests.
   // Dev Control is a Super-Admin-only pill — every other role never sees it
   // (and App.jsx blocks the route for them even by direct URL).
-  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
+  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_TALLY_RECON, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
     ...(role === 'Super Admin' ? [MENU_DEV_CONTROL] : [])];
 }
 

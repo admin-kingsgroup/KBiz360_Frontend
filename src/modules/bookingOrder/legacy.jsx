@@ -30,6 +30,8 @@ const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
 const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTRY[to] || 'IN');
 import { AuditTrail } from '../../core/AuditTrail';
 import { useLedgerRegistry } from '../../core/useReference';
+import { supplyTypeOf, stateNameOf, stateCodeOf, homeStateNameForBranch } from '../../core/gstSupply';
+import { STATE_NAMES } from '../../core/partyEnums';
 import { useFormKeys } from '../../core/ux/forms';
 import { toast } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
@@ -39,8 +41,9 @@ import { usePager, Pager } from '../../core/ux/pager';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import {
-  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, tcs206cRate, lineCalc, isVatBranch, rowsFromSnapshots,
+  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, tcs206cRate, lineCalc, isVatBranch, rowsFromSnapshots, fareSum,
 } from '../../core/voucherSpecs.js';
+import { useMasterList } from '../../core/useMasters';
 import { RefundReissueFields } from '../../core/voucher/fields/RefundReissueFields';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
 import { invalidateBooks, useVoucherApprovals, useApproveMany, useApproveVoucher, useRejectVoucher } from '../../core/useAccounting';
@@ -56,6 +59,9 @@ const SO_BAR = '#1D4E89', PO_BAR = '#8A1F3D', GP_BAR = GOLD;
 // of the fare grid and spawn one RF/RI voucher on approval.
 const REVERSAL_CHIPS = [{ code: 'RF', name: 'Refund', icon: '↩️' }, { code: 'RI', name: 'Reissue', icon: '🔁' }];
 const isReversalModule = (m) => m === 'RF' || m === 'RI';
+// Voucher module code → the module name used by the /api/markup-rules master
+// (the rule sheet stores 'Flight'/'Hotel'/…/'Misc' or 'ALL').
+const MARKUP_RULE_MODULE = { SF: 'Flight', SH: 'Holiday', SHT: 'Hotel', SV: 'Visa', SI: 'Insurance', SC: 'Car', SM: 'Misc' };
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
 // A supplier attracts Indian 194H TDS only when it is an Indian vendor (blank country =
 // India default). Mirrors the backend isIndia() in shared/util/gstSupplyType so the live
@@ -76,6 +82,9 @@ const tdTot = { ...tdC, fontWeight: 800, color: DARK };
 const cellInp = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'right', border: '1px solid #cdd1d8', borderRadius: 8, background: '#fff', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s' };
 const cellTxt = { width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 12, textAlign: 'left', border: '1px solid #cdd1d8', borderRadius: 8, background: '#fff', fontFamily: 'inherit', fontWeight: 600, outline: 'none', transition: 'border-color 0.2s' };
 const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 800, fontSize: 12, background: '#f1f5f9', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: DARK };
+// Tiny helper lines under the GST-mode dropdowns (auto-derived vs missing-state).
+const hintOk = { margin: '4px 0 0', fontSize: 10.5, fontWeight: 700, color: '#16794c' };
+const hintWarn = { margin: '4px 0 0', fontSize: 10.5, fontWeight: 700, color: '#a9690a' };
 // Per-section column-header + total-row styles — the section colour carries INTO
 // the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
 const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' };
@@ -179,7 +188,7 @@ export function legToPayload(leg, brCode, noVat, foreign = false) {
   };
 }
 
-function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, isForeign }) {
+function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, isForeign, supplyOf }) {
   const allowed = ALLOWED_LEG_MODULES[parentModule];
   if (!allowed) return null;
   const setLeg = (i, patch) => onChange(legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -209,12 +218,19 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
               </select>
               <div style={{ minWidth: 220 }}>
                 <PartyPicker branch={branch} kind="supplier" value={{ name: leg.supplier.name, group: leg.supplier.ledgerGroup }}
-                  onChange={(v) => setLeg(i, { supplier: { name: v.name, ledgerGroup: v.group } })} />
+                  onChange={(v) => {
+                    // The leg supplier's master state auto-picks THIS leg's GST mode
+                    // (still overridable via the select); foreign → mode is moot (0 GST).
+                    const auto = supplyOf ? supplyOf(v.name) : '';
+                    setLeg(i, { supplier: { name: v.name, ledgerGroup: v.group }, ...(auto === 'intra' || auto === 'inter' ? { gstMode: auto } : {}) });
+                  }} />
               </div>
               <input value={leg.costCenter} onChange={(e) => setLeg(i, { costCenter: e.target.value.toUpperCase() })} placeholder="Cost Centre" style={{ ...cell, width: 120 }} />
               <input value={leg.purTallyRef} onChange={(e) => setLeg(i, { purTallyRef: e.target.value })} placeholder="Supplier Inv. No (Tally ref)" style={{ ...cell, width: 170 }} />
               {/* VAT has no intra/inter split — hidden on Africa branches. */}
-              {!isVatBranch(brCode) && <select value={leg.gstMode} onChange={(e) => setLeg(i, { gstMode: e.target.value })} style={{ ...cell, width: 'auto' }}><option value="intra">Intra (CGST+SGST)</option><option value="inter">Inter (IGST)</option></select>}
+              {!isVatBranch(brCode) && (isForeign && isForeign(leg.supplier.name)
+                ? <span title="Overseas supplier — no Indian GST (import of service)" style={{ ...cell, width: 'auto', background: '#eef0f4', color: '#5b616e', fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>🌐 No GST — overseas</span>
+                : <select value={leg.gstMode} onChange={(e) => setLeg(i, { gstMode: e.target.value })} style={{ ...cell, width: 'auto' }}><option value="intra">Intra (CGST+SGST)</option><option value="inter">Inter (IGST)</option></select>)}
               <button type="button" onClick={() => del(i)} style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: '#c0392b', fontSize: 16 }} title="Remove leg">×</button>
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -281,19 +297,33 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   const [clientType, setClientType] = useState(editing ? (editBooking.customer?.ledgerGroup || '') : '');
   const reg = useLedgerRegistry(branch).data || [];
-  // Foreign-supplier resolver (mirrors the backend's countryFromSupplierMaster): match the
-  // chosen creditor ledger to its master row by exact name and read its home country — a
-  // foreign vendor (e.g. IATA-BSP / Singapore) can't withhold Indian 194H TDS, so the 2%
-  // TDS on its incentive is dropped here too, keeping the grid in step with the books.
+  // Party-master resolvers (mirror the backend's countryFromSupplierMaster): match the
+  // chosen ledger / typed name to its master row by exact name. The SUPPLIER's record
+  // drives the purchase leg — a foreign vendor (e.g. IATA-BSP / Singapore) can't withhold
+  // Indian 194H TDS AND charges no Indian GST (import of service), so both are dropped
+  // from the grid; an Indian vendor's STATE vs the branch's home state auto-picks the
+  // Purchase GST mode. The CUSTOMER's record does the same for the Sale GST mode.
   const supplierMaster = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
-  const supplierCountryBy = useMemo(() => {
+  const supplierByName = useMemo(() => {
     const m = new Map();
-    (supplierMaster || []).forEach((s) => { if (s && s.name) m.set(s.name.trim().toLowerCase(), s.country || ''); });
+    (supplierMaster || []).forEach((s) => { if (s && s.name) m.set(s.name.trim().toLowerCase(), s); });
     return m;
   }, [supplierMaster]);
-  const countryOfSupplier = (name) => supplierCountryBy.get(String(name || '').trim().toLowerCase()) || '';
+  const supplierOf = (name) => supplierByName.get(String(name || '').trim().toLowerCase()) || null;
+  const countryOfSupplier = (name) => (supplierOf(name) || {}).country || '';
   const isForeignSupplier = (name) => !isIndiaCountry(countryOfSupplier(name));
   const suppForeign = isForeignSupplier(supplier.name);
+  const supplySupplierOf = (name) => { const r = supplierOf(name); return r ? supplyTypeOf(r, brCode) : ''; };
+  // Customer master (ERP-owned + transaction-derived rows). B2C end-customers are looked
+  // up here by NAME — the pooled per-staff B2C ledger carries no state, the customer
+  // record does (address + state are compulsory on creation).
+  const customerMaster = useQuery({ queryKey: ['customers'], queryFn: () => apiGet('/api/customers') }).data || [];
+  const customerByName = useMemo(() => {
+    const m = new Map();
+    (customerMaster || []).forEach((c) => { if (c && c.name) m.set(c.name.trim().toLowerCase(), c); });
+    return m;
+  }, [customerMaster]);
+  const customerOf = (name) => customerByName.get(String(name || '').trim().toLowerCase()) || null;
   const clientTypes = useMemo(() => {
     const set = new Set();
     reg.forEach((l) => {
@@ -327,6 +357,31 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const [saleGstMode, setSaleGstMode] = useState(editing ? (editBooking.so?.gstMode || editBooking.gstMode || 'intra') : 'intra');
   // INB deals carry the purchase leg's mode on editBooking.purchase (getDeal shape).
   const [purGstMode, setPurGstMode] = useState(editing ? (editBooking.po?.gstMode || editBooking.purchase?.gstMode || editBooking.gstMode || 'intra') : 'intra');
+  // ── Auto GST mode from the party masters ────────────────────────────────────
+  // Sale leg ← the CUSTOMER's state · Purchase leg ← the SUPPLIER's state, each vs
+  // the branch's home state (BOM=Maharashtra, AMD=Gujarat). Fires only when the user
+  // picks/types a DIFFERENT party than the one the form loaded with (an edit keeps
+  // its stored mode), and the dropdowns stay manually overridable. A foreign
+  // supplier needs no mode at all — its purchase leg carries zero GST.
+  const custRec = customerOf(customer.name);
+  const custSupply = custRec ? supplyTypeOf(custRec, brCode) : '';
+  const suppRec = supplierOf(supplier.name);
+  const suppSupply = suppForeign ? 'foreign' : (suppRec ? supplyTypeOf(suppRec, brCode) : '');
+  const normName = (s) => String(s || '').trim().toLowerCase();
+  const lastCustApplied = useRef(normName(editing ? editBooking.customer?.name : ''));
+  const lastSuppApplied = useRef(normName(editing ? (editBooking.supplier?.ledgerName || editBooking.supplier?.name) : ''));
+  useEffect(() => {
+    if (interBranch) return; // INB fixes its own modes (seller IGST / buyer via fetchInb)
+    const key = normName(customer.name);
+    if (!key || key === lastCustApplied.current) return;
+    if (custSupply === 'intra' || custSupply === 'inter') { setSaleGstMode(custSupply); lastCustApplied.current = key; }
+  }, [customer.name, custSupply, interBranch]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (interBranch) return;
+    const key = normName(supplier.name);
+    if (!key || key === lastSuppApplied.current) return;
+    if (suppSupply === 'intra' || suppSupply === 'inter') { setPurGstMode(suppSupply); lastSuppApplied.current = key; }
+  }, [supplier.name, suppSupply, interBranch]); // eslint-disable-line react-hooks/exhaustive-deps
   // No silent default — the user MUST consciously pick International vs Domestic
   // (that choice IS the cost centre). A blank leaves it untagged: it still saves as
   // Pending but the approval gate refuses to post it until it's tagged.
@@ -401,8 +456,35 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const folderGpTotal = Math.round((num(totals.gp.total) - extraLegNet) * 100) / 100;
   const folderGpPct = num(totals.so.total) > 0 ? Math.round((folderGpTotal / num(totals.so.total)) * 10000) / 100 : 0;
 
+  // ── Markup-rule default (Masters ▸ Service Charge - 2 / Rate Sheet) ─────────
+  // The ACTIVE Percentage rule for this module (an exact module rule beats an
+  // 'ALL' rule) seeds each line's Service Charge - 2 as the fares are entered:
+  // while the line's markup is blank or still exactly the rule-derived figure,
+  // editing a fare cell re-derives it as rule% × fare sum. Typing your own figure
+  // breaks the link for that line — the rule is a DEFAULT, never a lock. New
+  // vouchers only (editing keeps the saved figures); INB has no markup column.
+  const markupRules = useMasterList('markup-rules', { active: true }).data || [];
+  const markupRule = useMemo(() => {
+    const mod = String(MARKUP_RULE_MODULE[moduleCode] || '').toLowerCase();
+    const pool = markupRules.filter((r) => r && r.active !== false && r.markupType === 'Percentage' && num(r.value) > 0);
+    return pool.find((r) => String(r.module || '').toLowerCase() === mod)
+      || pool.find((r) => String(r.module || '').toUpperCase() === 'ALL')
+      || null;
+  }, [markupRules, moduleCode]);
+  const fareKeySet = useMemo(() => new Set((spec.fareCols || []).map((c) => c.key)), [spec]);
+  const ruleMarkupFor = (l) => round2(fareSum(spec, l) * num(markupRule && markupRule.value) / 100);
+
   const setLine = (i, key, val, numeric) =>
-    setLines(lines.map((l, idx) => (idx === i ? { ...l, [key]: numeric ? (val === '' ? '' : Number(val)) : val } : l)));
+    setLines(lines.map((l, idx) => {
+      if (idx !== i) return l;
+      const next = { ...l, [key]: numeric ? (val === '' ? '' : Number(val)) : val };
+      // Markup-rule default: a fare edit re-derives an untouched markup (see above).
+      if (!editing && !interBranch && markupRule && fareKeySet.has(key)
+          && (l.markup === '' || num(l.markup) === ruleMarkupFor(l))) {
+        next.markup = ruleMarkupFor(next) || '';
+      }
+      return next;
+    }));
   const addLine = () => setLines([...lines, blankLine(spec)]);
   const delLine = (i) => setLines(lines.length > 1 ? lines.filter((_, idx) => idx !== i) : [blankLine(spec)]);
 
@@ -771,7 +853,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   {spec.fareCols.map((col) => <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
                   <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
                   {pkg
-                    ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} /></td>
+                    ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
+                        {suppForeign
+                          ? <span title="Overseas supplier — no Indian GST (import of service)" style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', color: '#9197a3', fontWeight: 700 }}>—</span>
+                          : <input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} />}
+                      </td>
                     : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
                   <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
                   <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
@@ -788,7 +874,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {refKeys.map((c) => <td key={c.key} style={poTf} />)}
             {spec.fareCols.map((c) => <td key={c.key} style={poTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
             <td style={poTf}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
-            <td style={poTf}>{pkg ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
+            <td style={poTf}>{pkg && !suppForeign ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
             <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}</td>
@@ -996,9 +1082,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </FL>
           )}
           {isB2C && (
-            <FL label="Customer (Bill to) — free text *">
-              <input value={customer.name} onChange={(e) => setCustomer((c) => ({ ...c, name: e.target.value }))} placeholder="End-customer name (B2C)" style={inp} />
-              {!customer.name.trim()}
+            <FL label="Customer (Bill to) *">
+              <B2cCustomerPicker value={customer.name} customers={customerMaster} brCode={brCode}
+                onChange={(name) => setCustomer((c) => ({ ...c, name }))}
+                onPick={(rec) => setCustomer((c) => ({ ...c, name: rec.name, gstin: rec.gstin || '', address: rec.address || '', email: rec.email || '', contact: rec.phone || rec.contact || '' }))} />
             </FL>
           )}
           {/* VAT has no intra/inter (place-of-supply) split — these CGST/SGST vs IGST
@@ -1019,27 +1106,53 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 </button>
               )}
             />
+            {!interBranch && (custSupply === 'intra' || custSupply === 'inter' ? (
+              <p style={saleGstMode === custSupply ? hintOk : hintWarn}>
+                {saleGstMode === custSupply ? '✓ Auto' : '⚠ Overridden — customer state says'}: {custRec.state || stateNameOf(stateCodeOf(custRec))} → {custSupply === 'intra' ? 'Intra (CGST+SGST)' : 'Inter (IGST)'}
+              </p>
+            ) : custRec && !custSupply ? (
+              <p style={hintWarn}>⚠ Customer has no State in the Customer Master — add it to auto-pick the mode</p>
+            ) : isB2C && customer.name.trim() && !custRec ? (
+              <p style={hintWarn}>⚠ Not in the Customer Master — pick a match or “＋ New” (address + state) to auto-set the mode</p>
+            ) : null)}
           </FL>}
           {!isNoSupp && <FL label={interBranch ? 'Supplier ledger (airline / cost) *' : 'Supplier ledger (Pay to) *'}>
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
               onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
           </FL>}
           {!isNoSupp && !isVatBr && <FL label="Purchase GST mode">
-            <DropdownMenu
-              ariaLabel="Purchase GST mode"
-              menuRole="listbox"
-              items={[
-                { key: 'intra', label: 'Intra-state (CGST+SGST)', selected: purGstMode === 'intra', onSelect: () => setPurGstMode('intra') },
-                { key: 'inter', label: 'Inter-state (IGST)', selected: purGstMode === 'inter', onSelect: () => setPurGstMode('inter') },
-              ]}
-              renderTrigger={({ ref, toggle, triggerProps }) => (
-                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
-                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{purGstMode === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'}</span>
-                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
-                </button>
-              )}
-            />
+            {suppForeign ? (
+              // Import of service — the vendor charges no Indian GST, so there is no
+              // intra/inter to pick; the PO grid drops its GST (and 194H TDS) to match.
+              <div style={{ ...inp, display: 'flex', alignItems: 'center', background: '#eef0f4', color: '#5b616e', fontWeight: 700, cursor: 'default' }}>
+                🌐 Overseas supplier — no GST (import of service)
+              </div>
+            ) : (
+              <>
+                <DropdownMenu
+                  ariaLabel="Purchase GST mode"
+                  menuRole="listbox"
+                  items={[
+                    { key: 'intra', label: 'Intra-state (CGST+SGST)', selected: purGstMode === 'intra', onSelect: () => setPurGstMode('intra') },
+                    { key: 'inter', label: 'Inter-state (IGST)', selected: purGstMode === 'inter', onSelect: () => setPurGstMode('inter') },
+                  ]}
+                  renderTrigger={({ ref, toggle, triggerProps }) => (
+                    <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                      style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{purGstMode === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'}</span>
+                      <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                    </button>
+                  )}
+                />
+                {!interBranch && (suppSupply === 'intra' || suppSupply === 'inter' ? (
+                  <p style={purGstMode === suppSupply ? hintOk : hintWarn}>
+                    {purGstMode === suppSupply ? '✓ Auto' : '⚠ Overridden — supplier state says'}: {suppRec.state || stateNameOf(stateCodeOf(suppRec))} → {suppSupply === 'intra' ? 'Intra (CGST+SGST)' : 'Inter (IGST)'}
+                  </p>
+                ) : suppRec && !suppSupply ? (
+                  <p style={hintWarn}>⚠ Supplier has no State in the Supplier Master — add it to auto-pick the mode</p>
+                ) : null)}
+              </>
+            )}
           </FL>}
           {hasPackage && <FL label="Package type *">
             <DropdownMenu
@@ -1124,6 +1237,22 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></tfoot>
           </table>
         </div>
+        {/* Markup-rule hint: the applied Service Charge - 2 % (vs fares) against the
+            rule's default and GP floor. Purely advisory — the cells stay editable. */}
+        {!interBranch && markupRule && (() => {
+          const fares = lines.reduce((s, l) => s + fareSum(spec, l), 0);
+          const mk = lines.reduce((s, l) => s + num(l.markup), 0);
+          const pct = fares > 0 ? round2((mk / fares) * 100) : null;
+          const below = num(markupRule.floor) > 0 && pct != null && pct < num(markupRule.floor);
+          if (!below && editing) return null; // edits keep saved figures — only warn on a floor breach
+          return (
+            <p style={below ? hintWarn : hintOk}>
+              {below
+                ? `⚠ Service Charge - 2 ≈ ${pct}% of fares — below the ${markupRule.floor}% GP floor (rule: ${markupRule.value}% · ${markupRule.module})`
+                : `Rate-sheet default ${markupRule.value}% (${markupRule.module === 'ALL' ? 'all modules' : markupRule.module})${num(markupRule.floor) > 0 ? ` · GP floor ${markupRule.floor}%` : ''} — auto-fills Service Charge - 2 from the fares; type your own to override`}
+            </p>
+          );
+        })()}
         <button onClick={addLine} style={{ ...btnGh, marginTop: 8, padding: '6px 12px', fontSize: 11 }}><Plus size={12} /> Add line</button>
       </Section>
 
@@ -1132,7 +1261,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* N-PO: additional purchase legs (Flight +Misc / Holiday components) */}
       {!isNoSupp && ALLOWED_LEG_MODULES[moduleCode] && (
-        <ExtraPurchases parentModule={moduleCode} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} isForeign={isForeignSupplier} />
+        <ExtraPurchases parentModule={moduleCode} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} isForeign={isForeignSupplier} supplyOf={supplySupplierOf} />
       )}
 
       {/* ③ Gross Profit */}
@@ -1427,6 +1556,114 @@ function PartyPicker({ branch, kind, value, onChange, subGroupFilter }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── B2C bill-to picker ────────────────────────────────────────────────────────
+// B2C rides on a POOLED per-staff debtor ledger, so the end-customer's state lives
+// on their CUSTOMER MASTER record, not the ledger. This searches the master by name
+// (picking auto-sets the Sale GST mode from the stored state) and quick-creates a
+// fresh B2C customer with the COMPULSORY address + state when there's no match.
+function B2cCustomerPicker({ value, customers, brCode, onChange, onPick }) {
+  const [open, setOpen] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const q = value || '';
+  const matches = (customers || [])
+    .filter((c) => c && c.name && (!q.trim() || c.name.toLowerCase().includes(q.trim().toLowerCase())))
+    .slice(0, 10);
+  const wrapRef = useRef(null);
+  const stateOf = (c) => c.state || stateNameOf(stateCodeOf(c));
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}
+      onKeyDown={listKeyNav({ onEscape: () => setOpen(false) })}
+      onBlur={(e) => { if (!wrapRef.current || !wrapRef.current.contains(e.relatedTarget)) setOpen(false); }}>
+      <input value={q} placeholder="Search customer master or type…"
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} style={inp} />
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 60, marginTop: 2, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.16)', maxHeight: 260, overflowY: 'auto' }}>
+          {matches.map((c) => (
+            <div key={c.id || c.name} {...clickable(() => { onPick(c); setOpen(false); }, { role: 'option' })}
+              style={{ padding: '7px 11px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11.5, outline: 'none' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f4ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              onFocus={(e) => (e.currentTarget.style.background = '#f0f4ff')}
+              onBlur={(e) => (e.currentTarget.style.background = 'transparent')}>
+              <span style={{ color: '#1a1c22', fontWeight: 500 }}>{c.name}</span>
+              <span style={{ color: stateOf(c) ? '#9197a3' : '#a9690a', fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>{stateOf(c) || '⚠ no state'}</span>
+            </div>
+          ))}
+          <div {...clickable(() => { setShowNew(true); setOpen(false); }, { role: 'option' })}
+            style={{ padding: '8px 11px', cursor: 'pointer', fontSize: 11.5, fontWeight: 800, color: GOLD_DEEP, background: GOLD_SOFT, borderTop: '1px solid ' + GOLD_LINE, outline: 'none' }}>
+            ＋ New B2C customer{q.trim() ? ` “${q.trim()}”` : ''} — address & state compulsory
+          </div>
+        </div>
+      )}
+      {showNew && (
+        <QuickCreateCustomer initialName={q.trim()} brCode={brCode}
+          onClose={() => setShowNew(false)}
+          onCreated={(rec) => { setShowNew(false); onPick(rec); }} />
+      )}
+    </div>
+  );
+}
+
+// Minimal in-flow customer creation — Name, ADDRESS and STATE are compulsory (the
+// state is what fixes the sale's place of supply → auto Sale GST mode); the backend
+// rejects an Indian customer without them, so this validates the same rule up front.
+function QuickCreateCustomer({ initialName, brCode, onClose, onCreated }) {
+  const qc = useQueryClient();
+  const [f, setF] = useState({ name: initialName || '', address: '', city: '', state: '', phone: '', email: '' });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  useModalEsc(onClose, true);
+  const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const canSave = !!(f.name.trim() && f.address.trim() && f.state.trim()) && !saving;
+  const lbl = { display: 'block', fontSize: 10.5, fontWeight: 700, color: '#5b616e', marginBottom: 3 };
+  const save = async () => {
+    if (!canSave) return;
+    setSaving(true); setErr('');
+    try {
+      const rec = await apiPost('/api/customers', {
+        name: f.name.trim(), branch: brCode || '', country: 'India',
+        address: f.address.trim(), city: f.city.trim(), state: f.state,
+        phone: f.phone.trim(), email: f.email.trim(),
+      });
+      qc.invalidateQueries({ queryKey: ['customers'] });
+      qc.invalidateQueries({ queryKey: ['master', 'customers'] });
+      toast(`Customer ${rec?.name || f.name.trim()} created`);
+      onCreated(rec || { name: f.name.trim(), ...f });
+    } catch (e) { setErr(e.message || 'Failed to create customer'); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(13,19,38,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: 'min(540px, 94vw)', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(13,19,38,.28)', padding: '18px 20px', fontFamily: HELV }}>
+        <h3 style={{ margin: 0, fontSize: 15, color: DARK }}>＋ New B2C customer</h3>
+        <p style={{ margin: '4px 0 14px', fontSize: 11.5, color: '#5b616e' }}>
+          Address & State are <b>compulsory</b> — the state vs {brCode || 'the branch'}&rsquo;s home state ({homeStateNameForBranch(brCode)}) auto-sets this voucher&rsquo;s <b>Sale GST mode</b>.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div><span style={lbl}>Full name *</span><input value={f.name} onChange={set('name')} style={inp} /></div>
+          <div><span style={lbl}>State *</span>
+            <select value={f.state} onChange={set('state')} style={inp}>
+              {STATE_NAMES.map((s) => <option key={s} value={s}>{s === '' ? '— Select state —' : s}</option>)}
+            </select>
+          </div>
+          <div style={{ gridColumn: '1/-1' }}><span style={lbl}>Address *</span>
+            <textarea value={f.address} onChange={set('address')} rows={2} style={{ ...inp, height: 'auto', resize: 'vertical' }} />
+          </div>
+          <div><span style={lbl}>City</span><input value={f.city} onChange={set('city')} style={inp} /></div>
+          <div><span style={lbl}>Phone</span><input value={f.phone} onChange={set('phone')} style={inp} /></div>
+          <div style={{ gridColumn: '1/-1' }}><span style={lbl}>Email</span><input value={f.email} onChange={set('email')} type="email" style={inp} /></div>
+        </div>
+        {err && <div style={{ margin: '12px 0 0', padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>{err}</div>}
+        <div style={{ display: 'flex', gap: 9, justifyContent: 'flex-end', marginTop: 16 }}>
+          <button type="button" onClick={onClose} disabled={saving} style={btnGh}>Cancel</button>
+          <button type="button" onClick={save} disabled={!canSave} style={{ ...btnG, opacity: canSave ? 1 : 0.5 }}>{saving ? 'Creating…' : 'Create customer'}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2226,6 +2463,13 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const onReview = makeBookingReview(qc, setBusyId, setMsg);
   const onReviewSelected = makeBookingReviewSelected(qc, setBusyId, setMsg, sel, setSel);
 
+  // Editing opens the FULL SO/PO/GP entry form (same as the Pending bookings page),
+  // not the compact PO-only modal — customer, SO, PO and sectors are all editable.
+  if (editing) {
+    return <SoPoGpVoucherEntry branch={branch} setRoute={setRoute} editBooking={editing}
+      onDone={() => { setEditing(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }} />;
+  }
+
   const tab = (k, label) => (
     <button key={k} onClick={() => setStatus(k)} className="max-tablet:min-h-[44px]" style={{ padding: '8px 16px', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `3px solid ${status === k ? GOLD : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? DARK : '#5b616e' }}>{label} <span style={{ fontSize: 11, color: '#9197a3' }}>({counts[k]})</span></button>
   );
@@ -2272,13 +2516,6 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
             <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onEditPO={onEditPO} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
             <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
           </>}
-      {/* Edit — a compact modal scoped to the Purchase Order fields only (fares,
-          Supplier Service Charge, Supp Comm/Inc Rcvd, TDS, sectors), not the full
-          SO/PO/GP entry page. Reuses SoPoGpVoucherEntry's own state/save logic. */}
-      {editing && (
-        <SoPoGpVoucherEntry poOnly branch={branch} setRoute={setRoute} editBooking={editing}
-          onDone={() => { setEditing(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); }} />
-      )}
       {/* Approved tab's "Edit PO" — same compact modal, but autoApprove re-posts &
           re-approves on save so the booking stays Approved (never drops to Pending). */}
       {editingPO && (

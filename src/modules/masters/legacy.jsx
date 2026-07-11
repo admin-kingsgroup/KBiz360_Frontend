@@ -891,14 +891,30 @@ export function MastersSuppliers(){
    5. AIRLINES & CONSOLIDATORS
    ════════════════════════════════════════════════════════════════ */
 
+const AIRLINE_BLANK={iata:"",name:"",country:"",hub:"",type:"Full Service",alliance:"None",bsp:"No",commPct:""};
+
 export function MastersAirlines(){
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [search,setSearch]=useState("");
-  const airlines=[];
+  // Live airline master (/api/airlines). Create/Edit persist via the mutations;
+  // editId tracks which row the modal is editing (null = New Airline).
+  const [form,setForm]=useState(AIRLINE_BLANK);
+  const [editId,setEditId]=useState(null);
+  const setF=(p)=>setForm(f=>({...f,...p}));
+  const {data:airlines=[]}=useMasterList('airlines');
+  const {create,update}=useMasterMutations('airlines');
+  const openNew=()=>{setForm(AIRLINE_BLANK);setEditId(null);setModal(true);};
+  const openEdit=(a)=>{setForm({iata:a.iata||"",name:a.name||"",country:a.country||"",hub:a.hub||"",type:a.type||"Full Service",alliance:a.alliance||"None",bsp:a.bsp?"Yes":"No",commPct:a.commPct??""});setEditId(a.id);setModal(true);};
+  const saveAirline=()=>{
+    const body={iata:form.iata.trim().toUpperCase(),name:form.name.trim(),country:form.country.trim(),hub:form.hub.trim().toUpperCase(),type:form.type,alliance:form.alliance==="None"?"":form.alliance,bsp:form.bsp==="Yes",commPct:+form.commPct||0};
+    if(!body.iata||!body.name)return;
+    const done={onSuccess:()=>{setModal(false);setEditId(null);setForm(AIRLINE_BLANK);}};
+    editId?update.mutate({id:editId,body},done):create.mutate(body,done);
+  };
   const filtered=airlines.filter(a=>!search||
-    a.name.toLowerCase().includes(search.toLowerCase())||
-    a.iata.toLowerCase().includes(search.toLowerCase())||
-    a.country.toLowerCase().includes(search.toLowerCase())
+    (a.name||"").toLowerCase().includes(search.toLowerCase())||
+    (a.iata||"").toLowerCase().includes(search.toLowerCase())||
+    (a.country||"").toLowerCase().includes(search.toLowerCase())
   );
   return (
     <MstrShell title="Airlines & Consolidators" icon="✈" badge={`${airlines.length} airlines`}
@@ -906,7 +922,7 @@ export function MastersAirlines(){
         <input key="s" value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Search airline, IATA..." style={{...inp,width:210,minHeight:32,fontSize:11}}/>,
         <ExportBtn key="x" name="airlines" rows={filtered} columns={[{key:"iata",label:"IATA"},{key:"name",label:"Airline Name"},{key:"country",label:"Country"},{key:"type",label:"Type"},{key:"hub",label:"Hub"},{key:"bsp",label:"BSP"},{key:"alliance",label:"Alliance"},{key:"gds",label:"GDS"},{key:"commPct",label:"Comm %"}]}/>,
-        <button key="a" onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}>
+        <button key="a" onClick={openNew} style={{...btnG,fontSize:11}}>
           <Plus size={13}/> New Airline
         </button>
       ]}>
@@ -939,29 +955,29 @@ export function MastersAirlines(){
               <td style={{padding:"8px 10px",textAlign:"center",fontWeight:700,
                 color:a.commPct>0?"#16a34a":"#cbd0db"}}>{a.commPct>0?`${a.commPct}%`:"—"}</td>
               <td style={{padding:"8px 10px"}}>
-                <button style={{...btnGh,padding:"3px 8px",fontSize:10}}>Edit</button>
+                <button onClick={()=>openEdit(a)} style={{...btnGh,padding:"3px 8px",fontSize:10}}>Edit</button>
               </td>
             </tr>
           ))}</tbody>
         </table>
       </div>
-      {modal&&<MstrModal title="New Airline" onClose={()=>setModal(false)}>
+      {modal&&<MstrModal title={editId?"Edit Airline":"New Airline"} onClose={()=>setModal(false)} onSave={saveAirline} saving={create.isPending||update.isPending}>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:10}}>
-            <FL label="IATA code"><input style={inp} placeholder="AI"/></FL>
-            <FL label="Airline name"><input style={inp}/></FL>
+            <FL label="IATA code"><input value={form.iata} onChange={e=>setF({iata:e.target.value.toUpperCase()})} style={inp} placeholder="AI"/></FL>
+            <FL label="Airline name"><input value={form.name} onChange={e=>setF({name:e.target.value})} style={inp}/></FL>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
-            <FL label="Country"><input style={inp}/></FL>
-            <FL label="Hub airport"><input style={inp} placeholder="DEL"/></FL>
+            <FL label="Country"><input value={form.country} onChange={e=>setF({country:e.target.value})} style={inp}/></FL>
+            <FL label="Hub airport"><input value={form.hub} onChange={e=>setF({hub:e.target.value.toUpperCase()})} style={inp} placeholder="DEL"/></FL>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
-            <FL label="Type"><select style={inp}><option>Full Service</option><option>Low Cost</option><option>Regional</option></select></FL>
-            <FL label="Alliance"><select style={inp}><option>None</option><option>Star Alliance</option><option>Oneworld</option><option>SkyTeam</option></select></FL>
+            <FL label="Type"><select value={form.type} onChange={e=>setF({type:e.target.value})} style={inp}><option>Full Service</option><option>Low Cost</option><option>Regional</option></select></FL>
+            <FL label="Alliance"><select value={form.alliance} onChange={e=>setF({alliance:e.target.value})} style={inp}><option>None</option><option>Star Alliance</option><option>Oneworld</option><option>SkyTeam</option></select></FL>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
-            <FL label="BSP participant?"><select style={inp}><option>Yes</option><option>No</option></select></FL>
-            <FL label="Commission %"><input type="number" style={inp} placeholder="0"/></FL>
+            <FL label="BSP participant?"><select value={form.bsp} onChange={e=>setF({bsp:e.target.value})} style={inp}><option>Yes</option><option>No</option></select></FL>
+            <FL label="Commission %"><input type="number" value={form.commPct} onChange={e=>setF({commPct:e.target.value})} style={inp} placeholder="0"/></FL>
           </div>
         </div>
       </MstrModal>}
@@ -973,14 +989,39 @@ export function MastersAirlines(){
    6. HOTELS & DMCs
    ════════════════════════════════════════════════════════════════ */
 
+const HOTEL_BLANK={name:"",city:"",chain:"",stars:"5",tariff:"",gstSlab:"18",contract:"No"};
+const DMC_BLANK={name:"",country:"",speciality:"",currency:"INR",commPct:"",contract:"No"};
+
 export function MastersHotels(){
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [tab,setTab]=useState("hotels");
   const [search,setSearch]=useState("");
-  const hotels=[];
-  const dmcs=[];
-  const filt_h=hotels.filter(h=>!search||h.name.toLowerCase().includes(search.toLowerCase())||h.city.toLowerCase().includes(search.toLowerCase()));
-  const filt_d=dmcs.filter(d=>!search||d.name.toLowerCase().includes(search.toLowerCase())||d.country.toLowerCase().includes(search.toLowerCase()));
+  // Live hotel & DMC master — ONE /api/hotels collection, split by `kind` into the
+  // two tabs. Create/Edit persist via the mutations (editId null = New).
+  const [form,setForm]=useState(HOTEL_BLANK);
+  const [editId,setEditId]=useState(null);
+  const setF=(p)=>setForm(f=>({...f,...p}));
+  const {data:rows=[]}=useMasterList('hotels');
+  const {create,update}=useMasterMutations('hotels');
+  const hotels=rows.filter(r=>r.kind!=="DMC");
+  const dmcs=rows.filter(r=>r.kind==="DMC");
+  const openNew=()=>{setForm(tab==="hotels"?HOTEL_BLANK:DMC_BLANK);setEditId(null);setModal(true);};
+  const openEdit=(r)=>{
+    setForm(tab==="hotels"
+      ?{name:r.name||"",city:r.city||"",chain:r.chain||"",stars:String(r.stars||5),tariff:r.tariff??"",gstSlab:String(r.gstSlab??18),contract:r.contract?"Yes":"No"}
+      :{name:r.name||"",country:r.country||"",speciality:r.speciality||"",currency:r.currency||"INR",commPct:r.commPct??"",contract:r.contract?"Yes":"No"});
+    setEditId(r.id);setModal(true);
+  };
+  const saveRow=()=>{
+    if(!(form.name||"").trim())return;
+    const body=tab==="hotels"
+      ?{kind:"Hotel",name:form.name.trim(),city:form.city.trim(),chain:form.chain.trim(),stars:+form.stars||0,tariff:+form.tariff||0,gstSlab:+form.gstSlab||0,contract:form.contract==="Yes"}
+      :{kind:"DMC",name:form.name.trim(),country:form.country.trim(),speciality:form.speciality.trim(),currency:form.currency,commPct:+form.commPct||0,contract:form.contract==="Yes"};
+    const done={onSuccess:()=>{setModal(false);setEditId(null);setForm(tab==="hotels"?HOTEL_BLANK:DMC_BLANK);}};
+    editId?update.mutate({id:editId,body},done):create.mutate(body,done);
+  };
+  const filt_h=hotels.filter(h=>!search||(h.name||"").toLowerCase().includes(search.toLowerCase())||(h.city||"").toLowerCase().includes(search.toLowerCase()));
+  const filt_d=dmcs.filter(d=>!search||(d.name||"").toLowerCase().includes(search.toLowerCase())||(d.country||"").toLowerCase().includes(search.toLowerCase()));
   const gstColor={0:"#cbd0db",12:"#d97706",16:"#2563eb",18:"#dc2626"};
   const gstBg   ={0:"#f3f4f8",12:"#fbeedb",16:"#e8f0ff",18:"#fbe9e9"};
   return (
@@ -998,7 +1039,7 @@ export function MastersHotels(){
         tab==="hotels"
           ? <ExportBtn key="x" name="hotels" rows={filt_h} columns={[{key:"name",label:"Hotel Name"},{key:"city",label:"City"},{key:"stars",label:"Stars"},{key:"gstSlab",label:"GST Slab %"},{key:"tariff",label:"Rack Rate"},{key:"chain",label:"Chain"},{key:"contract",label:"Contract"}]}/>
           : <ExportBtn key="x" name="dmcs" rows={filt_d} columns={[{key:"name",label:"DMC Name"},{key:"country",label:"Country"},{key:"speciality",label:"Speciality"},{key:"currency",label:"Currency"},{key:"commPct",label:"Commission %"},{key:"contract",label:"Contract"}]}/>,
-        <button key="a" onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}>
+        <button key="a" onClick={openNew} style={{...btnG,fontSize:11}}>
           <Plus size={13}/> {tab==="hotels"?"New Hotel":"New DMC"}
         </button>
       ]}>
@@ -1035,7 +1076,7 @@ export function MastersHotels(){
                   </span>
                 </td>
                 <td style={{padding:"8px 12px"}}>
-                  <button style={{...btnGh,padding:"3px 8px",fontSize:10}}>Edit</button>
+                  <button onClick={()=>openEdit(h)} style={{...btnGh,padding:"3px 8px",fontSize:10}}>Edit</button>
                 </td>
               </tr>
             ))}</tbody>
@@ -1066,38 +1107,42 @@ export function MastersHotels(){
                   </span>
                 </td>
                 <td style={{padding:"8px 12px"}}>
-                  <button style={{...btnGh,padding:"3px 8px",fontSize:10}}>Edit</button>
+                  <button onClick={()=>openEdit(d)} style={{...btnGh,padding:"3px 8px",fontSize:10}}>Edit</button>
                 </td>
               </tr>
             ))}</tbody>
           </table>
         </div>
       )}
-      {modal&&<MstrModal title={tab==="hotels"?"New Hotel":"New DMC"} onClose={()=>setModal(false)}>
+      {modal&&<MstrModal title={tab==="hotels"?(editId?"Edit Hotel":"New Hotel"):(editId?"Edit DMC":"New DMC")} onClose={()=>setModal(false)} onSave={saveRow} saving={create.isPending||update.isPending}>
         {tab==="hotels"?(
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <FL label="Hotel name"><input style={inp}/></FL>
+            <FL label="Hotel name"><input value={form.name} onChange={e=>setF({name:e.target.value})} style={inp}/></FL>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
-              <FL label="City"><input style={inp}/></FL>
-              <FL label="Chain/Brand"><input style={inp}/></FL>
+              <FL label="City"><input value={form.city} onChange={e=>setF({city:e.target.value})} style={inp}/></FL>
+              <FL label="Chain/Brand"><input value={form.chain} onChange={e=>setF({chain:e.target.value})} style={inp}/></FL>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
-              <FL label="Star rating"><select style={inp}><option>5</option><option>4</option><option>3</option><option>2</option></select></FL>
-              <FL label="Rack rate (per night)"><input type="number" style={inp}/></FL>
+              <FL label="Star rating"><select value={form.stars} onChange={e=>setF({stars:e.target.value})} style={inp}><option>5</option><option>4</option><option>3</option><option>2</option></select></FL>
+              <FL label="Rack rate (per night)"><input type="number" value={form.tariff} onChange={e=>setF({tariff:e.target.value})} style={inp}/></FL>
             </div>
-            <FL label="GST slab"><select style={inp}><option>18% (above ₹7,500/night)</option><option>12% (₹1,000–₹7,500)</option><option>0% (below ₹1,000)</option></select></FL>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
+              <FL label="GST slab"><select value={form.gstSlab} onChange={e=>setF({gstSlab:e.target.value})} style={inp}><option value="18">18% (above ₹7,500/night)</option><option value="12">12% (₹1,000–₹7,500)</option><option value="0">0% (below ₹1,000)</option></select></FL>
+              <FL label="Contracted rate?"><select value={form.contract} onChange={e=>setF({contract:e.target.value})} style={inp}><option>No</option><option>Yes</option></select></FL>
+            </div>
           </div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <FL label="DMC name"><input style={inp}/></FL>
+            <FL label="DMC name"><input value={form.name} onChange={e=>setF({name:e.target.value})} style={inp}/></FL>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
-              <FL label="Country"><input style={inp}/></FL>
-              <FL label="Speciality"><input style={inp}/></FL>
+              <FL label="Country"><input value={form.country} onChange={e=>setF({country:e.target.value})} style={inp}/></FL>
+              <FL label="Speciality"><input value={form.speciality} onChange={e=>setF({speciality:e.target.value})} style={inp}/></FL>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10}}>
-              <FL label="Settlement currency"><select style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
-              <FL label="Commission %"><input type="number" style={inp} placeholder="10"/></FL>
+              <FL label="Settlement currency"><select value={form.currency} onChange={e=>setF({currency:e.target.value})} style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
+              <FL label="Commission %"><input type="number" value={form.commPct} onChange={e=>setF({commPct:e.target.value})} style={inp} placeholder="10"/></FL>
             </div>
+            <FL label="Contracted rate?"><select value={form.contract} onChange={e=>setF({contract:e.target.value})} style={inp}><option>No</option><option>Yes</option></select></FL>
           </div>
         )}
       </MstrModal>}

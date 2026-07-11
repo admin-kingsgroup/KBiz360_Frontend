@@ -26,14 +26,14 @@ import { canReachRoute, expandHidden } from './core/menus';
    Infrastructure that renders on every screen (shell, providers, hosts) stays
    eagerly imported above/below. Components render inside <Suspense> (see render).
    ── */
-const { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, GratuityRegister, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, UxPreferences } = lazyModule(() => import('./core/helpers'));
+const { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, UxPreferences } = lazyModule(() => import('./core/helpers'));
 const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } = lazyModule(() => import('./core/styles'));
 const { RPT_InterbranchElim, InterBranchRegister, InterBranchMatrix, InterBranchCounterpartyLedger } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/reports/salesGpAnalytics'));
 const { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } = lazyModule(() => import('./modules/assets'));
 const { Dashboard, AlertsDashboard, OwnerDashboard, AdCockpit, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
 const { DirectorDash, TargetsMaster } = lazyModule(() => import('./modules/directorDashboards'));
-const { BankBalanceDashboard, BankReco, CashBookReport, CashFlowDirect, CashFlowForecast, DayBook, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LedgerAc, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, TrialBalance, WorkingCapitalDashboard, YearEndClose } = lazyModule(() => import('./modules/finance'));
+const { BankBalanceDashboard, BankReco, CashFlowDirect, CashFlowForecast, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, WorkingCapitalDashboard, YearEndClose } = lazyModule(() => import('./modules/finance'));
 
 /* financeRoutes is plain DATA (a route table) needed synchronously at module
    load, so it's imported directly from ./modules/finance/routes — NOT through
@@ -44,23 +44,24 @@ import { financeRoutes } from './modules/finance/routes';
 import { supportRoutes } from './modules/support/routes';
 /* Reconciliation module (4-tier per-ledger certificates + Rule Book). */
 import { reconciliationRoutes } from './modules/reconciliation/routes';
+import { tallyReconRoutes } from './modules/tally-reconciliation/routes';
 
 /* Declarative route tables from migrated feature modules. The host renders
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
-const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes, ...reconciliationRoutes];
+const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes, ...reconciliationRoutes, ...tallyReconRoutes];
 const { BankingApiSettings, DelegationsManager, GroupDashboard, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
-const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
+const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, GratuityEstimateView, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyForm16, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/masters/mastersParties'));
-const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, IntercompanyBilling, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
+const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
 const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
 const { PageAccessControl } = lazyModule(() => import('./modules/settings/pageAccess'));
-const { EWayBill, Form16AGenerator, Form16Generator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
+const { EWayBill, Form16AGenerator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, MultiCurrencyVoucher, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
 const { UnifiedApprovals } = lazyModule(() => import('./modules/approvals'));
-const { PaymentVerificationLive, PaymentRun } = lazyModule(() => import('./modules/payments'));
+const { PaymentVerificationLive } = lazyModule(() => import('./modules/payments'));
 const { ModuleRegister } = lazyModule(() => import('./modules/reports/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/masters/chartBuilder'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/reportsFinancial/pnlTally'));
@@ -543,14 +544,14 @@ export default function KB360App(){
     if(route==="/hr/reimbursement")        return <ReimbursementClaim/>;
     if(route==="/hr/my-payslip")           return <MyPayslip/>;
     if(route==="/hr/investment-declaration")return <InvestmentDeclaration/>;
-    if(route==="/hr/form-16")              return <Form16Generator/>;
+    if(route==="/hr/form-16")              return <MyForm16/>;
     if(route==="/hr/performance")          return <PerformanceReview/>;
     if(route==="/hr/feedback-360")         return <Feedback360/>;
     if(route==="/hr/skills")               return <SkillMatrix/>;
     /* Taxation */
     if(route==="/tax/gstr-1-prep")         return <GSTR1Prep/>;
     if(route==="/tax/gstr-3b-prep")        return <GSTR3BPrep/>;
-    if(route==="/tax/form-16a")            return <Form16AGenerator/>;
+    if(route==="/tax/form-16a")            return <Form16AGenerator branch={branch}/>;
     if(route==="/tax/calendar")            return <TaxCalendarV2/>;
     /* Settings */
     if(route==="/settings/doc-templates")  return <DocTemplateEditor/>;
@@ -561,8 +562,8 @@ export default function KB360App(){
     if(route==="/settings/bulk-users")     return <BulkUserOperations/>;
     if(route==="/settings/permissions-matrix") return <PermissionsMatrix/>;
     if(route==="/settings/branding")       return <BrandingSettings/>;
-    if(route==="/reports/builder")      return <CustomReportBuilder/>;
-    if(route==="/reports/saved-views")  return <SavedReportViews/>;
+    if(route==="/reports/builder")      return <CustomReportBuilder branch={branch} setRoute={navigate}/>;
+    if(route==="/reports/saved-views")  return <SavedReportViews setRoute={navigate}/>;
     if(route==="/reports/scheduled")    return <ScheduledReports/>;
     if(route==="/reports/meta-demo")    return <ReportsMetaDemo/>;
     if(route==="/finance/bank-balance")  return <BankBalanceDashboard branch={branch}/>;
@@ -606,7 +607,8 @@ export default function KB360App(){
     if(route==="/accounts/inb-matrix")     return <InterBranchMatrix branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-counterparty") return <InterBranchCounterpartyLedger branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/tally-reco")    return <TallyReco branch={branch} setRoute={navigate}/>;
-    if(route==="/accounts/payment-run")   return <PaymentRun branch={branch} setRoute={navigate}/>;
+    // Payment Run / Batch Pay route removed — bulk supplier payment disabled by
+    // policy (component kept in modules/payments; a direct URL now falls through).
     if(route==="/accounts/suspense")      return <SuspenseClearing branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/month-end")     return <MonthEndChecklist branch={branch} setRoute={navigate}/>;
     // The owner's home IS the Owner Dashboard — the role-scoped My Dashboard is retired for
@@ -688,7 +690,7 @@ export default function KB360App(){
     if(route==="/tax/tds")            return <TaxTdsTcs branch={branch}/>;
     if(route==="/tax/rcm")            return <TaxRcm branch={branch}/>;
     if(route==="/tax/vat")            return <TaxVat branch={branch}/>;
-    if(route==="/tax/einvoice")       return <TaxEInvoice/>;
+    if(route==="/tax/einvoice")       return <TaxEInvoice branch={branch}/>;
     if(route==="/reports/gp")        return <ReportGP branch={branch} setRoute={navigate}/>;
     // Unified statements: one P&L screen and one BS screen, view-switched
     // (Fiori · Classic · Vertical · Tally · TKF [· Schedule III · Consolidated]).
@@ -781,9 +783,11 @@ export default function KB360App(){
     if(route==="/reports/package-pl")       return <PackagePnL branch={branch}/>;
     if(route==="/hr/recruitment")           return <Recruitment branch={branch}/>;
     if(route==="/reports/budget")           return <BudgetPlanning branch={branch}/>;
-    if(route==="/accounting/intercompany")  return <IntercompanyBilling branch={branch}/>;
+    /* Intercompany billing IS the inter-branch (INB) flow — the old NotWired
+       screen was retired 2026-07-10; the route now opens the live INB register. */
+    if(route==="/accounting/intercompany")  return <InterBranchRegister branch={branch} setRoute={navigate}/>;
     if(route==="/masters/seats")            return <SeatInventory branch={branch}/>;
-    if(route==="/hr/gratuity")              return <GratuityRegister branch={branch}/>;
+    if(route==="/hr/gratuity")              return <GratuityEstimateView branch={branch}/>;
     if(route==="/tax/eway")                 return <EWayBill branch={branch}/>;
         if(route==="/assets/register")                 return <FixedAssetRegister branch={branch} setRoute={navigate}/>;
         if(route==="/assets/depreciation")             return <AssetDepreciation branch={branch} setRoute={navigate}/>;

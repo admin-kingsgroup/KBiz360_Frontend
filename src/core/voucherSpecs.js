@@ -274,7 +274,10 @@ export function lineCalcPackage(spec, l, ctx) {
   const rate = pkgRateOf(spec, ctx);
   const land = num(l.base);
   const psvc = num(l.psvc);
-  const psvcGst = num(l.psvcGst);          // Supplier Service GST — entered
+  // A FOREIGN supplier (master country ≠ India, e.g. a UAE DMC) charges no Indian
+  // GST — import of service. Any entered Supplier Service GST is ignored: it never
+  // loads into the cost and there is no ITC to claim on the purchase leg.
+  const psvcGst = (ctx && ctx.foreignSupplier) ? 0 : num(l.psvcGst); // Supplier Service GST — entered
   const markup = num(l.markup);            // net markup (agency margin = SVC2)
   const incentive = num(l.incentive);
   // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
@@ -313,7 +316,9 @@ export function lineCalc(spec, l, ctx) {
   const gSvc = taxable ? gstSvc(l, sr) : 0;
   const gMk  = taxable ? gstMk(l, sr) : 0;
   // Input VAT follows the supplier, not the Without-VAT sale choice (decoupled).
-  const gPur = isInputTaxable(ctx) ? gstPur(spec, l, pr) : 0;
+  // A FOREIGN supplier (master country ≠ India) charges no Indian GST at all —
+  // import of service — so the purchase leg carries ZERO input GST.
+  const gPur = (ctx && ctx.foreignSupplier) ? 0 : (isInputTaxable(ctx) ? gstPur(spec, l, pr) : 0);
   const incentive = num(l.incentive);
   // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
   // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.

@@ -23,6 +23,16 @@ jest.mock('../api', () => ({
       { _id: 'c1', branch: 'BOM', tier: 'weekly', period: '2026-W28', status: 'reconciled', signatures: [], exceptions: [], attachments: [], snapshot: { frozenAt: '2026-07-09', difference: 0 }, ledger: { name: 'ICICI Bank A/c', code: 'BOM-BNK-0001', parentGroup: 'Current Assets', subGroup: 'Bank Accounts' } },
     ] }] }],
   })),
+  // Scope tree = the FULL in-scope checklist: one reconciled cert + one PENDING
+  // (in scope, not generated yet) ledger — the Hub full view must show both.
+  getScopeTree: jest.fn(() => Promise.resolve({
+    period: '2026-W28',
+    counts: { total: 2, pending: 1, open: 0, reconciled: 1, signed: 0, locked: 0, done: 0, frozen: 1, diffOpen: 0, exceptions: 0 },
+    groups: [{ parentGroup: 'Current Assets', subGroups: [{ subGroup: 'Bank Accounts', items: [
+      { _id: 'c1', branch: 'BOM', tier: 'weekly', period: '2026-W28', status: 'reconciled', signatures: [], exceptions: [], snapshot: { frozenAt: '2026-07-09', difference: 0 }, ledger: { name: 'ICICI Bank A/c', code: 'BOM-BNK-0001', parentGroup: 'Current Assets', subGroup: 'Bank Accounts' } },
+      { _id: null, branch: 'BOM', tier: 'weekly', period: '2026-W28', status: 'pending', signatures: [], exceptions: [], snapshot: null, ledger: { name: 'HDFC Bank A/c', code: 'BOM-BNK-0002', parentGroup: 'Current Assets', subGroup: 'Bank Accounts' } },
+    ] }] }],
+  })),
   getList: jest.fn(() => Promise.resolve([
     { _id: 'c1', certNo: 'WK/BOM/2026-W28/B1', branch: 'BOM', tier: 'weekly', period: '2026-W28', status: 'open', signatures: [], attachments: [],
       exceptions: [{ _id: 'e1', text: 'Cheque unpresented 90+ days', resolved: false }],
@@ -38,6 +48,7 @@ jest.mock('../api', () => ({
 }));
 
 import { ReconciliationHub } from '../ReconciliationHub';
+import { CertificationRegister } from '../CertificationRegister';
 import { ReconReportsPage } from '../ReconReportsPage';
 import { RuleBookPage } from '../RuleBookPage';
 import { getRulebook } from '../api';
@@ -47,9 +58,9 @@ const wrap = (ui) => {
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 };
 
-describe('ReconciliationHub · render (tier-locked pages — the menu is the tier switch)', () => {
+describe('CertificationRegister · render (tier-locked sign-off pages — the menu is the tier switch)', () => {
   test('weekly page: this tier\'s card ONLY + the grouped ledger register', async () => {
-    wrap(<ReconciliationHub branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    wrap(<CertificationRegister branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
     expect(await screen.findByText('Weekly Certification')).toBeInTheDocument(); // page title
     expect(screen.getByText('Weekly')).toBeInTheDocument();                   // the tier progress card
     expect(screen.queryByText('Month-End')).not.toBeInTheDocument();          // other tiers live on their own pages
@@ -61,14 +72,14 @@ describe('ReconciliationHub · render (tier-locked pages — the menu is the tie
   });
 
   test('monthly page: tier prop locks the page to Month-End (H1 matches the menu entry)', async () => {
-    wrap(<ReconciliationHub branch="BOM" tier="month" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    wrap(<CertificationRegister branch="BOM" tier="month" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
     expect(await screen.findByText('Monthly Certification')).toBeInTheDocument(); // same words the user clicked
     expect(screen.getByText('Month-End')).toBeInTheDocument();                     // the tier's formal name on the card
     expect(screen.queryByText('Weekly')).not.toBeInTheDocument();
   });
 
   test('branch prop as an OBJECT (the real app shape) scopes to that branch — no in-page picker', async () => {
-    wrap(<ReconciliationHub branch={{ code: 'AMD', city: 'Ahmedabad' }} tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    wrap(<CertificationRegister branch={{ code: 'AMD', city: 'Ahmedabad' }} tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
     const scope = await screen.findByTestId('recon-branch-scope');
     expect(scope.textContent).toContain('AMD');
     expect(scope.textContent).toContain('Scoped by the top TK branch selector');
@@ -76,17 +87,42 @@ describe('ReconciliationHub · render (tier-locked pages — the menu is the tie
   });
 
   test('Branch Accountant: weekly page works + the TK-Group note', async () => {
-    wrap(<ReconciliationHub branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
+    wrap(<CertificationRegister branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
     expect(await screen.findByText('Weekly')).toBeInTheDocument();
     expect(screen.queryByText('Month-End')).not.toBeInTheDocument();
     expect(screen.getByText(/worked from TK Group Central/i)).toBeInTheDocument();
   });
 
   test('Branch Accountant on a central tier URL: guarded, not broken', async () => {
-    wrap(<ReconciliationHub branch="BOM" tier="quarter" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
+    wrap(<CertificationRegister branch="BOM" tier="quarter" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
     expect(await screen.findByText('Central closing tier')).toBeInTheDocument();
     expect(screen.getByText(/WEEKLY cycle only/i)).toBeInTheDocument();
     expect(screen.queryByText('ICICI Bank A/c')).not.toBeInTheDocument();     // no register leaks
+  });
+});
+
+describe('ReconciliationHub · render (the full-view dashboard — read-only overview)', () => {
+  test('weekly hub: KPIs, the FULL scope checklist (incl. a PENDING not-yet-generated ledger) + attention', async () => {
+    wrap(<ReconciliationHub branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText('Weekly Reconciliation')).toBeInTheDocument();     // dashboard H1 (not "Certification")
+    expect(screen.getByText('In scope')).toBeInTheDocument();                          // a KPI tile
+    // 'Pending' shows on both the KPI tile and the pending ledger's status badge.
+    expect((await screen.findAllByText('Pending')).length).toBeGreaterThanOrEqual(1);
+    // Ledgers appear in BOTH the attention list and the full checklist.
+    expect((await screen.findAllByText('ICICI Bank A/c')).length).toBeGreaterThanOrEqual(1); // reconciled ledger
+    expect(screen.getAllByText('HDFC Bank A/c').length).toBeGreaterThanOrEqual(1);      // the PENDING ledger IS listed (the whole point)
+    expect(screen.getByText('Open Weekly Certification')).toBeInTheDocument();          // link across to sign-off
+  });
+
+  test('monthly hub: H1 matches the menu entry (Monthly Reconciliation)', async () => {
+    wrap(<ReconciliationHub branch="BOM" tier="month" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText('Monthly Reconciliation')).toBeInTheDocument();
+  });
+
+  test('Branch Accountant on a central hub tier: guarded, not broken', async () => {
+    wrap(<ReconciliationHub branch="BOM" tier="quarter" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
+    expect(await screen.findByText('Central closing tier')).toBeInTheDocument();
+    expect(screen.queryByText('ICICI Bank A/c')).not.toBeInTheDocument();              // no checklist leaks
   });
 });
 

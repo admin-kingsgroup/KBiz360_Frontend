@@ -135,97 +135,6 @@ function _ReportPackagePnL_legacy(){
 
 /* ── PACKAGE P&L BY TOUR CODE ────────────────────────────────── */
 
-export function IntercompanyBilling(){
-  return <NotWired title="Intercompany Billing" note="Cross-branch billing isn't wired to live data yet. Once the inter-branch billing voucher flow is connected, real IC transactions and markup will appear here — no sample entries are shown in the meantime."/>;
-}
-function _IntercompanyBilling_legacy({branch}){
-  const mob=useMobile();
-  const [tab,setTab]=useState("list"); // list | new
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
-  const IC_ENTRIES=[
-    {id:"IC/BOM-AMD/001",from:"BOM",to:"AMD",desc:"BOM issued tickets for AMD client group",amount:142000,currency:"INR",markup:5,date:"2026-05-12",status:"Invoiced",ref:"BOM/1726/SH00018"},
-    {id:"IC/AMD-BOM/001",from:"AMD",to:"BOM",desc:"AMD client group — BOM issued tickets",amount:220000,currency:"INR",markup:4,date:"2026-05-15",status:"Pending",ref:"AMD/1726/SF00022"},
-  ];
-  const STATUS_CLR={Invoiced:"#2563eb",Settled:"#16a34a",Pending:"#d97706"};
-  const STATUS_BG ={Invoiced:"#e8f0ff",Settled:"#e8f6ed",Pending:"#fbeedb"};
-  const BRANCH_CLR={BOM:"#2563eb",AMD:"#d97706"};
-
-  return(
-    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
-          <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Intercompany Billing</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>Cross-branch transactions · BOM ↔ AMD · Auto markup {IC_ENTRIES[0].markup}%</p>
-          </div>
-        </div>
-        <button onClick={()=>setTab(t=>t==="list"?"new":"list")} style={{...btnG,fontSize:11}}>{tab==="list"?"+ New IC Entry":"← Back to List"}</button>
-      </div>
-
-      {tab==="list"&&(
-        <>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,150px),1fr))",gap:10,marginBottom:14}}>
-            {[
-              {l:"Total IC Volume",v:f(IC_ENTRIES.reduce((s,e)=>s+e.amount,0)),c:"#2563eb",bg:"#e8f0ff"},
-              {l:"Settled",v:String(IC_ENTRIES.filter(e=>e.status==="Settled").length),c:"#16a34a",bg:"#e8f6ed"},
-              {l:"Invoiced",v:String(IC_ENTRIES.filter(e=>e.status==="Invoiced").length),c:"#2563eb",bg:"#e8f0ff"},
-              {l:"Pending",v:String(IC_ENTRIES.filter(e=>e.status==="Pending").length),c:"#d97706",bg:"#fbeedb"},
-            ].map((k,i)=>(
-              <div key={i} style={{...card,borderTop:`3px solid ${k.c}`,padding:"10px 12px",background:k.bg}}>
-                <p style={{margin:0,fontSize:8.5,fontWeight:700,color:k.c,textTransform:"uppercase"}}>{k.l}</p>
-                <p style={{margin:"3px 0 0",fontSize:18,fontWeight:800,color:"#1a1c22"}}>{k.v}</p>
-              </div>
-            ))}
-          </div>
-
-          <div style={{...card,padding:0,overflow:"hidden"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-              <thead><tr style={{background:"#1a1c22"}}>
-                {["IC Ref","From","To","Description","Amount","Markup","Date","Status"].map((h,i)=>(
-                  <th key={i} style={{padding:"9px 11px",textAlign:i>=4&&i<=5?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>{IC_ENTRIES.map((e,i)=>(
-                <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
-                  <td style={{padding:"8px 11px",fontFamily:"monospace",fontSize:10,color:"#2563eb"}}>{e.id}</td>
-                  <td style={{padding:"8px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:800,background:(BRANCH_CLR[e.from]||"#2e323c")+"22",color:BRANCH_CLR[e.from]||"#2e323c"}}>{e.from}</span></td>
-                  <td style={{padding:"8px 11px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:800,background:(BRANCH_CLR[e.to]||"#2e323c")+"22",color:BRANCH_CLR[e.to]||"#2e323c"}}>{e.to}</span></td>
-                  <td style={{padding:"8px 11px",color:"#2e323c",maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.desc}</td>
-                  <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{e.currency} {e.amount.toLocaleString()}</td>
-                  <td style={{padding:"8px 11px",textAlign:"right",color:"#16a34a",fontWeight:700}}>{e.markup}%</td>
-                  <td style={{padding:"8px 11px",color:"#5b616e",whiteSpace:"nowrap"}}>{e.date}</td>
-                  <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[e.status],color:STATUS_CLR[e.status]}}>{e.status}</span></td>
-                </tr>
-              ))}</tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {tab==="new"&&(
-        <div style={{...card}}>
-          <p style={{margin:"0 0 14px",fontSize:13,fontWeight:700,color:"#1a1c22"}}>New Intercompany Entry</p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,220px),1fr))",gap:10,marginBottom:12}}>
-            <FL label="From branch"><select style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
-            <FL label="To branch"><select style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:10,marginBottom:12}}>
-            <FL label="Amount"><input type="number" style={inp} placeholder="0"/></FL>
-            <FL label="Currency"><select style={inp}>{ACTIVE_CURRENCIES.map(c=><option key={c}>{c}</option>)}</select></FL>
-            <FL label="Intercompany Markup %"><input type="number" defaultValue={5} style={inp}/></FL>
-          </div>
-          <FL label="Description"><input style={inp} placeholder="e.g. BOM issued tickets for AMD client"/></FL>
-          <FL label="Linked booking ref"><input style={{...inp,marginTop:10,fontFamily:"monospace"}} placeholder="BOM/1726/SH00001"/></FL>
-          <div style={{display:"flex",gap:8,marginTop:14,justifyContent:"flex-end"}}>
-            <button onClick={()=>setTab("list")} style={btnGh}>Cancel</button>
-            <button onClick={()=>setTab("list")} style={btnG}>Post IC Entry</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ── SEAT INVENTORY ──────────────────────────────────────────── */
 
@@ -457,9 +366,9 @@ function _ReportViewerTabbed_legacy(){
    ════════════════════════════════════════════════════════════════════ */
 
 
-export function CustomReportBuilder(){
-  return <NotWired title="Custom Report Builder" note="The custom report builder isn't connected to a live query engine yet, so it can't run against the books. It will be enabled once the report-builder service is available."/>;
-}
+// CustomReportBuilder migrated → ./pages/report-builder.jsx (live query engine via
+// POST /api/report-views/run). Re-exported from the feature barrel under its
+// original name; the demo layout below is retained as dead reference code only.
 function _CustomReportBuilder_legacy(){
   const [selected,setSelected]=useState(["Branch","Revenue","GP","GP %","Bookings"]);
   const [filters,setFilters]=useState([
@@ -584,9 +493,7 @@ function _CustomReportBuilder_legacy(){
    2. SAVED REPORT VIEWS
    ════════════════════════════════════════════════════════════════════ */
 
-export function SavedReportViews(){
-  return <NotWired title="Saved Report Views" note="Saved report views aren't available yet — there's no saved-views service connected to store or run them."/>;
-}
+// SavedReportViews migrated → ./pages/saved-views.jsx (live via /api/report-views).
 function _SavedReportViews_legacy(){
   const [filter,setFilter]=useState("ALL");
   const types=["ALL","Profitability","Financial","Operational","Compliance"];
@@ -644,9 +551,8 @@ function _SavedReportViews_legacy(){
    3. SCHEDULED EMAIL REPORTS
    ════════════════════════════════════════════════════════════════════ */
 
-export function ScheduledReports(){
-  return <NotWired title="Scheduled Reports" note="Scheduled report delivery isn't available yet — no scheduling or email service is connected. Email/recipient counts are not shown until it's live."/>;
-}
+// ScheduledReports migrated → ./pages/scheduled-reports.jsx (live via
+// /api/report-schedules + the backend's hourly report-schedules cron).
 function _ScheduledReports_legacy(){
   const [schedules,setSchedules]=useState(SCHEDULED_REPORTS_DATA);
   const toggleStatus=id=>setSchedules(s=>s.map(r=>r.id===id?{...r,status:r.status==="Active"?"Paused":"Active"}:r));
@@ -725,7 +631,7 @@ function _ScheduledReports_legacy(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function ReportsMetaDemo(){
-  return <NotWired title="Report Meta Features" note="This screen demonstrates report meta-features (comparatives, sparklines, drill-downs) and isn't wired to live data."/>;
+  return <NotWired title="Report Meta Features (Demo)" note="Demo screen — it showcases report meta-features (comparatives, sparklines, drill-downs) and is not wired to live data."/>;
 }
 function _ReportsMetaDemo_legacy(){
   const [showComparative,setShowComparative]=useState(true);

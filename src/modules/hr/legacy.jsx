@@ -9,13 +9,15 @@ import { openPrintPreview } from '../../core/PrintPreview';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, HR_BRANCHES_F, HR_DEPTS, HR_EMPLOYEES_DATA } from '../../core/data';
 import { fmt, fmtINR, compactAmt, localeOf } from '../../core/format';
-import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, MY_CLAIMS_DATA, MY_PAYSLIP_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, cardStyle, tabPanel } from '../../core/helpers';
+import { Breadcrumb, FEEDBACK_360_DATA, GRP_COLORS, GratuityRegister, MY_CLAIMS_DATA, PERFORMANCE_REVIEWS, SKILLS_DATA, TAB_Page, cardStyle, tabPanel } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { useExpenseLedgers, useFiscalYears, useExpenseBudgets } from '../../core/useReference';
 import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { fromEmpDTO, toEmpPayload, BLANK_EMP } from './employeeMap';
 import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, takenFor, fromShiftDTO, toShiftPayload, weeklyOffForShift, isLate, punctualityPct, fromLoanDTO, toLoanPayload, fromRevisionDTO, toRevisionPayload } from './hrMaps';
+import { usePayrollRegister, useProcessPayroll, usePayslips, useChallans, useMarkChallanPaid, useMyEmployee } from './usePayroll';
+import { challanDueDate, fyOfMonth, form16Summary } from './payrollMaps';
 import { buildRevisionDue } from './hrReports';
 import { todayISO } from '../../core/dates';
 import { toast } from '../../core/ux/toast';
@@ -282,6 +284,17 @@ export function HrEmployees({branch}){
     remove.mutate(form._id,{ onSuccess:()=>{ toast("Employee deleted"); closeModal(); },
       onError:(err)=>toast(err?.message||"Delete failed","error") });
   };
+  /* Safe alternative to Delete: flips the employee to Inactive (full payload — the
+     backend validator needs empId/name/branch on every PUT). Record, payroll and
+     attendance history stay; Reactivate reverses it. */
+  const toggleEmpStatus=()=>{
+    if(!form._id) return;
+    const next=form.status==="Inactive"?"Active":"Inactive";
+    if(next==="Inactive"&&!window.confirm(`Deactivate ${form.name}? The record and payroll history stay — you can reactivate any time.`)) return;
+    update.mutate({id:form._id,body:toEmpPayload({...form,status:next})},{
+      onSuccess:()=>{ toast(next==="Inactive"?"Employee deactivated":"Employee reactivated"); closeModal(); },
+      onError:(err)=>toast(err?.message||"Update failed","error") });
+  };
 
   const filtered=emps.filter(e=>(
     (deptFilter==="All"||e.dept===deptFilter)&&
@@ -484,10 +497,14 @@ export function HrEmployees({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",
               display:"flex",justifyContent:"space-between",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
-              <div>{selected&&(
+              <div style={{display:"flex",gap:8}}>{selected&&(<>
+                <button onClick={toggleEmpStatus} disabled={update.isPending}
+                  style={{...btnGh,color:form.status==="Inactive"?"#27500A":"#854F0B",borderColor:form.status==="Inactive"?"#27500A":"#854F0B"}}
+                  title="Keeps the record and its payroll/attendance history — use instead of Delete">
+                  {update.isPending?"Saving…":form.status==="Inactive"?"Reactivate":"Deactivate"}</button>
                 <button onClick={deleteEmp} disabled={remove.isPending}
                   style={{...btnGh,color:"#A32D2D",borderColor:"#A32D2D"}}>{remove.isPending?"Deleting…":"Delete"}</button>
-              )}</div>
+              </>)}</div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={closeModal} style={btnGh}>Cancel</button>
                 <button onClick={saveEmp} disabled={saving} style={btnG}>{saving?"Saving…":"Save Employee"}</button>
@@ -803,6 +820,13 @@ export function HrShifts({branch}){
   };
   const del=(s)=>{ if(!window.confirm(`Delete shift "${s.name}"? Employees on it fall back to the branch default.`))return;
     remove.mutate(s.id,{onSuccess:()=>toast("Shift deleted"),onError:e=>toast(e?.message||"Delete failed","error")}); };
+  /* Safe alternative to Delete: an inactive shift keeps past attendance intact but
+     leaves the employee assignment picker (it fetches active:true only). Reversible. */
+  const toggleShift=(s)=>{
+    if(s.active&&!window.confirm(`Deactivate shift "${s.name}"? Past attendance stays; it leaves the assignment picker until reactivated.`))return;
+    update.mutate({id:s.id,body:{active:!s.active}},{
+      onSuccess:()=>toast(s.active?"Shift deactivated":"Shift reactivated"),
+      onError:e=>toast(e?.message||"Update failed","error")}); };
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
@@ -838,7 +862,11 @@ export function HrShifts({branch}){
               <td style={{padding:"8px 12px",color:"#5a6691"}}>{s.graceMins}m</td>
               <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10}}>{s.weeklyOff.length?s.weeklyOff.map(d=>DOW[d]).join(", "):"—"}</td>
               <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:s.active?"#EAF3DE":"#f3f4f8",color:s.active?"#27500A":"#5a6691"}}>{s.active?"Active":"Inactive"}</span></td>
-              <td style={{padding:"8px 12px"}}><button onClick={ev=>{ev.stopPropagation();del(s);}} style={{...btnGh,padding:"2px 8px",fontSize:9,color:"#A32D2D"}}>Delete</button></td>
+              <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>
+                <button onClick={ev=>{ev.stopPropagation();toggleShift(s);}} title="Keeps past attendance — use instead of Delete"
+                  style={{...btnGh,padding:"2px 8px",fontSize:9,color:s.active?"#854F0B":"#27500A",marginRight:6}}>{s.active?"Deactivate":"Reactivate"}</button>
+                <button onClick={ev=>{ev.stopPropagation();del(s);}} style={{...btnGh,padding:"2px 8px",fontSize:9,color:"#A32D2D"}}>Delete</button>
+              </td>
             </tr>
           ))}</tbody>
         </table>
@@ -895,75 +923,38 @@ export function HrPayroll({branch}){
   const [period,setPeriod]=useState(PERIODS[0].v);
   const [journalPosted,setJournalPosted]=useState(false);
 
-  /* Live active employees for this branch (from the now-live Employee Master). */
-  const empQ=useMasterList('employees', {branch:brCode});
-  const emps=(empQ.data||[]).map(fromEmpDTO).filter(e=>e.status==="Active");
-  /* Persisted payroll-run status for this branch × month (/api/payroll-runs). */
-  const runQ=useMasterList('payroll-runs', {branch:brCode, month:period});
-  const runDoc=((runQ.data)||[]).find(r=>r.month===period&&r.branch===brCode);
-  const {create:createRun,update:updateRun}=useMasterMutations('payroll-runs');
-  const processed=runDoc?.status==="Paid";
-  const runPending=createRun.isPending||updateRun.isPending;
-
-  const payroll=useMemo(()=>emps.map(e=>{
-    const basic   =e.basic;
-    const hra     =e.hra;
-    const gross   =e.basic+e.hra+e.da+e.travel+e.medical;
-    const special =gross-basic-hra;
-    // PF: 12% of Basic (both employee & employer)
-    const empPF   =Math.round(basic*0.12);
-    const empPFr  =Math.round(basic*0.12);  // employer
-    // ESI: only if gross <= 21000
-    const esiElig =gross<=21000;
-    const empESI  =esiElig?Math.round(gross*0.0075):0;
-    const empESIr =esiElig?Math.round(gross*0.0325):0;
-    // Professional Tax (Maharashtra)
-    const profTax =gross>20000?200:gross>15000?150:gross>10000?100:0;
-    // LWP — no loss-of-pay field on the employee master, default to 0
-    const lwpDays =e.lwpDays||0;
-    const lwpDed  =Math.round(gross/26*lwpDays);
-    // TDS on salary (simplified)
-    const annualGross=(gross-empPF-profTax-lwpDed)*12;
-    const tdsBase=annualGross>700000?annualGross-700000:0;
-    const tds=annualGross>700000?Math.round((tdsBase*0.20+200000*0.10+250000*0.05)/12):
-      annualGross>500000?Math.round((annualGross-500000)*0.10/12+250000*0.05/12):
-      annualGross>250000?Math.round((annualGross-250000)*0.05/12):0;
-    const net =gross-empPF-empESI-profTax-lwpDed-tds;
-    return {...e,basic:basic,hra:hra,special:special,gross:gross,empPF:empPF,empPFr:empPFr,empESI:empESI,empESIr:empESIr,profTax:profTax,lwpDays:lwpDays,lwpDed:lwpDed,tds:tds,net:net};
-  }),[emps]);
-
-  const totals=useMemo(()=>({
-    gross:  payroll.reduce((s,e)=>s+e.gross,0),
-    empPF:  payroll.reduce((s,e)=>s+e.empPF,0),
-    empPFr: payroll.reduce((s,e)=>s+e.empPFr,0),
-    empESI: payroll.reduce((s,e)=>s+e.empESI,0),
-    empESIr:payroll.reduce((s,e)=>s+e.empESIr,0),
-    profTax:payroll.reduce((s,e)=>s+e.profTax,0),
-    lwpDed: payroll.reduce((s,e)=>s+e.lwpDed,0),
-    tds:    payroll.reduce((s,e)=>s+e.tds,0),
-    net:    payroll.reduce((s,e)=>s+e.net,0),
-  }),[payroll]);
+  /* Server-side payroll engine (/api/payroll-runs/register): the register lines
+     are COMPUTED AND PERSISTED by the backend from config-driven statutory rates
+     (app-config `payrollStatutoryRates`) — this screen only renders them. Until
+     the month is processed the backend returns a live preview from the current
+     roster (persisted:false); "Process Payroll" persists the lines + payslips. */
+  const reg=usePayrollRegister(brCode,period);
+  const payroll=reg.rows;
+  const totals=reg.totals;
+  const rates=reg.rates;
+  const processed=reg.persisted&&reg.run?.status==="Paid";
+  const processMut=useProcessPayroll();
+  const runPending=processMut.isPending;
 
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  const DUE_DATE=challanDueDate(period);
 
-  /* Persist the run for this branch × month (upsert): PUT if a row exists, else
-     POST. Stamps gross + headcount so the HR dashboard's Payroll-Status KPI reads
-     a real figure instead of a guess. */
+  /* Compute + persist this run server-side (idempotent — reprocessing swaps the
+     lines wholesale). The backend also stamps the run header (gross/net/headcount)
+     so the HR dashboard's Payroll-Status KPI reads a real figure. */
   const processPayroll=()=>{
-    const body={month:period,branch:brCode,status:"Paid",grossTotal:Math.round(totals.gross),
-      headcount:emps.length,runAt:new Date().toISOString().slice(0,10)};
-    const opts={onSuccess:()=>toast(`Payroll processed — ${brCode} ${period}`),onError:e=>toast(e?.message||"Could not process payroll","error")};
-    if(runDoc) updateRun.mutate({id:runDoc.id,body},opts);
-    else createRun.mutate(body,opts);
+    processMut.mutate({month:period,branch:brCode},{
+      onSuccess:()=>toast(`Payroll processed — ${brCode} ${period}`),
+      onError:e=>toast(e?.message||"Could not process payroll","error")});
   };
 
   /* ── PAYROLL JOURNAL ENTRIES ─────────────────────────── */
   const journalEntries=[
     {side:"Dr",ledger:"Salaries & Wages",          amount:totals.gross,  note:"Gross salary expense"},
-    {side:"Cr",ledger:"Employee PF Payable",        amount:totals.empPF,  note:"Employee PF 12% of basic"},
+    {side:"Cr",ledger:"Employee PF Payable",        amount:totals.empPF,  note:`Employee PF ${rates?.pf?.employeePct??12}% of basic`},
     {side:"Dr",ledger:"Employer PF Contribution",   amount:totals.empPFr, note:"Employer PF expense"},
     {side:"Cr",ledger:"PF Payable",                 amount:totals.empPF+totals.empPFr, note:"Total PF to EPFO by 15th"},
-    {side:"Dr",ledger:"Employer ESI Contribution",  amount:totals.empESIr,note:"Employer ESI 3.25%"},
+    {side:"Dr",ledger:"Employer ESI Contribution",  amount:totals.empESIr,note:`Employer ESI ${rates?.esi?.employerPct??3.25}%`},
     {side:"Cr",ledger:"ESI Payable",                amount:totals.empESI+totals.empESIr,note:"Total ESI to ESIC by 15th"},
     {side:"Cr",ledger:"Professional Tax Payable",   amount:totals.profTax,note:"Prof Tax — Maharashtra"},
     {side:"Cr",ledger:"TDS Payable (194C)",         amount:totals.tds,    note:"TDS on salaries — deposit by 7th"},
@@ -981,7 +972,7 @@ export function HrPayroll({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💼</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Salary & Payroll</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · {emps.length} employees</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · {reg.isLoading?"Loading…":`${payroll.length} employees`}{!reg.isLoading&&!processed?" · preview (not yet processed)":""}</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -989,8 +980,8 @@ export function HrPayroll({branch}){
             {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
           </select>
           {!processed
-            ?<button onClick={processPayroll} disabled={runPending||emps.length===0} style={{...btnG,fontSize:11,background:"#27500A"}}>{runPending?"Processing…":"⚙ Process Payroll"}</button>
-            :<span style={{padding:"6px 12px",borderRadius:9,background:"#EAF3DE",color:"#27500A",fontSize:11,fontWeight:700}}>✔ Processed{runDoc?.runAt?` · ${runDoc.runAt}`:""}</span>}
+            ?<button onClick={processPayroll} disabled={runPending||payroll.length===0} style={{...btnG,fontSize:11,background:"#27500A"}}>{runPending?"Processing…":"⚙ Process Payroll"}</button>
+            :<span style={{padding:"6px 12px",borderRadius:9,background:"#EAF3DE",color:"#27500A",fontSize:11,fontWeight:700}}>✔ Processed{reg.run?.runAt?` · ${reg.run.runAt}`:""}</span>}
         </div>
       </div>
 
@@ -1020,6 +1011,11 @@ export function HrPayroll({branch}){
                 ))}
               </tr></thead>
               <tbody>
+                {payroll.length===0&&(
+                  <tr><td colSpan={12} style={{padding:"22px 12px",textAlign:"center",color:"#8b94b3",fontSize:12}}>
+                    {reg.isLoading?"Loading payroll register…":reg.isError?"Failed to load payroll register.":"No active employees for this branch — add them in Employee Master."}
+                  </td></tr>
+                )}
                 {payroll.map((e,i)=>(
                   <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"8px 10px",fontWeight:600,color:"#0d1326",whiteSpace:"nowrap"}}>{e.name}</td>
@@ -1046,7 +1042,7 @@ export function HrPayroll({branch}){
               </tbody>
               <tfoot><tr style={{background:"#0d1326"}}>
                 <td style={{padding:"8px 10px",fontWeight:700,color:"#d4a437"}}>TOTAL</td>
-                {[totals.gross*0.5,totals.gross*0.2,totals.gross*0.3,0,totals.gross,totals.empPF,totals.empESI,totals.profTax,totals.tds,totals.net].map((v,i)=>(
+                {[totals.basic,totals.hra,totals.special,totals.lwpDed,totals.gross,totals.empPF,totals.empESI,totals.profTax,totals.tds,totals.net].map((v,i)=>(
                   <td key={i} style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:11}}>{v>0?f(v):"—"}</td>
                 ))}
                 <td style={{padding:"8px 10px",textAlign:"right",fontWeight:700,color:"#fff",fontVariantNumeric:"tabular-nums",fontSize:11}}>{totals.gross>0?`${Math.round(totals.net/totals.gross*100)}%`:"—"}</td>
@@ -1063,19 +1059,19 @@ export function HrPayroll({branch}){
           <div style={{display:"grid",gridTemplateColumns:mob?"1fr":"1fr 1fr",gap:16}}>
             <div style={{...card,background:"#f9fafb"}}>
                 <p style={{margin:"0 0 12px",fontSize:12,fontWeight:700,color:"#0d1326"}}>Provident Fund (EPFO)</p>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employee Contribution (12% Basic)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Deducted from salary</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPF)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employer Contribution (12% Basic)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Company expense</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPFr)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employee Contribution ({rates?.pf?.employeePct??12}% Basic)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Deducted from salary</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPF)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employer Contribution ({rates?.pf?.employerPct??12}% Basic)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Company expense</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPFr)}</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:700,color:"#0d1326"}}>Total PF Deposit</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Via ECR by 15th</p></div><span style={{fontSize:12,fontWeight:800,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(totals.empPF+totals.empPFr)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Admin Charges (0.5%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>0.5% of wages</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(Math.round((totals.empPF+totals.empPFr)*0.005))}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Deposit Deadline</p><p style={{margin:0,fontSize:9.5,color:"#A32D2D"}}>Late = 12% p.a. interest</p></div><span style={{fontSize:11,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>15 Jun 2026</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Admin Charges ({rates?.pf?.adminChargesPct??0.5}%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>{rates?.pf?.adminChargesPct??0.5}% of wages</p></div><span style={{fontSize:11,fontWeight:600,color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>{f(Math.round((totals.empPF+totals.empPFr)*((rates?.pf?.adminChargesPct??0.5)/100)))}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Deposit Deadline</p><p style={{margin:0,fontSize:9.5,color:"#A32D2D"}}>Late = 12% p.a. interest</p></div><span style={{fontSize:11,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{DUE_DATE}</span></div>
               </div>
               <div style={{...card,background:"#f9fafb"}}>
                 <p style={{margin:"0 0 12px",fontSize:12,fontWeight:700,color:"#0d1326"}}>ESI Corporation</p>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employee Contribution (0.75%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Deducted from gross</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESI)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employer Contribution (3.25%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Company expense</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESIr)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employee Contribution ({rates?.esi?.employeePct??0.75}%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Deducted from gross</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESI)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Employer Contribution ({rates?.esi?.employerPct??3.25}%)</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Company expense</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESIr)}</span></div>
                 <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:700,color:"#0d1326"}}>Total ESI Deposit</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Via EC by 15th</p></div><span style={{fontSize:12,fontWeight:800,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{f(totals.empESI+totals.empESIr)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Eligible employees</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Gross up to ₹21,000</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{String(payroll.filter(e=>e.empESI>0).length)+" of "+String(emps.length)}</span></div>
-                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Deposit Deadline</p><p style={{margin:0,fontSize:9.5,color:"#A32D2D"}}>Late = 12% p.a. interest</p></div><span style={{fontSize:11,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>15 Jun 2026</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Eligible employees</p><p style={{margin:0,fontSize:9.5,color:"#5a6691"}}>Gross up to ₹{Number(rates?.esi?.grossCeiling??21000).toLocaleString("en-IN")}</p></div><span style={{fontSize:11,fontWeight:600,color:"#1D9E75",fontVariantNumeric:"tabular-nums"}}>{String(totals.esiEligibleCount)+" of "+String(payroll.length)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #cdd1d8"}}><div><p style={{margin:0,fontSize:10.5,fontWeight:400,color:"#0d1326"}}>Deposit Deadline</p><p style={{margin:0,fontSize:9.5,color:"#A32D2D"}}>Late = 12% p.a. interest</p></div><span style={{fontSize:11,fontWeight:700,color:"#A32D2D",fontVariantNumeric:"tabular-nums"}}>{DUE_DATE}</span></div>
               </div>
           </div>
           <div style={{marginTop:12,padding:"10px 14px",borderRadius:9,background:"#E6F1FB",fontSize:10,color:"#185FA5"}}>
@@ -1146,7 +1142,7 @@ export function HrPayroll({branch}){
                 return (
                   <tr key={e.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
-                    <td style={{padding:"7px 12px",fontSize:10.5,color:"#5a6691"}}>{e.designation||"Staff"}</td>
+                    <td style={{padding:"7px 12px",fontSize:10.5,color:"#5a6691"}}>{e.desig||"Staff"}</td>
                     <td style={{padding:"7px 12px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{f(e.gross*12)}</td>
                     <td style={{padding:"7px 12px",textAlign:"right",fontWeight:600,color:annualTds>0?"#A32D2D":"#bfc3d6",fontVariantNumeric:"tabular-nums"}}>{annualTds>0?f(annualTds):"—"}</td>
                     <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10.5}}>{e.pan||"PENDING"}</td>
@@ -1230,6 +1226,10 @@ export function HrPayslips({branch}){
   const empsAll=((useMasterList('employees', brScope?{branch:brScope}:{}).data)||[]).map(fromEmpDTO);
   const filtEmps=empsAll.filter(e=>brFilter==="All"||e.branch===brFilter);
   const emp=empsAll.find(e=>e.id===empId)||filtEmps[0]||empsAll[0];
+  /* The payslip is the PERSISTED payroll register line for (employee, month) —
+     written by "Process Payroll" (server-side engine), never recomputed here. */
+  const slipQ=usePayslips(emp?.id,month);
+  const slip=slipQ.slips[0]||null;
   if(!emp) return (
     <div style={{padding:"40px 16px",textAlign:"center",color:"#8b94b3",fontSize:13}}>
       No employees for this branch yet — add them in <b>Employee Master</b> to generate payslips.
@@ -1237,9 +1237,9 @@ export function HrPayslips({branch}){
   );
   const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{cur:"₹",entity:"Travkings Tours & Travels"};
   const c=brCfg.cur;
-  const gross=(emp.basic||0)+(emp.hra||0)+(emp.da||0)+(emp.travel||0)+(emp.medical||0);
-  const deductions=(emp.pf||0)+(emp.esi||0)+(emp.tds||0);
-  const net=gross-deductions;
+  const gross=slip?.gross||0;
+  const deductions=slip?.totalDeductions||0;
+  const net=slip?.net||0;
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
@@ -1297,7 +1297,16 @@ export function HrPayslips({branch}){
           ))}
         </div>
 
+        {/* No persisted payslip for this month → honest empty state (never recompute here) */}
+        {!slip&&(
+          <div style={{padding:"36px 24px",textAlign:"center",color:"#8b94b3",fontSize:12.5}}>
+            {slipQ.isLoading?"Loading payslip…":(<>
+              No processed payroll for <b>{MONTHS.find(m=>m.v===month)?.l}</b> — run <b>⚙ Process Payroll</b> in Salary &amp; Payroll to generate this payslip.
+            </>)}
+          </div>
+        )}
         {/* Earnings & Deductions */}
+        {slip&&(<>
         <div style={{padding:"16px 24px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
           {/* Earnings */}
           <div>
@@ -1308,7 +1317,7 @@ export function HrPayslips({branch}){
                 <th style={{padding:"6px 10px",textAlign:"right",color:"#27500A",fontWeight:700,fontSize:10}}>Amount</th>
               </tr></thead>
               <tbody>
-                {[["Basic Salary",emp.basic],["HRA",emp.hra],["Dearness Allowance",emp.da],["Travel Allowance",emp.travel],["Medical Allowance",emp.medical]].map(([l,v],i)=>(
+                {[["Basic Salary",slip.basic],["HRA",slip.hra],["Dearness Allowance",slip.da],["Travel Allowance",slip.travel],["Medical Allowance",slip.medical]].map(([l,v],i)=>(
                   <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{padding:"6px 10px",color:"#384677"}}>{l}</td>
                     <td style={{padding:"6px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{c}{v.toLocaleString()}</td>
@@ -1331,7 +1340,7 @@ export function HrPayslips({branch}){
                 <th style={{padding:"6px 10px",textAlign:"right",color:"#A32D2D",fontWeight:700,fontSize:10}}>Amount</th>
               </tr></thead>
               <tbody>
-                {[["Provident Fund",emp.pf],["ESI",emp.esi],["Income Tax (TDS)",emp.tds]].map(([l,v],i)=>(
+                {[["Provident Fund",slip.empPF],["ESI",slip.empESI],["Professional Tax",slip.profTax],...(slip.lwpDed>0?[["LWP Deduction",slip.lwpDed]]:[]),["Income Tax (TDS)",slip.tds]].map(([l,v],i)=>(
                   <tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}>
                     <td style={{padding:"6px 10px",color:"#384677"}}>{l}</td>
                     <td style={{padding:"6px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{v>0?c+v.toLocaleString():"—"}</td>
@@ -1358,9 +1367,10 @@ export function HrPayslips({branch}){
             {c}{net.toLocaleString()}
           </p>
         </div>
+        </>)}
 
         {/* Footer */}
-        <div style={{padding:"12px 24px",borderTop:"1px solid #cdd1d8",
+        {slip&&<div style={{padding:"12px 24px",borderTop:"1px solid #cdd1d8",
           display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <p style={{margin:0,fontSize:9.5,color:"#bfc3d6"}}>
             This is a computer-generated payslip. No signature required.
@@ -1375,7 +1385,7 @@ export function HrPayslips({branch}){
           }} style={{...btnG,fontSize:11,display:"flex",alignItems:"center",gap:5}}>
             <Download size={13}/> Download Payslip
           </button>
-        </div>
+        </div>}
       </div>
     </div>
   );
@@ -1751,41 +1761,54 @@ export function PfEsiChallan({branch}){
   const MONTHS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
   const [month,setMonth]=useState(MONTHS[0].v);
   const [tab,setTab]=useState("pf"); // pf | esi | pt
-  /* Live, branch-scoped employees; PF/ESI/PT challans are computed from each
-     employee's salary structure. */
-  const emps=((useMasterList('employees', {branch:brCode}).data)||[]).map(fromEmpDTO);
-  const gross=e=>e.basic+e.hra+e.da+e.travel+e.medical;
+  /* Server-side payroll register for this branch × month (persisted lines when
+     the run is processed, else a live preview): the challan figures mirror the
+     payroll register — never a second client-side computation with its own rates. */
+  const regC=usePayrollRegister(brCode,month);
+  const lines=regC.rows;
+  const rates=regC.rates;
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
-  const dueYear=parseInt(month.slice(0,4),10), dueMonRaw=parseInt(month.slice(5),10)+1;
-  const dueYr=dueMonRaw>12?dueYear+1:dueYear, dueMon=dueMonRaw>12?1:dueMonRaw;
-  const DUE_DATE=dueYr+"-"+String(dueMon).padStart(2,"0")+"-15";
+  const DUE_DATE=challanDueDate(month);
 
-  // PF data
-  const pfData=emps.map((e,i)=>({
+  // PF register rows (UAN/ESIC numbers aren't on the employee master yet — display placeholders)
+  const pfData=lines.map((e,i)=>({
     name:e.name,uan:"100"+String(i+123456789).slice(-9),
-    basic:e.basic,empPF:Math.round(e.basic*0.12),emplPF:Math.round(e.basic*0.12),
-    empEPS:Math.round(Math.min(e.basic,15000)*0.0833),emplEPS:Math.round(Math.min(e.basic,15000)*0.0833),
+    basic:e.basic,empPF:e.empPF,emplPF:e.empPFr,empEPS:e.eps,emplEPS:e.eps,
   }));
-  const totEmpPF=pfData.reduce((s,e)=>s+e.empPF,0);
-  const totEmplPF=pfData.reduce((s,e)=>s+e.emplPF,0);
-  const totEPS=pfData.reduce((s,e)=>s+e.emplEPS,0);
+  const totEmpPF=regC.totals.empPF;
+  const totEmplPF=regC.totals.empPFr;
+  const totEPS=regC.totals.eps;
   const totalPFChallan=totEmpPF+totEmplPF;
 
-  // ESI data
-  const esiEmps=emps.filter(e=>gross(e)<=21000);
-  const esiData=esiEmps.map((e,i)=>({
+  // ESI register rows (server-side eligibility: gross ≤ configured ceiling)
+  const esiData=lines.filter(e=>e.esiEligible).map((e,i)=>({
     name:e.name,esic:"31"+String(i+10000000).slice(-8),
-    gross:gross(e),empESI:Math.round(gross(e)*0.0075),emplESI:Math.round(gross(e)*0.0325),
+    gross:e.gross,empESI:e.empESI,emplESI:e.empESIr,
   }));
-  const totEmpESI=esiData.reduce((s,e)=>s+e.empESI,0);
-  const totEmplESI=esiData.reduce((s,e)=>s+e.emplESI,0);
+  const totEmpESI=regC.totals.empESI;
+  const totEmplESI=regC.totals.empESIr;
 
-  // PT data (Maharashtra)
-  const ptData=emps.filter(e=>gross(e)>10000).map(e=>({name:e.name,gross:gross(e),pt:200}));
-  const totPT=ptData.reduce((s,e)=>s+e.pt,0);
+  // PT register rows (configured slab, applied server-side)
+  const ptData=lines.filter(e=>e.profTax>0).map(e=>({name:e.name,gross:e.gross,pt:e.profTax}));
+  const totPT=regC.totals.profTax;
 
-  const [challanPF,setChallanPF]=useState({bsr:"",date:"",trn:"",status:"Pending"});
-  const [challanESI,setChallanESI]=useState({bsr:"",date:"",trn:"",status:"Pending"});
+  /* PERSISTED challan payment records — "Mark Paid" upserts one record per
+     (month, branch, type) via PUT /api/payroll-runs/challans; the local state
+     below is just the entry form, hydrated from the saved record. */
+  const challansQ=useChallans(brCode,month);
+  const markPaid=useMarkChallanPaid();
+  const savedPF=challansQ.byType.PF||null;
+  const savedESI=challansQ.byType.ESI||null;
+  const [challanPF,setChallanPF]=useState({bsr:"",date:"",trn:""});
+  const [challanESI,setChallanESI]=useState({bsr:"",date:"",trn:""});
+  React.useEffect(()=>{ setChallanPF({bsr:savedPF?.bsr||"",date:savedPF?.paidDate||"",trn:savedPF?.trn||""}); },[savedPF?.id,savedPF?.updatedAt,month,brCode]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(()=>{ setChallanESI({bsr:savedESI?.bsr||"",date:savedESI?.paidDate||"",trn:savedESI?.trn||""}); },[savedESI?.id,savedESI?.updatedAt,month,brCode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const recordChallan=(type,form,amount)=>{
+    if(markPaid.isPending) return;
+    markPaid.mutate({month,branch:brCode,type,bsr:form.bsr,trn:form.trn,paidDate:form.date,amount:Math.round(amount),status:"Paid"},{
+      onSuccess:()=>toast(`${type} challan marked paid — ${month}`),
+      onError:e=>toast(e?.message||"Could not record challan payment","error")});
+  };
 
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
@@ -1837,7 +1860,11 @@ export function PfEsiChallan({branch}){
                 <th key={i} style={{padding:"8px 12px",textAlign:i>=2?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{pfData.map((e,i)=>(
+            <tbody>{pfData.length===0&&(
+              <tr><td colSpan={7} style={{padding:"20px",textAlign:"center",color:"#5a6691",fontSize:11}}>
+                {regC.isLoading?"Loading payroll register…":"No payroll lines for this month — add employees or process the run."}
+              </td></tr>
+            )}{pfData.map((e,i)=>(
               <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                 <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{e.name}</td>
                 <td style={{padding:"7px 12px",fontFamily:"monospace",fontSize:10,color:"#5a6691"}}>{e.uan}</td>
@@ -1856,16 +1883,16 @@ export function PfEsiChallan({branch}){
               <td style={{padding:"8px 12px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totalPFChallan)}</td>
             </tr></tfoot>
           </table>
-          {/* Challan entry */}
+          {/* Challan entry — persisted per (month, branch, type) */}
           <div style={{padding:"12px 14px",background:"#f9fafb",borderTop:"1px solid #cdd1d8"}}>
             <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Record PF Challan Payment</p>
             <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
               <FL label="BSR Code"><input value={challanPF.bsr} onChange={e=>setChallanPF(c=>({...c,bsr:e.target.value}))} style={{...inp,fontFamily:"monospace",width:120}} placeholder="0600115"/></FL>
               <FL label="Challan Date"><input type="date" value={challanPF.date} onChange={e=>setChallanPF(c=>({...c,date:e.target.value}))} style={{...inp,width:150}}/></FL>
               <FL label="TRN / Ref No."><input value={challanPF.trn} onChange={e=>setChallanPF(c=>({...c,trn:e.target.value}))} style={{...inp,fontFamily:"monospace",width:160}} placeholder="CRN123456"/></FL>
-              <button onClick={()=>setChallanPF(c=>({...c,status:"Paid"}))} style={{...btnG,background:"#27500A",fontSize:11,marginBottom:4}}>✔ Mark PF Paid — {f(totalPFChallan)}</button>
+              <button onClick={()=>recordChallan("PF",challanPF,totalPFChallan)} disabled={markPaid.isPending} style={{...btnG,background:"#27500A",fontSize:11,marginBottom:4}}>{markPaid.isPending?"Saving…":`✔ Mark PF Paid — ${f(totalPFChallan)}`}</button>
             </div>
-            {challanPF.status==="Paid"&&<p style={{margin:"8px 0 0",fontSize:11,color:"#27500A",fontWeight:700}}>✅ PF Challan marked as paid · BSR {challanPF.bsr} · {challanPF.date}</p>}
+            {savedPF?.status==="Paid"&&<p style={{margin:"8px 0 0",fontSize:11,color:"#27500A",fontWeight:700}}>✅ PF Challan marked as paid · BSR {savedPF.bsr||"—"} · {savedPF.paidDate||"—"} · {f(savedPF.amount||0)}</p>}
           </div>
         </div>
       )}
@@ -1873,7 +1900,7 @@ export function PfEsiChallan({branch}){
       {tab==="esi"&&(
         <div style={{...card,borderTop:"none",borderRadius:"0 0 9px 9px",padding:0,overflow:"hidden"}}>
           <div style={{padding:"10px 14px",background:"#EAF3DE",borderBottom:"1px solid #C0DD97",fontSize:10.5,color:"#27500A"}}>
-            ESI applicable for employees with gross salary ≤ ₹21,000/month. Employee: 0.75% · Employer: 3.25% · Due by 15th of following month
+            ESI applicable for employees with gross salary ≤ ₹{Number(rates?.esi?.grossCeiling??21000).toLocaleString("en-IN")}/month. Employee: {rates?.esi?.employeePct??0.75}% · Employer: {rates?.esi?.employerPct??3.25}% · Due by 15th of following month
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead><tr style={{background:"#0d1326"}}>
@@ -1891,7 +1918,7 @@ export function PfEsiChallan({branch}){
                 <td style={{padding:"7px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(e.empESI+e.emplESI)}</td>
               </tr>
             ))}
-            {esiData.length===0&&<tr><td colSpan={6} style={{padding:"20px",textAlign:"center",color:"#5a6691"}}>No employees eligible for ESI (all earning &gt;₹21,000)</td></tr>}
+            {esiData.length===0&&<tr><td colSpan={6} style={{padding:"20px",textAlign:"center",color:"#5a6691"}}>No employees eligible for ESI (all earning &gt;₹{Number(rates?.esi?.grossCeiling??21000).toLocaleString("en-IN")})</td></tr>}
             </tbody>
             <tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
               <td colSpan={3} style={{padding:"8px 12px",fontWeight:700,color:"#d4a437",fontSize:11}}>TOTAL ESI CHALLAN</td>
@@ -1900,13 +1927,24 @@ export function PfEsiChallan({branch}){
               <td style={{padding:"8px 12px",textAlign:"right",fontWeight:800,color:"#d4a437",fontVariantNumeric:"tabular-nums"}}>{f(totEmpESI+totEmplESI)}</td>
             </tr></tfoot>
           </table>
+          {/* Challan entry — persisted per (month, branch, type) */}
+          <div style={{padding:"12px 14px",background:"#f9fafb",borderTop:"1px solid #cdd1d8"}}>
+            <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Record ESI Challan Payment</p>
+            <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
+              <FL label="BSR Code"><input value={challanESI.bsr} onChange={e=>setChallanESI(c=>({...c,bsr:e.target.value}))} style={{...inp,fontFamily:"monospace",width:120}} placeholder="0600115"/></FL>
+              <FL label="Challan Date"><input type="date" value={challanESI.date} onChange={e=>setChallanESI(c=>({...c,date:e.target.value}))} style={{...inp,width:150}}/></FL>
+              <FL label="TRN / Ref No."><input value={challanESI.trn} onChange={e=>setChallanESI(c=>({...c,trn:e.target.value}))} style={{...inp,fontFamily:"monospace",width:160}} placeholder="CRN123456"/></FL>
+              <button onClick={()=>recordChallan("ESI",challanESI,totEmpESI+totEmplESI)} disabled={markPaid.isPending} style={{...btnG,background:"#27500A",fontSize:11,marginBottom:4}}>{markPaid.isPending?"Saving…":`✔ Mark ESI Paid — ${f(totEmpESI+totEmplESI)}`}</button>
+            </div>
+            {savedESI?.status==="Paid"&&<p style={{margin:"8px 0 0",fontSize:11,color:"#27500A",fontWeight:700}}>✅ ESI Challan marked as paid · BSR {savedESI.bsr||"—"} · {savedESI.paidDate||"—"} · {f(savedESI.amount||0)}</p>}
+          </div>
         </div>
       )}
 
       {tab==="pt"&&(
         <div style={{...card,borderTop:"none",borderRadius:"0 0 9px 9px",padding:0,overflow:"hidden"}}>
           <div style={{padding:"10px 14px",background:"#E6F1FB",borderBottom:"1px solid #B5D4F4",fontSize:10.5,color:"#185FA5"}}>
-            Professional Tax (Maharashtra): ₹200/month for employees earning &gt;₹10,000 · Paid to state govt via mahagst.gov.in · Monthly challan
+            Professional Tax (Maharashtra) slab: {(rates?.pt?.slabs||[]).slice().reverse().map(s=>`>₹${Number(s.above).toLocaleString("en-IN")} → ₹${s.amount}`).join(" · ")||"—"} · Paid to state govt via mahagst.gov.in · Monthly challan
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
             <thead><tr style={{background:"#0d1326"}}>{["Employee","Gross Salary","PT Applicable","PT Amount"].map((h,i)=><th key={i} style={{padding:"8px 12px",textAlign:i>=1?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>)}</tr></thead>
@@ -2182,7 +2220,50 @@ export function EmployeeMasterTabbed(){
    ════════════════════════════════════════════════════════════════════ */
 
 
+/* ── Self-service identity gate ────────────────────────────────────
+   Every self-service page (/hr/portal, /hr/leave-apply, /hr/my-payslip,
+   /hr/form-16) resolves the LOGGED-IN user's employee record via useMyEmployee
+   (localStorage 'kb360-user' email ⇄ employee master email, case-insensitive).
+   No match → this empty state — NEVER demo data. `children` is a render-prop
+   that receives the resolved employee. */
+function SelfServiceGate({title,subtitle,my,children}){
+  if(my.isLoading) return (
+    <PHASE2_Page title={title} subtitle={subtitle}>
+      <div style={{padding:"48px 16px",textAlign:"center",color:"#8b94b3",fontSize:13}}>Loading your employee profile…</div>
+    </PHASE2_Page>
+  );
+  if(!my.employee) return (
+    <PHASE2_Page title={title} subtitle={subtitle}>
+      <div style={{maxWidth:540,margin:"40px auto",padding:"28px 26px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:10,textAlign:"center"}}>
+        <p style={{margin:0,fontSize:34}}>🪪</p>
+        {my.isError?(<>
+          <p style={{margin:"12px 0 6px",fontSize:14,fontWeight:700,color:"#0d1326"}}>Couldn't load the employee list</p>
+          <p style={{margin:0,fontSize:12,color:"#5a6691",lineHeight:1.6}}>Please try again in a moment.</p>
+        </>):(<>
+          <p style={{margin:"12px 0 6px",fontSize:14,fontWeight:700,color:"#0d1326"}}>Your login isn't linked to an employee profile</p>
+          <p style={{margin:0,fontSize:12,color:"#5a6691",lineHeight:1.6}}>
+            Ask HR to add your email{my.email?<> (<b>{my.email}</b>)</>:""} to your employee record in the Employee Master.
+          </p>
+        </>)}
+      </div>
+    </PHASE2_Page>
+  );
+  return children(my.employee);
+}
+
+const SS_MONTH_LABEL=m=>m?new Date(m+"-01T00:00:00").toLocaleString("en",{month:"short",year:"numeric"}):"—";
+const SS_DEFAULT_ENT={annual:18,sick:12,casual:6};
+
 export function HRPortal({setRoute}){
+  const my=useMyEmployee();
+  return (
+    <SelfServiceGate title="Employee Self-Service Portal" subtitle="" my={my}>
+      {(emp)=><HRPortalBody emp={emp} setRoute={setRoute}/>}
+    </SelfServiceGate>
+  );
+}
+
+function HRPortalBody({emp,setRoute}){
   const tiles=[
     {icon:"📋",title:"Leave Application",sub:"Apply / check balance",route:"/hr/leave-apply",color:"#3b82f6"},
     {icon:"💰",title:"Reimbursement Claim",sub:"Submit expense claims",route:"/hr/reimbursement",color:"#22c55e"},
@@ -2193,11 +2274,23 @@ export function HRPortal({setRoute}){
     {icon:"🔄",title:"360° Feedback",sub:"Give & receive feedback",route:"/hr/feedback-360",color:"#A32D2D"},
     {icon:"🎓",title:"Skill Matrix",sub:"My skills & development",route:"/hr/skills",color:"#2F7A8E"},
   ];
+  /* MY quick stats — all from live sources scoped to the resolved employee.
+     (Claims and tax declarations have no data source yet → honest "None yet".) */
+  const year=String(new Date().getFullYear());
+  const myReqs=((useMasterList('leave-requests',{empId:emp.id}).data)||[]).map(fromLeaveDTO);
+  const ent=(((useMasterList('leave-balances',{year}).data)||[]).map(fromLeaveBalanceDTO).find(b=>b.empId===emp.id))||SS_DEFAULT_ENT;
+  const taken=takenFor(myReqs,emp.id,year);
+  const remaining=(ent.annual-taken.annual)+(ent.sick-taken.sick)+(ent.casual-taken.casual);
+  const pendingCount=myReqs.filter(r=>r.status==="Pending").length;
+  const lastSlip=usePayslips(emp.id).slips[0]||null;
   return(
-    <PHASE2_Page title="Employee Self-Service Portal" subtitle="">
+    <PHASE2_Page title="Employee Self-Service Portal" subtitle={`${emp.name} (${emp.id}) · ${emp.branch}${emp.desig?` · ${emp.desig}`:""}`}>
       {/* Quick stats */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:18}}>
-        {[{l:"Leave Balance",v:"7 days",c:"#22c55e"},{l:"Pending Claims",v:"₹1,240",c:"#f97316"},{l:"Last Payslip",v:"Apr 2026",c:"#d4a437"},{l:"Tax Declared",v:"₹2,44,600",c:"#6B4C8B"}].map(k=>(
+        {[{l:"Leave Balance",v:`${remaining} days`,c:"#22c55e"},
+          {l:"Pending Leave Requests",v:String(pendingCount),c:"#f97316"},
+          {l:"Last Payslip",v:lastSlip?SS_MONTH_LABEL(lastSlip.month):"None yet",c:"#d4a437"},
+          {l:"Pending Claims",v:"None yet",c:"#6B4C8B"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"5px 0 0",fontSize:20,fontWeight:700,color:"#0d1326"}}>{k.v}</p></div>
         ))}
       </div>
@@ -2219,25 +2312,58 @@ export function HRPortal({setRoute}){
    ════════════════════════════════════════════════════════════════════ */
 
 export function LeaveApply(){
+  const my=useMyEmployee();
+  return (
+    <SelfServiceGate title="Leave Application" subtitle="Apply for leave" my={my}>
+      {(emp)=><LeaveApplyBody emp={emp}/>}
+    </SelfServiceGate>
+  );
+}
+
+function LeaveApplyBody({emp}){
   const [type,setType]=useState("Casual Leave");
-  const [from,setFrom]=useState("2026-06-02");
-  const [to,setTo]=useState("2026-06-03");
+  const [from,setFrom]=useState(todayISO());
+  const [to,setTo]=useState(todayISO());
   const [reason,setReason]=useState("");
   const [submitted,setSubmitted]=useState(false);
   const inp={padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:12.5,width:"100%"};
-  const days=Math.max(1,Math.round((new Date(to)-new Date(from))/86400000)+1);
-  const balances=[{type:"Casual Leave",balance:4},{type:"Sick Leave",balance:8},{type:"Earned Leave",balance:7},{type:"LOP",balance:null}];
+  const days=leaveDays(from,to);
+
+  /* MY live balances + history: entitlement master − approved requests this
+     year (same derivation as HrLeave's Balances tab, scoped to me). */
+  const year=String(new Date().getFullYear());
+  const reqQ=useMasterList('leave-requests',{empId:emp.id});
+  const myReqs=((reqQ.data)||[]).map(fromLeaveDTO);
+  const ent=(((useMasterList('leave-balances',{year}).data)||[]).map(fromLeaveBalanceDTO).find(b=>b.empId===emp.id))||SS_DEFAULT_ENT;
+  const taken=takenFor(myReqs,emp.id,year);
+  const balances=[
+    {type:"Annual Leave",balance:ent.annual-taken.annual,ent:ent.annual},
+    {type:"Sick Leave",balance:ent.sick-taken.sick,ent:ent.sick},
+    {type:"Casual Leave",balance:ent.casual-taken.casual,ent:ent.casual},
+    {type:"LWP",balance:null},
+  ];
   const bal=balances.find(b=>b.type===type);
-  const MY_LEAVE_HISTORY=[];
+  const history=myReqs.slice().sort((a,b)=>String(b.from).localeCompare(String(a.from)));
+  const HIST_CLR={Pending:{bg:"#fff3cd",c:"#856404"},Approved:{bg:"#d4edda",c:"#155724"},Rejected:{bg:"#f8d7da",c:"#721c24"},Cancelled:{bg:"#f3f4f8",c:"#5a6691"}};
+
+  /* Submit a REAL request to /api/leave-requests, attributed to the resolved
+     employee — it lands in HR's Leave Management queue as Pending. */
+  const {create}=useMasterMutations('leave-requests');
+  const submit=()=>{
+    if(!reason.length||create.isPending) return;
+    create.mutate(toLeavePayload({empId:emp.id,empName:emp.name,branch:emp.branch,type,from,to,days,reason,status:"Pending"}),{
+      onSuccess:()=>{setSubmitted(true);setReason("");},
+      onError:e=>toast(e?.message||"Could not submit leave request","error")});
+  };
   return(
-    <PHASE2_Page title="Leave Application" subtitle="Apply for leave">
+    <PHASE2_Page title="Leave Application" subtitle={`Apply for leave · ${emp.name} (${emp.id}) · ${emp.branch}`}>
       <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14}}>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {submitted?(
             <div style={{padding:24,background:"#d4edda",border:"1px solid #bbf7d0",borderRadius:8,textAlign:"center"}}>
               <p style={{margin:0,fontSize:32}}>✅</p>
               <p style={{margin:"10px 0 4px",fontSize:15,fontWeight:700,color:"#155724"}}>Leave application submitted!</p>
-              <p style={{margin:0,fontSize:12,color:"#155724"}}>Awaiting approval · You'll receive an email notification</p>
+              <p style={{margin:0,fontSize:12,color:"#155724"}}>Sent to HR's Leave Management queue · Awaiting approval</p>
               <button onClick={()=>setSubmitted(false)} style={{marginTop:14,padding:"8px 18px",background:"#155724",color:"#fff",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>Apply Another</button>
             </div>
           ):(
@@ -2256,16 +2382,19 @@ export function LeaveApply(){
                   {bal?.balance==null&&<span style={{color:"#5a6691"}}>LOP — salary deducted</span>}
                 </div>
                 <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Reason</label><textarea value={reason} onChange={e=>setReason(e.target.value)} rows={3} style={{...inp,fontFamily:"inherit",resize:"vertical"}} placeholder="Brief reason for leave…"/></div>
-                <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Backup arrangement (who will cover)</label><input style={inp} placeholder="Who will cover"/></div>
-                <button onClick={()=>reason.length>0&&setSubmitted(true)} style={{padding:"10px",background:reason.length>0?"#d4a437":"#e1e3ec",color:reason.length>0?"#0d1326":"#5a6691",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:reason.length>0?"pointer":"not-allowed"}}>Submit Application</button>
+                <button onClick={submit} disabled={create.isPending} style={{padding:"10px",background:reason.length>0?"#d4a437":"#e1e3ec",color:reason.length>0?"#0d1326":"#5a6691",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:reason.length>0?"pointer":"not-allowed"}}>{create.isPending?"Submitting…":"Submit Application"}</button>
               </div>
             </div>
           )}
           <div style={cardStyle}>
-            <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>Leave History</p>
+            <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>My Leave History</p>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
               <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Dates</th><th style={RPT_thStyle}>Type</th><th style={{...RPT_thStyle,textAlign:"center"}}>Days</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-              <tbody>{MY_LEAVE_HISTORY.map((h,i)=>(<tr key={i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{...RPT_tdStyle,fontSize:10.5}}>{h.dates}</td><td style={RPT_tdStyle}>{h.type}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{h.days}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 7px",background:"#d4edda",color:"#155724",borderRadius:3,fontSize:10,fontWeight:700}}>{h.status}</span></td></tr>))}</tbody>
+              <tbody>{history.length===0&&(
+                <tr><td colSpan={4} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3",padding:"16px 8px"}}>{reqQ.isLoading?"Loading…":"No leave requests yet."}</td></tr>
+              )}{history.map((h,i)=>{const sc=HIST_CLR[h.status]||HIST_CLR.Pending;return(
+                <tr key={h.id||i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{...RPT_tdStyle,fontSize:10.5}}>{h.from} → {h.to}</td><td style={RPT_tdStyle}>{h.type}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{h.days}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 7px",background:sc.bg,color:sc.c,borderRadius:3,fontSize:10,fontWeight:700}}>{h.status}</span></td></tr>
+              );})}</tbody>
             </table>
           </div>
         </div>
@@ -2278,7 +2407,7 @@ export function LeaveApply(){
                   <span style={{fontSize:11.5,color:"#0d1326"}}>{b.type}</span>
                   <span style={{fontSize:12,fontWeight:700,color:"#0d1326"}}>{b.balance} days</span>
                 </div>
-                <div style={{height:6,background:"#f0f2f7",borderRadius:3}}><div style={{height:"100%",width:(b.balance/12*100)+"%",background:b.balance<=2?"#A32D2D":b.balance<=5?"#d4a437":"#22c55e",borderRadius:3}}/></div>
+                <div style={{height:6,background:"#f0f2f7",borderRadius:3}}><div style={{height:"100%",width:Math.max(0,Math.min(100,(b.balance/(b.ent||12))*100))+"%",background:b.balance<=2?"#A32D2D":b.balance<=5?"#d4a437":"#22c55e",borderRadius:3}}/></div>
               </div>
             ))}
           </div>
@@ -2364,27 +2493,49 @@ export function ReimbursementClaim(){
    ════════════════════════════════════════════════════════════════════ */
 
 export function MyPayslip(){
-  const [selMonth,setSelMonth]=useState("April 2026");
-  const months=["May 2026","April 2026","March 2026","February 2026","January 2026","December 2025","November 2025","October 2025"];
-  const d=MY_PAYSLIP_DATA;
-  const totalEarnings=d.earnings.reduce((s,e)=>s+e.amount,0);
-  const totalDeductions=d.deductions.reduce((s,e)=>s+e.amount,0);
-  const netPay=totalEarnings-totalDeductions;
+  const my=useMyEmployee();
+  return (
+    <SelfServiceGate title="My Payslip" subtitle="View and download your monthly salary statement" my={my}>
+      {(emp)=><MyPayslipBody emp={emp}/>}
+    </SelfServiceGate>
+  );
+}
+
+function MyPayslipBody({emp}){
+  /* MY persisted payslips (server-side payroll engine) — months offered are the
+     months actually processed; nothing is recomputed or invented here. */
+  const {slips,isLoading}=usePayslips(emp.id);
+  const [selMonth,setSelMonth]=useState("");
+  const months=slips.map(s=>s.month);
+  const curMonth=months.includes(selMonth)?selMonth:months[0]||"";
+  const slip=slips.find(s=>s.month===curMonth)||null;
+  const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{entity:"Travkings Tours & Travels"};
+  const earnings=slip?[["Basic Salary",slip.basic],["HRA",slip.hra],["Dearness Allowance",slip.da],["Travel Allowance",slip.travel],["Medical Allowance",slip.medical]]:[];
+  const deductions=slip?[["Provident Fund",slip.empPF],["ESI",slip.empESI],["Professional Tax",slip.profTax],...(slip.lwpDed>0?[["LWP Deduction",slip.lwpDed]]:[]),["Income Tax (TDS)",slip.tds]]:[];
   return(
-    <PHASE2_Page title="My Payslip" subtitle="View and download your monthly salary statement"
-      toolbar={<><select value={selMonth} onChange={e=>setSelMonth(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{months.map(m=><option key={m}>{m}</option>)}</select><button onClick={()=>openPrintPreview({ selector:'main', title:'Payslip', recommend:'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button></>}>
+    <PHASE2_Page title="My Payslip" subtitle={`${emp.name} (${emp.id}) · ${emp.branch}`}
+      toolbar={<><select value={curMonth} onChange={e=>setSelMonth(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{months.length===0&&<option value="">No payslips</option>}{months.map(m=><option key={m} value={m}>{SS_MONTH_LABEL(m)}</option>)}</select>{slip&&<button onClick={()=>openPrintPreview({ selector:'main', title:'Payslip', recommend:'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button>}</>}>
       <div style={{maxWidth:680,margin:"0 auto"}}>
+        {!slip?(
+          <div style={{padding:"48px 24px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,textAlign:"center",color:"#8b94b3",fontSize:12.5}}>
+            {isLoading?"Loading your payslips…":(<>
+              <p style={{margin:0,fontSize:30}}>🧾</p>
+              <p style={{margin:"10px 0 4px",fontSize:13.5,fontWeight:700,color:"#0d1326"}}>No payslips yet</p>
+              <p style={{margin:0,lineHeight:1.6}}>Payslips appear here after HR processes payroll for your branch.</p>
+            </>)}
+          </div>
+        ):(
         <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
           {/* Header */}
           <div style={{padding:"18px 22px",background:"#0d1326",color:"#fff"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-              <div><p style={{margin:0,fontSize:18,fontWeight:700,color:"#d4a437",letterSpacing:"0.5px"}}>Travkings Tours & Travels Pvt. Ltd.</p><p style={{margin:"3px 0 0",fontSize:11,color:"#5a6691"}}>Lower Parel, Mumbai · IATA Accredited</p></div>
-              <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:14,fontWeight:700}}>Payslip</p><p style={{margin:"2px 0 0",fontSize:12,color:"#d4a437"}}>{selMonth}</p></div>
+              <div><p style={{margin:0,fontSize:18,fontWeight:700,color:"#d4a437",letterSpacing:"0.5px"}}>{brCfg.entity||"Travkings Tours & Travels"}</p><p style={{margin:"3px 0 0",fontSize:11,color:"#5a6691"}}>{emp.branch} branch</p></div>
+              <div style={{textAlign:"right"}}><p style={{margin:0,fontSize:14,fontWeight:700}}>Payslip</p><p style={{margin:"2px 0 0",fontSize:12,color:"#d4a437"}}>{SS_MONTH_LABEL(curMonth)}</p></div>
             </div>
           </div>
           {/* Employee info */}
           <div style={{padding:"14px 22px",background:"#fafbfd",borderBottom:"1px solid #cdd1d8",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:11.5}}>
-            {[{l:"Employee",v:d.employee},{l:"Employee ID",v:d.empId},{l:"Branch",v:d.branch},{l:"Department",v:d.dept}].map(f=>(
+            {[{l:"Employee",v:emp.name},{l:"Employee ID",v:emp.id},{l:"Branch",v:emp.branch},{l:"Department",v:emp.dept||"—"}].map(f=>(
               <div key={f.l} style={{display:"flex",gap:8}}><span style={{color:"#5a6691",minWidth:90}}>{f.l}:</span><b>{f.v}</b></div>
             ))}
           </div>
@@ -2392,35 +2543,126 @@ export function MyPayslip(){
           <div style={{padding:"0 22px",display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #cdd1d8"}}>
             <div style={{paddingRight:16,borderRight:"1px solid #cdd1d8"}}>
               <p style={{margin:"12px 0 8px",fontSize:11,fontWeight:700,color:"#155724",textTransform:"uppercase",letterSpacing:"0.4px"}}>Earnings</p>
-              {d.earnings.map(e=>(
-                <div key={e.desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
-                  <span style={{color:"#0d1326"}}>{e.desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>₹{e.amount.toLocaleString("en-IN")}</span>
+              {earnings.map(([desc,amount])=>(
+                <div key={desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
+                  <span style={{color:"#0d1326"}}>{desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>₹{Number(amount).toLocaleString("en-IN")}</span>
                 </div>
               ))}
               <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:"2px solid #0d1326",marginTop:4,fontWeight:700}}>
-                <span>Gross Earnings</span><span style={{fontFamily:"monospace",color:"#22c55e"}}>₹{totalEarnings.toLocaleString("en-IN")}</span>
+                <span>Gross Earnings</span><span style={{fontFamily:"monospace",color:"#22c55e"}}>₹{Number(slip.gross).toLocaleString("en-IN")}</span>
               </div>
             </div>
             <div style={{paddingLeft:16}}>
               <p style={{margin:"12px 0 8px",fontSize:11,fontWeight:700,color:"#A32D2D",textTransform:"uppercase",letterSpacing:"0.4px"}}>Deductions</p>
-              {d.deductions.map(e=>(
-                <div key={e.desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
-                  <span style={{color:"#0d1326"}}>{e.desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>₹{e.amount.toLocaleString("en-IN")}</span>
+              {deductions.map(([desc,amount])=>(
+                <div key={desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
+                  <span style={{color:"#0d1326"}}>{desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>₹{Number(amount).toLocaleString("en-IN")}</span>
                 </div>
               ))}
               <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:"2px solid #0d1326",marginTop:4,fontWeight:700}}>
-                <span>Total Deductions</span><span style={{fontFamily:"monospace",color:"#A32D2D"}}>₹{totalDeductions.toLocaleString("en-IN")}</span>
+                <span>Total Deductions</span><span style={{fontFamily:"monospace",color:"#A32D2D"}}>₹{Number(slip.totalDeductions).toLocaleString("en-IN")}</span>
               </div>
             </div>
           </div>
           {/* Net pay */}
           <div style={{padding:"16px 22px",background:"#fff8e8",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div><p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Net Pay</p><p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>Credited to HDFC ...4321 on 1st May 2026</p></div>
-            <p style={{margin:0,fontSize:26,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>₹{netPay.toLocaleString("en-IN")}</p>
+            <div><p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Net Pay</p><p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>{SS_MONTH_LABEL(curMonth)} · {emp.branch}</p></div>
+            <p style={{margin:0,fontSize:26,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>₹{Number(slip.net).toLocaleString("en-IN")}</p>
           </div>
         </div>
+        )}
       </div>
     </PHASE2_Page>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   4b. FORM 16 — SELF-SERVICE (scoped to the logged-in employee)
+   Replaces the demo Form16Generator on /hr/form-16: every figure below is a
+   sum over MY persisted payroll register lines for the chosen FY. What Books
+   does not have (TRACES Part A, Chapter VI-A declarations) is said outright.
+   ════════════════════════════════════════════════════════════════════ */
+
+export function MyForm16(){
+  const my=useMyEmployee();
+  return (
+    <SelfServiceGate title="Form 16 — My TDS Summary" subtitle="Salary & TDS drawn from processed payroll runs" my={my}>
+      {(emp)=><MyForm16Body emp={emp}/>}
+    </SelfServiceGate>
+  );
+}
+
+function MyForm16Body({emp}){
+  const {slips,isLoading}=usePayslips(emp.id);
+  const fys=[...new Set(slips.map(s=>fyOfMonth(s.month)))];
+  const [selFy,setSelFy]=useState("");
+  const fy=fys.includes(selFy)?selFy:fys[0]||"";
+  const sum=form16Summary(slips,fy);
+  const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{entity:"Travkings Tours & Travels"};
+  const rows=[
+    {desc:`Gross Salary (${sum.months} processed month${sum.months===1?"":"s"})`,amount:sum.gross,bold:true},
+    {desc:"Provident Fund deducted (employee share)",amount:sum.pf},
+    {desc:"Professional Tax deducted",amount:sum.profTax},
+    {desc:"Total TDS deducted on salary",amount:sum.tds,bold:true},
+    {desc:"Net salary paid",amount:sum.net,bold:true},
+  ];
+  return(
+    <PHASE2_Page title="Form 16 — My TDS Summary" subtitle={`${emp.name} (${emp.id}) · ${emp.branch}`}
+      toolbar={<>{fys.length>0&&<select value={fy} onChange={e=>setSelFy(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{fys.map(o=><option key={o} value={o}>FY {o}</option>)}</select>}{sum.months>0&&<button onClick={()=>openPrintPreview({ selector:'main', title:'Form 16 Summary', recommend:'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download</button>}</>}>
+      <div style={{maxWidth:720,margin:"0 auto"}}>
+        {!isLoading&&sum.months===0?(
+          <div style={{padding:"48px 24px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,textAlign:"center",color:"#8b94b3",fontSize:12.5}}>
+            <p style={{margin:0,fontSize:30}}>📃</p>
+            <p style={{margin:"10px 0 4px",fontSize:13.5,fontWeight:700,color:"#0d1326"}}>No processed payroll data yet</p>
+            <p style={{margin:0,lineHeight:1.6}}>Form 16 figures appear here once payroll runs have been processed for you.</p>
+          </div>
+        ):(
+        <div style={{background:"#fff",border:"2px solid #0d1326",borderRadius:6,overflow:"hidden",fontSize:12}}>
+          <div style={{padding:"12px 20px",background:"#0d1326",color:"#fff",textAlign:"center"}}>
+            <p style={{margin:0,fontSize:14,fontWeight:700,letterSpacing:"1px"}}>FORM 16 — SALARY &amp; TDS SUMMARY</p>
+            <p style={{margin:"3px 0 0",fontSize:11,color:"#d4a437"}}>From processed payroll runs · FY {fy}</p>
+          </div>
+          <div style={{padding:"14px 20px",borderBottom:"2px solid #0d1326"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:11.5}}>
+              {[{l:"Employer (Deductor)",v:brCfg.entity||"Travkings Tours & Travels"},{l:"Branch",v:emp.branch},{l:"Employee Name",v:emp.name},{l:"Employee ID",v:emp.id},{l:"Financial Year",v:fy},{l:"Months Processed",v:String(sum.months)}].map(f=>(
+                <div key={f.l} style={{display:"flex",gap:6,padding:"4px 0",borderBottom:"1px solid #dfe2e7"}}><span style={{color:"#5a6691",minWidth:150}}>{f.l}</span><b>{f.v}</b></div>
+              ))}
+            </div>
+          </div>
+          <div style={{padding:"14px 20px"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <tbody>{rows.map((r,i)=>(
+                <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:r.bold?"#fafbfd":"#fff"}}>
+                  <td style={{padding:"6px 8px",fontWeight:r.bold?700:400}}>{r.desc}</td>
+                  <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"monospace",fontWeight:r.bold?700:400}}>₹{Number(r.amount).toLocaleString("en-IN")}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+            <div style={{marginTop:14,padding:"10px 12px",borderRadius:6,background:"#fff8e8",border:"1px solid #fde68a",fontSize:10.5,color:"#856404",lineHeight:1.6}}>
+              This is a summary computed from your processed payroll register lines in Books — not an issued certificate.
+              Part A (TRACES quarterly TDS certificate), HRA / Chapter VI-A exemptions and the final tax computation are
+              issued by HR and are not available in Books yet.
+            </div>
+          </div>
+        </div>
+        )}
+      </div>
+    </PHASE2_Page>
+  );
+}
+
+/* ── Gratuity Register wrapper (/hr/gratuity) ───────────────────────
+   The provision figure is a CLIENT-SIDE actuarial estimate (Basic+DA × 15/26 ×
+   service years) — it is never journalled, so this wrapper says so before the
+   register renders. */
+export function GratuityEstimateView({branch}){
+  return(
+    <div>
+      <div style={{maxWidth:1100,margin:"12px auto 0",padding:"10px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:11,color:"#854F0B",fontWeight:600,display:"flex",alignItems:"center",gap:8}}>
+        <AlertTriangle size={14} style={{flexShrink:0}}/> View-only actuarial estimate — computed on screen from current Basic+DA and service length. It is NOT posted to the books: no gratuity provision ledger entry exists.
+      </div>
+      <GratuityRegister branch={branch}/>
+    </div>
   );
 }
 
