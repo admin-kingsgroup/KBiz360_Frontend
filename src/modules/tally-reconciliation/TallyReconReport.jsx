@@ -47,8 +47,13 @@ export function TallyReconReport({ branch: appBranch, currentUser, tier: fixedTi
       if (it.cert) certs.push(it);
       const off = snap ? Number(snap.offTotal || 0) : 0;
       const stale = snap ? Number(snap.staleAccepted || 0) : 0;
-      if ((it.ledgers > 0 && st === 'none') || off > 0 || stale > 0) {
-        openItems.push({ ...it, reason: st === 'none' ? 'TB uploaded — no certificate started' : off > 0 ? `${off} ledger(s) off at freeze` : `${stale} accepted variance(s) changed` });
+      // Blockers to certifying (never a locked period — it's done): no cert started,
+      // a re-opened/not-tied period with uploaded ledgers, or a frozen-but-dirty snap.
+      if (st !== 'locked' && ((it.ledgers > 0 && (st === 'none' || st === 'open')) || off > 0 || stale > 0)) {
+        openItems.push({ ...it, reason: st === 'none' ? 'TB uploaded — no certificate started'
+          : off > 0 ? `${off} ledger(s) off at freeze`
+          : stale > 0 ? `${stale} accepted variance(s) changed`
+          : 'not tied — clear the off ledgers' });
       }
     }
     return { pending, certs, openItems };
@@ -96,7 +101,8 @@ export function TallyReconReport({ branch: appBranch, currentUser, tier: fixedTi
                   </tr></thead>
                   <tbody>{pending.map((it) => {
                     const st = it.cert?.status || 'none'; const m = certMeta(st);
-                    const next = st === 'none' ? 'Freeze the tie-out' : st === 'open' ? 'Clear the off ledgers' : st === 'reconciled' ? 'Sign the chain' : `Next signer of ${TALLY_CHAIN.length - (it.cert?.signatures?.length || 0)} left`;
+                    const left = TALLY_CHAIN.length - (it.cert?.signatures?.length || 0);
+                    const next = st === 'none' ? 'Freeze the tie-out' : st === 'open' ? 'Clear the off ledgers' : st === 'reconciled' ? 'Sign the chain' : `${left} signature${left === 1 ? '' : 's'} left`;
                     return (<tr key={it.period} className="border-b border-surface-border hover:bg-surface-alt/60">
                       <td className="px-4 py-2 font-semibold text-ink">{it.period}</td>
                       <td className="px-4 py-2 text-right font-mono tabular-nums text-ink-muted">{it.ledgers}</td>

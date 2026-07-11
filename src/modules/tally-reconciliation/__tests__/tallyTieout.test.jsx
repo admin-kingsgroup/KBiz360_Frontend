@@ -214,6 +214,52 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByTestId('tb-file')).not.toBeInTheDocument(); // the two panels are mutually exclusive
   });
 
+  test('Clear Upload removes THIS month’s TB + Day Book after confirm (period-scoped)', async () => {
+    const { clearTB, clearDayBook } = require('../api');
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // The default tie-out mock has imported.count = 4 → the Clear button is offered.
+    fireEvent.click(await screen.findByText('Clear Upload'));
+    const now = new Date();
+    const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; // board defaults to the current month
+    await waitFor(() => expect(clearTB).toHaveBeenCalledWith(expect.objectContaining({ branch: 'BOM', period: cur, tier: 'month' })));
+    expect(clearDayBook).toHaveBeenCalledWith(expect.objectContaining({ branch: 'BOM', period: cur, tier: 'month' }));
+    confirmSpy.mockRestore();
+  });
+
+  test('Clear Upload does nothing when the confirm is declined', async () => {
+    const { clearTB, clearDayBook } = require('../api');
+    clearTB.mockClear(); clearDayBook.mockClear();
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByText('Clear Upload'));
+    expect(clearTB).not.toHaveBeenCalled();
+    expect(clearDayBook).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  test('Clear Upload is disabled on a certified (locked) period', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2025-09', tier: 'month', certStatus: 'locked',
+      counts: { total: 1, tied: 1, off: 0 }, erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 63 },
+      rows: [{ ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 100, tally: 100, diff: 0, status: 'tied' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    const btn = await screen.findByText('Clear Upload');
+    expect(btn.closest('button')).toBeDisabled();
+  });
+
+  test('the period selector shows a human month label (Sep 25) while keeping the machine key', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    const sel = screen.getByLabelText('Tie-out period');
+    const sept = [...sel.querySelectorAll('option')].find((o) => o.value === '2025-09');
+    expect(sept).toBeTruthy();
+    expect(sept.textContent).toMatch(/Sep 25/);   // human label shown to the user
+    expect(sept.value).toBe('2025-09');           // machine key (unchanged — this is what the API receives)
+  });
+
   test('TB upload panel offers a file picker alongside paste', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
@@ -367,6 +413,16 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     expect(screen.getByText('Open Items')).toBeInTheDocument();
     // 2026-07 is uploaded but not certified → appears as pending + an open blocker.
     expect(await screen.findByText(/TB uploaded — no certificate started/)).toBeInTheDocument();
+  });
+
+  test('Report lists a re-opened (not-tied) period as an Open Item, never a locked one', async () => {
+    const { getRegister } = require('../api');
+    getRegister.mockResolvedValueOnce([
+      { period: '2025-09', tier: 'month', ledgers: 63, cert: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { offTotal: 0, staleAccepted: 0, frozenAt: '2025-09-30' }, reopened: 0 } },
+      { period: '2026-06', tier: 'month', ledgers: 10, cert: { status: 'open', signatures: [], snapshot: { frozenAt: null }, reopened: 1 } }, // re-opened → not tied
+    ]);
+    wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
+    expect(await screen.findByText(/not tied — clear the off ledgers/)).toBeInTheDocument();
   });
 
   test('every /tally-reconciliation certification + reports href resolves to a route', () => {

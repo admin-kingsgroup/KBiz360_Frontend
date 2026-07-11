@@ -136,15 +136,21 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const period = periodSel[`${branch}:${tier}`] || defaultPeriod(tier, branch);
   const setPeriod = (p) => setPeriodSel((s) => ({ ...s, [`${branch}:${tier}`]: p }));
   // The Certification Register / Report hand a period to this board via sessionStorage
-  // ("Open in Tie-Out") — pick it up once on mount for this branch+tier.
+  // ("Open in Tie-Out"). Consume it ONLY when this board's branch+tier match — the
+  // cockpit focus hydrates lazily, so the first mount can carry a transient branch;
+  // leaving a mismatch in place lets the re-run (after focus resolves) pick it up. A
+  // malformed value is cleared immediately so it can't loop.
   useEffect(() => {
+    let o = null;
     try {
       const raw = sessionStorage.getItem('tally-open-period');
       if (!raw) return;
-      const o = JSON.parse(raw);
-      sessionStorage.removeItem('tally-open-period');
-      if (o && o.branch === branch && o.tier === tier && o.period) setPeriod(o.period);
-    } catch { /* ignore */ }
+      try { o = JSON.parse(raw); } catch { sessionStorage.removeItem('tally-open-period'); return; }
+    } catch { return; }
+    if (o && o.branch === branch && o.tier === tier && o.period) {
+      try { sessionStorage.removeItem('tally-open-period'); } catch { /* ignore */ }
+      setPeriod(o.period);
+    }
   }, [branch, tier]); // eslint-disable-line react-hooks/exhaustive-deps
   const periodOptions = useMemo(() => {
     const current = defaultPeriod(tier, branch);

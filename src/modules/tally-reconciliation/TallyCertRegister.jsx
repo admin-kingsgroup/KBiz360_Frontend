@@ -4,7 +4,7 @@ import { ShieldCheck, RefreshCcw, BookOpenCheck, ExternalLink } from 'lucide-rea
 import { getRegister } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../shell/primitives';
-import { BRANCHES, AFRICA, CUR, localeOf, round2, branchCodeOf, fmt, certMeta, CERT_META, TALLY_CHAIN, isCentralRole } from './format';
+import { BRANCHES, CUR, round2, branchCodeOf, fmt, certMeta, TALLY_CHAIN, isCentralRole } from './format';
 
 // ─── Tally Certification Register — one page per tier (month / year) ──────────
 // The at-a-glance "which period is certified" overview: every period that has an
