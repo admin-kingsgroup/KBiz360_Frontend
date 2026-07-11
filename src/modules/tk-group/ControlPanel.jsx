@@ -207,15 +207,21 @@ export function ControlPanel({ setRoute }) {
             </div>
             <H3>Who is under control</H3>
             <div className="grid gap-3 tablet:grid-cols-2">
-              {v.people.map((p) => (
-                <div key={p.key} className={`rounded-brand border border-l-4 p-4 shadow-sm ${p.independent ? 'border-warning/40 bg-warning-soft/40' : 'border-success/40 bg-success-soft/40'}`} style={{ borderLeftColor: p.independent ? '#d97706' : '#16a34a' }}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div><div className="text-[16px] font-semibold text-ink">{p.name}</div><div className="text-[11px] text-ink-muted">{p.role} · {p.duty}</div></div>
-                    {p.independent ? <Badge tone="warning" size="sm">Independent · no approval</Badge> : <Badge tone="success" size="sm">Under control</Badge>}
+              {ROLE_SWITCHES.map((rs) => {
+                // Branch-aware (matches the toggles above): a role is under control when its
+                // own switch is on for the selected branch OR the master guard is engaged.
+                const under = isOn(rs.flag) || isOn('core.policy_guard');
+                const extra = rs.key === 'ae' && v.aeCanApprove ? 'can also Approve' : '';
+                return (
+                  <div key={rs.key} className={`rounded-brand border border-l-4 p-4 shadow-sm ${under ? 'border-success/40 bg-success-soft/40' : 'border-warning/40 bg-warning-soft/40'}`} style={{ borderLeftColor: under ? '#16a34a' : '#d97706' }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div><div className="text-[16px] font-semibold text-ink">{rs.name}</div><div className="text-[11px] text-ink-muted">{rs.role} · {rs.duty}</div></div>
+                      {under ? <Badge tone="success" size="sm">Under control</Badge> : <Badge tone="warning" size="sm">Independent · no approval</Badge>}
+                    </div>
+                    <p className="mt-2 text-[11px] text-ink-muted">{under ? `Operates within the approval chain${extra ? ` (${extra})` : ''}.` : 'Switched off — reacts independently, no approval required.'}</p>
                   </div>
-                  <p className="mt-2 text-[11px] text-ink-muted">{p.independent ? 'Switched off — reacts independently, no approval required.' : `Operates within the approval chain${p.extra ? ` (${p.extra})` : ''}.`}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         );
