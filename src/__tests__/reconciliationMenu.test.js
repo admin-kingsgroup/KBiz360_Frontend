@@ -17,7 +17,8 @@ function allHrefs(node, out = []) {
   return out;
 }
 
-const MATCHING = ['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco', '/finance/reco-queue', '/accounts/interbranch-reco', '/accounts/tally-reco'];
+// The Tally Ledger Matcher (/accounts/tally-reco) MOVED to the Tally Reconciliation pill.
+const MATCHING = ['/accounts/client-reco', '/bank-reco', '/accounts/supplier-reco', '/finance/reco-queue', '/accounts/interbranch-reco'];
 
 describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', () => {
   const matching = groupByLabel(MENU_RECONCILIATION, 'Statement Matching');

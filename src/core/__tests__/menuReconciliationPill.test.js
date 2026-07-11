@@ -27,9 +27,9 @@ describe('Reconciliation · top-level pill', () => {
       // Reports — one report per tier
       '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
       '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
-      // Statement Matching
+      // Statement Matching (Tally Ledger Matcher MOVED to the Tally Reconciliation pill)
       '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
-      '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+      '/accounts/supplier-reco', '/accounts/interbranch-reco',
       '/reconciliation/match-guide', // the staff Match Guide — LAST under Statement Matching
     ]);
   });
@@ -66,7 +66,7 @@ describe('Reconciliation · top-level pill', () => {
       '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
       '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
       '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
-      '/accounts/supplier-reco', '/accounts/interbranch-reco', '/accounts/tally-reco',
+      '/accounts/supplier-reco', '/accounts/interbranch-reco',
       '/reconciliation/match-guide',
       '/reconciliation/rulebook',
     ]);
@@ -80,7 +80,8 @@ describe('Reconciliation · top-level pill', () => {
     expect(crumbsFor('/reconciliation/weekly').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Certification', 'Weekly Certification']);
     expect(crumbsFor('/reconciliation/reports/monthly').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Reports', 'Monthly Report']);
     expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Certification', 'Rule Book & Process']);
-    // The new Tally Reconciliation pill resolves its own crumbs.
-    expect(crumbsFor('/tally-reconciliation/monthly').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Monthly Tie-Out']);
+    // The Tally Reconciliation pill (now grouped Tie-Out / Vouchers / Help).
+    expect(crumbsFor('/tally-reconciliation/monthly').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Tie-Out', 'Monthly Tie-Out']);
+    expect(crumbsFor('/accounts/tally-reco').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Vouchers', 'Ledger Matcher (Day Book)']);
   });
 });

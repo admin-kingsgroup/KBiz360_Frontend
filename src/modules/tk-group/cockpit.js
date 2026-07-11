@@ -129,7 +129,6 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Reconciliation Queue', href: '/finance/reco-queue' },
         { label: 'Supplier Reconciliation', href: '/accounts/supplier-reco' },
         { label: 'Inter-Branch Reconciliation', href: '/accounts/interbranch-reco' },
-        { label: 'Tally Ledger Matcher (per ledger)', href: '/accounts/tally-reco' },
         { label: 'Match Guide', href: '/reconciliation/match-guide' },
       ] },
       { label: 'Govern', children: [
@@ -137,12 +136,19 @@ export function controlCockpitMenu(focus, currentUser) {
       ] },
     ] },
 
-    // Tally Reconciliation — whole-books ERP↔Tally tie-out, its own pill (Central
-    // works the Month/Year tie-outs). The menu is the tier switch.
+    // Tally Reconciliation — whole-books ERP↔Tally tie-out, its own pill. EVERYTHING
+    // Tally lives here: the tie-out board, the per-ledger Day Book matcher (moved
+    // out of Statement Matching), and the staff Guide.
     { label: 'Tally Reconciliation', icon: Scale, children: [
       { label: 'Tie-Out', children: [
         { label: 'Monthly Tie-Out', href: '/tally-reconciliation/monthly' },
         { label: 'Yearly Tie-Out', href: '/tally-reconciliation/yearly' },
+      ] },
+      { label: 'Vouchers', children: [
+        { label: 'Ledger Matcher (Day Book)', href: '/accounts/tally-reco' },
+      ] },
+      { label: 'Help', children: [
+        { label: 'Tally Reconciliation Guide', href: '/tally-reconciliation/guide' },
       ] },
     ] },
 

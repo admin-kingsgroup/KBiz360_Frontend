@@ -690,18 +690,29 @@ export const MENU_RECONCILIATION = {label:"Statement Reconciliation", icon:Arrow
     {label:"Reconciliation Queue",     href:"/finance/reco-queue"},
     {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
     {label:"Inter-Branch Reconciliation", href:"/accounts/interbranch-reco"},
-    {label:"Tally Ledger Matcher (per ledger)", href:"/accounts/tally-reco"},
     {label:"Match Guide",              href:"/reconciliation/match-guide"},
   ]},
 ]};
 
 // Tally Reconciliation — the WHOLE-BOOKS ERP↔Tally tie-out (its own top-level
-// pill, distinct from Statement Reconciliation above). One entry per tier (the
-// menu is the tier switch): each page puts the ERP's live Trial Balance next to
-// the uploaded Tally TB — every ledger, Balance Sheet and P&L side by side.
+// pill, distinct from Statement Reconciliation above). EVERYTHING Tally lives
+// here: the tie-out board (Trial Balance upload), the per-ledger Day Book matcher
+// (moved out of Statement Matching), and the staff Guide.
 export const MENU_TALLY_RECON = {label:"Tally Reconciliation", icon:Scale, children:[
-  {label:"Monthly Tie-Out", href:"/tally-reconciliation/monthly"},
-  {label:"Yearly Tie-Out",  href:"/tally-reconciliation/yearly"},
+  // The whole-books board — the menu is the tier switch (TB upload lives inside).
+  {label:"Tie-Out", children:[
+    {label:"Monthly Tie-Out", href:"/tally-reconciliation/monthly"},
+    {label:"Yearly Tie-Out",  href:"/tally-reconciliation/yearly"},
+  ]},
+  // Per-ledger voucher matcher — where the Tally Day Book is imported (feeds the
+  // tie-out board's voucher drill). Route kept as /accounts/tally-reco.
+  {label:"Vouchers", children:[
+    {label:"Ledger Matcher (Day Book)", href:"/accounts/tally-reco"},
+  ]},
+  // Staff how-to for the whole Tally reconciliation flow.
+  {label:"Help", children:[
+    {label:"Tally Reconciliation Guide", href:"/tally-reconciliation/guide"},
+  ]},
 ]};
 
 // Branch-Accountant view of the pill: they PREPARE the weekly certificates

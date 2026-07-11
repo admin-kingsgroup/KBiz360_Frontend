@@ -299,6 +299,7 @@ export const APP_ROUTES = [
   "/settings/users",
   "/support/tickets",
   "/tally-reconciliation",
+  "/tally-reconciliation/guide",
   "/tally-reconciliation/monthly",
   "/tally-reconciliation/yearly",
   "/tax/audit-3cd",
@@ -391,6 +392,7 @@ export const APP_ROUTE_LABELS = {
   "/reconciliation/yearly": "Yearly Certification",
   "/support/tickets": "Support Tickets",
   "/tally-reconciliation": "Monthly Tie-Out",
+  "/tally-reconciliation/guide": "Tally Reconciliation Guide",
   "/tally-reconciliation/monthly": "Monthly Tie-Out",
   "/tally-reconciliation/yearly": "Yearly Tie-Out"
 };

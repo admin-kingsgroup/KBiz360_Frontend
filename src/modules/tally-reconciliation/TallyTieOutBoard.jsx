@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { Upload, RefreshCcw, AlertTriangle, BookOpenCheck } from 'lucide-react';
 import { getTieOut, getPeriods, importTB, getDefects } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
@@ -57,7 +57,7 @@ function parseTB(text) {
   }).filter(Boolean);
 }
 
-export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTier }) {
+export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTier, setRoute }) {
   const tier = fixedTier === 'year' ? 'year' : 'month';
   const appCode = branchCodeOf(appBranch);
   const focus = useCockpitFocus();
@@ -168,6 +168,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         <div className="flex items-center gap-2">
           <Button variant="secondary" icon={Upload} onClick={() => setShowImport((s) => !s)}>Upload Tally TB</Button>
           <Button variant="ghost" icon={RefreshCcw} onClick={() => refetch()}>Refresh</Button>
+          <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/tally-reconciliation/guide')}>Guide</Button>
         </div>
       </div>
 
@@ -319,7 +320,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         </>)}
       </PageSection>
 
-      {drill && <VoucherDrawer branch={branch} period={period} tier={tier} row={drill} cur={cur} onClose={() => setDrill(null)} />}
+      {drill && <VoucherDrawer branch={branch} period={period} tier={tier} row={drill} cur={cur} setRoute={setRoute} onClose={() => setDrill(null)} />}
     </div>
   );
 }
