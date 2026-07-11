@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 jest.mock('../api', () => ({
   getPeriods: jest.fn(() => Promise.resolve([{ period: '2026-07', tier: 'month', ledgers: 4 }])),
+  getInception: jest.fn(() => Promise.resolve('2025-01-01')),
   importTB: jest.fn(),
   clearTB: jest.fn(),
   importDayBook: jest.fn(() => Promise.resolve({ inserted: 0, ledgers: 0 })),
@@ -208,5 +209,28 @@ describe('Tally Reconciliation · tie-out board render', () => {
     getDayBookStatus.mockResolvedValueOnce({ vouchers: 274, ledgers: 63 });
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     expect(await screen.findByText(/Day Book · 274 vouchers · 63 ledgers/)).toBeInTheDocument();
+  });
+
+  test('period selector spans back to the books inception, not just the current month', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    const sel = screen.getByLabelText('Tie-out period');
+    const values = [...sel.querySelectorAll('option')].map((o) => o.value);
+    // getInception mock → 2025-01-01, so every month from 2025-01 to now is offered.
+    expect(values).toContain('2025-01');
+    expect(values).toContain('2025-06');
+    expect(values.some((v) => v.startsWith('2026'))).toBe(true);
+    // newest first
+    expect(values[0] >= values[values.length - 1]).toBe(true);
+  });
+
+  test('yearly selector offers FY years back to inception (Indian branch)', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="year" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('Tally Reconciliation · Yearly Tie-Out');
+    const sel = screen.getByLabelText('Tie-out period');
+    const values = [...sel.querySelectorAll('option')].map((o) => o.value);
+    // 2025-01 inception → FY2024-25 (Jan–Mar 2025 belongs to the prior FY) through current.
+    expect(values).toContain('FY2024-25');
+    expect(values.every((v) => /^FY\d{4}-\d{2}$/.test(v))).toBe(true);
   });
 });

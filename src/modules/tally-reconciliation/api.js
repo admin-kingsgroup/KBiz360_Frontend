@@ -10,6 +10,12 @@ export function getTieOut({ branch, period, tier } = {}) {
 export async function getPeriods({ branch } = {}) {
   return (await apiGet('/api/tally-tieout/periods', { branch }))?.items || [];
 }
+// Earliest posted date in the branch's books — drives the period selector's range
+// (months/years back to the books' inception, not just the current period).
+export async function getInception({ branch } = {}) {
+  try { return (await apiGet('/api/accounting/inception', { branch }))?.from || null; }
+  catch { return null; }
+}
 // Phase 2 — voucher drill for one off ledger + the classified Defect Register.
 export function getLedgerVouchers({ branch, period, tier, ledger } = {}) {
   return apiGet('/api/tally-tieout/ledger', { branch, period, tier, ledger });

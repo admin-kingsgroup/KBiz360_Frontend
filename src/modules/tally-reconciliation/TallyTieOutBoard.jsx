@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Upload, RefreshCcw, AlertTriangle, BookOpenCheck, FileUp } from 'lucide-react';
-import { getTieOut, getPeriods, importTB, getDefects, importDayBook, getDayBookStatus } from './api';
+import { getTieOut, getPeriods, importTB, getDefects, importDayBook, getDayBookStatus, getInception } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { VoucherDrawer } from './VoucherDrawer';
@@ -22,6 +22,38 @@ function currentYearKey(branch) {
   return d.getMonth() >= 3 ? `FY${y}-${String((y + 1) % 100).padStart(2, '0')}` : `FY${y - 1}-${String(y % 100).padStart(2, '0')}`;
 }
 const defaultPeriod = (tier, branch) => (tier === 'year' ? currentYearKey(branch) : currentMonthKey());
+
+// The selectable months, newest→oldest, from the books' inception month to the
+// current month. `fromISO` is the earliest posted date ('YYYY-MM-DD'); when it's
+// unknown we still offer a sensible 24-month window so the picker is never empty.
+function monthOptionsFrom(fromISO) {
+  const now = new Date(); const cy = now.getFullYear(); const cm = now.getMonth() + 1;
+  let sy = cy; let sm = cm; let span = 24;
+  if (fromISO && /^\d{4}-\d{2}/.test(fromISO)) { sy = +fromISO.slice(0, 4); sm = +fromISO.slice(5, 7); span = 600; }
+  else { sy = cy - 1; sm = cm; } // no inception yet → last ~24 months
+  const out = []; let y = cy; let m = cm;
+  while ((y > sy || (y === sy && m >= sm)) && out.length < span) {
+    out.push(`${y}-${String(m).padStart(2, '0')}`);
+    m -= 1; if (m === 0) { m = 12; y -= 1; }
+  }
+  return out;
+}
+// The selectable years, newest→oldest, from inception to the current year. Africa
+// branches run the Calendar Year (CY); everyone else the Apr–Mar Financial Year (FY).
+function yearOptionsFrom(fromISO, branch) {
+  const now = new Date(); const cy = now.getFullYear(); const cm = now.getMonth() + 1;
+  const sy = fromISO && /^\d{4}/.test(fromISO) ? +fromISO.slice(0, 4) : cy - 1;
+  const sm = fromISO && /^\d{4}-\d{2}/.test(fromISO) ? +fromISO.slice(5, 7) : 1;
+  const out = [];
+  if (AFRICA.has(branch)) {
+    for (let y = cy; y >= sy; y -= 1) out.push(`CY${y}`);
+  } else {
+    const curFyStart = cm >= 4 ? cy : cy - 1;         // current FY's starting year
+    const earliestFyStart = sm >= 4 ? sy : sy - 1;    // a Jan–Mar inception belongs to the prior FY
+    for (let ys = curFyStart; ys >= earliestFyStart; ys -= 1) out.push(`FY${ys}-${String((ys + 1) % 100).padStart(2, '0')}`);
+  }
+  return out;
+}
 
 // Group a flat (already-ordered) row list by parent group, preserving order.
 function byParent(rows) {
@@ -83,14 +115,28 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const [drill, setDrill] = useState(null); // off ledger being drilled (Phase 2)
 
   const { data: periodsData } = useQuery({ queryKey: ['tally-tieout', 'periods', branch], queryFn: () => getPeriods({ branch }), enabled: central });
+  // Earliest posted date for this branch → the selector spans inception..now.
+  const { data: inceptionFrom } = useQuery({ queryKey: ['tally-tieout', 'inception', branch], queryFn: () => getInception({ branch }), enabled: central });
   const period = periodSel[`${branch}:${tier}`] || defaultPeriod(tier, branch);
   const setPeriod = (p) => setPeriodSel((s) => ({ ...s, [`${branch}:${tier}`]: p }));
   const periodOptions = useMemo(() => {
-    const opts = new Map();
-    (periodsData || []).filter((p) => p.tier === tier).forEach((p) => opts.set(p.period, `${p.period} · ${p.ledgers} ledgers`));
-    if (!opts.has(period)) opts.set(period, `${period} · current`);
-    return [...opts.entries()].map(([value, label]) => ({ value, label }));
-  }, [periodsData, tier, period]);
+    const current = defaultPeriod(tier, branch);
+    // How many Tally ledgers are uploaded per period (annotate the range with it).
+    const uploaded = new Map();
+    (periodsData || []).filter((p) => p.tier === tier).forEach((p) => uploaded.set(p.period, p.ledgers));
+    // The full range from the books' inception to now, PLUS the current period and
+    // any uploaded period that falls outside the range (e.g. a stray future upload).
+    const base = tier === 'year' ? yearOptionsFrom(inceptionFrom, branch) : monthOptionsFrom(inceptionFrom);
+    const seen = new Set(); const order = [];
+    const add = (p) => { if (p && !seen.has(p)) { seen.add(p); order.push(p); } };
+    add(current); base.forEach(add);
+    [...uploaded.keys()].sort().reverse().forEach(add);
+    order.sort().reverse(); // newest first (string-sortable within a tier)
+    return order.map((value) => ({
+      value,
+      label: uploaded.has(value) ? `${value} · ${uploaded.get(value)} ledgers` : (value === current ? `${value} · current` : value),
+    }));
+  }, [periodsData, inceptionFrom, tier, period, branch]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['tally-tieout', 'board', branch, tier, period],
