@@ -307,6 +307,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
               Clear Upload
             </Button>
           )}
+          {clr.isError && <span className="text-sm text-danger">{clr.error?.message || 'Could not clear this period.'}</span>}
           <Button variant="ghost" icon={RefreshCcw} onClick={() => qc.invalidateQueries({ queryKey: ['tally-tieout'] })}>Refresh</Button>
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/tally-reconciliation/guide')}>Guide</Button>
         </div>

@@ -16,7 +16,8 @@ jest.mock('../api', () => ({
     { period: '2026-07', tier: 'month', ledgers: 4, cert: null }, // uploaded, not yet certified
   ])),
   importTB: jest.fn(),
-  clearTB: jest.fn(),
+  clearTB: jest.fn(() => Promise.resolve({ deleted: 0 })),
+  clearDayBook: jest.fn(() => Promise.resolve({ deleted: 0 })),
   importDayBook: jest.fn(() => Promise.resolve({ inserted: 0, ledgers: 0 })),
   getDayBookStatus: jest.fn(() => Promise.resolve({ vouchers: 0, ledgers: 0 })),
   getDefects: jest.fn(() => Promise.resolve({
