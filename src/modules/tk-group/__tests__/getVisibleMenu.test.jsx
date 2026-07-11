@@ -69,6 +69,18 @@ describe('getVisibleMenu — TK Group Central vs branch', () => {
     expect(hrefs.some((h) => h.startsWith('/dashboard'))).toBe(true); // Dashboards group present
   });
 
+  test('cockpit Tally Reconciliation carries Tie-Out + Certification + Reports (parity with the branch pill)', () => {
+    const hrefs = hrefsOf(getVisibleMenu('ALL', { role: 'Super Admin' }));
+    // Tie-Out (was already there) …
+    expect(hrefs).toContain('/tally-reconciliation/monthly');
+    // … PLUS the Certification register and the Reports, per tier — the bug was these
+    // being absent from the cockpit nav while present in the branch MENU_TALLY_RECON.
+    expect(hrefs).toContain('/tally-reconciliation/certification/monthly');
+    expect(hrefs).toContain('/tally-reconciliation/certification/yearly');
+    expect(hrefs).toContain('/tally-reconciliation/reports/monthly');
+    expect(hrefs).toContain('/tally-reconciliation/reports/yearly');
+  });
+
   test('Administration lives in the cockpit (Owner) and is stripped from the branch nav', () => {
     const owner = hrefsOf(getVisibleMenu('ALL', { role: 'Super Admin' }));
     expect(owner).toContain('/settings/users');            // Administration ▸ Users & Roles

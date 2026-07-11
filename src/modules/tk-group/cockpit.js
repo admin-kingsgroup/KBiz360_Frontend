@@ -144,6 +144,17 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Monthly Tie-Out', href: '/tally-reconciliation/monthly' },
         { label: 'Yearly Tie-Out', href: '/tally-reconciliation/yearly' },
       ] },
+      // The certification register — the "which period is certified" overview per tier
+      // (status · sign chain · frozen snapshot). Mirrors MENU_TALLY_RECON (branch nav).
+      { label: 'Certification', children: [
+        { label: 'Monthly Certification', href: '/tally-reconciliation/certification/monthly' },
+        { label: 'Yearly Certification', href: '/tally-reconciliation/certification/yearly' },
+      ] },
+      // Per-tier report: pending closings · certificate register · open blockers.
+      { label: 'Reports', children: [
+        { label: 'Monthly Report', href: '/tally-reconciliation/reports/monthly' },
+        { label: 'Yearly Report', href: '/tally-reconciliation/reports/yearly' },
+      ] },
       { label: 'Vouchers', children: [
         { label: 'Ledger Matcher (Day Book)', href: '/accounts/tally-reco' },
       ] },
