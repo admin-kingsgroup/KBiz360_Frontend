@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Check, RotateCcw } from 'lucide-react';
 import { getLedgerVouchers, acceptVariance, clearVariance } from './api';
@@ -24,6 +24,8 @@ export function VoucherDrawer({ branch, period, tier, row, cur, onClose }) {
     queryFn: () => getLedgerVouchers({ branch, period, tier, ledger }),
     enabled: !!ledger,
   });
+  const closeRef = useRef(null);
+  useEffect(() => { closeRef.current?.focus(); }, []); // move focus into the dialog on open (a11y)
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
@@ -48,8 +50,8 @@ export function VoucherDrawer({ branch, period, tier, row, cur, onClose }) {
               {row && row.interBranch ? <span className="ml-2 align-middle rounded-full bg-info/10 px-2 py-0.5 text-[10.5px] font-semibold text-info">inter-branch</span> : null}</h4>
             <p className="text-xs text-ink-subtle">Voucher-by-voucher · ERP ↔ Tally Day Book · {period}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close"
-            className="ml-auto grid h-8 w-8 place-items-center rounded-brand border border-surface-border text-ink-muted hover:border-danger hover:text-danger">
+          <button ref={closeRef} type="button" onClick={onClose} aria-label="Close"
+            className="ml-auto grid h-8 w-8 place-items-center rounded-brand border border-surface-border text-ink-muted hover:border-danger hover:text-danger focus:outline-none focus:ring-2 focus:ring-accent">
             <X size={16} />
           </button>
         </div>

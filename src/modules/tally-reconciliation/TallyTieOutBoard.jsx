@@ -64,11 +64,12 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const branch = appCode || (BRANCHES.includes(focus) ? focus : 'BOM');
   const cur = CUR[branch] || '₹';
   const qc = useQueryClient();
-  // Tally recon is a central Month/Year control — a Branch Accountant (or any
-  // non-central role) that reaches this by direct URL gets the rule, not the board
-  // (the menu already hides it; the backend also refuses the writes).
-  const granted = Array.isArray(currentUser?.granted) ? currentUser.granted : [];
-  const central = isCentralRole(currentUser?.role) || granted.includes(`/tally-reconciliation/${tier === 'year' ? 'yearly' : 'monthly'}`);
+  // Tally recon is a central Month/Year control — a non-central role that reaches
+  // this by direct URL gets the rule, not the board. Access requires an ACTUAL
+  // central role (NOT a page-visibility grant): the whole board is write-oriented
+  // (Upload / Accept / Freeze / Sign) and the backend refuses those to non-central
+  // roles — a grant would only produce a board where every action 403s.
+  const central = isCentralRole(currentUser?.role);
 
   const [tab, setTab] = useState('tb');
   const [periodSel, setPeriodSel] = useState({});
@@ -121,7 +122,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     // Net Profit belongs to Capital on the BS — inject it ONLY when the P&L has rows
     // (never a spurious "Profit · 0" line on a branch with no P&L activity).
     const hasPL = rows.some((r) => r.statement === 'PL');
-    const np = { ledger: 'Profit for the period', code: '(from P&L)', parentGroup: 'Capital Account',
+    const np = { ledger: 'Profit for the period', code: '(from P&L)', parentGroup: 'Capital Account', synthetic: true,
       erp: round2(-(counts.netProfitErp || 0)), tally: round2(-(counts.netProfitTally || 0)) };
     np.diff = round2((np.erp || 0) - (np.tally || 0)); np.status = statusOf(np.erp, np.tally);
     return [
@@ -190,7 +191,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             placeholder={'ICICI Bank A/c\t1245300\t0\nHDFC Bank A/c\t805000\t0\nBSP / IATA\t0\t9000'}
             className="w-full rounded-brand border border-surface-border bg-surface p-3 font-mono text-xs text-ink" />
           <div className="mt-2 flex items-center gap-3">
-            <Button variant="primary" loading={imp.isPending} disabled={!paste.trim()} onClick={() => imp.mutate()}>
+            <Button variant="primary" loading={imp.isPending} disabled={parseTB(paste).length === 0} onClick={() => imp.mutate()}>
               Parse &amp; upload ({parseTB(paste).length} rows)
             </Button>
             {imp.isError && <span className="text-sm text-danger">{imp.error?.message}</span>}
@@ -211,8 +212,17 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         <Kpi label="Net profit Δ" value={fmt(round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)), cur)} tone={round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)) !== 0 ? 'danger' : 'muted'} small />
       </div>
 
-      {/* certificate — the close gate */}
-      {!empty && <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} />}
+      {/* Before any Tally TB is uploaded, onboard calmly (not a wall of red);
+          once uploaded, show the certificate close gate. Deferred until the board
+          has loaded so the gate never flashes a wrong state (U4). */}
+      {!empty && !isLoading && (imported.count
+        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} />
+        : (
+          <PageSection icon={Upload} title={`No Tally Trial Balance uploaded — ${branch} · ${period}`}
+            subtitle="Until you upload the period's Tally TB, every ERP ledger below shows as unmatched. This is the starting point, not an error.">
+            <Button variant="primary" icon={Upload} onClick={() => setShowImport(true)}>Upload Tally TB</Button>
+          </PageSection>
+        ))}
 
       {/* tabs */}
       <div className="flex gap-1 border-b border-surface-border">
@@ -258,7 +268,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                         <tr><td colSpan={5} className="bg-navy px-4 py-2 text-xs font-bold uppercase text-white">{g.parent}</td></tr>
                         {g.items.map((r) => {
                           const meta = statusMeta(r.status);
-                          const off = r.status !== 'tied';
+                          const off = r.status !== 'tied' && !r.synthetic; // the injected P&L Net-Profit row isn't a real ledger to drill
                           const acc = r.status === 'accepted';
                           const drill = () => setDrill(r);
                           return (

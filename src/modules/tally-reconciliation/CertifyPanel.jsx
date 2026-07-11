@@ -80,13 +80,17 @@ export function CertifyPanel({ branch, period, tier, offTotal }) {
                 onClick={() => freeze.mutate()}>
                 {frozen ? 'Re-freeze snapshot' : 'Freeze tie-out'}
               </Button>
-              <Button variant="primary" icon={PenLine} loading={sign.isPending} disabled={!gate.ok}
+              {/* Sign requires the BE gate (frozen snapshot clean) AND the LIVE
+                  tie-out still clean — otherwise a voucher posted after a clean
+                  freeze could be signed/locked on a stale-clean snapshot. */}
+              <Button variant="primary" icon={PenLine} loading={sign.isPending} disabled={!gate.ok || !tied}
                 onClick={() => sign.mutate()}>
                 {progress.next ? `Sign as ${progress.next.role}` : 'Sign'}
               </Button>
-              {!tied && <span className="text-xs font-semibold text-danger">{offTotal} off — clear before signing</span>}
+              {frozen && !tied && <span className="text-xs font-semibold text-danger">Tie-out changed since freezing — {offTotal} now off. Clear/accept them, then re-freeze.</span>}
+              {!tied && !frozen && <span className="text-xs font-semibold text-danger">{offTotal} off — clear before signing</span>}
               {tied && !frozen && <span className="text-xs text-ink-subtle">Freeze the snapshot, then the chain can sign.</span>}
-              {frozen && !gate.ok && gate.reason && <span className="text-xs text-ink-subtle">{gate.reason}</span>}
+              {tied && frozen && !gate.ok && gate.reason && <span className="text-xs text-ink-subtle">{gate.reason}</span>}
               {freeze.isError && <span className="text-xs text-danger">{freeze.error?.message}</span>}
               {sign.isError && <span className="text-xs text-danger">{sign.error?.message}</span>}
             </div>
