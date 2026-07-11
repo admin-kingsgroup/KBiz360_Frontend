@@ -132,6 +132,98 @@ const countNote = (leds) => {
   return `${c} common${b ? ` · ${b} branch` : ''}`;
 };
 
+// ── Structural actions: Move / Clone (Dynamic Chart of Accounts, Phase 3/5) ──
+// Flatten the group chart into indented parent-picker options, tree order.
+// `excludeSubtreeOf` drops a node AND its whole subtree — the client-side cycle
+// guard for Move (a group can never move inside itself; the backend re-checks
+// and answers 409). Pure — unit-testable.
+export function flattenParentOptions(groups = [], excludeSubtreeOf = null) {
+  const kids = new Map();
+  (groups || []).forEach((g) => { const p = g.parent || ''; if (!kids.has(p)) kids.set(p, []); kids.get(p).push(g); });
+  const sorted = (arr) => (arr || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const out = [];
+  const walk = (g, depth) => {
+    if (excludeSubtreeOf && g.name === excludeSubtreeOf) return;   // node + descendants can't host it
+    out.push({ id: g.id, name: g.name, depth, system: !!g.system });
+    sorted(kids.get(g.name)).forEach((c) => walk(c, depth + 1));
+  };
+  sorted((kids.get('') || []).filter((g) => g.system)).forEach((r) => walk(r, 0));
+  return out;
+}
+
+// Modal for "Move to…" / "Clone…" on a CUSTOM (non-system) group node. Move
+// re-parents the node + its whole subtree (nature/statement re-derive from the
+// new head); Clone deep-copies it (" (copy)" names, optional zero-opening ledger
+// copies with fresh codes). Both are admin-gated server-side (Super Admin /
+// Senior Finance Manager); cycle (409) and lock (423) errors surface as toasts.
+function GroupStructureDialog({ action, groups, onClose }) {
+  const { kind, node } = action;                       // kind: 'move' | 'clone'
+  const qc = useQueryClient();
+  const [parentId, setParentId] = useState('');
+  const [withLedgers, setWithLedgers] = useState(false);
+  const options = React.useMemo(
+    () => flattenParentOptions(groups, kind === 'move' ? node.name : null),
+    [groups, kind, node.name],
+  );
+  // Re-grouping the chart changes where every report nests its balances — bust the
+  // same roots useMasters' MASTER_RELATED_ROOTS.subgroups busts (masters + books).
+  const invalidate = () => {
+    [['master', 'groups'], ['master', 'ledgers'], ['groups'], ['ledgers'], ['accounting'], ['finance']]
+      .forEach((k) => qc.invalidateQueries({ queryKey: k }));
+  };
+  const m = useMutation({
+    mutationFn: () => (kind === 'move'
+      ? apiPost(`/api/subgroups/${node.id}/move`, { newParentId: parentId })
+      : apiPost(`/api/subgroups/${node.id}/clone`, { intoParentId: parentId, withLedgers })),
+    onSuccess: (data) => {
+      invalidate();
+      toastSuccess(kind === 'move'
+        ? `Moved “${node.name}” — its whole subtree was re-filed and re-classified under the new parent.`
+        : `Cloned “${node.name}” → “${(data && data.root && data.root.name) || `${node.name} (copy)`}”${withLedgers ? ` · ${(data && data.ledgers) || 0} ledger(s) copied (zero opening, fresh codes)` : ''}`);
+      onClose();
+    },
+    // 409 cycle guard / 423 locks / 403 role gate → human message from the API envelope.
+    onError: (e) => toastError((e && e.message) || `Could not ${kind} “${node.name}”`),
+  });
+  const lbl = { fontSize: 11, fontWeight: 700, color: DIM, display: 'block', marginBottom: 4 };
+  return (
+    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, background: 'rgba(15,18,26,.45)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div style={{ background: '#fff', borderRadius: 10, width: 460, maxWidth: '92vw', padding: 16, boxShadow: '0 18px 50px rgba(15,18,26,.35)' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: DARK, marginBottom: 2 }}>
+          {kind === 'move' ? 'Move sub-group' : 'Clone sub-group'}
+        </div>
+        <div style={{ fontSize: 11.5, color: DIM, marginBottom: 10 }}>
+          {kind === 'move'
+            ? <>Move <b style={{ color: DARK }}>{node.name}</b> — with its whole subtree — under a new parent. Its Nature / Statement re-derive from the new parent chain.</>
+            : <>Deep-copy <b style={{ color: DARK }}>{node.name}</b> (names get a “(copy)” suffix) under a chosen parent.</>}
+        </div>
+        <label style={lbl}>{kind === 'move' ? 'New parent' : 'Clone into'}</label>
+        <select size={10} value={parentId} onChange={(e) => setParentId(e.target.value)}
+          style={{ width: '100%', border: '1px solid #cdd1d8', borderRadius: 7, fontSize: 12, padding: 4, marginBottom: 10, fontFamily: 'inherit' }}>
+          {options.map((o) => (
+            <option key={o.id} value={o.id} disabled={kind === 'move' && o.name === node.parent}>
+              {' '.repeat(o.depth * 3)}{o.name}{o.system ? ' 🔒' : ''}{kind === 'move' && o.name === node.parent ? ' (current parent)' : ''}
+            </option>
+          ))}
+        </select>
+        {kind === 'clone' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: DIM, marginBottom: 10, cursor: 'pointer' }}>
+            <input type="checkbox" checked={withLedgers} onChange={(e) => setWithLedgers(e.target.checked)} />
+            Also clone the subtree's ledgers (zero opening balance, fresh server-allocated codes)
+          </label>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onClose} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, border: '1px solid #cdd1d8', borderRadius: 6, background: '#fff', color: DIM, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={() => m.mutate()} disabled={!parentId || m.isPending}
+            style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, background: !parentId || m.isPending ? '#9db4dd' : BLUE, color: '#fff', cursor: !parentId || m.isPending ? 'default' : 'pointer' }}>
+            {m.isPending ? 'Working…' : kind === 'move' ? 'Move here' : 'Clone here'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AccountsTreeView({ branch, setRoute, setBranch }) {
   const brc = branchCode(branch);                    // undefined for ALL → shows all
   const [branchView, setBranchView] = useState(() => brc || 'ALL'); // in-page branch picker
@@ -153,6 +245,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
   const [open, setOpen] = useState({});
   const [sel, setSel] = useState({ pg: '', g: '', sg: '' });
   const [includeInactive, setIncludeInactive] = useState(false); // hide deactivated ledgers by default
+  const [structAction, setStructAction] = useState(null); // { kind: 'move'|'clone', node } → GroupStructureDialog
   // Re-apply the scope default whenever the Branch view changes: pick a branch → its
   // own ledgers only; switch to consolidated → all. The pills still override within a view.
   useEffect(() => { setScope(defaultScopeFor(branchView)); }, [branchView]);
@@ -258,6 +351,19 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
   const mandatoryStar = <span title="Mandatory — fixed in all branches; cannot be created, edited or deleted"><span style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>*</span>{LOCK_ICON}</span>;
   // A sub-group wired to a module/posting/tax path → locked. ~ = module-wired, * = non-editable / non-deletable.
   const wiredMark = <span title="Wired to a module — locked (non-editable, non-deletable)"><span style={{ color: RED, fontWeight: 800, marginLeft: 3 }}>~*</span>{LOCK_ICON}</span>;
+  // Structural actions on CUSTOM (non-system) groups only — system nodes keep their
+  // 🔒 and never offer move/delete. Wired (~*) sub-groups can be CLONED (the copy is
+  // unwired) but not MOVED (a move would re-classify module postings — backend 423s).
+  const actBtn = (label, onClick, title) => (
+    <button type="button" title={title} onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{ padding: '1px 7px', fontSize: 9.5, fontWeight: 700, border: '1px solid #cdd1d8', borderRadius: 5, background: '#fff', color: '#1a3a6e', cursor: 'pointer' }}>{label}</button>
+  );
+  const nodeActions = (node) => (node.system ? null : (
+    <span style={{ display: 'inline-flex', gap: 4 }}>
+      {!node.wired && actBtn('Move to…', () => setStructAction({ kind: 'move', node }), 'Move this sub-group — with its whole subtree — under a different parent (admin only)')}
+      {actBtn('Clone…', () => setStructAction({ kind: 'clone', node }), 'Deep-copy this sub-group (optionally with its ledgers) under a chosen parent (admin only)')}
+    </span>
+  ));
   const ledgerRow = (l, indent) => {
     const n = entriesFor(l), rm = removableOf(l, n);
     return (
@@ -293,6 +399,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
                   <div style={{ display: 'flex', alignItems: 'center', padding: '7px 12px 7px 26px', background: '#f6f9fd', fontWeight: 700, color: '#1a3a6e' }}>
                     <Caret k={grp.name} has={grpHas} /><span {...(grpHas ? clickable(() => tog(grp.name)) : {})} style={{ cursor: grpHas ? 'pointer' : 'default' }}>{grp.name}</span>{mandatoryStar}{badge('Group', '#1a3a6e')}
                     <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: DIM }}>
+                      {nodeActions(grp)}
                       {grp.ledgers.length > 0 && <span>{countNote(grp.ledgers)}</span>}{countChip(rollupCount(grp), false)}
                     </span>
                   </div>
@@ -302,6 +409,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
                         <div style={{ display: 'flex', alignItems: 'center', padding: '6px 12px 6px 46px', fontWeight: 600, color: DARK, borderBottom: '1px solid #dfe2e7' }}>
                           <Caret k={sg.name} has={sg.ledgers.length} /><span {...(sg.ledgers.length ? clickable(() => tog(sg.name)) : {})} style={{ cursor: sg.ledgers.length ? 'pointer' : 'default' }}>{sg.name}</span>{badge('Sub-Group', GOLD)}{sg.wired ? wiredMark : mandatoryStar}
                           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: DIM }}>
+                            {nodeActions(sg)}
                             {sg.ledgers.length > 0 && <span>{countNote(sg.ledgers)}</span>}{countChip(rollupCount(sg), false)}
                           </span>
                         </div>
@@ -414,9 +522,10 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
   return (
     <div style={{ padding: '12px 14px', maxWidth: 1600, margin: '0 auto' }}>
       <FocusBanner />
+      {structAction && <GroupStructureDialog action={structAction} groups={groups} onClose={() => setStructAction(null)} />}
       <div style={{ marginBottom: 8 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Accounts Tree View</h2>
-        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>.</p>
+        <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>Parent Group ▸ Group ▸ Sub-Group ▸ Ledger · View-only — create under <b>Masters ▸ Accounts Master</b>. Custom sub-groups offer <b>Move to…</b> / <b>Clone…</b> from their row (admin — system nodes 🔒 never move).</p>
       </div>
 
       {/* Scope legend — Groups/Sub-Groups are org-wide; only Ledgers carry a branch. Each

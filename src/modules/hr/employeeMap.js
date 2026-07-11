@@ -20,7 +20,7 @@ export const BLANK_EMP = {
 export function fromEmpDTO(e = {}) {
   const row = {
     _id: e.id, id: e.empId, name: e.name || '', branch: e.branch || '',
-    dept: e.department || '', desig: e.designation || '',
+    dept: e.department || '', desig: e.designation || '', grade: e.grade || '',
     joined: e.joinDate || '', exit: e.exitDate || '', dob: e.dob || '', mobile: e.phone || '', email: e.email || '',
     status: e.status === 'inactive' ? 'Inactive' : 'Active',
     shiftId: e.shiftId || '', shiftCode: e.shiftCode || '',
@@ -33,7 +33,7 @@ export function fromEmpDTO(e = {}) {
 export function toEmpPayload(f = {}) {
   const body = {
     empId: f.id, name: f.name, branch: f.branch,
-    department: f.dept, designation: f.desig,
+    department: f.dept, designation: f.desig, grade: f.grade || '',
     joinDate: f.joined, exitDate: f.exit, dob: f.dob, phone: f.mobile, email: f.email,
     status: f.status === 'Inactive' ? 'inactive' : 'active',
     shiftId: f.shiftId || '', shiftCode: f.shiftCode || '',

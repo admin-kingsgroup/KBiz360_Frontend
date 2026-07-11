@@ -262,6 +262,12 @@ export function HrEmployees({branch}){
   const {create,update,remove}=useMasterMutations('employees');
   /* Active shifts for the assignment picker: those for the form's branch + the all-branch ('') ones. */
   const shifts=((useMasterList('shifts', {active:true}).data)||[]).map(fromShiftDTO).filter(s=>s.active);
+  // HR org masters (LIVE 2026-07-10) — departments/designations/grades drive the
+  // job-detail selects; an employee's legacy free-text value not in the master
+  // renders as an extra "(current)" option so old rows never blank on save.
+  const orgDepts=((useMasterList('departments',{active:true}).data)||[]).map(d=>d.name).filter(Boolean);
+  const orgDesigs=((useMasterList('designations',{active:true}).data)||[]).map(d=>d.name).filter(Boolean);
+  const orgGrades=(useMasterList('grades',{active:true}).data)||[];
   const shiftOpts=shifts.filter(s=>!s.branch||s.branch===(form.branch||brScope));
   const saving=create.isPending||update.isPending;
   React.useEffect(()=>{ setBrFilter(branch==="ALL"?"All":branch?.code||"All"); },[branch]);
@@ -448,8 +454,17 @@ export function HrEmployees({branch}){
                   {BRANCHES.map(b=><option key={b.code} value={b.code}>{b.code}</option>)}</select></FL>
                 <FL label="Department"><select value={form.dept} onChange={e=>setF("dept",e.target.value)} style={inp}>
                   <option value="">—</option>
-                  {HR_DEPTS.filter(d=>d!=="All").map(d=><option key={d} value={d}>{d}</option>)}</select></FL>
-                <FL label="Designation"><input value={form.desig} onChange={e=>setF("desig",e.target.value)} style={inp}/></FL>
+                  {form.dept&&!orgDepts.includes(form.dept)&&!HR_DEPTS.includes(form.dept)&&<option value={form.dept}>{form.dept} (current)</option>}
+                  {(orgDepts.length?orgDepts:HR_DEPTS.filter(d=>d!=="All")).map(d=><option key={d} value={d}>{d}</option>)}</select></FL>
+                <FL label="Designation"><select value={form.desig} onChange={e=>setF("desig",e.target.value)} style={inp}>
+                  <option value="">—</option>
+                  {form.desig&&!orgDesigs.includes(form.desig)&&<option value={form.desig}>{form.desig} (current)</option>}
+                  {orgDesigs.map(d=><option key={d} value={d}>{d}</option>)}
+                  {!orgDesigs.length&&!form.desig&&<option value="" disabled>Define designations under the HR org masters</option>}</select></FL>
+                <FL label="Grade (salary band)"><select value={form.grade||""} onChange={e=>setF("grade",e.target.value)} style={inp}>
+                  <option value="">—</option>
+                  {form.grade&&!orgGrades.some(g=>g.name===form.grade)&&<option value={form.grade}>{form.grade} (current)</option>}
+                  {orgGrades.map(g=><option key={g.id||g.name} value={g.name}>{g.name}{g.minSalary||g.maxSalary?` (₹${g.minSalary||0}–${g.maxSalary||"∞"})`:""}</option>)}</select></FL>
                 <FL label="Shift"><select value={form.shiftId||""} onChange={e=>{const s=shiftOpts.find(x=>x.id===e.target.value);setForm(f=>({...f,shiftId:e.target.value,shiftCode:s?.code||""}));}} style={inp}>
                   <option value="">— branch default —</option>
                   {/* Keep the current assignment visible even if that shift is inactive or from
@@ -549,6 +564,15 @@ export function HrAttendance({branch}){
      even if it was later deactivated — matching the backend KPI (getStats loads all shifts). */
   const shiftsById=Object.fromEntries(((useMasterList('shifts',{}).data)||[]).map(s=>{const x=fromShiftDTO(s);return [x.id,x];}));
   const woFor=(emp)=>weeklyOffForShift(emp.shiftId,shiftsById);
+  /* Public-holiday calendar (LIVE 2026-07-10, /api/holidays): holidays matching the
+     employee's branch (or 'ALL') auto-render 'H'; a hand-marked status still WINS so
+     corrections stay possible. Bulk fills skip holiday dates like weekly-offs. */
+  const { create: holidayCreate, remove: holidayRemove } = useMasterMutations('holidays');
+  const holidayRows=((useMasterList('holidays',{active:true}).data)||[]).filter(h=>String(h.date||"").startsWith(month));
+  const isoOf=(day)=>`${month}-${String(day).padStart(2,"0")}`;
+  const holidayFor=(emp,day)=>holidayRows.some(h=>h.date===isoOf(day)&&(h.branch==="ALL"||h.branch===emp.branch));
+  const [holModal,setHolModal]=useState(false);
+  const [holForm,setHolForm]=useState({date:"",name:"",branch:"ALL"});
   const attQ=useQuery({
     queryKey:['attendance',brScope||'ALL',month],
     queryFn:()=>apiGet('/api/attendance',{branch:brScope||'ALL',month}),
@@ -600,8 +624,11 @@ export function HrAttendance({branch}){
       groups.get(key).list.push({empId:e.id,empName:e.name});
     }
     const plan=[];
+    // Holidays are skipped like weekly-offs. Group-wide ('ALL') and the bulk branch's
+    // holidays both apply (the bulk always targets ONE branch, so this is exact).
+    const isHoliday=(d)=>holidayRows.some(h=>h.date===isoOf(d)&&(h.branch==="ALL"||h.branch===bulkBranch));
     for(const {wo,list} of groups.values()){
-      const daysArr=dayFilter.filter(d=>!wo.includes(getDay(d)));
+      const daysArr=dayFilter.filter(d=>!wo.includes(getDay(d))&&!isHoliday(d));
       if(daysArr.length&&list.length) plan.push({days:daysArr,employees:list});
     }
     return plan;
@@ -636,7 +663,8 @@ export function HrAttendance({branch}){
      Present. Unassigned employees fall back to Sunday-only off (weeklyOffForShift default). */
   const getAtt=(emp,day)=>{
     const marked=attByEmp[emp.id]?.[String(day)];
-    if(marked) return marked;
+    if(marked) return marked;                       // a hand-marked status always wins
+    if(holidayFor(emp,day)) return "H";              // holiday calendar → auto-'H'
     return woFor(emp).includes(getDay(day))?"WO":"";
   };
   const cycleCell=(emp,day)=>{
@@ -678,8 +706,52 @@ export function HrAttendance({branch}){
             style={{...btnGh,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed"}}>Fill working days →</button>
           <button onClick={openPunch} disabled={emps.length===0} title="Record in/out punch times and see late marks"
             style={{...btnGh,fontSize:11,minHeight:32,opacity:emps.length?1:0.5,cursor:emps.length?"pointer":"not-allowed"}}>🕒 Punch times</button>
+          <button onClick={()=>{setHolForm({date:month+"-01",name:"",branch:brScope||"ALL"});setHolModal(true);}} title="Manage the public-holiday calendar (auto-marks H on the grid)"
+            style={{...btnGh,fontSize:11,minHeight:32}}>🎉 Holidays ({holidayRows.length})</button>
         </div>
       </div>
+
+      {/* Public-holiday calendar admin (LIVE — /api/holidays) */}
+      {holModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:520,maxHeight:"85vh",overflow:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Public Holidays — {MONTHS.find(m2=>m2.v===month)?.l}</p>
+              <button onClick={()=>setHolModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"14px 18px"}}>
+              {holidayRows.length===0&&<p style={{fontSize:11.5,color:"#5a6691",margin:"0 0 10px"}}>No holidays entered for this month — the grid only knows shift weekly-offs until you add them.</p>}
+              {holidayRows.map(h=>(
+                <div key={h.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
+                  <span style={{fontFamily:"monospace",fontWeight:700,color:"#185FA5"}}>{h.date}</span>
+                  <span style={{flex:1,color:"#0d1326",fontWeight:600}}>{h.name}</span>
+                  <span style={{fontSize:10,padding:"1px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{h.branch}</span>
+                  <button onClick={()=>holidayRemove.mutate(h.id)} title="Remove holiday" style={{background:"#fbe9e9",border:"1px solid #f3c9c9",color:"#dc2626",borderRadius:3,fontSize:10.5,padding:"2px 8px",cursor:"pointer",fontWeight:700}}>✕</button>
+                </div>
+              ))}
+              <div style={{marginTop:14,padding:12,background:"#fafbfd",border:"1px solid #cdd1d8",borderRadius:8}}>
+                <p style={{margin:"0 0 8px",fontSize:11,fontWeight:700,color:"#0d1326"}}>Add holiday</p>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1.4fr 0.8fr",gap:8}}>
+                  <input type="date" value={holForm.date} onChange={e=>setHolForm(f=>({...f,date:e.target.value}))} style={{...inp,minHeight:32,fontSize:11}}/>
+                  <input value={holForm.name} onChange={e=>setHolForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Independence Day" style={{...inp,minHeight:32,fontSize:11}}/>
+                  <select value={holForm.branch} onChange={e=>setHolForm(f=>({...f,branch:e.target.value}))} style={{...inp,minHeight:32,fontSize:11}}>
+                    <option value="ALL">ALL</option>
+                    {BRANCHES.map(b=><option key={b.code} value={b.code}>{b.code}</option>)}
+                  </select>
+                </div>
+                <button disabled={!holForm.date||!holForm.name.trim()||holidayCreate.isPending}
+                  onClick={()=>holidayCreate.mutate({date:holForm.date,name:holForm.name.trim(),branch:holForm.branch,active:true},
+                    {onSuccess:()=>{toast("Holiday added — the grid now auto-marks H.");setHolForm(f=>({...f,name:""}));},
+                     onError:(e)=>toast(e?.message||"Add failed (duplicate date for this branch?)","error")})}
+                  style={{...btnG,fontSize:11,marginTop:8,opacity:!holForm.date||!holForm.name.trim()?0.5:1}}>
+                  {holidayCreate.isPending?"Adding…":"+ Add holiday"}
+                </button>
+                <p style={{margin:"8px 0 0",fontSize:10,color:"#5a6691"}}>A hand-marked cell still wins over the auto-H, and bulk "Fill working days" skips holidays like weekly-offs.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Legend */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
