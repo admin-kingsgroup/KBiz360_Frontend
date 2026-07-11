@@ -856,16 +856,32 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} placeholder={spec.idCols[0].label} style={cellTxt} /></td>
                   <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', width: 140, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input value={l.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} placeholder={spec.idCols[1].label} style={cellTxt} /></td>
                   {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{l[col.key] || '—'}</td>)}
-                  {spec.fareCols.map((col) => <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>)}
-                  <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} /></td>
+                  {spec.fareCols.map((col) => (
+                    <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
+                      {poOnly
+                        ? <span style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700, color: '#3A3A3A' }}>{fmt(l[col.key] || 0)}</span>
+                        : <input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} />}
+                    </td>
+                  ))}
+                  <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
+                    {poOnly
+                      ? <span style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700, color: '#3A3A3A' }}>{fmt(l.psvc || 0)}</span>
+                      : <input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} />}
+                  </td>
                   {pkg
                     ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
                         {suppForeign
                           ? <span title="Overseas supplier — no Indian GST (import of service)" style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', color: '#9197a3', fontWeight: 700 }}>—</span>
-                          : <input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} />}
+                          : poOnly
+                            ? <span style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700, color: '#3A3A3A' }}>{fmt(l.psvcGst || 0)}</span>
+                            : <input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} />}
                       </td>
                     : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
-                  <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}><input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} /></td>
+                  <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
+                    {poOnly
+                      ? <span style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700, color: '#3A3A3A' }}>{fmt(l.incentive || 0)}</span>
+                      : <input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} />}
+                  </td>
                   <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
                   <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
                 </tr>
