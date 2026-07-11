@@ -11,6 +11,7 @@ import { SampleBanner } from '../../core/ux/SampleBanner';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { AlertTriangle, ChevronDown, Download, Lock, Plus, Printer, Save, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
 import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useGroupMatch, useUnmatch, useSetReconStatus, useClearStatement, useRefreshBankReco } from '../../core/useBankReco';
+import { useParseStatementFile } from '../../core/useStatementFile';
 import { useReconQueue, useReconSummary } from '../../core/useReconciliation';
 import { usePDCs, usePDCSummary, useCreatePDC, useDepositPDC, useBouncePDC, useRepresentPDC, useDeletePDC } from '../../core/usePDC';
 import { branchCode } from '../../core/useAccounting';
@@ -573,25 +574,38 @@ export function BankReco({branch}){
   );
 }
 
-/* Statement import — paste or upload CSV, map columns, preview, import. */
+/* Statement import — paste, upload CSV, or upload a PDF (extracted + stored to
+   S3 server-side), map columns, preview, import. */
 function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut,onImported}){
   const [raw,setRaw]=useState("");
   const [fileName,setFileName]=useState("");
-  const {headers,rows}=useMemo(()=>parseDelimited(raw),[raw]);
+  const [pdfResult,setPdfResult]=useState(null); // {key,fileName,headers,rows,warning} once a PDF has been uploaded+parsed
+  const parsePdf=useParseStatementFile();
+  const parsedRaw=useMemo(()=>parseDelimited(raw),[raw]);
+  const {headers,rows}=pdfResult?{headers:pdfResult.headers,rows:pdfResult.rows}:parsedRaw;
   const [mapping,setMapping]=useState({});
-  useEffect(()=>{ setMapping(guessMapping(headers)); },[raw]); // re-guess whenever a new file/paste lands
+  useEffect(()=>{ setMapping(guessMapping(headers)); },[raw,pdfResult]); // re-guess whenever a new file/paste/PDF lands
   const built=useMemo(()=>buildImportRows(rows,mapping),[rows,mapping]);
   const valid=built.filter(r=>r.date&&(r.debit||r.credit));
-  const onFile=e=>{ const file=e.target.files?.[0]; if(!file) return; setFileName(file.name); const rd=new FileReader(); rd.onload=()=>setRaw(String(rd.result||"")); rd.readAsText(file); };
+  const onFile=e=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    setPdfResult(null);
+    if(/\.pdf$/i.test(file.name)){
+      setFileName(file.name); setRaw("");
+      parsePdf.mutate({file,module:"bank-reconciliation"},{onSuccess:data=>setPdfResult(data)});
+      return;
+    }
+    setFileName(file.name); const rd=new FileReader(); rd.onload=()=>setRaw(String(rd.result||"")); rd.readAsText(file);
+  };
   // Post exactly the rows we counted (valid), then widen — never shrink — the
   // period so every row we just imported is visible below. ISO dates sort/compare
   // lexicographically, so string min/max is chronological.
   const doImport=()=>{
     const dates=valid.map(r=>r.date).filter(Boolean).sort();
     const fileFrom=dates[0], fileTo=dates[dates.length-1];
-    importMut.mutate({ledger,branch:code,rows:valid,fileName},{onSuccess:()=>{
+    importMut.mutate({ledger,branch:code,rows:valid,fileName,sourceFileKey:pdfResult?.key},{onSuccess:()=>{
       if(fileFrom) onImported?.({from:fileFrom<from?fileFrom:from, to:fileTo>to?fileTo:to});
-      setRaw(""); setFileName("");
+      setRaw(""); setFileName(""); setPdfResult(null);
     }});
   };
 
@@ -603,10 +617,13 @@ function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut,onImported}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         <div>
-          <label style={{fontSize:10,fontWeight:700,color:"#5a6691",textTransform:"uppercase"}}>1 · Upload CSV or paste from Excel</label>
-          <input type="file" accept=".csv,.txt,.tsv" onChange={onFile} style={{display:"block",margin:"6px 0",fontSize:11}}/>
-          <textarea value={raw} onChange={e=>setRaw(e.target.value)} placeholder={"Paste rows here (Tab or comma separated). First row = headers, e.g.\nDate,Cheque No,Narration,Withdrawal,Deposit,Balance"} rows={6} style={{...inp,width:"100%",fontSize:10.5,fontFamily:"monospace",resize:"vertical"}}/>
-          {fileName&&<p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>Loaded: {fileName}</p>}
+          <label style={{fontSize:10,fontWeight:700,color:"#5a6691",textTransform:"uppercase"}}>1 · Upload CSV / PDF or paste from Excel</label>
+          <input type="file" accept=".csv,.txt,.tsv,.pdf" onChange={onFile} disabled={parsePdf.isPending} style={{display:"block",margin:"6px 0",fontSize:11}}/>
+          <textarea value={raw} onChange={e=>{setRaw(e.target.value);if(pdfResult)setPdfResult(null);}} placeholder={"Paste rows here (Tab or comma separated). First row = headers, e.g.\nDate,Cheque No,Narration,Withdrawal,Deposit,Balance"} rows={6} style={{...inp,width:"100%",fontSize:10.5,fontFamily:"monospace",resize:"vertical"}}/>
+          {parsePdf.isPending&&<p style={{margin:"4px 0 0",fontSize:10,color:"#185FA5"}}>Extracting text &amp; storing to S3…</p>}
+          {parsePdf.isError&&<p style={{margin:"4px 0 0",fontSize:10,color:"#A32D2D"}}>{String(parsePdf.error?.message||"Could not read this PDF.")}</p>}
+          {pdfResult?.warning&&<p style={{margin:"4px 0 0",fontSize:10,color:"#8a5a00"}}>⚠ {pdfResult.warning}</p>}
+          {fileName&&!parsePdf.isPending&&<p style={{margin:"4px 0 0",fontSize:10,color:"#5a6691"}}>Loaded: {fileName}{pdfResult?" · stored to S3 · rows extracted from PDF text":""}</p>}
         </div>
         <div>
           <label style={{fontSize:10,fontWeight:700,color:"#5a6691",textTransform:"uppercase"}}>2 · Map columns</label>
