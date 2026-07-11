@@ -1,0 +1,1 @@
+export { TallyTieOutBoard } from './TallyTieOutBoard';

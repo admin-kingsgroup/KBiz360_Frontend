@@ -27,6 +27,16 @@ describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', (
     expect(hrefs(matching)).toEqual(expect.arrayContaining(MATCHING));
   });
 
+  test('Reconciliation Hub: a full-view dashboard, one entry per tier (first sub-head)', () => {
+    const hub = groupByLabel(MENU_RECONCILIATION, 'Reconciliation Hub');
+    expect(hrefs(hub)).toEqual([
+      '/reconciliation/hub/weekly', '/reconciliation/hub/monthly',
+      '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly',
+    ]);
+    // Hub is the FIRST sub-head under the pill (watch first, then certify).
+    expect(MENU_RECONCILIATION.children[0].label).toBe('Reconciliation Hub');
+  });
+
   test('Certification: one entry per tier + the Rule Book', () => {
     const certs = groupByLabel(MENU_RECONCILIATION, 'Certification');
     expect(hrefs(certs)).toEqual([
@@ -71,13 +81,13 @@ describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', (
 
   test('breadcrumbs resolve to Reconciliation › Statement Matching › <leaf>', () => {
     expect(crumbsFor('/accounts/client-reco').map((c) => c.label)).toEqual(
-      ['Reconciliation', 'Statement Matching', 'Client Reconciliation'],
+      ['Statement Reconciliation', 'Statement Matching', 'Client Reconciliation'],
     );
     expect(crumbsFor('/bank-reco').map((c) => c.label)).toEqual(
-      ['Reconciliation', 'Statement Matching', 'Bank Reconciliation'],
+      ['Statement Reconciliation', 'Statement Matching', 'Bank Reconciliation'],
     );
     expect(crumbsFor('/accounts/interbranch-reco').map((c) => c.label)).toEqual(
-      ['Reconciliation', 'Statement Matching', 'Inter-Branch Reconciliation'],
+      ['Statement Reconciliation', 'Statement Matching', 'Inter-Branch Reconciliation'],
     );
   });
 });
@@ -85,7 +95,7 @@ describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', (
 describe('the Reconciliation pill carries the matching screens in every regime (getMenu)', () => {
   const reconPill = (branch) => {
     const menu = getMenu(branch, { role: 'Super Admin' });
-    return allHrefs(menu.find((m) => m.label === 'Reconciliation'));
+    return allHrefs(menu.find((m) => m.label === 'Statement Reconciliation'));
   };
   const GST = ['/tax/gstr2b', '/tax/gstr2a', '/tax/gstr9c', '/tax/reconciliation'];
 
@@ -101,9 +111,10 @@ describe('the Reconciliation pill carries the matching screens in every regime (
 
   test('Branch Accountant gets the pill WEEKLY-ONLY (their prep work; central tiers hidden)', () => {
     const menu = getMenu({ code: 'BOM' }, { role: 'Branch Accountant' });
-    const h = allHrefs(menu.find((m) => m.label === 'Reconciliation'));
-    expect(h).toEqual(expect.arrayContaining(['/bank-reco', '/reconciliation/weekly', '/reconciliation/reports/weekly', '/reconciliation/rulebook']));
-    ['/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
+    const h = allHrefs(menu.find((m) => m.label === 'Statement Reconciliation'));
+    expect(h).toEqual(expect.arrayContaining(['/bank-reco', '/reconciliation/hub/weekly', '/reconciliation/weekly', '/reconciliation/reports/weekly', '/reconciliation/rulebook']));
+    ['/reconciliation/hub/monthly', '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly',
+      '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
       '/reconciliation/reports/monthly', '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
     ].forEach((hidden) => expect(h).not.toContain(hidden));
   });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { flagRows, withToggled } from '../utils/flags';
+import { flagRows, withToggled, isFlagOn, withBranchToggled } from '../utils/flags';
 import { FlagPanel } from '../FlagPanel';
 
 // api/flags pulls in core/api (Vite import.meta) → mock it for the container test.
@@ -28,6 +28,34 @@ describe('flag utils', () => {
   test('withToggled flips a normal flag, never a foundation one', () => {
     expect(withToggled(state, 'branch.hide_statements')['branch.hide_statements'].enabled).toBe(true);
     expect(withToggled(state, 'core.policy_guard')['core.policy_guard'].foundation).toBe(true); // unchanged
+  });
+});
+
+describe('branch-wise flag utils', () => {
+  const bstate = { flags: {
+    'entry.mandatory_docs': { enabled: false, branches: { BOM: true } },
+    'core.policy_guard': { enabled: true },
+    'core.audit_log': { foundation: true },
+  } };
+  test('isFlagOn: branch override wins; else global; default → global; foundation always on', () => {
+    expect(isFlagOn(bstate, 'entry.mandatory_docs', 'BOM')).toBe(true);    // override
+    expect(isFlagOn(bstate, 'entry.mandatory_docs', 'AMD')).toBe(false);   // global
+    expect(isFlagOn(bstate, 'entry.mandatory_docs', 'default')).toBe(false); // global
+    expect(isFlagOn(bstate, 'core.policy_guard', 'FBM')).toBe(true);       // inherits global ON
+    expect(isFlagOn(bstate, 'core.audit_log', 'BOM')).toBe(true);          // foundation
+  });
+  test('withBranchToggled: writes a per-branch override, leaving the global value intact', () => {
+    const next = withBranchToggled(bstate, 'core.policy_guard', 'FBM');    // global on → FBM override off
+    expect(next['core.policy_guard'].branches.FBM).toBe(false);
+    expect(next['core.policy_guard'].enabled).toBe(true);                  // global untouched
+  });
+  test('withBranchToggled: default scope flips the global value (no branches)', () => {
+    const next = withBranchToggled(bstate, 'entry.mandatory_docs', 'default');
+    expect(next['entry.mandatory_docs'].enabled).toBe(true);
+  });
+  test('withBranchToggled: toggling an existing BOM override off', () => {
+    const next = withBranchToggled(bstate, 'entry.mandatory_docs', 'BOM'); // BOM true → false
+    expect(next['entry.mandatory_docs'].branches.BOM).toBe(false);
   });
 });
 

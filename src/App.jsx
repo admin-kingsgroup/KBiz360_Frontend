@@ -44,11 +44,12 @@ import { financeRoutes } from './modules/finance/routes';
 import { supportRoutes } from './modules/support/routes';
 /* Reconciliation module (4-tier per-ledger certificates + Rule Book). */
 import { reconciliationRoutes } from './modules/reconciliation/routes';
+import { tallyReconRoutes } from './modules/tally-reconciliation/routes';
 
 /* Declarative route tables from migrated feature modules. The host renders
    these via react-router FIRST; any route not listed falls through to the
    legacy string-router in Page(). Append more tables here as modules migrate. */
-const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes, ...reconciliationRoutes];
+const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes, ...reconciliationRoutes, ...tallyReconRoutes];
 const { BankingApiSettings, DelegationsManager, GroupDashboard, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, GratuityEstimateView, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyForm16, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
