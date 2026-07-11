@@ -58,6 +58,18 @@ describe('EnforcementMatrix', () => {
     expect(setVoucherPolicy).not.toHaveBeenCalled();
   });
 
+  test('renders the combined Booking (SO/PO/GP) row and a separate Inter-Branch (INB) row', async () => {
+    getVoucherPolicy.mockResolvedValue({
+      categories: [{ key: 'booking', label: 'Booking (SO/PO/GP)' }, { key: 'inb', label: 'Inter-Branch (INB)' }],
+      defaults: { enforce: false, threshold: 0, effectiveDate: '' },
+      store: { default: {}, branches: {} },
+      effective: {},
+    });
+    renderWith(<EnforcementMatrix branch="BOM" />);
+    expect(await screen.findByText('Booking (SO/PO/GP)')).toBeInTheDocument();
+    expect(screen.getByText('Inter-Branch (INB)')).toBeInTheDocument();
+  });
+
   test('rejects a negative threshold before saving', async () => {
     localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
     renderWith(<EnforcementMatrix branch="default" />);

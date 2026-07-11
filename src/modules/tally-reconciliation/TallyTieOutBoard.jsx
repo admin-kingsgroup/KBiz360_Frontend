@@ -151,6 +151,9 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const rows = data?.rows || [];
   const counts = data?.counts || {};
   const imported = data?.imported || {};
+  // A certified (signed/locked) period is frozen — re-upload/Clear are blocked by the
+  // BE until re-opened; gate the upload controls proactively (not just via the 409).
+  const periodCertified = data?.certStatus === 'signed' || data?.certStatus === 'locked';
   // One authoritative "off" count (accepted variances already excluded on the BE),
   // used by the KPI, the Defects tab badge AND the certificate gate — never diverge.
   const offTotal = counts.offTotal ?? ((counts.off || 0) + (counts.onlyErp || 0) + (counts.onlyTally || 0));
@@ -255,8 +258,8 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           <p className="text-sm text-ink-muted">ERP live books vs uploaded Tally — every ledger, Balance Sheet &amp; P&amp;L side by side. Branch-wise, never blended.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" icon={Upload} onClick={() => { setShowImport((s) => !s); setShowDayBook(false); }}>Upload Tally TB</Button>
-          <Button variant="secondary" icon={FileUp} onClick={() => { setShowDayBook((s) => !s); setShowImport(false); }}>Upload Day Book</Button>
+          <Button variant="secondary" icon={Upload} disabled={periodCertified} title={periodCertified ? 'This period is certified — re-open the certificate to re-upload' : undefined} onClick={() => { setShowImport((s) => !s); setShowDayBook(false); }}>Upload Tally TB</Button>
+          <Button variant="secondary" icon={FileUp} disabled={periodCertified} title={periodCertified ? 'This period is certified — re-open the certificate to re-upload' : undefined} onClick={() => { setShowDayBook((s) => !s); setShowImport(false); }}>Upload Day Book</Button>
           <Button variant="ghost" icon={RefreshCcw} onClick={() => qc.invalidateQueries({ queryKey: ['tally-tieout'] })}>Refresh</Button>
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/tally-reconciliation/guide')}>Guide</Button>
         </div>
@@ -276,6 +279,11 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         {dbStatus?.vouchers > 0 && (
           <span className="rounded-full bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent" title="Full Day Book loaded for this period">
             Day Book · {dbStatus.vouchers} vouchers · {dbStatus.ledgers} ledgers
+          </span>
+        )}
+        {periodCertified && (
+          <span className="rounded-full bg-navy/10 px-2.5 py-1 text-xs font-semibold text-navy" title="Certified — re-open the certificate to re-upload or Clear">
+            🔒 Certified · re-open to change
           </span>
         )}
       </div>

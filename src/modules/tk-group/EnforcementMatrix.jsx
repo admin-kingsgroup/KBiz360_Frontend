@@ -133,7 +133,7 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
 
       <div className="mt-[16px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold">
         <span>▶</span>
-        <span>Turning <b>Enforce</b> on routes that voucher type through the approval chain directly — it does <b>not</b> require the Master Switch. A blank threshold enforces at any amount; a future effective date schedules the rule. Each branch inherits the <b>Group default</b> row unless it sets its own.</span>
+        <span>Turning <b>Enforce</b> on routes that voucher type through the approval chain directly — it does <b>not</b> require the Master Switch. A blank threshold enforces at any amount; a future effective date schedules the rule. Each branch inherits the <b>Group default</b> row unless it sets its own. <b>Booking (SO/PO/GP)</b> governs a booking’s sale and purchase legs together; <b>Inter-Branch (INB)</b> is controlled separately.</span>
       </div>
     </div>
   );

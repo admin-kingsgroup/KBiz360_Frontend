@@ -56,6 +56,6 @@ export async function getDayBookStatus({ branch, period, tier } = {}) {
   try { return (await apiGet('/api/tally-tieout/daybook', { branch, period, tier })) || { vouchers: 0, ledgers: 0 }; }
   catch { return { vouchers: 0, ledgers: 0 }; }
 }
-export function clearTB({ branch, period }) {
-  return apiDelete(`/api/tally-tieout?branch=${encodeURIComponent(branch)}&period=${encodeURIComponent(period)}`);
+export function clearTB({ branch, period, tier = 'month' }) {
+  return apiDelete(`/api/tally-tieout?branch=${encodeURIComponent(branch)}&period=${encodeURIComponent(period)}&tier=${encodeURIComponent(tier)}`);
 }

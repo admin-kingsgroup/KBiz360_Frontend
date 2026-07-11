@@ -2,11 +2,8 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck, Lock, Snowflake, PenLine, RotateCcw, AlertTriangle } from 'lucide-react';
 import { getTallyCert, freezeTallyCert, signTallyCert, reopenTallyCert } from './api';
+import { isApproverRole } from './format';
 import { PageSection, Badge, Button, ErrorState } from '../../shell/primitives';
-
-// Re-opening a certified period reverses sign-offs — approver-only (Director/Owner);
-// the backend enforces it too, this just hides the control from non-approvers.
-const canReopenRole = (role) => /owner|director|super.?admin/i.test(String(role || ''));
 
 // ─── Tally certificate — the sign-off that gates the month close (Phase 3) ────
 // A month can't hard-lock until this is signed: it certifies "ERP ties to Tally,
@@ -32,10 +29,14 @@ export function CertifyPanel({ branch, period, tier, offTotal, staleAccepted = 0
   const progress = data?.progress || { done: 0, total: 4, next: null };
   const gate = data?.canSign || { ok: false, reason: '' };
   const status = cert?.status || (tied ? 'reconciled' : 'open');
-  const meta = STATUS[status] || STATUS.open;
   const frozen = !!cert?.snapshot?.frozenAt;
   const certified = status === 'signed' || status === 'locked';
-  const canReopen = certified && canReopenRole(currentUser?.role);
+  const canReopen = certified && isApproverRole(currentUser?.role);
+  const stale = (staleAccepted || 0) > 0;
+  // A re-opened cert persists status 'open' with a cleared snapshot; show the live
+  // tie state in the badge rather than a stale "Not tied" when the ERP actually ties.
+  const displayStatus = (status === 'open' && !frozen && tied) ? 'reconciled' : status;
+  const meta = STATUS[displayStatus] || STATUS.open;
 
   const [reopening, setReopening] = useState(false);
   const [reason, setReason] = useState('');
@@ -58,10 +59,12 @@ export function CertifyPanel({ branch, period, tier, offTotal, staleAccepted = 0
       <div className="grid gap-3">
         {/* Stale accepted variances — an acceptance whose difference has since moved
             (a corrective re-upload). Non-silent so a reviewer re-checks before signing. */}
-        {staleAccepted > 0 && (
+        {stale && (
           <div className="flex items-start gap-2 rounded-brand border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink">
             <AlertTriangle size={16} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
-            <span><b>{staleAccepted} accepted variance{staleAccepted === 1 ? '' : 's'} changed</b> since being accepted — the recorded amount no longer matches the live difference. Re-review (re-accept or clear) in the <b>Defects</b> tab before signing.</span>
+            <span><b>{staleAccepted} accepted variance{staleAccepted === 1 ? '' : 's'} changed</b> since being accepted — the recorded amount no longer matches the live difference. {certified
+              ? <>Re-open the certificate to re-review (re-accept or clear) {staleAccepted === 1 ? 'it' : 'them'}.</>
+              : <>Re-review (re-accept or clear) in the <b>Defects</b> tab — certifying is blocked until then.</>}</span>
           </div>
         )}
         {/* gate state */}
@@ -94,19 +97,21 @@ export function CertifyPanel({ branch, period, tier, offTotal, staleAccepted = 0
               ) : null}
             </div>
 
-            {/* actions */}
+            {/* actions. Freeze is blocked once signing has started (the snapshot is
+                frozen — re-open to change) and while any acceptance is stale. */}
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" icon={Snowflake} loading={freeze.isPending} disabled={!tied}
+              <Button variant="secondary" icon={Snowflake} loading={freeze.isPending} disabled={!tied || stale || (cert?.signatures?.length > 0)}
                 onClick={() => freeze.mutate()}>
                 {frozen ? 'Re-freeze snapshot' : 'Freeze tie-out'}
               </Button>
-              {/* Sign requires the BE gate (frozen snapshot clean) AND the LIVE
-                  tie-out still clean — otherwise a voucher posted after a clean
-                  freeze could be signed/locked on a stale-clean snapshot. */}
-              <Button variant="primary" icon={PenLine} loading={sign.isPending} disabled={!gate.ok || !tied}
+              {/* Sign requires the BE gate (frozen snapshot clean) AND the LIVE tie
+                  still clean AND no stale acceptance — otherwise a voucher/re-upload
+                  after a clean freeze could be signed on a stale-clean snapshot. */}
+              <Button variant="primary" icon={PenLine} loading={sign.isPending} disabled={!gate.ok || !tied || stale}
                 onClick={() => sign.mutate()}>
                 {progress.next ? `Sign as ${progress.next.role}` : 'Sign'}
               </Button>
+              {stale && <span className="text-xs font-semibold text-warning">Re-review the changed accepted variance{staleAccepted === 1 ? '' : 's'} before certifying.</span>}
               {frozen && !tied && <span className="text-xs font-semibold text-danger">Tie-out changed since freezing — {offTotal} now off. Clear/accept them, then re-freeze.</span>}
               {!tied && !frozen && <span className="text-xs font-semibold text-danger">{offTotal} off — clear before signing</span>}
               {tied && !frozen && <span className="text-xs text-ink-subtle">Freeze the snapshot, then the chain can sign.</span>}

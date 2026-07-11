@@ -36,6 +36,15 @@ export const isCentralRole = (role) => {
   return /account.*(exec|executive)|(^|[^a-z])ae([^a-z]|$)|finance\s*manager|(^|[^a-z])fm([^a-z]|$)|director|owner|super[\s_-]*admin/i.test(r);
 };
 
+// Re-opening a certified period reverses sign-offs → APPROVER-ONLY. Mirrors the
+// backend gate roleSatisfies(role,'Director') = Director or Owner (Owner via Rule 07),
+// with the same Branch-Accountant-first precedence as isCentralRole.
+export const isApproverRole = (role) => {
+  const r = String(role || '');
+  if (/branch\s*account/i.test(r)) return false;
+  return /director|owner|super[\s_-]*admin/i.test(r);
+};
+
 export const STATUS_META = {
   tied: { tone: 'success', label: 'Tied' },
   off: { tone: 'danger', label: 'Off' },

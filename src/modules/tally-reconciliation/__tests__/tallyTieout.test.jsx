@@ -290,10 +290,28 @@ describe('Tally Reconciliation · certificate re-open + stale acceptance', () =>
     getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
   });
 
-  test('stale accepted variances raise a re-review warning on the certificate', async () => {
+  test('a stale accepted variance BLOCKS Freeze/Sign (the flag is not toothless)', async () => {
     const { getTallyCert } = require('../api');
-    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false } });
+    // Clean gate + tied, but a stale acceptance → the buttons must still be disabled.
+    getTallyCert.mockResolvedValue({ certificate: { status: 'reconciled', snapshot: { frozenAt: '2026-07-05' }, signatures: [] }, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: true, step: { role: 'AE' } } });
     wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} staleAccepted={2} currentUser={{ role: 'Owner' }} />);
     expect(await screen.findByText(/2 accepted variances changed/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sign/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Freeze|Re-freeze/ })).toBeDisabled();
+    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false } });
+  });
+
+  test('a certified period disables the Upload buttons (re-open first)', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', certStatus: 'locked',
+      counts: { total: 1, tied: 1, off: 0, offTotal: 0 }, erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 1 },
+      rows: [{ ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 100, tally: 100, diff: 0, status: 'tied' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('ICICI Bank A/c');
+    expect(screen.getAllByText('Upload Tally TB')[0].closest('button')).toBeDisabled();
+    expect(screen.getByText('Upload Day Book').closest('button')).toBeDisabled();
+    expect(screen.getByText(/Certified · re-open to change/)).toBeInTheDocument();
   });
 });
