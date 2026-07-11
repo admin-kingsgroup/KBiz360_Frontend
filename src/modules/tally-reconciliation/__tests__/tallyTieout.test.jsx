@@ -224,6 +224,20 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(values[0] >= values[values.length - 1]).toBe(true);
   });
 
+  test('Refresh re-pulls the whole period — the Defects register too, not just the balance view', async () => {
+    const { getDefects, getTieOut } = require('../api');
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    await screen.findByText('3 off ledgers'); // the Defect Register loaded
+    const defectsBefore = getDefects.mock.calls.length;
+    const tieBefore = getTieOut.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+    // Refresh invalidates ALL tally-tieout queries → both the board AND the defects re-run.
+    await waitFor(() => expect(getDefects.mock.calls.length).toBeGreaterThan(defectsBefore));
+    expect(getTieOut.mock.calls.length).toBeGreaterThan(tieBefore);
+  });
+
   test('yearly selector offers FY years back to inception (Indian branch)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="year" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('Tally Reconciliation · Yearly Tie-Out');

@@ -244,7 +244,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         <div className="flex items-center gap-2">
           <Button variant="secondary" icon={Upload} onClick={() => { setShowImport((s) => !s); setShowDayBook(false); }}>Upload Tally TB</Button>
           <Button variant="secondary" icon={FileUp} onClick={() => { setShowDayBook((s) => !s); setShowImport(false); }}>Upload Day Book</Button>
-          <Button variant="ghost" icon={RefreshCcw} onClick={() => refetch()}>Refresh</Button>
+          <Button variant="ghost" icon={RefreshCcw} onClick={() => qc.invalidateQueries({ queryKey: ['tally-tieout'] })}>Refresh</Button>
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/tally-reconciliation/guide')}>Guide</Button>
         </div>
       </div>
