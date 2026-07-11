@@ -10,6 +10,8 @@ import { BranchLimitsEditor } from './BranchLimitsEditor';
 import { EnforcementMatrix } from './EnforcementMatrix';
 import { UserConfig } from './UserConfig';
 import { ChangeLog } from './ChangeLog';
+import { Delegation } from './Delegation';
+import { BreakGlass } from './BreakGlass';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
 import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
@@ -244,19 +246,9 @@ export function ControlPanel({ setRoute }) {
           </>
         );
       case 'delegation':
-        return (
-          <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Temporary hand-over during leave — power passes for a window, then auto-reverts. Nothing delegated now.</p>
-            <div className="rounded-brand border border-surface-border bg-surface p-4 text-[12.5px] text-ink-muted">No active delegation. Example: <b className="text-ink">Faiz away 10–15 Jul → Sughra approves in his place</b>, reverting automatically. Every delegation is logged in the Change Log.</div>
-          </>
-        );
+        return <Delegation />;
       case 'breakglass':
-        return (
-          <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Emergency elevated access — granted for a short window with a mandatory reason, fully audited, auto-expiring. Use only when normal approval can't run.</p>
-            <div className="rounded-brand border border-warning/40 bg-surface p-4 text-[12.5px] text-ink-muted">No break-glass session active. When invoked, it demands a reason, notifies the Owner immediately, and expires on a timer — every action inside the window is flagged in the audit trail.</div>
-          </>
-        );
+        return <BreakGlass />;
       case 'erp':
         return (
           <>

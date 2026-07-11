@@ -31,6 +31,9 @@ jest.mock('../api/userLimits', () => ({
 }));
 // ChangeLog (Change Log screen) pulls api/monitor → core/api.
 jest.mock('../api/monitor', () => ({ getAudit: jest.fn().mockResolvedValue({ items: [] }) }));
+// Delegation + Break-Glass screens pull their api → core/api.
+jest.mock('../api/delegation', () => ({ getDelegations: jest.fn().mockResolvedValue({ items: [], activeCount: 0 }), createDelegation: jest.fn().mockResolvedValue({}), revokeDelegation: jest.fn().mockResolvedValue({}) }));
+jest.mock('../api/breakglass', () => ({ getBreakglass: jest.fn().mockResolvedValue({ items: [], activeCount: 0 }), invokeBreakglass: jest.fn().mockResolvedValue({}), endBreakglass: jest.fn().mockResolvedValue({}) }));
 // Master-switch confirm — default to "confirmed" so the happy-path flip proceeds; a
 // test overrides it to assert cancellation blocks the flip.
 jest.mock('../../../core/ux/confirm', () => ({ confirmDialog: jest.fn().mockResolvedValue({ confirmed: true }) }));
