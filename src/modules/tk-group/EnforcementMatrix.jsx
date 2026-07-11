@@ -24,11 +24,15 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
   const [busy, setBusy] = useState('');
 
   // Seed each row from the effective policy for the selected branch on branch / reload.
+  // Defaults shown when a row has no stored value: amount 0 (= enforce at any amount) and
+  // the effective date = today (= effective immediately). Both are functionally identical
+  // to leaving them blank, just clearer at a glance.
+  const today = new Date().toISOString().slice(0, 10);
   useEffect(() => {
     const seed = {};
     categories.forEach((c) => {
       const cell = resolveCell(store, branch, c.key);
-      seed[c.key] = { enforce: cell.enforce === true, threshold: cell.threshold ? String(cell.threshold) : '', effectiveDate: cell.effectiveDate || '' };
+      seed[c.key] = { enforce: cell.enforce === true, threshold: cell.threshold ? String(cell.threshold) : '0', effectiveDate: cell.effectiveDate || today };
     });
     setRows(seed);
     setMsg('');
@@ -133,7 +137,7 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
 
       <div className="mt-[16px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold">
         <span>▶</span>
-        <span>Turning <b>Enforce</b> on routes that voucher type through the approval chain directly — it does <b>not</b> require the Master Switch. A blank threshold enforces at any amount; a future effective date schedules the rule. Each branch inherits the <b>Group default</b> row unless it sets its own. <b>Booking (SO/PO/GP)</b> governs a booking’s sale and purchase legs together; <b>Inter-Branch (INB)</b> is controlled separately.</span>
+        <span>Turning <b>Enforce</b> on routes that voucher type through the approval chain directly — it does <b>not</b> require the Master Switch. <b>0</b> (the default, or blank) enforces at any amount; the <b>Effective from</b> date defaults to today (effective immediately) — set a future date to schedule the rule. Each branch inherits the <b>Group default</b> row unless it sets its own. <b>Booking (SO/PO/GP)</b> governs a booking’s sale and purchase legs together; <b>Inter-Branch (INB)</b> is controlled separately.</span>
       </div>
     </div>
   );

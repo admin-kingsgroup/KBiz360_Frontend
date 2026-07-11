@@ -6,8 +6,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 jest.mock('../api', () => ({
-  getPeriods: jest.fn(() => Promise.resolve([{ period: '2026-07', tier: 'month', ledgers: 4 }])),
+  getPeriods: jest.fn(() => Promise.resolve([
+    { period: '2026-07', tier: 'month', ledgers: 4, certStatus: 'none' },
+    { period: '2025-09', tier: 'month', ledgers: 63, certStatus: 'locked' }, // certified → 🔒 in the selector
+  ])),
   getInception: jest.fn(() => Promise.resolve('2025-01-01')),
+  getRegister: jest.fn(() => Promise.resolve([
+    { period: '2025-09', tier: 'month', ledgers: 63, cert: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { offTotal: 0, absDiff: 0, netProfitErp: -500, netProfitTally: -500, frozenAt: '2025-09-30' }, reopened: 0 } },
+    { period: '2026-07', tier: 'month', ledgers: 4, cert: null }, // uploaded, not yet certified
+  ])),
   importTB: jest.fn(),
   clearTB: jest.fn(),
   importDayBook: jest.fn(() => Promise.resolve({ inserted: 0, ledgers: 0 })),
@@ -52,6 +59,8 @@ jest.mock('../api', () => ({
 
 import { TallyTieOutBoard } from '../TallyTieOutBoard';
 import { CertifyPanel } from '../CertifyPanel';
+import { TallyCertRegister } from '../TallyCertRegister';
+import { TallyReconReport } from '../TallyReconReport';
 import { TallyGuidePage } from '../TallyGuidePage';
 import { tallyReconRoutes } from '../routes';
 import { MENU_TALLY_RECON, getMenu } from '../../../core/menus';
@@ -64,12 +73,14 @@ const wrap = (ui) => {
 const allHrefs = (n, out = []) => { if (!n) return out; if (n.href) out.push(n.href); (n.children || []).forEach((c) => allHrefs(c, out)); return out; };
 
 describe('Tally Reconciliation · pill + routes', () => {
-  test('the pill consolidates everything Tally — tie-outs, the Day Book matcher, and the guide', () => {
+  test('the pill consolidates everything Tally — tie-outs, certification, reports, the matcher, and the guide', () => {
     expect(MENU_TALLY_RECON.label).toBe('Tally Reconciliation');
     expect(allHrefs(MENU_TALLY_RECON)).toEqual([
-      '/tally-reconciliation/monthly', '/tally-reconciliation/yearly', // Tie-Out
-      '/accounts/tally-reco',                                          // Vouchers · Day Book matcher (moved in)
-      '/tally-reconciliation/guide',                                   // Help · staff guide
+      '/tally-reconciliation/monthly', '/tally-reconciliation/yearly',                     // Tie-Out
+      '/tally-reconciliation/certification/monthly', '/tally-reconciliation/certification/yearly', // Certification
+      '/tally-reconciliation/reports/monthly', '/tally-reconciliation/reports/yearly',     // Reports
+      '/accounts/tally-reco',                                                              // Vouchers · Day Book matcher
+      '/tally-reconciliation/guide',                                                       // Help · staff guide
     ]);
   });
   test('appears in the full menu for a Super Admin', () => {
@@ -87,6 +98,10 @@ describe('Tally Reconciliation · pill + routes', () => {
   test('breadcrumbs resolve the moved leaf + the guide under the Tally Reconciliation pill', () => {
     expect(crumbsFor('/accounts/tally-reco').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Vouchers', 'Ledger Matcher (Day Book)']);
     expect(crumbsFor('/tally-reconciliation/guide').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Help', 'Tally Reconciliation Guide']);
+  });
+  test('breadcrumbs resolve the new Certification + Reports pages', () => {
+    expect(crumbsFor('/tally-reconciliation/certification/monthly').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Certification', 'Monthly Certification']);
+    expect(crumbsFor('/tally-reconciliation/reports/yearly').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Reports', 'Yearly Report']);
   });
   test('the staff Guide page renders', () => {
     wrap(<TallyGuidePage setRoute={() => {}} />);
@@ -313,5 +328,49 @@ describe('Tally Reconciliation · certificate re-open + stale acceptance', () =>
     expect(screen.getAllByText('Upload Tally TB')[0].closest('button')).toBeDisabled();
     expect(screen.getByText('Upload Day Book').closest('button')).toBeDisabled();
     expect(screen.getByText(/Certified · re-open to change/)).toBeInTheDocument();
+  });
+});
+
+describe('Tally Reconciliation · Certification Register + Report + selector lock', () => {
+  test('the period selector marks a certified month with a lock', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    const sel = screen.getByLabelText('Tie-out period');
+    const opts = [...sel.querySelectorAll('option')];
+    const sept = opts.find((o) => o.value === '2025-09');
+    expect(sept).toBeTruthy();
+    expect(sept.textContent).toMatch(/🔒 Certified/);
+  });
+
+  test('Certification Register lists periods with their status + certified summary', async () => {
+    wrap(<TallyCertRegister branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
+    expect(await screen.findByText('Tally Certification Register · Monthly')).toBeInTheDocument();
+    // The certified Sept row shows the Certified badge; the summary counts 1 certified.
+    expect(await screen.findByText('2025-09')).toBeInTheDocument();
+    // Both the "🔒 Certified" KPI chip and the certified row badge carry the label.
+    expect(screen.getAllByText('🔒 Certified').length).toBeGreaterThan(0);
+  });
+
+  test('Certification Register self-guards a non-central role', async () => {
+    wrap(<TallyCertRegister branch="BOM" tier="month" currentUser={{ role: 'Branch Accountant' }} setRoute={() => {}} />);
+    expect(await screen.findByText('Central control')).toBeInTheDocument();
+    expect(screen.queryByText('2025-09')).not.toBeInTheDocument();
+  });
+
+  test('Report splits Pending Closings, Certificate Register and Open Items', async () => {
+    wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
+    expect(await screen.findByText('Tally Reconciliation Report · Monthly')).toBeInTheDocument();
+    // Sections render after the register query resolves.
+    expect(await screen.findByText('Pending Closings')).toBeInTheDocument();
+    expect(screen.getByText('Certificate Register')).toBeInTheDocument();
+    expect(screen.getByText('Open Items')).toBeInTheDocument();
+    // 2026-07 is uploaded but not certified → appears as pending + an open blocker.
+    expect(await screen.findByText(/TB uploaded — no certificate started/)).toBeInTheDocument();
+  });
+
+  test('every /tally-reconciliation certification + reports href resolves to a route', () => {
+    const paths = tallyReconRoutes.map((r) => r.path);
+    ['/tally-reconciliation/certification/monthly', '/tally-reconciliation/certification/yearly',
+      '/tally-reconciliation/reports/monthly', '/tally-reconciliation/reports/yearly'].forEach((h) => expect(paths).toContain(h));
   });
 });
