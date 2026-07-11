@@ -41,7 +41,12 @@ export const isCentralRole = (role) => {
 // with the same Branch-Accountant-first precedence as isCentralRole.
 export const isApproverRole = (role) => {
   const r = String(role || '');
+  // Same precedence as the backend normalizeRole: a lower role wins even if the
+  // string also contains "director"/"owner" (e.g. a dual "FM / Director" label),
+  // so the FE never shows Re-open where the backend would 403.
   if (/branch\s*account/i.test(r)) return false;
+  if (/account.*(exec|executive)|(^|[^a-z])ae([^a-z]|$)/i.test(r)) return false;
+  if (/finance\s*manager|(^|[^a-z])fm([^a-z]|$)/i.test(r)) return false;
   return /director|owner|super[\s_-]*admin/i.test(r);
 };
 

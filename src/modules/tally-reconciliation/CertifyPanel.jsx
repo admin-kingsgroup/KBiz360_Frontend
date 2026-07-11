@@ -143,7 +143,7 @@ export function CertifyPanel({ branch, period, tier, offTotal, staleAccepted = 0
                   </Button>
                   <Button variant="ghost" onClick={() => { setReopening(false); setReason(''); }}>Cancel</Button>
                   {reopen.isError && <span className="text-xs text-danger">{reopen.error?.message}</span>}
-                  <span className="text-xs text-ink-subtle">This re-opens the Tally attestation only — it does not unlock the ERP accounting period.</span>
+                  <span className="text-xs text-ink-subtle">Withdraws the Tally sign-offs so the period can be corrected and re-signed. It does not unlock the ERP accounting period — an ERP-side correction to a locked month needs the separate period-unlock control.</span>
                 </div>
               </div>
             )}
