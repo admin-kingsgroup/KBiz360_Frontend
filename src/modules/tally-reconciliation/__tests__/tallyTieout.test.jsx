@@ -7,8 +7,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 jest.mock('../api', () => ({
   getPeriods: jest.fn(() => Promise.resolve([{ period: '2026-07', tier: 'month', ledgers: 4 }])),
+  getInception: jest.fn(() => Promise.resolve('2025-01-01')),
   importTB: jest.fn(),
   clearTB: jest.fn(),
+  importDayBook: jest.fn(() => Promise.resolve({ inserted: 0, ledgers: 0 })),
+  getDayBookStatus: jest.fn(() => Promise.resolve({ vouchers: 0, ledgers: 0 })),
   getDefects: jest.fn(() => Promise.resolve({
     branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 3,
     summary: { total: 1, byType: { 'missing-in-erp': 1 } },
@@ -22,6 +25,7 @@ jest.mock('../api', () => ({
   })),
   freezeTallyCert: jest.fn(),
   signTallyCert: jest.fn(),
+  reopenTallyCert: jest.fn(() => Promise.resolve({ certificate: { status: 'open', signatures: [] } })),
   acceptVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
   clearVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
   getLedgerVouchers: jest.fn(() => Promise.resolve({
@@ -47,6 +51,7 @@ jest.mock('../api', () => ({
 }));
 
 import { TallyTieOutBoard } from '../TallyTieOutBoard';
+import { CertifyPanel } from '../CertifyPanel';
 import { TallyGuidePage } from '../TallyGuidePage';
 import { tallyReconRoutes } from '../routes';
 import { MENU_TALLY_RECON, getMenu } from '../../../core/menus';
@@ -178,5 +183,117 @@ describe('Tally Reconciliation · tie-out board render', () => {
     fireEvent.click(await screen.findByText('HDFC Bank A/c')); // off ledger → drawer
     fireEvent.click(await screen.findByText('Accept variance'));
     await waitFor(() => expect(acceptVariance).toHaveBeenCalledWith(expect.objectContaining({ ledger: 'HDFC Bank A/c', period: '2026-07' })));
+  });
+
+  test('both upload buttons live on the board; Day Book panel opens a file picker', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    // Both full-upload buttons sit in the header (TB button also appears as onboarding CTA → getAllBy).
+    expect(screen.getAllByText('Upload Tally TB').length).toBeGreaterThan(0);
+    expect(screen.getByText('Upload Day Book')).toBeInTheDocument();
+    // Opening the Day Book panel reveals the file input; the TB panel's stays hidden.
+    fireEvent.click(screen.getByText('Upload Day Book'));
+    expect(await screen.findByText('Upload Tally Day Book')).toBeInTheDocument();
+    expect(screen.getByTestId('db-file')).toBeInTheDocument();
+    expect(screen.queryByTestId('tb-file')).not.toBeInTheDocument(); // the two panels are mutually exclusive
+  });
+
+  test('TB upload panel offers a file picker alongside paste', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getAllByText('Upload Tally TB')[0]); // header button toggles the TB panel
+    expect(await screen.findByTestId('tb-file')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/ICICI Bank/)).toBeInTheDocument(); // the paste box is still offered
+  });
+
+  test('Day Book status line shows how many vouchers are loaded', async () => {
+    const { getDayBookStatus } = require('../api');
+    getDayBookStatus.mockResolvedValueOnce({ vouchers: 274, ledgers: 63 });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText(/Day Book · 274 vouchers · 63 ledgers/)).toBeInTheDocument();
+  });
+
+  test('period selector spans back to the books inception, not just the current month', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    const sel = screen.getByLabelText('Tie-out period');
+    const values = [...sel.querySelectorAll('option')].map((o) => o.value);
+    // getInception mock → 2025-01-01, so every month from 2025-01 to now is offered.
+    expect(values).toContain('2025-01');
+    expect(values).toContain('2025-06');
+    expect(values.some((v) => v.startsWith('2026'))).toBe(true);
+    // newest first
+    expect(values[0] >= values[values.length - 1]).toBe(true);
+  });
+
+  test('Refresh re-pulls the whole period — the Defects register too, not just the balance view', async () => {
+    const { getDefects, getTieOut } = require('../api');
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    await screen.findByText('3 off ledgers'); // the Defect Register loaded
+    const defectsBefore = getDefects.mock.calls.length;
+    const tieBefore = getTieOut.mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+    // Refresh invalidates ALL tally-tieout queries → both the board AND the defects re-run.
+    await waitFor(() => expect(getDefects.mock.calls.length).toBeGreaterThan(defectsBefore));
+    expect(getTieOut.mock.calls.length).toBeGreaterThan(tieBefore);
+  });
+
+  test('yearly selector offers FY years back to inception (Indian branch)', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="year" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('Tally Reconciliation · Yearly Tie-Out');
+    const sel = screen.getByLabelText('Tie-out period');
+    const values = [...sel.querySelectorAll('option')].map((o) => o.value);
+    // 2025-01 inception → FY2024-25 (Jan–Mar 2025 belongs to the prior FY) through current.
+    expect(values).toContain('FY2024-25');
+    expect(values.every((v) => /^FY\d{4}-\d{2}$/.test(v))).toBe(true);
+  });
+
+  test('TB uploaded but no Day Book → out-of-sync warning', async () => {
+    const { getDayBookStatus } = require('../api');
+    getDayBookStatus.mockResolvedValue({ vouchers: 0, ledgers: 0 }); // board mock TB has imported.count 4
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByTestId('db-sync-warning')).toHaveTextContent(/no Day Book/i);
+    getDayBookStatus.mockResolvedValue({ vouchers: 0, ledgers: 0 }); // reset default
+  });
+});
+
+describe('Tally Reconciliation · certificate re-open + stale acceptance', () => {
+  const lockedCert = {
+    certificate: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { frozenAt: '2026-07-05' } },
+    chain: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
+    progress: { done: 4, total: 4, next: null },
+    canSign: { ok: false, reason: 'certificate is locked' },
+  };
+
+  test('an approver (Owner) sees Re-open on a certified period; a reason is required to confirm', async () => {
+    const { getTallyCert, reopenTallyCert } = require('../api');
+    getTallyCert.mockResolvedValue(lockedCert);
+    wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} currentUser={{ role: 'Owner' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Re-open to correct/ }));
+    const confirm = await screen.findByRole('button', { name: /Confirm re-open/ });
+    expect(confirm).toBeDisabled(); // no reason yet
+    fireEvent.change(screen.getByLabelText(/Reason for re-opening/), { target: { value: 'BSP closing was wrong in Tally' } });
+    expect(confirm).not.toBeDisabled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(reopenTallyCert).toHaveBeenCalledWith(expect.objectContaining({ branch: 'BOM', period: '2026-07', reason: 'BSP closing was wrong in Tally' })));
+    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
+  });
+
+  test('a non-approver (AE) does NOT see Re-open on a certified period', async () => {
+    const { getTallyCert } = require('../api');
+    getTallyCert.mockResolvedValue(lockedCert);
+    wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} currentUser={{ role: 'AE' }} />);
+    expect(await screen.findByText(/close gate is satisfied/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Re-open to correct/ })).not.toBeInTheDocument();
+    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
+  });
+
+  test('stale accepted variances raise a re-review warning on the certificate', async () => {
+    const { getTallyCert } = require('../api');
+    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false } });
+    wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} staleAccepted={2} currentUser={{ role: 'Owner' }} />);
+    expect(await screen.findByText(/2 accepted variances changed/)).toBeInTheDocument();
   });
 });

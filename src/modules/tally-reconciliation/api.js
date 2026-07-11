@@ -10,6 +10,12 @@ export function getTieOut({ branch, period, tier } = {}) {
 export async function getPeriods({ branch } = {}) {
   return (await apiGet('/api/tally-tieout/periods', { branch }))?.items || [];
 }
+// Earliest posted date in the branch's books — drives the period selector's range
+// (months/years back to the books' inception, not just the current period).
+export async function getInception({ branch } = {}) {
+  try { return (await apiGet('/api/accounting/inception', { branch }))?.from || null; }
+  catch { return null; }
+}
 // Phase 2 — voucher drill for one off ledger + the classified Defect Register.
 export function getLedgerVouchers({ branch, period, tier, ledger } = {}) {
   return apiGet('/api/tally-tieout/ledger', { branch, period, tier, ledger });
@@ -27,6 +33,11 @@ export function freezeTallyCert({ branch, period, tier }) {
 export function signTallyCert({ branch, period, tier }) {
   return apiPost('/api/tally-tieout/certificate/sign', { branch, period, tier });
 }
+// Re-open a certified period (Director/Owner) so corrected Tally data can be
+// re-uploaded and the chain re-signed. Clears the signatures; requires a reason.
+export function reopenTallyCert({ branch, period, tier, reason }) {
+  return apiPost('/api/tally-tieout/certificate/reopen', { branch, period, tier, reason });
+}
 // Phase 4 — accept / un-accept an off ledger's difference (explained variance).
 export function acceptVariance({ branch, period, tier, ledger, code, reason, note }) {
   return apiPost('/api/tally-tieout/accept', { branch, period, tier, ledger, code, reason, note });
@@ -36,6 +47,14 @@ export function clearVariance({ branch, period, tier, ledger }) {
 }
 export function importTB({ branch, period, tier, rows }) {
   return apiPost('/api/tally-tieout/import', { branch, period, tier, rows });
+}
+// Full Day Book upload (all ledgers at once) + how much is currently loaded.
+export function importDayBook({ branch, period, tier, rows }) {
+  return apiPost('/api/tally-tieout/daybook', { branch, period, tier, rows });
+}
+export async function getDayBookStatus({ branch, period, tier } = {}) {
+  try { return (await apiGet('/api/tally-tieout/daybook', { branch, period, tier })) || { vouchers: 0, ledgers: 0 }; }
+  catch { return { vouchers: 0, ledgers: 0 }; }
 }
 export function clearTB({ branch, period }) {
   return apiDelete(`/api/tally-tieout?branch=${encodeURIComponent(branch)}&period=${encodeURIComponent(period)}`);
