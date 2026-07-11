@@ -770,20 +770,20 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <>
         <table style={{ borderCollapse: 'collapse' }}>
           <thead><tr>
-            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '4px 16px', ...(readOnly ? {} : { color: GOLD_DEEP, background: 'transparent', borderBottom: '1px solid #ecdfb8' }) }}>{sc.label}</th>)}
-            {!readOnly && <th style={{ ...thA, width: 26, background: 'transparent', borderBottom: '1px solid #ecdfb8' }} />}
+            {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '4px 8px', ...(readOnly ? {} : { color: GOLD_DEEP, background: 'transparent', borderBottom: '1px solid #ecdfb8' }) }}>{sc.label}</th>)}
+            {!readOnly && <th style={{ ...thA, width: 22, padding: '4px 4px', background: 'transparent', borderBottom: '1px solid #ecdfb8' }} />}
           </tr></thead>
           <tbody>
             {(l.sectors || []).map((s, si) => (
               <tr key={si}>
                 {spec.sectorCols.map((sc) => (
-                  <td key={sc.key} style={{ padding: '6px 16px' }}>
+                  <td key={sc.key} style={{ padding: '5px 8px' }}>
                     {readOnly
                       ? <span style={{ fontSize: 11, fontWeight: 600, color: s[sc.key] ? (sc.kind === 'pnr' ? GOLD : '#3A3A3A') : '#b9b9b9', fontStyle: s[sc.key] ? 'normal' : 'italic' }}>{s[sc.key] || `No ${sc.label}`}</span>
-                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} placeholder={sc.label} style={{ ...cellTxt, width: sc.type === 'date' ? 140 : 110, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
+                      : <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setSec(li, si, sc.key, e.target.value)} placeholder={sc.label} style={{ ...cellTxt, width: sc.type === 'date' ? 122 : 92, color: sc.kind === 'pnr' ? GOLD : DARK }} />}
                   </td>
                 ))}
-                {!readOnly && <td style={{ padding: '6px 16px', textAlign: 'center' }}><button onClick={() => delSec(li, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>}
+                {!readOnly && <td style={{ padding: '5px 4px', textAlign: 'center' }}><button onClick={() => delSec(li, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>}
               </tr>
             ))}
           </tbody>
@@ -890,29 +890,49 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     </Section>
   );
 
+  // poOnly's sectors-only view — just the ✈ Sectors block per passenger, no fare
+  // grid. Fares stay exactly as loaded from editBooking and save back unchanged.
+  const sectorsOnlySection = !isNoSupp && spec.sectors && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {lines.map((l, i) => (
+        <div key={i}>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: DARK, marginBottom: 4 }}>{l.fn || '—'} {l.sn || ''}</div>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <tbody>{sectorBlock(l, i, false, 1)}</tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+
   // poOnly: a compact modal (used from the approvals queue's Edit button) showing
-  // ONLY the Purchase Order fields — not the full multi-section entry page. Reuses the
-  // SAME state/save() as the full form (so GST/TDS/TCS/GP computation and the save
-  // payload are byte-identical), it just renders a smaller view. Customer, supplier,
-  // Sales Order markup/Service Fee and everything else stay exactly as loaded from
-  // editBooking — untouched here, so they save back unchanged.
+  // ONLY the Sectors for each passenger — not the full fare grid, and not the full
+  // multi-section entry page. Reuses the SAME state/save() as the full form (so
+  // GST/TDS/TCS/GP computation and the save payload are byte-identical), it just
+  // renders a smaller view. Fares, customer, supplier, Sales Order markup/Service
+  // Fee and everything else stay exactly as loaded from editBooking — untouched
+  // here, so they save back unchanged. Modules with no sectors (e.g. Hotel) fall
+  // back to the full PO grid since there's nothing sectors-only to show.
   if (poOnly) {
     const close = () => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'));
+    const compact = !!spec.sectors && !isNoSupp;
     return (
       <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,19,38,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-        <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: 'min(1180px, 96vw)', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(13,19,38,.28)', padding: '18px 20px', fontFamily: HELV }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: compact ? 'min(760px, 96vw)' : 'min(1180px, 96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 18px 50px rgba(13,19,38,.28)', fontFamily: HELV }}>
+          <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: compact ? '14px 16px 8px' : '18px 20px 10px' }}>
             <div>
               <h3 style={{ margin: 0, fontSize: 15, color: DARK, display: 'flex', alignItems: 'center', gap: 7 }}><Pencil size={15} style={{ color: PO_BAR }} /> Edit Purchase Order · {editBooking.bookingNo}</h3>
               <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#5b616e' }}>{spec.icon} {spec.name} · Link <b style={{ fontFamily: 'monospace' }}>{editBooking.linkNo}</b> · {autoApprove ? <>saving re-posts the changes and <b>keeps this voucher Approved</b> — no Pending step.</> : 'saving returns this voucher to Pending for re-approval.'}</p>
             </div>
             <button onClick={close} style={{ ...btnGh, padding: '4px 10px' }}>✕</button>
           </div>
-          {isNoSupp ? (
-            <div style={{ padding: 18, fontSize: 12, color: '#9197a3' }}>This voucher has no purchase leg (no-supplier sale) — nothing to edit here.</div>
-          ) : poSection}
-          {error && <div style={{ margin: '10px 0', padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>{error}</div>}
-          <div style={{ display: 'flex', gap: 9, justifyContent: 'flex-end', marginTop: 14 }}>
+          <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: compact ? '0 16px' : '0 20px' }}>
+            {isNoSupp ? (
+              <div style={{ padding: 18, fontSize: 12, color: '#9197a3' }}>This voucher has no purchase leg (no-supplier sale) — nothing to edit here.</div>
+            ) : (compact ? sectorsOnlySection : poSection)}
+            {error && <div style={{ margin: '10px 0', padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>{error}</div>}
+          </div>
+          <div style={{ flex: '0 0 auto', display: 'flex', gap: 9, justifyContent: 'flex-end', padding: compact ? '10px 16px 14px' : '14px 20px 18px' }}>
             <button onClick={close} disabled={saving} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
             <button disabled={!canSave || isNoSupp || saving} onClick={() => save()} className="max-tablet:min-h-[44px]"
               style={{ ...btnG, background: (canSave && !isNoSupp) ? DARK : '#9ca3af', cursor: (canSave && !isNoSupp) ? 'pointer' : 'not-allowed', opacity: (canSave && !isNoSupp) ? 1 : 0.7 }}>
