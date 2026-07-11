@@ -9,6 +9,7 @@ import { confirmDialog } from '../../core/ux/confirm';
 import { BranchLimitsEditor } from './BranchLimitsEditor';
 import { EnforcementMatrix } from './EnforcementMatrix';
 import { UserConfig } from './UserConfig';
+import { ChangeLog } from './ChangeLog';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
 import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
@@ -276,12 +277,7 @@ export function ControlPanel({ setRoute }) {
           </>
         );
       case 'log':
-        return (
-          <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Every power change — who, when, from → to, why. Immutable. It fills as you engage controls; nothing changed yet.</p>
-            <div className="rounded-brand border border-surface-border bg-surface p-6 text-center text-[12.5px] text-ink-muted">No power changes yet — this log records every toggle, grant, delegation and freeze once you begin.</div>
-          </>
-        );
+        return <ChangeLog go={go} />;
       default: return null;
     }
   };
@@ -310,6 +306,10 @@ export function ControlPanel({ setRoute }) {
             : owner ? 'Flip any switch to engage it live — your change applies immediately and is logged.'
             : 'Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.'}
         </span>
+        <button type="button" onClick={() => go('/tk/rules')}
+          className="ml-auto shrink-0 rounded-full border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">
+          📖 Rule Book
+        </button>
       </div>
 
       {/* branch scope selector — every control below applies to the chosen branch */}

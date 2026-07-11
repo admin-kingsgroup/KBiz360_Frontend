@@ -29,6 +29,8 @@ jest.mock('../api/userLimits', () => ({
   setUserLimit: jest.fn().mockResolvedValue({ store: {} }),
   proposeUserLimit: jest.fn().mockResolvedValue({}),
 }));
+// ChangeLog (Change Log screen) pulls api/monitor → core/api.
+jest.mock('../api/monitor', () => ({ getAudit: jest.fn().mockResolvedValue({ items: [] }) }));
 // Master-switch confirm — default to "confirmed" so the happy-path flip proceeds; a
 // test overrides it to assert cancellation blocks the flip.
 jest.mock('../../../core/ux/confirm', () => ({ confirmDialog: jest.fn().mockResolvedValue({ confirmed: true }) }));
@@ -179,5 +181,31 @@ describe('Control Panel · Power Console', () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     // guard is off in the mocked getFlagState → still dormant, but the owner is told it flips live
     expect(await screen.findByText(/applies immediately and is logged/)).toBeInTheDocument();
+  });
+
+  test('Data-Entry exposes the Integrity-before-close toggle (close.require_integrity)', async () => {
+    const { setFlag } = require('../api/flags');
+    setFlag.mockClear();
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(await screen.findByText('Data-Entry & Compliance'));
+    fireEvent.click(await screen.findByRole('switch', { name: /Integrity before close/ }));
+    await waitFor(() => expect(setFlag).toHaveBeenCalledWith('close.require_integrity', true, 'default'));
+  });
+
+  test('Change Log screen is wired to the real audit trail', async () => {
+    const { getAudit } = require('../api/monitor');
+    getAudit.mockClear();
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(await screen.findByText('Change Log / Audit'));
+    await waitFor(() => expect(getAudit).toHaveBeenCalled());
+    expect(await screen.findByTestId('control-change-log')).toBeInTheDocument();
+  });
+
+  test('a Rule Book link routes to /tk/rules', async () => {
+    const nav = jest.fn();
+    renderWith(<ControlPanel setRoute={nav} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Rule Book/ }));
+    expect(nav).toHaveBeenCalledWith('/tk/rules');
   });
 });
