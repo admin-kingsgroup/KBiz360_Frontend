@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Pencil, Trash2, Download, Printer, Ban, RotateCcw } from 'lucide-react';
-import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../core/data';
+import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL, branchMainCurrency } from '../../core/data';
 import {
   SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
   SETTLE_CYCLES, PAY_METHODS, CUST_TYPES, CUST_SOURCES, PAY_TERMS,
@@ -812,11 +812,15 @@ export const LedgersMaster = ({ branch }) => {
           { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true, clears: ['subGroup'] },
           { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
             options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
-          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: shellLocked ? topBarView : 'BOM' },
+          // Changing Branch re-defaults Currency to that branch's main currency
+          // (INR for India, USD elsewhere) — matches what a fresh form already
+          // defaults to below, so switching branch mid-form stays consistent.
+          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: shellLocked ? topBarView : 'BOM',
+            onSet: (v, next) => { next.currency = branchMainCurrency(v); } },
           // Display-only flag column, shown only when hidden/inactive rows are in the
           // list — Hidden = presence-toggled off for its branch, Inactive = deactivated.
           ...(showHidden ? [{ key: 'visibility', label: 'Visibility', type: 'text', input: false, export: false }] : []),
-          { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: 'INR' },
+          { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: branchMainCurrency(shellLocked ? topBarView : 'BOM') },
           { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
           { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
           { key: 'active', label: 'Active', type: 'bool', default: true },
