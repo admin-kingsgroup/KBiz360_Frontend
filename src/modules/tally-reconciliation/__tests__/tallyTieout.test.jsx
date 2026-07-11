@@ -124,6 +124,24 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText('HDFC Bank A/c')).not.toBeInTheDocument(); // no board leak
   });
 
+  test('pre-upload: calm onboarding state, not the red certificate gate (U1)', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 1, tied: 0, off: 0, onlyErp: 1, offTotal: 1 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 0 },
+      rows: [{ ledger: 'AD Capital', code: 'L1', group: 'Capital Account', parentGroup: 'Capital Account', statement: 'BS', nature: 'liability', erp: -50000, tally: null, diff: -50000, status: 'only-erp' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText(/No Tally Trial Balance uploaded/)).toBeInTheDocument();
+    expect(screen.queryByText('Month-End Tally Certificate')).not.toBeInTheDocument(); // no red gate before upload
+  });
+
+  test('a page-visibility grant does NOT open the write board for a non-central role (M4)', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Branch Accountant', granted: ['/tally-reconciliation/monthly'] }} />);
+    expect(await screen.findByText('Central control')).toBeInTheDocument();
+  });
+
   test('TB footer shows "Not balanced" when a side does not self-balance (no false all-clear)', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({

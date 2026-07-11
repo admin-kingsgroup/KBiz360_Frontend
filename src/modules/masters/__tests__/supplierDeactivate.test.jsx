@@ -58,17 +58,25 @@ describe('Suppliers master — Delete/Deactivate row actions', () => {
     });
   });
 
+  // Selectors match the REAL button titles: the Deactivate tooltip is
+  // "Deactivate — keeps the record and its history; use instead of Delete"
+  // (so a bare /Delete/ regex would also match it), a derived row's Delete
+  // carries the "no master record" explanation, and an INACTIVE row swaps
+  // Deactivate for an enabled "Reactivate" — there is no disabled
+  // "Already inactive" state in the UI.
+  const DEACTIVATE_RE = /^Deactivate — keeps the record/;
+
   test('derived row: Delete is disabled (no confirm, no API call); Deactivate promotes it to a real record with active:false', async () => {
     renderWith(<SuppliersMaster branch="BOM" />);
 
-    const deleteButtons = screen.getAllByTitle(/Delete|no master record/);
-    expect(deleteButtons[0]).toBeDisabled(); // DERIVED_ROW is first
-    fireEvent.click(deleteButtons[0]);
+    const derivedDelete = screen.getByTitle(/no master record/);
+    expect(derivedDelete).toBeDisabled();
+    fireEvent.click(derivedDelete);
     expect(confirmDialog).not.toHaveBeenCalled();
     expect(removeMutate).not.toHaveBeenCalled();
 
-    const deactivateButtons = screen.getAllByTitle('Deactivate');
-    fireEvent.click(deactivateButtons[0]);
+    const deactivateButtons = screen.getAllByTitle(DEACTIVATE_RE);
+    fireEvent.click(deactivateButtons[0]); // DERIVED_ROW is first
     await waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
     const [body] = createMutate.mock.calls[0];
     expect(body.active).toBe(false);
@@ -80,14 +88,14 @@ describe('Suppliers master — Delete/Deactivate row actions', () => {
   test('a real, active row: Delete works as before; Deactivate updates active:false on its real id', async () => {
     renderWith(<SuppliersMaster branch="BOM" />);
 
-    const deleteButtons = screen.getAllByTitle('Delete');
+    const deleteButtons = screen.getAllByTitle('Delete'); // exact — real rows only
     expect(deleteButtons[0]).not.toBeDisabled(); // REAL_ROW's Delete is enabled
     fireEvent.click(deleteButtons[0]);
     await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
     await waitFor(() => expect(removeMutate).toHaveBeenCalledWith('sup-1', expect.anything()));
 
     // DERIVED_ROW (still active) also gets a "Deactivate" button — REAL_ROW's is second.
-    const deactivateButtons = screen.getAllByTitle('Deactivate');
+    const deactivateButtons = screen.getAllByTitle(DEACTIVATE_RE);
     fireEvent.click(deactivateButtons[1]);
     await waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1));
     const [{ id, body }] = updateMutate.mock.calls[0];
@@ -96,14 +104,17 @@ describe('Suppliers master — Delete/Deactivate row actions', () => {
     expect(createMutate).not.toHaveBeenCalled();
   });
 
-  test('an already-inactive row: Deactivate is disabled and does nothing', () => {
+  test('an already-inactive row: shows an enabled Reactivate that flips active:true (no confirm)', async () => {
     renderWith(<SuppliersMaster branch="BOM" />);
 
-    const alreadyInactive = screen.getByTitle('Already inactive');
-    expect(alreadyInactive).toBeDisabled();
-    fireEvent.click(alreadyInactive);
-    expect(updateMutate).not.toHaveBeenCalled();
+    const reactivate = screen.getByTitle('Reactivate'); // only INACTIVE_ROW carries it
+    expect(reactivate).not.toBeDisabled();
+    fireEvent.click(reactivate);
+    await waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1));
+    expect(confirmDialog).not.toHaveBeenCalled(); // reactivation needs no confirm
+    const [{ id, body }] = updateMutate.mock.calls[0];
+    expect(id).toBe('sup-2');
+    expect(body.active).toBe(true);
     expect(createMutate).not.toHaveBeenCalled();
-    expect(toast).not.toHaveBeenCalled();
   });
 });

@@ -27,9 +27,14 @@ export const statusOf = (e, t) => {
 };
 
 // Tally reconciliation is a CENTRAL Month/Year control (AE / FM / Director /
-// Owner). Mirrors the backend role gate — used to self-guard the board on a
-// direct URL for a role that shouldn't reach it (e.g. a Branch Accountant).
-export const isCentralRole = (role) => /account.*(exec|executive)|(^|[^a-z])ae([^a-z]|$)|finance\s*manager|(^|[^a-z])fm([^a-z]|$)|director|owner|super[\s_-]*admin/i.test(String(role || ''));
+// Owner). Mirrors the backend role gate EXACTLY, including its Branch-Accountant-
+// first precedence — used to self-guard the board on a direct URL for a role that
+// shouldn't reach it. (A "Branch Accountant (AE)" string must resolve to BA, not AE.)
+export const isCentralRole = (role) => {
+  const r = String(role || '');
+  if (/branch\s*account/i.test(r)) return false;
+  return /account.*(exec|executive)|(^|[^a-z])ae([^a-z]|$)|finance\s*manager|(^|[^a-z])fm([^a-z]|$)|director|owner|super[\s_-]*admin/i.test(r);
+};
 
 export const STATUS_META = {
   tied: { tone: 'success', label: 'Tied' },

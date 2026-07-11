@@ -14,13 +14,14 @@ import { Menu as DropdownMenu } from '../../core/ux/Menu';
 import { Legend, Line } from 'recharts';
 import { BRANCHES, EXP_ACTUALS, FX_RATES, GP_BILLS } from '../../core/data';
 import { fmt, fmtINR } from '../../core/format';
-import { ACTIVE_DELEGATIONS, GROUP_BOOKINGS, GROUP_DASH_DATA, PERIOD_LOCK_DATA, STATUTORY_FILINGS, cardStyle } from '../../core/helpers';
+import { GROUP_BOOKINGS, GROUP_DASH_DATA, PERIOD_LOCK_DATA, cardStyle } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { B, FL, RPT_tdStyle, RPT_thStyle, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, rangeNote } from '../../core/dates';
 import { Dashboard } from '../dashboard';
 import { useQueries, useQuery } from '@tanstack/react-query';
+import { useMasterList, useMasterMutations } from '../../core/useMasters';
 import { apiGet } from '../../core/api';
 import { clickable } from '../../core/ux/clickable';
 
@@ -529,32 +530,48 @@ export function BankingApiSettings({branch,setRoute}){
    STATUTORY FILING REGISTER  (compliance filings register)
    ════════════════════════════════════════════════════════════════════ */
 
+/* LIVE (2026-07-11): reads /api/tax-calendar (the same statutory compliance
+   calendar the Task List gates on); "Mark Filed" persists filedDate/filedBy/ack.
+   Status is derived from filedDate vs due date — never stored guesswork. */
 export function StatutoryFilingRegister(){
   const [filter,setFilter]=useState("ALL");
-  const statuses=["Filed","In Progress","Due Today","Pending","Overdue"];
-  const filtered=filter==="ALL"?STATUTORY_FILINGS:STATUTORY_FILINGS.filter(f=>f.status===filter);
-  const filed=STATUTORY_FILINGS.filter(f=>f.status==="Filed").length;
-  const pending=STATUTORY_FILINGS.filter(f=>f.status==="Pending"||f.status==="In Progress").length;
-  const dueToday=STATUTORY_FILINGS.filter(f=>f.status==="Due Today").length;
-  const statusStyle={Filed:{bg:"#d4edda",color:"#155724"},"In Progress":{bg:"#cfe2ff",color:"#004085"},"Due Today":{bg:"#f8d7da",color:"#721c24"},Pending:{bg:"#fff3cd",color:"#856404"},Overdue:{bg:"#f8d7da",color:"#721c24"}};
+  const { data: events = [] } = useMasterList('tax-calendar', { active: true });
+  const { update } = useMasterMutations('tax-calendar');
+  const TODAY=new Date().toISOString().slice(0,10);
+  const statusOf=(f)=>f.filedDate?"Filed":f.date<TODAY?"Overdue":f.date===TODAY?"Due Today":"Pending";
+  const rows=events.map(e=>({...e,status:statusOf(e)})).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const statuses=["Filed","Due Today","Pending","Overdue"];
+  const filtered=filter==="ALL"?rows:rows.filter(f=>f.status===filter);
+  const filed=rows.filter(f=>f.status==="Filed").length;
+  const pending=rows.filter(f=>f.status==="Pending").length;
+  const dueToday=rows.filter(f=>f.status==="Due Today").length;
+  const overdue=rows.filter(f=>f.status==="Overdue").length;
+  const statusStyle={Filed:{bg:"#d4edda",color:"#155724"},"Due Today":{bg:"#f8d7da",color:"#721c24"},Pending:{bg:"#fff3cd",color:"#856404"},Overdue:{bg:"#f8d7da",color:"#721c24"}};
+  const markFiled=(f)=>{
+    const ack=window.prompt(`Mark "${f.title}" as filed.\nAcknowledgment / ARN number (optional):`,"");
+    if(ack===null)return;
+    let user=""; try{user=(JSON.parse(localStorage.getItem("kb360-user")||"null")||{}).name||"";}catch{/* ignore */}
+    update.mutate({id:f.id,body:{filedDate:TODAY,filedBy:user,ack:ack.trim()}},{
+      onSuccess:()=>toast(`${f.title} marked filed`),
+      onError:(e)=>toast(e?.message||"Could not mark filed","error")});
+  };
   return(
     <PHASE2_Page title="Statutory Filing Register"
-      subtitle="Central register of statutory filings across the group · single source of truth"
-      toolbar={<><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📥 Export Register</button></>}>
+      subtitle="Central register of statutory filings across the group — live from the compliance calendar (/api/tax-calendar)"
+      toolbar={<select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All statuses</option>{statuses.map(st=><option key={st}>{st}</option>)}</select>}>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        {[{l:"Filed (Month)",v:filed,c:"#22c55e"},{l:"In Progress",v:pending,c:"#3b82f6"},{l:"Due Today",v:dueToday,c:"#A32D2D"},{l:"Filing Owner",v:"Faiz / Sughra",c:"#0d1326",small:true}].map(k=>(
-          <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:k.small?14:22,fontWeight:700,color:k.c}}>{k.v}</p></div>
+        {[{l:"Filed",v:filed,c:"#22c55e"},{l:"Pending",v:pending,c:"#3b82f6"},{l:"Due Today",v:dueToday,c:"#A32D2D"},{l:"Overdue",v:overdue,c:"#7B1F1F"}].map(k=>(
+          <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:k.c}}>{k.v}</p></div>
         ))}
       </div>
 
       <div style={cardStyle}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#f7f8fb"}}>
-            <th style={RPT_thStyle}>Filing ID</th>
             <th style={RPT_thStyle}>Type</th>
+            <th style={RPT_thStyle}>Filing</th>
             <th style={RPT_thStyle}>Entity</th>
-            <th style={RPT_thStyle}>Period</th>
             <th style={RPT_thStyle}>Due Date</th>
             <th style={{...RPT_thStyle,textAlign:"center"}}>Status</th>
             <th style={RPT_thStyle}>Filed By</th>
@@ -562,22 +579,21 @@ export function StatutoryFilingRegister(){
             <th style={{...RPT_thStyle,textAlign:"center"}}>Action</th>
           </tr></thead>
           <tbody>{filtered.map(f=>(
-            <tr key={f.id} style={{borderBottom:"1px solid #dfe2e7",background:f.status==="Due Today"?"#fff8e8":"#fff"}}>
-              <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{f.id}</td>
-              <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10.5,fontWeight:700}}>{f.type}</span></td>
-              <td style={{...RPT_tdStyle,fontWeight:600}}>{f.entity}</td>
-              <td style={RPT_tdStyle}>{f.period}</td>
-              <td style={{...RPT_tdStyle,fontFamily:"monospace",color:f.dueDate<="2026-05-20"?"#A32D2D":"#0d1326",fontWeight:600}}>{f.dueDate}</td>
+            <tr key={f.id} style={{borderBottom:"1px solid #dfe2e7",background:f.status==="Due Today"?"#fff8e8":f.status==="Overdue"?"#fff5f5":"#fff"}}>
+              <td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10.5,fontWeight:700}}>{f.type||"—"}</span></td>
+              <td style={{...RPT_tdStyle,fontWeight:600}}>{f.title}</td>
+              <td style={RPT_tdStyle}>{f.entity||"—"}</td>
+              <td style={{...RPT_tdStyle,fontFamily:"monospace",color:!f.filedDate&&f.date<=TODAY?"#A32D2D":"#0d1326",fontWeight:600}}>{f.date}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,background:(statusStyle[f.status]||{}).bg,color:(statusStyle[f.status]||{}).color}}>{f.status}</span></td>
-              <td style={{...RPT_tdStyle,fontSize:11}}>{f.filedBy!=="-"?f.filedBy:<span style={{color:"#5a6691"}}>—</span>}</td>
-              <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:f.ack!=="-"?"#22c55e":"#5a6691",fontWeight:600}}>{f.ack}</td>
+              <td style={{...RPT_tdStyle,fontSize:11}}>{f.filedBy||<span style={{color:"#5a6691"}}>—</span>}</td>
+              <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:f.ack?"#22c55e":"#5a6691",fontWeight:600}}>{f.ack||(f.filedDate?"filed "+f.filedDate:"—")}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}>
-                {f.status==="Filed"?
-                  <button style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>View</button>:
-                  <button style={{padding:"3px 10px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>File Now</button>}
+                {!f.filedDate&&<button onClick={()=>markFiled(f)} disabled={update.isPending} style={{padding:"3px 10px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Mark Filed</button>}
               </td>
             </tr>
-          ))}</tbody>
+          ))}
+          {filtered.length===0&&<tr><td colSpan={8} style={{padding:20,textAlign:"center",color:"#5a6691",fontSize:11.5}}>No filings{filter!=="ALL"?" with this status":" on the compliance calendar yet — add them under the Tax Calendar"}.</td></tr>}
+          </tbody>
         </table>
       </div>
     </PHASE2_Page>
@@ -588,40 +604,77 @@ export function StatutoryFilingRegister(){
    2. DELEGATIONS MANAGER  (full-page view)
    ════════════════════════════════════════════════════════════════════ */
 
+/* LIVE (2026-07-11): delegations persist via /api/delegations (buildCrudRouter).
+   INFORMATIONAL register for now — the auth layer does not yet re-route approvals
+   to the delegate (that wiring is a separate product decision); the register is
+   the explicit, time-bound, logged record the policy requires. */
 export function DelegationsManager(){
-  const all=[
-    ...ACTIVE_DELEGATIONS,
-    {id:"DG-003",delegator:"Faiz Patel",delegatee:"Sughra Sayed",scope:"Approvals up to ₹5L",from:"2026-03-12",to:"2026-03-19",reason:"Health · 1 week medical leave",status:"Completed",approvedBy:"Afshin Dhanani"},
-    {id:"DG-004",delegator:"Afshin Dhanani",delegatee:"Faiz Patel",scope:"All Director approvals (with notification)",from:"2026-02-05",to:"2026-02-12",reason:"International travel — UAE business",status:"Completed",approvedBy:"Self (Director)"},
-  ];
-  const active=all.filter(d=>d.status==="Approved"||d.status==="Scheduled").length;
+  const { data: all = [] } = useMasterList('delegations');
+  const { create, update } = useMasterMutations('delegations');
+  const [modal,setModal]=useState(false);
+  const TODAY=new Date().toISOString().slice(0,10);
+  const blank={fromUser:"",toUser:"",scope:"",fromDate:TODAY,toDate:"",reason:""};
+  const [form,setForm]=useState(blank);
+  const statusOf=(d)=>d.active===false?"Ended":d.toDate&&d.toDate<TODAY?"Completed":d.fromDate>TODAY?"Scheduled":"Active";
+  const rows=(all||[]).map(d=>({...d,status:statusOf(d)})).sort((a,b)=>String(b.fromDate).localeCompare(String(a.fromDate)));
+  const active=rows.filter(d=>d.status==="Active").length;
+  const saveNew=()=>{
+    create.mutate({...form,active:true},{
+      onSuccess:()=>{toast("Delegation recorded.");setModal(false);setForm(blank);},
+      onError:(e)=>toast(e?.message||"Save failed","error")});
+  };
   return(
     <PHASE2_Page title="Delegations Manager"
-      subtitle="All vacation back-up & temporary authority delegations · explicit, time-bound, fully logged"
-      toolbar={<button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Create Delegation</button>}>
+      subtitle="Vacation back-up & temporary authority delegations — explicit, time-bound, logged (informational register; approvals are not auto re-routed yet)"
+      toolbar={<button onClick={()=>setModal(true)} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>+ Create Delegation</button>}>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:14}}>
-        {[{l:"Active Delegations",v:active,c:"#22c55e"},{l:"Completed (YTD)",v:all.filter(d=>d.status==="Completed").length,c:"#5a6691"},{l:"Avg Duration",v:"—",c:"#3b82f6"},{l:"Pending Approval",v:all.filter(d=>d.status==="Pending Approval"||d.status==="Pending").length,c:"#f97316"}].map(k=>(
+        {[{l:"Active",v:active,c:"#22c55e"},{l:"Scheduled",v:rows.filter(d=>d.status==="Scheduled").length,c:"#3b82f6"},{l:"Completed",v:rows.filter(d=>d.status==="Completed").length,c:"#5a6691"},{l:"Ended Early",v:rows.filter(d=>d.status==="Ended").length,c:"#f97316"}].map(k=>(
           <div key={k.l} style={{...cardStyle,borderTop:"3px solid "+k.c}}><p style={{margin:0,fontSize:10,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>{k.l}</p><p style={{margin:"4px 0 0",fontSize:18,fontWeight:700,color:k.c}}>{k.v}</p></div>
         ))}
       </div>
       <div style={cardStyle}>
         <p style={{margin:"0 0 12px",fontSize:13,fontWeight:700,color:"#0d1326"}}>All Delegations (Active + Historical)</p>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>ID</th><th style={RPT_thStyle}>From</th><th style={RPT_thStyle}>To</th><th style={RPT_thStyle}>Scope</th><th style={RPT_thStyle}>Period</th><th style={RPT_thStyle}>Reason</th><th style={RPT_thStyle}>Approved By</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-          <tbody>{all.map(d=>(
+          <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>From</th><th style={RPT_thStyle}>To</th><th style={RPT_thStyle}>Scope</th><th style={RPT_thStyle}>Period</th><th style={RPT_thStyle}>Reason</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th><th style={{...RPT_thStyle,textAlign:"center"}}>Action</th></tr></thead>
+          <tbody>{rows.map(d=>(
             <tr key={d.id} style={{borderBottom:"1px solid #dfe2e7"}}>
-              <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{d.id}</td>
-              <td style={{...RPT_tdStyle,fontWeight:700}}>{d.delegator}</td>
-              <td style={{...RPT_tdStyle,fontWeight:700,color:"#d4a437"}}>→ {d.delegatee}</td>
+              <td style={{...RPT_tdStyle,fontWeight:700}}>{d.fromUser}</td>
+              <td style={{...RPT_tdStyle,fontWeight:700,color:"#d4a437"}}>→ {d.toUser}</td>
               <td style={{...RPT_tdStyle,fontSize:11}}>{d.scope}</td>
-              <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:11}}>{d.from} → {d.to}</td>
+              <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:11}}>{d.fromDate} → {d.toDate||"open"}</td>
               <td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>{d.reason}</td>
-              <td style={{...RPT_tdStyle,fontSize:11}}>{d.approvedBy}</td>
-              <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 9px",borderRadius:3,fontSize:10,fontWeight:700,background:d.status==="Approved"?"#d4edda":d.status==="Scheduled"?"#cfe2ff":d.status==="Completed"?"#e2e3e5":"#fff3cd",color:d.status==="Approved"?"#155724":d.status==="Scheduled"?"#004085":d.status==="Completed"?"#383d41":"#856404"}}>{d.status}</span></td>
+              <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 9px",borderRadius:3,fontSize:10,fontWeight:700,background:d.status==="Active"?"#d4edda":d.status==="Scheduled"?"#cfe2ff":d.status==="Completed"?"#e2e3e5":"#fff3cd",color:d.status==="Active"?"#155724":d.status==="Scheduled"?"#004085":d.status==="Completed"?"#383d41":"#856404"}}>{d.status}</span></td>
+              <td style={{...RPT_tdStyle,textAlign:"center"}}>
+                {(d.status==="Active"||d.status==="Scheduled")&&<button onClick={()=>update.mutate({id:d.id,body:{active:false}},{onSuccess:()=>toast("Delegation ended."),onError:(e)=>toast(e?.message||"Failed","error")})} style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#A32D2D",borderRadius:3,fontSize:10,cursor:"pointer",fontWeight:700}}>End now</button>}
+              </td>
             </tr>
-          ))}</tbody>
+          ))}
+          {rows.length===0&&<tr><td colSpan={7} style={{padding:20,textAlign:"center",color:"#5a6691",fontSize:11.5}}>No delegations recorded yet.</td></tr>}
+          </tbody>
         </table>
       </div>
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(7,11,26,0.65)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,width:"100%",maxWidth:480,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",display:"flex",justifyContent:"space-between"}}>
+              <p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Create Delegation</p>
+              <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
+            </div>
+            <div style={{padding:"16px 18px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <FL label="Delegating from"><input value={form.fromUser} onChange={e=>setForm(f=>({...f,fromUser:e.target.value}))} placeholder="e.g. Faiz Patel" style={inp}/></FL>
+              <FL label="Delegating to"><input value={form.toUser} onChange={e=>setForm(f=>({...f,toUser:e.target.value}))} placeholder="e.g. Sughra Sayed" style={inp}/></FL>
+              <div style={{gridColumn:"1 / -1"}}><FL label="Scope of authority"><input value={form.scope} onChange={e=>setForm(f=>({...f,scope:e.target.value}))} placeholder="e.g. Approvals up to ₹5L" style={inp}/></FL></div>
+              <FL label="From"><input type="date" value={form.fromDate} onChange={e=>setForm(f=>({...f,fromDate:e.target.value}))} style={inp}/></FL>
+              <FL label="To"><input type="date" value={form.toDate} onChange={e=>setForm(f=>({...f,toDate:e.target.value}))} style={inp}/></FL>
+              <div style={{gridColumn:"1 / -1"}}><FL label="Reason"><input value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} placeholder="e.g. Annual leave — 1 week" style={inp}/></FL></div>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
+              <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
+              <button onClick={saveNew} disabled={!form.fromUser.trim()||!form.toUser.trim()||!form.scope.trim()||create.isPending} style={{...btnG,opacity:!form.fromUser.trim()||!form.toUser.trim()||!form.scope.trim()?0.5:1}}>{create.isPending?"Saving…":"Create"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </PHASE2_Page>
   );
 }

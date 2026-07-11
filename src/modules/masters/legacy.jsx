@@ -15,6 +15,8 @@ import { apiPost, apiPut } from '../../core/api';
 import { fmt, fmtINR, localeOf } from '../../core/format';
 import { exportToExcel } from '../../core/exportExcel';
 import { ACM_DATA, BANK_ACCOUNTS_DATA, COST_CENTERS_DATA, DashboardRouter, MASTER_CHANGE_QUEUE, MASTER_PAGE, PROJECTS_DATA, TAB_Page, TOUR_CODES_DATA, VENDOR_ADVANCES_DATA, cardStyle, tabPanel } from '../../core/helpers';
+import { toast } from '../../core/ux/toast';
+import { SETTLE_CYCLES, PAY_METHODS } from '../../core/partyEnums';
 // MstrShell / MstrModal modernized (responsive header + shared Modal) — same props.
 import { MstrShell, MstrModal } from './components/mstr';
 import { useMobile } from '../../core/hooks';
@@ -154,67 +156,78 @@ export function MastersForex(){
    Full register with 26Q/27EQ data preparation
    ════════════════════════════════════════════════════════════════ */
 
+/* LIVE (2026-07-11): bulk credit-terms grid over the SUPPLIER MASTER — the fields
+   (creditDays / creditLimit / settlementCycle / paymentMethod) live on erpsuppliers,
+   so this edits them in place via PUT /api/suppliers/:id. Field-access rules may
+   403 a restricted column for some roles — surfaced as toasts. */
 export function VendorTermsMaster({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
-  const [terms,setTerms]=useState([]);   // demo data removed — populate from live vendor terms
-  const TODAY=todayISO();
-  const daysLeft=d=>Math.ceil((new Date(d)-new Date(TODAY))/(1000*60*60*24));
-  const totDue=terms.filter(t=>daysLeft(t.dueDate)<=7).reduce((s,t)=>s+t.dueAmt,0);
-  const totTds=terms.filter(t=>t.tds!=="None").reduce((s,t)=>s+Math.round(t.dueAmt*t.tdsRate/100),0);
-  const STATUS_CLR={"Due Today":"#dc2626","Due Soon":"#d97706","Upcoming":"#16a34a","Overdue":"#7B1F1F"};
-  const STATUS_BG={"Due Today":"#fbe9e9","Due Soon":"#fbeedb","Upcoming":"#e8f6ed","Overdue":"#fbe9e9"};
-  const f=n=>cur+Number(Math.round(n)).toLocaleString(localeOf(cur));
+  const brc=branch==="ALL"?"":(branch?.code||"");
+  const { data: suppliers = [] } = useMasterList('suppliers');
+  const { update } = useMasterMutations('suppliers');
+  const [search,setSearch]=useState("");
+  const [draft,setDraft]=useState({}); // id → {creditDays,creditLimit,settlementCycle,paymentMethod}
+  const rows=(suppliers||[])
+    .filter(s=>!s.derived&&s.active!==false)
+    .filter(s=>!brc||!s.branch||s.branch==="ALL"||s.branch===brc)
+    .filter(s=>!search||String(s.name||"").toLowerCase().includes(search.toLowerCase()));
+  const valOf=(s,k)=>draft[s.id]?.[k]!==undefined?draft[s.id][k]:(s[k]??"");
+  const setVal=(s,k,v)=>setDraft(d=>({...d,[s.id]:{...(d[s.id]||{}),[k]:v}}));
+  const dirty=(s)=>!!draft[s.id]&&Object.entries(draft[s.id]).some(([k,v])=>String(v)!==String(s[k]??""));
+  const saveRow=(s)=>{
+    const patch={};
+    for(const k of ["creditDays","creditLimit","settlementCycle","paymentMethod"]){
+      const v=valOf(s,k);
+      patch[k]=k==="creditDays"||k==="creditLimit"?(Number(v)||0):v;
+    }
+    update.mutate({id:s.id,body:patch},{
+      onSuccess:()=>{toast(`${s.name} — credit terms saved`);setDraft(d=>{const n={...d};delete n[s.id];return n;});},
+      onError:(e)=>toast(e?.message||"Save failed (field access?)","error"),
+    });
+  };
+  const f=n=>cur+Number(Math.round(n)||0).toLocaleString(localeOf(cur));
+  const inpS={padding:"5px 8px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11,width:"100%"};
   return (
-    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
+    <div style={{padding:"12px 10px",maxWidth:1400,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#fbeedb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>⏰</div>
           <div>
-            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Vendor Payment Terms</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>{f(totDue)} due in 7 days · TDS to deduct: {f(totTds)}</p>
+            <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#1a1c22"}}>Vendor Credit Terms</h2>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>{rows.length} suppliers · edits save to the supplier master (single source of truth)</p>
           </div>
         </div>
-        <ExportBtn name="vendor-payment-terms" rows={terms} columns={[{key:"supplier",label:"Supplier"},{key:"type",label:"Type"},{key:"terms",label:"Terms"},{key:"dueAmt",label:"Amount Due"},{key:"dueDate",label:"Due Date"},{key:"tds",label:"TDS Section"},{key:"tdsRate",label:"TDS Rate %"}]}/>
-      </div>
-      {terms.filter(t=>daysLeft(t.dueDate)<=0).length>0&&(
-        <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#fbe9e9",border:"1px solid #f3c9c9",fontSize:10.5,color:"#dc2626",fontWeight:600,display:"flex",gap:8}}>
-          <AlertTriangle size={14}/> Overdue payments — process immediately to avoid supplier suspension
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search supplier…" style={{...inp,width:200,minHeight:32,fontSize:11}}/>
+          <ExportBtn name="vendor-credit-terms" rows={rows.map(s=>({supplier:s.name,branch:s.branch||"ALL",creditDays:s.creditDays??"",creditLimit:s.creditLimit??"",settlementCycle:s.settlementCycle||"",paymentMethod:s.paymentMethod||""}))} columns={[{key:"supplier",label:"Supplier"},{key:"branch",label:"Branch"},{key:"creditDays",label:"Credit Days"},{key:"creditLimit",label:"Credit Limit"},{key:"settlementCycle",label:"Settlement Cycle"},{key:"paymentMethod",label:"Payment Method"}]}/>
         </div>
-      )}
+      </div>
       <div style={{...card,padding:0,overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr style={{background:"#1a1c22"}}>
-            {["Supplier","Type","Terms","Amount Due","TDS Section","TDS to Hold","Net Pay","Due Date","Days","Status","Pay"].map((h,i)=>(
-              <th key={i} style={{padding:"9px 11px",textAlign:i>=3&&i<=6?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
+            {["Supplier","Branch","Credit Days","Credit Limit","Settlement Cycle","Payment Method",""].map((h,i)=>(
+              <th key={i} style={{padding:"9px 11px",textAlign:"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{terms.map((t,i)=>{
-            const dl=daysLeft(t.dueDate);
-            const st=dl<0?"Overdue":dl===0?"Due Today":dl<=7?"Due Soon":"Upcoming";
-            const tdsHold=t.tds!=="None"?Math.round(t.dueAmt*t.tdsRate/100):0;
-            const netPay=t.dueAmt-tdsHold;
-            return (
-              <tr key={t.id} style={{borderBottom:"1px solid #dfe2e7",background:dl<=0?"#fff5f5":dl<=7?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
-                <td style={{padding:"8px 11px",fontWeight:600,color:"#1a1c22"}}>{t.supplier}</td>
-                <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#e8f0ff",color:"#2563eb",fontWeight:700}}>{t.type}</span></td>
-                <td style={{padding:"8px 11px",color:"#5b616e",fontSize:10.5}}>{t.terms}</td>
-                <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(t.dueAmt)}</td>
-                <td style={{padding:"8px 11px"}}>{t.tds!=="None"?<span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#fbeedb",color:"#d97706",fontWeight:700}}>{t.tds} ({t.tdsRate}%)</span>:<span style={{fontSize:10,color:"#cbd0db"}}>—</span>}</td>
-                <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:tdsHold>0?"#d97706":"#cbd0db"}}>{tdsHold>0?f(tdsHold):"—"}</td>
-                <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums",color:"#1a1c22"}}>{f(netPay)}</td>
-                <td style={{padding:"8px 11px",color:dl<=0?"#dc2626":dl<=7?"#d97706":"#5b616e",fontWeight:dl<=7?700:400,whiteSpace:"nowrap"}}>{t.dueDate}</td>
-                <td style={{padding:"8px 11px",fontWeight:700,color:STATUS_CLR[st]||"#5b616e"}}>{dl<0?`${Math.abs(dl)}d OD`:dl===0?"TODAY":`${dl}d`}</td>
-                <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[st]||"#f3f4f8",color:STATUS_CLR[st]||"#5b616e"}}>{st}</span></td>
-                <td style={{padding:"8px 11px"}}><button style={{...btnG,padding:"3px 10px",fontSize:9.5,background:dl<=7?"#dc2626":"#1a1c22",whiteSpace:"nowrap"}}>Pay {f(netPay)} →</button></td>
-              </tr>
-            );
-          })}</tbody>
+          <tbody>{rows.map((s,i)=>(
+            <tr key={s.id} style={{borderBottom:"1px solid #dfe2e7",background:dirty(s)?"#fffaf0":i%2===0?"#fff":"#fafafa"}}>
+              <td style={{padding:"8px 11px",fontWeight:600,color:"#1a1c22"}}>{s.name}<div style={{fontSize:9.5,color:"#5b616e",fontWeight:400}}>{s.category||""}</div></td>
+              <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#e8f0ff",color:"#2563eb",fontWeight:700}}>{s.branch||"ALL"}</span></td>
+              <td style={{padding:"6px 11px",width:100}}><input type="number" value={valOf(s,"creditDays")} onChange={e=>setVal(s,"creditDays",e.target.value)} style={{...inpS,textAlign:"right",fontFamily:"monospace"}}/></td>
+              <td style={{padding:"6px 11px",width:130}}><input type="number" value={valOf(s,"creditLimit")} onChange={e=>setVal(s,"creditLimit",e.target.value)} title={f(valOf(s,"creditLimit"))} style={{...inpS,textAlign:"right",fontFamily:"monospace"}}/></td>
+              <td style={{padding:"6px 11px",width:150}}><select value={valOf(s,"settlementCycle")} onChange={e=>setVal(s,"settlementCycle",e.target.value)} style={inpS}><option value="">—</option>{SETTLE_CYCLES.filter(Boolean).map(x=><option key={x} value={x}>{x}</option>)}</select></td>
+              <td style={{padding:"6px 11px",width:140}}><select value={valOf(s,"paymentMethod")} onChange={e=>setVal(s,"paymentMethod",e.target.value)} style={inpS}><option value="">—</option>{PAY_METHODS.filter(Boolean).map(x=><option key={x} value={x}>{x}</option>)}</select></td>
+              <td style={{padding:"6px 11px",width:80}}>
+                {dirty(s)&&<button onClick={()=>saveRow(s)} disabled={update.isPending} style={{...btnG,padding:"3px 10px",fontSize:10}}>{update.isPending?"…":"Save"}</button>}
+              </td>
+            </tr>
+          ))}
+          {rows.length===0&&<tr><td colSpan={7} style={{padding:20,textAlign:"center",color:"#5b616e",fontSize:11.5}}>No suppliers{search?" match the search":" in the master yet — add them under Masters ▸ Suppliers"}.</td></tr>}
+          </tbody>
         </table>
       </div>
-      <div style={{marginTop:12,...card,background:"#e8f0ff",border:"1px solid #B5D4F4",fontSize:10,color:"#2563eb"}}>
-        TDS column shows amount to HOLD before paying supplier. Pay net amount to supplier, deposit TDS to Govt by 7th. BSP payments are direct debit — ensure sufficient bank balance on settlement day.
-      </div>
+      <p style={{marginTop:10,fontSize:10.5,color:"#5b616e",fontStyle:"italic"}}>💡 These fields live on the supplier master itself — the Task List, ageing and payment screens all read the same values. Bill-wise DUES live in Payables Ageing, not here.</p>
     </div>
   );
 }
