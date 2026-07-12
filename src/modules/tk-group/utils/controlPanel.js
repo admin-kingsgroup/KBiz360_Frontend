@@ -4,6 +4,8 @@
 // the Accounts Executive can also approve (the toggle), and the master-guard state.
 // Mirrors the backend shared/approvalChain resolution so the panel shows exactly what
 // enforces. Pure & testable; the page pulls the raw config from app-config + flags.
+import { resolveCell } from './voucherPolicy';
+import { isFlagOn } from './flags';
 
 const DEFAULT_VERIFY = ['sughra@travkings.com'];   // AE — mirrors shared/approvalChain
 const DEFAULT_APPROVE = ['faiz@travkings.com'];    // FM
@@ -84,15 +86,81 @@ export function approvalChainView(cfg = {}) {
 
 export { DEFAULT_VERIFY, DEFAULT_APPROVE };
 
+/** Emails present in BOTH the Verify and Approve lists — a segregation-of-duties conflict
+ *  (the same person could verify AND give final approval on their own voucher). Pure. */
+export function verifyApproveOverlap(view = {}) {
+  const verify = new Set(view.verify || []);
+  return (view.approve || []).filter((e) => verify.has(e));
+}
+
+/** Guardrail before routing a role through the chain: if that role's own person is the SOLE
+ *  verifier / approver, their own entries can't be cleared by anyone but the Owner (maker ≠
+ *  verifier ≠ approver). Returns a caution string for that role, or null. `view` =
+ *  approvalChainView(). Only 'fm' (sole approver) and 'ae' (sole verifier) can hit it. */
+export function roleControlWarning(roleKey, view = {}) {
+  if (roleKey === 'fm' && !view.aeCanApprove && (view.approve || []).length <= 1) {
+    return 'Faiz is the only approver — under control he can’t approve his own entries, so only the Owner could. Add a second approver or enable “Let Sughra also Approve”.';
+  }
+  if (roleKey === 'ae' && (view.verify || []).length <= 1) {
+    return 'Sughra is the only verifier — under control her own entries can’t be verified (only the Owner could clear them). Add a second verifier.';
+  }
+  return null;
+}
+
+/** Policy Tester — given the live config + a hypothetical voucher, does it POST DIRECTLY or
+ *  ROUTE to Check → Verify → Approve, and WHY. Mirrors the BE create() guard (Enforcement
+ *  Matrix + per-role switches + owner-cosign + branch-entry chain). `store` = voucher-policy
+ *  store; `flags` = flag-state payload; `rowKey` = a Matrix row (booking/inb/receipt/…);
+ *  `role` = a ROLE_SWITCHES key. Returns { routed, reasons:[{rule,detail}], masterOn }. Pure. */
+export function policyTest({ store, flags, branch, rowKey, amount, role } = {}) {
+  const reasons = [];
+  const amt = Math.abs(Number(amount) || 0);
+  const cell = resolveCell(store, branch, rowKey);
+  if (cell.enforce && amt >= (Number(cell.threshold) || 0)) {
+    reasons.push({ rule: 'Enforcement Matrix', detail: `“${rowKey}” is enforced ${cell.threshold ? `at/above ${cell.threshold}` : 'at any amount'}${cell.effectiveDate ? ` from ${cell.effectiveDate}` : ''}.` });
+  }
+  const rs = ROLE_SWITCHES.find((r) => r.key === role);
+  if (rs && isFlagOn(flags, rs.flag, branch)) {
+    reasons.push({ rule: 'Role control', detail: `${rs.name} (${rs.role}) is switched under control.` });
+  }
+  if ((rowKey === 'refund' || rowKey === 'reissue') && isFlagOn(flags, 'approval.owner_cosign_sensitive', branch)) {
+    reasons.push({ rule: 'Owner co-sign', detail: 'a refund / reissue additionally needs the Owner to sign.' });
+  }
+  if (role === 'branch_accountant' && isFlagOn(flags, 'approval.chain_branch_entries', branch)) {
+    reasons.push({ rule: 'Branch-entry chain', detail: 'branch-accountant entries walk Check → Verify → Approve.' });
+  }
+  return { routed: reasons.length > 0, reasons, masterOn: isFlagOn(flags, 'core.policy_guard', branch) };
+}
+
+/** Active Controls digest — every flag currently ON (globally, or overridden ON for some
+ *  branch). `flags` = flag-state payload ({ flags: { key: {enabled,foundation,branches,…} } }).
+ *  Returns [{ key, label, scope, globalOn, branchesOn:[codes] }] sorted by key. Pure. */
+export function activeControls(flags, branchCodes = []) {
+  const map = (flags && flags.flags) || {};
+  const out = [];
+  Object.keys(map).forEach((key) => {
+    const f = map[key] || {};
+    const globalOn = f.foundation === true || f.enabled === true;
+    const branchesOn = branchCodes.filter((b) => {
+      const has = f.branches && Object.prototype.hasOwnProperty.call(f.branches, b);
+      return has ? f.branches[b] === true : globalOn;
+    });
+    const anyOverrideOn = f.branches && Object.values(f.branches).some((v) => v === true);
+    if (globalOn || anyOverrideOn) out.push({ key, label: f.label || key, scope: f.scope || 'global', globalOn, branchesOn });
+  });
+  return out.sort((a, b) => a.key.localeCompare(b.key));
+}
+
 // ─── Power Console structure (pure data) ─────────────────────────────────────
-// The 17 screens, grouped. `key` matches the component's screen router; every screen
-// ships dormant. Order is the recommended engage-order within each group.
+// The screens, grouped. `key` matches the component's screen router; every screen ships
+// dormant. Order is the recommended engage-order within each group.
 export const POWER_SCREENS = [
   { group: 'Enforcement', items: [
     { key: 'master',   label: 'Master Switch' },
     { key: 'approval', label: 'Approval & Verification' },
     { key: 'matrix',   label: 'Enforcement Matrix' },
     { key: 'limits',   label: 'Limits & Thresholds' },
+    { key: 'tester',   label: 'Policy Tester' },
   ] },
   { group: 'Access & Rights', items: [
     { key: 'rights',   label: 'Rights & Locks' },
@@ -109,6 +177,7 @@ export const POWER_SCREENS = [
     { key: 'breakglass', label: 'Break-Glass Access' },
   ] },
   { group: 'Oversight', items: [
+    { key: 'active',        label: 'Active Controls' },
     { key: 'notifications', label: 'Notifications & SLA' },
     { key: 'erp',           label: 'ERP Config & Security' },
     { key: 'log',           label: 'Change Log / Audit' },
@@ -136,7 +205,7 @@ export const CONTROL_LISTS = {
     { nm: 'Verifier ≠ Approver on the same voucher', ds: 'Not a switch — engages with the master guard: Check → Verify → Approve pass through different hands (relaxable via AE-approve).', guarded: true },
     { nm: 'Master create ≠ Master approve', ds: 'Already active: Faiz creates, the Owner approves — never the same hand (locked meta-rule). Nothing to switch.', applied: true },
     { nm: 'Payment prepared ≠ Payment released', ds: 'Not a switch — engages with the master guard: money-out starts Pending and the maker is barred from releasing it, so a different person must.', guarded: true, crit: true },
-    { nm: 'Branch entries walk Check → Verify → Approve', ds: 'ON = a branch-accountant ERP voucher goes Check (entry) → Verify (Sughra) → Approve (Faiz), not the maker single-step approving their own. OFF = maker single-step approve (today). Independent of the master switch.', flag: 'approval.chain_branch_entries' },
+    { nm: 'Branch entries walk Check → Verify → Approve', ds: 'ON = a branch-accountant ERP voucher goes Check (entry) → Verify (Sughra) → Approve (Faiz), not the maker single-step approving their own. OFF = maker single-step approve (today). NOTE: the newer Branch Accountant switch on Approval & Verification does the same thing per-role — use one or the other, not both.', flag: 'approval.chain_branch_entries' },
     { nm: 'Large-voucher escalation sign-offs', ds: 'ON = over the escalate ceiling a voucher also needs a Director (Farhan) sign-off, and over the dual ceiling an Owner (Afshin) sign-off, before Faiz’s final approval posts. OFF = FM-approve alone is enough.', flag: 'approval.escalation_signoffs' },
   ],
   security: [

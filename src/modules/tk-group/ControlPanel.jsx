@@ -8,12 +8,14 @@ import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
 import { BranchLimitsEditor } from './BranchLimitsEditor';
 import { EnforcementMatrix } from './EnforcementMatrix';
+import { PolicyTester } from './PolicyTester';
+import { ActiveControls } from './ActiveControls';
 import { UserConfig } from './UserConfig';
 import { ChangeLog } from './ChangeLog';
 import { Delegation } from './Delegation';
 import { BreakGlass } from './BreakGlass';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
-import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES } from './utils/controlPanel';
+import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning } from './utils/controlPanel';
 import { readinessFromFlags } from './utils/readiness';
 import { Badge } from '../../shell/primitives';
 
@@ -189,6 +191,16 @@ export function ControlPanel({ setRoute }) {
                 </React.Fragment>
               ))}
             </div>
+            {/* SoD conflict — the same person in both Verify and Approve can clear their own voucher */}
+            {(() => {
+              const overlap = verifyApproveOverlap(v);
+              return overlap.length > 0 ? (
+                <div className="mt-3 flex items-start gap-2 rounded-brand border border-danger/40 bg-danger-soft px-3 py-2 text-[12px] text-danger">
+                  <span>⚠</span>
+                  <span><b>Segregation-of-duties conflict:</b> {overlap.join(', ')} {overlap.length > 1 ? 'are' : 'is'} in <b>both</b> the Verify and Approve lists — the same person could verify AND give final approval on their own voucher. Remove them from one level on <button className="underline" onClick={() => go('/tk/control-panel')}>Approval config</button>.</span>
+                </div>
+              ) : null;
+            })()}
             <div className="mt-3 grid gap-2.5">
               <Row nm="Require approval before posting" ds="Already active: every voucher starts Pending — nothing hits the books until it's approved; the maker can clear their own until a review chain is engaged. Enforced on all non-booking entries. Nothing to switch." applied />
               <Row nm="Let Sughra also Approve (AE-approve)" ds="ON = the Accounts Executive (Sughra) may give final approval on a branch-accountant voucher, not just verify. OFF = Sughra verifies only; Faiz (FM) gives final approval."
@@ -199,11 +211,19 @@ export function ControlPanel({ setRoute }) {
             <H3>Roles under control</H3>
             <p className="mb-2 max-w-[82ch] text-[12.5px] text-ink-muted">Switch a role ON to route <b>its</b> entries through Check → Verify → Approve — <b>independently of the Master Switch</b> (like the Enforcement Matrix). OFF = that role acts on its own, no approval required.</p>
             <div className="grid gap-2.5 tablet:grid-cols-2">
-              {ROLE_SWITCHES.map((rs) => (
-                <Row key={rs.flag} nm={rs.name === rs.role ? rs.role : `${rs.role} · ${rs.name}`}
-                  ds={`ON = ${rs.name}'s entries walk the approval chain (${rs.duty}). OFF = acts independently — no approval required.${rs.key === 'owner' ? ' Note: a Super Admin can still override the chain.' : ''}`}
-                  st={rs.duty} flag={rs.flag} on={isOn(rs.flag)} onPropose={onPropose} />
-              ))}
+              {ROLE_SWITCHES.map((rs) => {
+                // Deadlock guardrail: routing a sole verifier/approver through the chain
+                // leaves their own entries clearable only by the Owner (maker ≠ verifier/approver).
+                const warn = roleControlWarning(rs.key, v);
+                return (
+                  <div key={rs.flag}>
+                    <Row nm={rs.name === rs.role ? rs.role : `${rs.role} · ${rs.name}`}
+                      ds={`ON = ${rs.name}'s entries walk the approval chain (${rs.duty}). OFF = acts independently — no approval required.${rs.key === 'owner' ? ' Note: a Super Admin can still override the chain.' : ''}`}
+                      st={rs.duty} flag={rs.flag} on={isOn(rs.flag)} onPropose={onPropose} />
+                    {warn && <div className="mt-1 flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning-soft px-2.5 py-1.5 text-[11px] text-warning"><span>⚠</span><span>{warn}</span></div>}
+                  </div>
+                );
+              })}
             </div>
             <H3>Who is under control</H3>
             <div className="grid gap-3 tablet:grid-cols-2">
@@ -227,6 +247,10 @@ export function ControlPanel({ setRoute }) {
         );
       case 'matrix':
         return <EnforcementMatrix go={go} branch={branch} />;
+      case 'tester':
+        return <PolicyTester branch={branch} />;
+      case 'active':
+        return <ActiveControls />;
       case 'limits':
         return <BranchLimitsEditor go={go} branch={branch} onBranchChange={setBranch} />;
       case 'roles':

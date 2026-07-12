@@ -70,6 +70,32 @@ describe('Control Panel · Power Console', () => {
     expect(screen.getAllByText(/Independent · no approval/).length).toBe(5); // all 5 roles, master guard off
   });
 
+  test('deadlock guardrail: cautions when the sole approver/verifier would be put under control', async () => {
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Approval & Verification'));
+    expect(await screen.findByText(/only approver/)).toBeInTheDocument();   // Faiz (sole approver) caution
+    expect(screen.getByText(/only verifier/)).toBeInTheDocument();          // Sughra (sole verifier) caution
+  });
+
+  test('no SoD banner when Verify and Approve lists do not overlap (default config)', async () => {
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Approval & Verification'));
+    await screen.findByText(/only approver/); // wait for the screen to render
+    expect(screen.queryByText(/Segregation-of-duties conflict/)).not.toBeInTheDocument();
+  });
+
+  test('Policy Tester screen renders a live verdict', async () => {
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(await screen.findByText('Policy Tester'));
+    expect(await screen.findByTestId('policy-verdict')).toBeInTheDocument();
+  });
+
+  test('Active Controls screen renders the digest', async () => {
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(await screen.findByText('Active Controls'));
+    expect(await screen.findByTestId('active-controls')).toBeInTheDocument();
+  });
+
   test('navigating to ERP Config shows the readiness + security gauges', async () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     fireEvent.click(screen.getByText('ERP Config & Security'));
