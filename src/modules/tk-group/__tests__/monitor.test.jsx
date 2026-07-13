@@ -12,6 +12,9 @@ jest.mock('../api/monitor', () => ({
   getGroupHealth: jest.fn().mockResolvedValue({}), getIntegrity: jest.fn().mockResolvedValue({}),
   getTrend: jest.fn().mockResolvedValue({}), getSetupReadiness: jest.fn().mockResolvedValue({}),
   getDevFindings: jest.fn().mockResolvedValue([]),
+  // Development lens now also folds in the live code scan; stub it clean (FE+BE
+  // scanned live, no findings) so the Overview card renders deterministically.
+  getCodeScan: jest.fn().mockResolvedValue({ roots: [{ tree: 'BE', scanned: true }, { tree: 'FE', scanned: true }], counts: { total: 0, bySeverity: {}, byCategory: {}, byTree: {} }, findings: [] }),
 }));
 // eslint-disable-next-line import/first
 import { getOverview, getBranchCockpit, getAudit } from '../api/monitor';
@@ -52,9 +55,9 @@ describe('ControlTower', () => {
     ['Overview', 'Group Health', 'Setup Readiness', 'Close & Integrity', 'Scrutiny Trend', 'Development', 'Governance']
       .forEach((t) => expect(screen.getByRole('button', { name: t })).toBeInTheDocument());
     // Development lens card renders on the Overview (tab button + lens card title),
-    // fed by the Dev Control registry + tracking rows.
+    // fed by the live code scan + the Dev Control registry + tracking rows.
     expect(screen.getAllByText('Development').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText(/findings open|clear/)).toBeInTheDocument();
+    expect(screen.getByText(/to fix|clear/)).toBeInTheDocument();
   });
 });
 

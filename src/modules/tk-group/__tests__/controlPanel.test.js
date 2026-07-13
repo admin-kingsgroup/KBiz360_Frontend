@@ -1,12 +1,12 @@
-import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, CONTROL_LISTS, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls } from '../utils/controlPanel';
+import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, CONTROL_LISTS, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary } from '../utils/controlPanel';
 
 describe('Power Console structure', () => {
-  test('19 screens across 4 groups', () => {
+  test('20 screens across 4 groups', () => {
     expect(POWER_SCREENS.map((g) => g.group)).toEqual(['Enforcement', 'Access & Rights', 'Governance', 'Oversight']);
-    expect(POWER_SCREEN_KEYS).toHaveLength(19);
+    expect(POWER_SCREEN_KEYS).toHaveLength(20);
   });
-  test('includes the added screens (incl. Policy Tester + Active Controls)', () => {
-    for (const k of ['notifications', 'breakglass', 'reports', 'tester', 'active']) expect(POWER_SCREEN_KEYS).toContain(k);
+  test('includes the added screens (Policy Tester + Active Controls + Daily Digest)', () => {
+    for (const k of ['notifications', 'breakglass', 'reports', 'tester', 'active', 'digest']) expect(POWER_SCREEN_KEYS).toContain(k);
   });
   test('screen keys are unique', () => {
     expect(new Set(POWER_SCREEN_KEYS).size).toBe(POWER_SCREEN_KEYS.length);
@@ -136,5 +136,28 @@ describe('activeControls (digest)', () => {
   });
   test('empty when nothing engaged', () => {
     expect(activeControls({ flags: { x: { enabled: false } } }, ['BOM'])).toEqual([]);
+  });
+});
+
+describe('digestSummary (Daily Digest)', () => {
+  test('extracts pending / exceptions / close from the monitor payloads', () => {
+    const d = digestSummary({
+      overview: { pendingTotal: 5, oldestPendingDays: 3, lockedPeriods: 2, streamPending: { governance: 4, decision: 1 } },
+      integrity: { fails: 2, branches: [{ branch: 'BOM', closeReady: false, fails: 2 }, { branch: 'AMD', closeReady: true, fails: 0 }] },
+      inbox: { count: 1 },
+    });
+    expect(d).toMatchObject({ pending: 5, oldestDays: 3, lockedPeriods: 2, governance: 4, decision: 1, mine: 1, exceptions: 2 });
+    expect(d.notCloseReady).toEqual(['BOM']);
+    expect(d.closeReady).toBe(false);
+  });
+  test('empty payloads → zeros, never crashes', () => {
+    const d = digestSummary({});
+    expect(d).toMatchObject({ pending: 0, exceptions: 0, mine: 0, closeReady: false });
+    expect(d.notCloseReady).toEqual([]);
+  });
+  test('all branches close-ready → closeReady true; fails summed when no top-level count', () => {
+    const d = digestSummary({ integrity: { branches: [{ branch: 'BOM', closeReady: true, fails: 0 }, { branch: 'AMD', closeReady: true, fails: 0 }] } });
+    expect(d.closeReady).toBe(true);
+    expect(d.exceptions).toBe(0);
   });
 });

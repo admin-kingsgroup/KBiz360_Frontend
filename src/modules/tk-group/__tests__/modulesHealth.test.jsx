@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { headScore, gradeOf, scoreTone, headCards, overallHealth, howTo100 } from '../utils/modulesHealth';
 
@@ -71,7 +71,7 @@ describe('Modules Health · scorecard maths (pure)', () => {
   });
 });
 
-// ── Render smoke: cards → click → sub-module drill ────────────────────────────
+// ── Render smoke: the merged home — cards on top, per-module health + tasks below ──
 
 const READINESS = { tree: [
   { head: 'Accounting & Ledgers', modules: [
@@ -83,58 +83,93 @@ const READINESS = { tree: [
   ] },
 ], byBranch: [{ branch: 'BOM' }, { branch: 'NBO' }, { branch: 'Central' }] };
 
+const TASKS = {
+  branches: ['BOM', 'NBO'],
+  tasks: [
+    { id: 'ledgers-openings', module: 'ledgers', branch: 'BOM', assignee: 'FM', label: 'Certify opening balances', section: 'Chart & Codes', link: '/masters/ledgers', check: 'openings = 0', remark: 'Certify.', status: 'pending' },
+  ],
+  parties: {
+    customers: { total: 1, incomplete: 1, capped: false, items: [{ name: 'NeuIQ Technologies Private Limited', branch: 'BOM', missing: ['Credit limit'] }] },
+    suppliers: { total: 0, incomplete: 0, capped: false, items: [] },
+    employees: { total: 0, incomplete: 0, capped: false, items: [] },
+  },
+  coverage: { total: 75, modules: [
+    { id: 'ledgers', name: 'Chart of Accounts / Ledgers', head: 'Accounting & Ledgers', kind: 'op', via: 'task' },
+  ] },
+};
+
 jest.mock('../api/monitor', () => ({
   getSetupReadiness: jest.fn().mockResolvedValue(READINESS),
+  getSetupTasks: jest.fn().mockResolvedValue(TASKS),
   getDevFindings: jest.fn().mockResolvedValue([]),
 }));
 // eslint-disable-next-line import/first
 import { ModulesHealth } from '../ModulesHealth';
+// eslint-disable-next-line import/first
+import { MemoryRouter } from 'react-router-dom';
 
 function renderWith(setRoute) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><ModulesHealth setRoute={setRoute} /></QueryClientProvider>);
+  return render(
+    <MemoryRouter>
+      <QueryClientProvider client={qc}><ModulesHealth setRoute={setRoute} /></QueryClientProvider>
+    </MemoryRouter>,
+  );
 }
 
-describe('ModulesHealth render (wiring smoke)', () => {
-  test('head cards show score + tally; clicking a card drills into each sub-module health', async () => {
+describe('ModulesHealth render (merged home — wiring smoke)', () => {
+  test('cards score the head; clicking a card expands ONLY that section with health + tasks', async () => {
     const setRoute = jest.fn();
     renderWith(setRoute);
     const card = await screen.findByTestId('tk-mh-card-Accounting & Ledgers');
     expect(card.textContent).toContain('75%');            // (100 + 50) / 2
     expect(card.textContent).toContain('1 live');
     expect(card.textContent).toContain('1 partial');
-    expect(screen.queryByTestId('tk-mh-drill')).not.toBeInTheDocument();
-    // Click → sub-module health opens
+    expect(card.textContent).toContain('to configure');   // the pending-tasks hook
+    // Sections are COLLAPSED by default — header present, body NOT rendered (short page)
+    expect(screen.getByTestId('tk-mh-section-accounting-ledgers')).toBeInTheDocument();
+    expect(screen.queryByTestId('tk-mh-body-accounting-ledgers')).not.toBeInTheDocument();
+    // Click the card → its section expands (focused) and the body renders
     fireEvent.click(card);
-    const drill = screen.getByTestId('tk-mh-drill');
-    expect(drill.textContent).toContain('Core Accounting');
-    expect(drill.textContent).toContain('Live');
-    expect(drill.textContent).toContain('Chart of Accounts / Ledgers');
-    expect(drill.textContent).toContain('Partly set up');
-    expect(drill.textContent).toContain('1/1 branches live');
-    // Readable path-to-100% renders per sub-module, with routed steps
-    expect(drill.textContent).toContain('To reach 100%');
-    expect(drill.textContent).toContain('Complete "Openings certified"');
-    expect(drill.textContent).toContain('Already at 100%'); // the live module's status line
-    fireEvent.click(screen.getAllByText('Do it →')[0]);
+    const sec = screen.getByTestId('tk-mh-section-accounting-ledgers');
+    expect(sec.className).toContain('border-accent');
+    const body = within(sec).getByTestId('tk-mh-body-accounting-ledgers');
+    expect(body.textContent).toContain('Core Accounting');
+    expect(body.textContent).toContain('Chart of Accounts / Ledgers');
+    expect(body.textContent).toContain('1/1 branches live');
+    expect(body.textContent).toContain('To reach 100%');
+    expect(body.textContent).toContain('Complete "Openings certified"');   // health step
+    expect(body.textContent).toContain('Certify opening balances');        // punch-list task
+    // Deep-links from within the expanded body
+    fireEvent.click(within(body).getByText('Complete →'));                 // the task
     expect(setRoute).toHaveBeenCalledWith('/masters/ledgers');
-    // Open → deep-links to the sub-module's screen
-    fireEvent.click(screen.getAllByText('Open →')[0]);
+    fireEvent.click(within(body).getAllByText('Do it →')[0]);             // ledgers health step
+    expect(setRoute).toHaveBeenCalledWith('/masters/ledgers');
+    fireEvent.click(within(body).getAllByText('Open →')[0]);              // accounting sub-module
     expect(setRoute).toHaveBeenCalledWith('/journal');
-    // Click again → collapses
-    fireEvent.click(card);
-    expect(screen.queryByTestId('tk-mh-drill')).not.toBeInTheDocument();
+    // Clicking the section header again collapses it
+    fireEvent.click(screen.getByTestId('tk-mh-sechead-accounting-ledgers'));
+    expect(screen.queryByTestId('tk-mh-body-accounting-ledgers')).not.toBeInTheDocument();
   });
 
-  test('KPIs roll up all heads; branch bar renders from byBranch (Central excluded)', async () => {
+  test('KPIs, user worklist filter, branch bar, and party completeness all render', async () => {
     renderWith();
     await screen.findByTestId('tk-mh-card-Accounting & Ledgers'); // data loaded
     const kpis = screen.getByTestId('tk-mh-kpis');
     expect(kpis.textContent).toContain('Overall health');
     expect(kpis.textContent).toContain('1/3');            // sub-modules live
+    expect(kpis.textContent).toContain('Tasks to configure');
+    // User worklist filter (folded in from the retired Task List)
+    expect(screen.getByTestId('tk-mh-user-FM').textContent).toContain('FM · Faiz');
+    expect(screen.getByTestId('tk-mh-user-Owner').textContent).toContain('Owner · Afshin');
+    // Branch bar from byBranch, Central excluded
     const bar = screen.getByTestId('tk-mh-branchbar');
     expect(screen.getByTestId('tk-mh-branch-BOM')).toBeInTheDocument();
     expect(screen.getByTestId('tk-mh-branch-NBO')).toBeInTheDocument();
     expect(bar.textContent).not.toContain('Central');
+    // Party master completeness (foot) renders under All / FM
+    expect(screen.getByText('NeuIQ Technologies Private Limited')).toBeInTheDocument();
+    // Coverage proof renders
+    expect(screen.getByText(/Module scan coverage/)).toBeInTheDocument();
   });
 });

@@ -34,6 +34,7 @@ import { DataTable } from '../../shell/DataTable';
 import { getAuthToken, API_BASE, apiGet, apiPost } from '../../core/api';
 import { APP_ROUTES } from '../../core/routeManifest.generated';
 import { DEV_REGISTRY, ALL_ITEMS, STATUS_META, TRACK_META, SEVERITY_ORDER, RUNBOOK, KNOWN_ISSUES, HEALTH_CHECKS, isCleared, isDormant, moduleRollup, VERDICT_META } from './registry';
+import { CodeScanPanel } from './CodeScanPanel';
 
 const isSuperAdmin = (u) => ['Super Admin', 'super_admin'].includes(u?.role || '');
 
@@ -375,6 +376,9 @@ export function DevControlPage({ setRoute, currentUser }) {
           <KpiTile label="Dormant by design" value={dormant.length} sub="built — awaiting go-live switch" color="#0969da" />
           <KpiTile label="Needs audit" value={pending.filter((i) => i.status === 'audit').length} sub="wiring unverified" color="#57606a" />
         </ResponsiveGrid>
+
+        {/* ── LIVE automated code scan — re-runs on every refresh ── */}
+        <CodeScanPanel subtitle="Auto-runs on every ERP refresh. Walks the frontend + backend source on disk and flags broken imports, dead routes, placeholder screens, dead buttons and unresolved TODOs — each with a how-to-fix remark. These are found in the CODE (distinct from the hand-tracked registry findings below); fix them in source and they clear on the next scan." />
 
         {/* ── module status — working / not-working verdict per module ── */}
         <ModuleStatusSection trackMap={trackMap} setRoute={setRoute} />

@@ -9,10 +9,10 @@ import { useCockpitFocus } from '../../store/cockpitFocus';
 import { PageSection, ResponsiveGrid, Badge } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
+import { CodeScanPanel, useCodeScan } from '../devControl/CodeScanPanel';
 import { BandError } from './BandError';
 import { GroupHealth } from './GroupHealth';
 import { SetupReadiness } from './SetupReadiness';
-import { SetupTaskList } from './SetupTaskList';
 import { ModulesHealth } from './ModulesHealth';
 import { IntegritySummary } from './IntegritySummary';
 import { ScrutinyTrend } from './ScrutinyTrend';
@@ -39,7 +39,9 @@ const TABS = [
   { id: 'trend', label: 'Scrutiny Trend' },
   { id: 'dev', label: 'Development' },
   { id: 'gov', label: 'Governance' },
-  { id: 'tasks', label: 'Task List' },
+  // Task List retired — its by-module punch-list, per-user worklist, party
+  // completeness and coverage now live inside Modules Health (one home). The old
+  // `?tab=tasks` deep-link is redirected there below so existing links still work.
   { id: 'modules-health', label: 'Modules Health' },
 ];
 
@@ -173,15 +175,25 @@ function Overview({ focus, goTab }) {
 }
 
 // ── Development lens card (Overview) — is dev work blocking the ERP? ──
+// Folds the LIVE code scan (broken imports, dead routes, placeholders…) together
+// with the hand-maintained registry, so the Overview highlights automated issues
+// the moment they appear — not only what a developer remembered to log.
 function DevLensCard({ goTab }) {
   const { open, dormant } = useDevFindings();
-  const broken = open.filter((i) => i.status === 'stub' || i.status === 'pending').length;
-  const gaps = open.filter((i) => i.status === 'partial' || i.status === 'audit').length;
+  const { scan } = useCodeScan();
+  const scanHigh = scan.counts.bySeverity.high || 0;
+  const scanTotal = scan.counts.total || 0;
+  const registryOpen = open.length;
+  const total = scanTotal + registryOpen;
   return (
     <LensCard title="Development" onOpen={() => goTab('dev')}
-      chart={<div className="w-[130px]"><StackedBar segments={[{ value: broken, color: SEM.err }, { value: gaps, color: SEM.warn }, { value: dormant.length, color: SEM.info }]} /></div>}
-      legend={<Legend items={[{ label: 'Not working', value: broken, color: SEM.err }, { label: 'Working, gaps', value: gaps, color: SEM.warn }, { label: 'Dormant by design', value: dormant.length, color: SEM.info }]} />}
-      foot={<><span className="text-ink-subtle">from the developer registry</span><Badge tone={broken ? 'danger' : open.length ? 'warning' : 'success'} size="sm">{open.length ? `${open.length} findings open` : 'clear'}</Badge></>} />
+      chart={<div className="w-[130px]"><StackedBar segments={[{ value: scanHigh, color: SEM.err }, { value: scanTotal - scanHigh, color: SEM.warn }, { value: registryOpen, color: SEM.info }]} /></div>}
+      legend={<Legend items={[
+        { label: 'Scanner — high', value: scanHigh, color: SEM.err },
+        { label: 'Scanner — other', value: scanTotal - scanHigh, color: SEM.warn },
+        { label: 'Registry open', value: registryOpen, color: SEM.info },
+      ]} />}
+      foot={<><span className="text-ink-subtle">auto-scan + registry</span><Badge tone={scanHigh ? 'danger' : total ? 'warning' : 'success'} size="sm">{total ? `${total} to fix` : 'clear'}</Badge></>} />
   );
 }
 
@@ -209,8 +221,9 @@ function DevelopmentLens({ setRoute }) {
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
         <span>
-          Development findings come from the developer registry + Dev Control tracking. Fix an item and mark it
-          <b> Done</b> in Developer Control (or flip its registry row to <b>live</b>) — the finding clears here automatically.
+          Two sources feed this lens: the <b>automated code scan</b> below (re-run on every refresh) and the
+          <b> developer registry</b> (hand-tracked features). Fix a scan issue in the code and it clears on the next
+          scan; mark a registry item <b>Done</b> in Developer Control (or flip its row to <b>live</b>) and it clears here.
         </span>
         {setRoute && (
           <button type="button" onClick={() => setRoute('/dev/control')} className="whitespace-nowrap text-[11.5px] font-semibold text-accent hover:underline">
@@ -219,6 +232,11 @@ function DevelopmentLens({ setRoute }) {
         )}
       </div>
 
+      {/* ── LIVE automated scan ── */}
+      <CodeScanPanel />
+
+      {/* ── registry-tracked module verdicts + findings ── */}
+      <div className="pt-1 text-[12px] font-semibold text-ink">Developer registry — tracked features</div>
       <ResponsiveGrid min="190px" gap="md">
         {rollup.map((m) => {
           const vm = VERDICT_META[m.verdict];
@@ -324,7 +342,9 @@ export function ControlTower({ setRoute } = {}) {
   // BEFORE Control Tower, ignoring every tab you clicked through on the way here.
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab = TABS.some((t) => t.id === tabParam) ? tabParam : 'overview';
+  // Legacy redirect: the retired Task List tab folds into Modules Health.
+  const resolvedParam = tabParam === 'tasks' ? 'modules-health' : tabParam;
+  const tab = TABS.some((t) => t.id === resolvedParam) ? resolvedParam : 'overview';
   const setTab = (id) => setSearchParams((prev) => { const p = new URLSearchParams(prev); p.set('tab', id); return p; });
   return (
     <div className="grid gap-5">
@@ -344,7 +364,6 @@ export function ControlTower({ setRoute } = {}) {
       {tab === 'trend' && <ScrutinyTrend />}
       {tab === 'dev' && <DevelopmentLens setRoute={setRoute} />}
       {tab === 'gov' && <Governance />}
-      {tab === 'tasks' && <SetupTaskList setRoute={setRoute} />}
       {tab === 'modules-health' && <ModulesHealth setRoute={setRoute} />}
     </div>
   );

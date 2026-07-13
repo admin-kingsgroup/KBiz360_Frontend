@@ -60,3 +60,18 @@ export function saveFindingStatus(row) { return apiPost('/api/tk/finding-status'
 export async function getDevFindings() {
   try { return (await apiGet('/api/dev-control'))?.items || []; } catch { return []; }
 }
+
+// Live automated code scan — walks the ERP source trees on the backend and
+// returns development findings (broken imports, dead routes, placeholder
+// screens, dead buttons, TODOs…). Structural getter: fails SOFT to an empty
+// shape so the Development lens still renders the build-time FE scan + registry
+// findings if the backend can't reach the trees. `fresh` forces a re-scan
+// (the "Re-scan now" button); the default read is served from a 60s cache.
+export async function getCodeScan(fresh = false) {
+  try {
+    return (await apiGet('/api/dev-control/scan', fresh ? { fresh: 1 } : {}))
+      || { roots: [], counts: { total: 0, bySeverity: {}, byCategory: {}, byTree: {} }, findings: [] };
+  } catch {
+    return { roots: [], counts: { total: 0, bySeverity: {}, byCategory: {}, byTree: {} }, findings: [], unreachable: true };
+  }
+}

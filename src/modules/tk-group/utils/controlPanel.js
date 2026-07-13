@@ -151,6 +151,27 @@ export function activeControls(flags, branchCodes = []) {
   return out.sort((a, b) => a.key.localeCompare(b.key));
 }
 
+/** Daily Digest — one Owner/Director summary from the monitor payloads (getOverview +
+ *  getIntegrity + getInbox). Defensive of every shape; pure & testable. */
+export function digestSummary({ overview = {}, integrity = {}, inbox = {} } = {}) {
+  const num = (v) => Number(v) || 0;
+  const sp = overview.streamPending || {};
+  const branches = Array.isArray(integrity.branches) ? integrity.branches : [];
+  const fails = integrity.fails != null ? num(integrity.fails) : branches.reduce((n, b) => n + num(b.fails), 0);
+  const notReady = branches.filter((b) => b && b.closeReady === false).map((b) => b.branch || b.code).filter(Boolean);
+  return {
+    pending: num(overview.pendingTotal),
+    oldestDays: num(overview.oldestPendingDays),
+    lockedPeriods: num(overview.lockedPeriods),
+    governance: num(sp.governance),
+    decision: num(sp.decision),
+    mine: num(inbox.count),                        // items waiting on the current user
+    exceptions: fails,                             // failing integrity gates (drift, suspense, self-approvals, …)
+    notCloseReady: notReady,
+    closeReady: branches.length > 0 && notReady.length === 0,
+  };
+}
+
 // ─── Power Console structure (pure data) ─────────────────────────────────────
 // The screens, grouped. `key` matches the component's screen router; every screen ships
 // dormant. Order is the recommended engage-order within each group.
@@ -177,6 +198,7 @@ export const POWER_SCREENS = [
     { key: 'breakglass', label: 'Break-Glass Access' },
   ] },
   { group: 'Oversight', items: [
+    { key: 'digest',        label: 'Daily Digest' },
     { key: 'active',        label: 'Active Controls' },
     { key: 'notifications', label: 'Notifications & SLA' },
     { key: 'erp',           label: 'ERP Config & Security' },

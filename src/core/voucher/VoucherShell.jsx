@@ -8,6 +8,7 @@ import { JvBlock } from './JvBlock';
 import { useVoucherRevoke, voucherParent, openParentFile } from './useRevokeAction';
 import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
+import { confirmDialog } from '../ux/confirm';
 import { Kbd } from '../ux/widgets.jsx';
 import { isViewOnly } from '../api';
 import { triggerSaveRefresh } from '../hooks';
@@ -79,13 +80,24 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       else setDone(true);
     };
     const fail = (e) => { setErr(e.message); toast(`Could not save — ${e.message}`, 'error'); };
+    // Duplicate-bill override: the server blocks a re-entered supplier expense bill (same
+    // supplier + Bill/Invoice no.) with a 409. Offer a one-click "save anyway" so a genuine
+    // re-entry isn't dead-ended, rather than surfacing a raw error.
+    const onCreateErr = async (e) => {
+      if (/possible duplicate/i.test(String((e && e.message) || ''))) {
+        const { confirmed } = await confirmDialog({ title: 'Possible duplicate bill', message: String(e.message), danger: true, confirmLabel: 'Save anyway' });
+        if (confirmed) createMut.mutate({ ...base, allowDuplicate: true }, { onSuccess: (r) => ok(r && (r.vno || r.voucherNo)), onError: fail });
+        return;
+      }
+      fail(e);
+    };
     if (isEdit) {
       const body = { ...voucher, ...base, status: voucher.status || 'saved' };
       delete body.id; delete body._id; delete body.createdAt; delete body.updatedAt;
       const id = voucherId || voucher.id || voucher._id;
       updateMut.mutate({ id, body }, { onSuccess: () => ok(voucher.vno), onError: fail });
     } else {
-      createMut.mutate(base, { onSuccess: (r) => ok(r && (r.vno || r.voucherNo)), onError: fail });
+      createMut.mutate(base, { onSuccess: (r) => ok(r && (r.vno || r.voucherNo)), onError: onCreateErr });
     }
   };
 

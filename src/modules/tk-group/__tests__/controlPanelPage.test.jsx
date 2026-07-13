@@ -29,8 +29,14 @@ jest.mock('../api/userLimits', () => ({
   setUserLimit: jest.fn().mockResolvedValue({ store: {} }),
   proposeUserLimit: jest.fn().mockResolvedValue({}),
 }));
-// ChangeLog (Change Log screen) pulls api/monitor → core/api.
-jest.mock('../api/monitor', () => ({ getAudit: jest.fn().mockResolvedValue({ items: [] }) }));
+// ChangeLog + Daily Digest pull api/monitor → core/api.
+jest.mock('../api/monitor', () => ({
+  getAudit: jest.fn().mockResolvedValue({ items: [] }),
+  getOverview: jest.fn().mockResolvedValue({ pendingTotal: 3, oldestPendingDays: 2, lockedPeriods: 0, streamPending: { governance: 2, decision: 1 } }),
+  getIntegrity: jest.fn().mockResolvedValue({ fails: 0, branches: [{ branch: 'BOM', closeReady: true, fails: 0 }] }),
+}));
+// Daily Digest also pulls the inbox count.
+jest.mock('../api/inbox', () => ({ getInbox: jest.fn().mockResolvedValue({ count: 0, items: [] }) }));
 // Delegation + Break-Glass screens pull their api → core/api.
 jest.mock('../api/delegation', () => ({ getDelegations: jest.fn().mockResolvedValue({ items: [], activeCount: 0 }), createDelegation: jest.fn().mockResolvedValue({}), revokeDelegation: jest.fn().mockResolvedValue({}) }));
 jest.mock('../api/breakglass', () => ({ getBreakglass: jest.fn().mockResolvedValue({ items: [], activeCount: 0 }), invokeBreakglass: jest.fn().mockResolvedValue({}), endBreakglass: jest.fn().mockResolvedValue({}) }));
@@ -94,6 +100,14 @@ describe('Control Panel · Power Console', () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     fireEvent.click(await screen.findByText('Active Controls'));
     expect(await screen.findByTestId('active-controls')).toBeInTheDocument();
+  });
+
+  test('Daily Digest screen renders live tiles', async () => {
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(await screen.findByText('Daily Digest'));
+    expect(await screen.findByTestId('daily-digest')).toBeInTheDocument();
+    expect(await screen.findByText('Pending approvals')).toBeInTheDocument();
+    expect(screen.getByText('Close readiness')).toBeInTheDocument();
   });
 
   test('navigating to ERP Config shows the readiness + security gauges', async () => {

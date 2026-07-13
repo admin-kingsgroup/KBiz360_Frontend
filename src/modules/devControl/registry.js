@@ -175,6 +175,7 @@ export const DEV_REGISTRY = [
       { name: 'Banking API / GSP-IRP integration settings', status: 'dormant', modules: ['app-config'], remark: 'Built to the provider boundary (2026-07-10) — switch ON when bank-feed / GSP contracts exist: enter credentials, then wire the provider client. No other dev work pending.', routes: ['/settings/banking-api', '/settings/gsp-irp'], note: 'PERSISTED 2026-07-10: both forms save/load for real via app-config (integration.banking / integration.gsp; secrets masked after save, blank re-save keeps stored value). Test-connection/enable stay disabled with an "awaiting provider contract" state.' },
       { name: 'Period locking (settings)', status: 'live', modules: ['tk-group'], routes: ['/settings/period-lock'], note: 'FIXED 2026-07-08: the dead second lock UI (empty data, inert buttons) was retired — /settings/period-lock now renders the real TK period-lock admin (TkPeriodLockPage → /api/tk/period-locks, policyGuard). Same page as /tk/period-locks.' },
       { name: 'Developer Control Tower (this console)', status: 'live', modules: [], routes: ['/dev/control'], api: ['/api/dev-control'], note: 'Super-Admin-only. Findings board mirrors TK Control Tower finding-status; per-item owner/status/due/note persisted in DevItemStatus. Definitions hand-maintained in this registry file.' },
+      { name: 'Automated code scan (live FE+BE issue detector)', status: 'live', modules: [], routes: ['/dev/control', '/tk/control-tower'], api: ['/api/dev-control/scan'], note: 'Auto-runs on every ERP refresh (Control Tower ▸ Development + Dev Control). Backend walks the FE+BE source trees on disk (codeScan.js) and flags broken imports, dead menu/registry routes, placeholder screens (<NotWired>/throw-not-implemented/"coming soon"), dead buttons/links, debugger + bare empty-catch + TODO/FIXME — each with a how-to-fix remark, worst-first. Comment-aware tokenizer keeps false positives near zero. FE findings also baked at build time (scripts/gen-dev-scan.cjs → core/devScan.generated.js) so prod, where the API box has no FE source, still gets FE coverage; the lens prefers live over build when the FE tree was reached. 60s server cache; "Re-scan now" forces a fresh walk.' },
     ],
   },
 ];
@@ -304,4 +305,5 @@ export const HEALTH_CHECKS = [
   { label: 'Numbering series', path: '/api/numbering-series' },
   { label: 'Import', path: '/api/import' },
   { label: 'Dev Control tracker', path: '/api/dev-control' },
+  { label: 'Code scan (live FE+BE)', path: '/api/dev-control/scan' },
 ];

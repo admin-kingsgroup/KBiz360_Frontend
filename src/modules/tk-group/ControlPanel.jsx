@@ -10,6 +10,7 @@ import { BranchLimitsEditor } from './BranchLimitsEditor';
 import { EnforcementMatrix } from './EnforcementMatrix';
 import { PolicyTester } from './PolicyTester';
 import { ActiveControls } from './ActiveControls';
+import { DailyDigest } from './DailyDigest';
 import { UserConfig } from './UserConfig';
 import { ChangeLog } from './ChangeLog';
 import { Delegation } from './Delegation';
@@ -251,6 +252,8 @@ export function ControlPanel({ setRoute }) {
         return <PolicyTester branch={branch} />;
       case 'active':
         return <ActiveControls />;
+      case 'digest':
+        return <DailyDigest go={go} />;
       case 'limits':
         return <BranchLimitsEditor go={go} branch={branch} onBranchChange={setBranch} />;
       case 'roles':
