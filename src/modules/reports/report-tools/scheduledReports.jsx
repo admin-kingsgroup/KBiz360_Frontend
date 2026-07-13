@@ -18,7 +18,7 @@ import { toastSuccess, toastError, toastWarning } from '../../../core/ux/toast';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { PageSection, Button, Input, Select, FormField, Modal, Switch, StatusPill, EmptyState } from '../../../shell/primitives';
-import { describeConfig } from '../builderShared';
+import { describeConfig } from './builderShared';
 
 const FREQS = [
   { key: 'daily', label: 'Daily' },

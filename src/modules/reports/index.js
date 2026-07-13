@@ -1,44 +1,56 @@
 /* ════════════════════════════════════════════════════════════════════
    Reports feature — public barrel
    ════════════════════════════════════════════════════════════════════
-   STRANGLER-FIG MIGRATION (mirrors modules/finance): the original
-   ~3300-line monolith now lives in `./legacy.jsx`. Screens are moved into
-   the shared responsive scaffold (PageLayout / primitives / DataTable) one
-   at a time under `./pages/`. This barrel re-exports the not-yet-migrated
-   screens AND the migrated ones under their ORIGINAL names, so App.jsx (and
-   finance/legacy.jsx, financialStatements.jsx) keep importing from
-   `modules/reports` with zero changes.
-
-   When a screen is migrated:
-     1. add its page under `pages/` (primitives + responsive layout)
-     2. add an explicit re-export below (it shadows the legacy `export *`)
-     3. delete the dead component from `legacy.jsx`
+   BUSINESS SUB-MODULE REORG (2026-07-13): screens are grouped by business
+   sub-module — matching the nav menu's MENU_REPORTS groups — into
+   financial-statements/, profitability-gp/, operational/, working-capital/,
+   compliance-tax/ and report-tools/ folders. moduleRegister.jsx,
+   salesGpAnalytics.jsx, statistics.jsx and pages/client-statement.jsx,
+   pages/tax-summary.jsx, pages/consolidated-bs.jsx, pages/schedule-iii-bs.jsx
+   are NOT MENU_REPORTS items (they belong to Finance/Accounts/Taxation and
+   are misfiled here) — left untouched, migrated in those modules' own phase.
+   components/scaffold.jsx (RptShell, NotWired) is the shared scaffold used
+   across both moved and not-moved pages — stays at its stable path.
    ──────────────────────────────────────────────────────────────────── */
 
-// Not-yet-migrated screens + shared exports. Explicit re-exports below win.
-export * from './legacy';
-
-// ── Shared report scaffold (rebuilt on responsive primitives) ───────────────
-export { RptShell, NotWired } from './components/scaffold';
-
-// ── Migrated → primitives + DataTable, feature-folder pages ─────────────────
-export { ReportBranch } from './pages/branch-comparison';
-export { ConsultantReport } from './pages/consultant-productivity';
-export { ClientConcentration } from './pages/client-concentration';
-export { DestinationIntelligence } from './pages/destination-intelligence';
-export { ForexReport } from './pages/forex';
-export { ReportCommission } from './pages/commission-income';
-export { RatioAnalysis } from './pages/ratio-analysis';
-export { ReportCF } from './pages/cash-flow-statement';
+// Not MENU_REPORTS items — belong to other business modules, left in place.
+export { ModuleRegister } from './moduleRegister';
+export { SalesGpAnalytics } from './salesGpAnalytics';
+export { Statistics, voucherRegister } from './statistics';
 export { ClientStatement } from './pages/client-statement';
 export { RPT_TaxSummary } from './pages/tax-summary';
 export { ConsolidatedBS } from './pages/consolidated-bs';
 export { ScheduleIIIBS } from './pages/schedule-iii-bs';
-export { ReportExpenseBgt } from './pages/expense-budget';
-export { MisReport } from './pages/mis-report';
-export { ReportGP } from './pages/gp-report';
 
-// ── Report Tools — live (backend: /api/report-views + /api/report-schedules) ─
-export { CustomReportBuilder } from './pages/report-builder';
-export { SavedReportViews } from './pages/saved-views';
-export { ScheduledReports } from './pages/scheduled-reports';
+// ── Shared report scaffold (rebuilt on responsive primitives) ───────────────
+export { RptShell, NotWired } from './components/scaffold';
+
+// ── Business sub-module regroup — financial-statements/ ─────────────────────
+export { ReportViewerTabbed } from './financial-statements/reportViewer';
+export { ReportCF } from './financial-statements/cashFlowStatement';
+
+// ── Business sub-module regroup — profitability-gp/ ──────────────────────────
+export { ReportPackagePnL } from './profitability-gp/packagePnL';
+export { ReportBranch } from './profitability-gp/branchComparison';
+export { MisReport } from './profitability-gp/misReport';
+export { ReportGP } from './profitability-gp/gpReport';
+
+// ── Business sub-module regroup — operational/ ───────────────────────────────
+export { ConsultantReport } from './operational/consultantReport';
+export { DestinationIntelligence } from './operational/destinationIntelligence';
+export { ForexReport } from './operational/forex';
+export { ReportCommission } from './operational/commissionIncome';
+
+// ── Business sub-module regroup — working-capital/ ───────────────────────────
+export { RatioAnalysis } from './working-capital/ratioAnalysis';
+
+// ── Business sub-module regroup — compliance-tax/ ────────────────────────────
+export { VarianceAnalysis } from './compliance-tax/varianceAnalysis';
+export { ClientConcentration } from './compliance-tax/clientConcentration';
+export { ReportExpenseBgt } from './compliance-tax/expenseBudgetVsActual';
+
+// ── Business sub-module regroup — report-tools/ (live: /api/report-views + /api/report-schedules) ─
+export { ReportsMetaDemo } from './report-tools/metaDemo';
+export { CustomReportBuilder } from './report-tools/reportBuilder';
+export { SavedReportViews } from './report-tools/savedViews';
+export { ScheduledReports } from './report-tools/scheduledReports';

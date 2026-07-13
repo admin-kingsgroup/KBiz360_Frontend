@@ -15,7 +15,7 @@ import { toastError, toastSuccess } from '../../../core/ux/toast';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { PageSection, Button, Input, FormField, Modal, Switch, StatusPill, EmptyState, Select } from '../../../shell/primitives';
-import { stashBuilderConfig, currentUserEmail, describeConfig } from '../builderShared';
+import { stashBuilderConfig, currentUserEmail, describeConfig } from './builderShared';
 
 export function SavedReportViews({ setRoute }) {
   const me = currentUserEmail();

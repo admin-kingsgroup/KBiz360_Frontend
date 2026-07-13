@@ -26,7 +26,7 @@ import { PageSection, Button, Input, Select, FormField, Checkbox, Switch, Modal,
 import {
   RUN_SOURCES, GROUP_OPTIONS, GROUP_LABEL, catalogFor,
   consumeBuilderConfig, currentUserEmail,
-} from '../builderShared';
+} from './builderShared';
 
 const fmtN = (v) => (Number(v) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 

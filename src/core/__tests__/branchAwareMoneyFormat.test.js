@@ -57,14 +57,14 @@ describe('active branch currency — fmt/fmtINR/money default follows the operat
 describe('guard — fixed screens stay branch-currency aware', () => {
   const FROM = path.join(__dirname, '..', '..');
   const SCREENS = [
-    'modules/reports/pages/cash-flow-statement.jsx',
-    'modules/reports/pages/commission-income.jsx',
+    'modules/reports/financial-statements/cashFlowStatement.jsx',
+    'modules/reports/operational/commissionIncome.jsx',
     'modules/reports/pages/client-statement.jsx',
-    'modules/reports/pages/client-concentration.jsx',
-    'modules/reports/pages/expense-budget.jsx',
-    'modules/reports/pages/forex.jsx',
-    'modules/reports/pages/consultant-productivity.jsx',
-    'modules/reports/pages/destination-intelligence.jsx',
+    'modules/reports/compliance-tax/clientConcentration.jsx',
+    'modules/reports/compliance-tax/expenseBudgetVsActual.jsx',
+    'modules/reports/operational/forex.jsx',
+    'modules/reports/operational/consultantReport.jsx',
+    'modules/reports/operational/destinationIntelligence.jsx',
     'modules/masters/pages/customer-360.jsx',
     'modules/masters/pages/supplier-360.jsx',
     'modules/masters/supplier-master/subAgents.jsx',
