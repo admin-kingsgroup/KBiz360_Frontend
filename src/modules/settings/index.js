@@ -1,25 +1,40 @@
 /* ════════════════════════════════════════════════════════════════════
    Settings feature — public barrel
    ════════════════════════════════════════════════════════════════════
-   STRANGLER-FIG MIGRATION (mirrors finance / reports / masters): the
-   original ~1720-line monolith now lives in `./legacy.jsx`. Screens move to
-   the shared responsive scaffold (PageLayout / primitives / DataTable) one at
-   a time under `./pages/`. This barrel re-exports the not-yet-migrated screens
-   AND the migrated ones under their ORIGINAL names, so App.jsx and
-   transactions.jsx keep importing from `modules/settings` unchanged.
-
-   When a screen is migrated:
-     1. add its page under `pages/` (primitives + responsive layout)
-     2. add an explicit re-export below (it shadows the legacy `export *`)
-     3. delete the dead component from `legacy.jsx`
+   BUSINESS SUB-MODULE REORG (2026-07-13): screens are grouped by business
+   sub-module — matching the nav menu's MENU_SETTINGS groups — into
+   organization/, compliance-workflow/, integrations/, tools/ and
+   admin-power/ folders. `legacy.jsx` and `pageAccess.jsx` are now thin
+   re-export shims (SettingsUsers / PageAccessControl moved into
+   organization/, but modules/tk-group/pages.jsx and App.jsx import them
+   directly from those exact old paths as separate lazy-loaded chunks).
+   pages/company.jsx (SettingsCompany) isn't a MENU_SETTINGS item — left
+   untouched at its original path.
    ──────────────────────────────────────────────────────────────────── */
 
-// Not-yet-migrated screens. Explicit re-exports below take precedence.
-export * from './legacy';
-
-// ── Migrated → primitives + DataTable, feature-folder pages ─────────────────
-export { SettingsAudit } from './pages/audit';
-export { ApiKeySettings } from './pages/api-keys';
 export { SettingsCompany } from './pages/company';
-export { ApprovalWorkflow } from './pages/approval-workflow';
-export { GspIrpSettings } from './pages/gsp-irp';
+
+// ── Business sub-module regroup — organization/ ──────────────────────────────
+export { SettingsBranches } from './organization/branches';
+export { SettingsUsers } from './organization/users';
+export { PageAccessControl } from './organization/pageAccess';
+
+// ── Business sub-module regroup — compliance-workflow/ ───────────────────────
+export { ApprovalWorkflow } from './compliance-workflow/approvalWorkflow';
+
+// ── Business sub-module regroup — integrations/ ──────────────────────────────
+export { ApiKeySettings } from './integrations/apiKeys';
+export { GspIrpSettings } from './integrations/gspIrp';
+
+// ── Business sub-module regroup — tools/ ─────────────────────────────────────
+export { SettingsAudit } from './tools/audit';
+
+// ── Business sub-module regroup — admin-power/ ───────────────────────────────
+export { DocTemplateEditor } from './admin-power/docTemplateEditor';
+export { EmailSMSTemplates } from './admin-power/emailSmsTemplates';
+export { ApprovalMatrixBuilder } from './admin-power/approvalMatrixBuilder';
+export { CustomFieldsManager } from './admin-power/customFieldsManager';
+export { FieldAccessControl } from './admin-power/fieldAccessControl';
+export { BulkUserOperations } from './admin-power/bulkUserOperations';
+export { PermissionsMatrix } from './admin-power/permissionsMatrix';
+export { BrandingSettings } from './admin-power/brandingSettings';
