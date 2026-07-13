@@ -141,6 +141,24 @@ describe('normalizeTB', () => {
     expect(normalizeTB(matrix).rows).toEqual([{ ledger: 'Rent', closingDebit: 68000, closingCredit: 0 }]);
   });
 
+  test('keeps a ledger that had ACTIVITY (Debit/Credit) even when Closing nets to ZERO', () => {
+    // A ledger with month transactions that net to a 0 closing must NOT vanish; a truly
+    // dormant ledger (no activity, no balance) is still dropped. A non-zero closing row
+    // keeps its exact prior shape (movement is NOT attached to it).
+    const matrix = [
+      ['Ledger', 'Debit', 'Credit', 'Closing'],
+      ['Active Netted Ledger', '50000', '50000', '0'],   // activity, zero closing → KEEP
+      ['Software & Subscription', '46500', '27898.63', '18601.37 Dr'], // has closing → keep, unchanged
+      ['Dormant Ledger', '0', '0', '0'],                 // no activity, no balance → drop
+    ];
+    const { rows } = normalizeTB(matrix);
+    const names = rows.map((r) => r.ledger);
+    expect(names).toEqual(['Active Netted Ledger', 'Software & Subscription']); // dormant dropped
+    expect(rows.find((r) => r.ledger === 'Active Netted Ledger')).toMatchObject({ closing: 0, debit: 50000, credit: 50000 });
+    // A row that already has a balance is untouched — no movement attached.
+    expect(rows.find((r) => r.ledger === 'Software & Subscription')).toEqual({ ledger: 'Software & Subscription', closing: 18601.37 });
+  });
+
   test('single signed Closing column (Cr / parentheses / no-space Cr → negative)', () => {
     const matrix = [
       ['Ledger', 'Closing Balance'],

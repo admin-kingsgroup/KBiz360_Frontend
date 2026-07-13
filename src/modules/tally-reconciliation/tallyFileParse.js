@@ -207,6 +207,16 @@ export function normalizeTB(matrix = []) {
     // Carry the Tally group when the export included it (only when non-empty, so a
     // group-less export keeps the exact prior row shape).
     if (row && cols.group !== undefined) { const g = String(r[cols.group] ?? '').trim(); if (g) row.group = g; }
+    // Keep a ledger that had ACTIVITY (Debit/Credit movement) even when its balance nets
+    // to ZERO — otherwise an all-zero-closing row is dropped below and a ledger that had
+    // real transactions this month silently vanishes from the reconciliation. Only a row
+    // with NO balance reads its movement columns (so non-zero rows keep their exact prior
+    // shape); a closing-only export that carries no movement still can't tell these apart
+    // from truly dormant ledgers, and those stay dropped.
+    if (row && !(row.closingDebit || row.closingCredit || row.closing || row.opening)) {
+      if (row.debit === undefined && cols.debit !== undefined) { const dr = Math.abs(num(r[cols.debit]) || 0); if (dr) row.debit = dr; }
+      if (row.credit === undefined && cols.credit !== undefined) { const cr = Math.abs(num(r[cols.credit]) || 0); if (cr) row.credit = cr; }
+    }
     if (row && (row.closingDebit || row.closingCredit || row.closing || row.debit || row.credit || row.opening)) rows.push(row);
   }
   return { rows, error: rows.length ? '' : 'Header found but no ledger rows parsed.', note: groupedNote(droppedGroups) };
