@@ -133,6 +133,10 @@ const TB_COLS = [
   ['credit', /^(credit|cr)(\s*amount)?$/i],
 ];
 const TB_LEDGER = /^(ledger(\s*name)?|particulars|account(\s*name)?|name)$/i;
+// Tally's TB can carry the ledger's GROUP when exported with it shown (F12 → Parent).
+// Reading it lets the tie-out flag a group that differs from ERP (and stops an
+// unmatched Tally ledger falling into Suspense). Not an amount column.
+const TB_GROUP = /^(group(\s*name)?|under|parent(\s*group)?|primary\s*group)$/i;
 const TB_BALANCE = /^balance$/i; // bare "Balance" — Tally uses it for opening AND closing
 
 function classifyTBHeaderRow(row = []) {
@@ -143,6 +147,7 @@ function classifyTBHeaderRow(row = []) {
     const c = String(cell ?? '').trim();
     if (!c) return;
     if (cols.ledger === undefined && TB_LEDGER.test(c)) { cols.ledger = i; return; }
+    if (cols.group === undefined && TB_GROUP.test(c)) { cols.group = i; return; }
     if (TB_BALANCE.test(c)) { balances.push(i); amtMatches += 1; return; }
     for (const [k, re] of TB_COLS) if (re.test(c)) { if (cols[k] === undefined) cols[k] = i; amtMatches += 1; break; }
   });
@@ -199,6 +204,9 @@ export function normalizeTB(matrix = []) {
       const dr = Math.abs(num(r[cols.debit]) || 0); const cr = Math.abs(num(r[cols.credit]) || 0);
       row = { ledger, opening: o, debit: dr, credit: cr };
     }
+    // Carry the Tally group when the export included it (only when non-empty, so a
+    // group-less export keeps the exact prior row shape).
+    if (row && cols.group !== undefined) { const g = String(r[cols.group] ?? '').trim(); if (g) row.group = g; }
     if (row && (row.closingDebit || row.closingCredit || row.closing || row.debit || row.credit || row.opening)) rows.push(row);
   }
   return { rows, error: rows.length ? '' : 'Header found but no ledger rows parsed.', note: groupedNote(droppedGroups) };
@@ -298,11 +306,16 @@ export function parseTallyXmlTB(text) {
   if (!names.length) return { rows: [], error: 'No <DSPACCNAME> ledger rows found — this is not a Tally Trial Balance XML export (export the TB, or use Excel/CSV).' };
   const rows = [];
   let droppedGroups = 0;
+  let curGroup = ''; // best-effort: the last group HEADER seen becomes the context
   for (const n of names) {
     const nameNode = n.querySelector('DSPDISPNAME');
     const ledger = (nameNode ? nameNode.textContent : '').trim();
     if (!ledger || isTBNoiseRow(ledger)) continue;
-    if (isTallyGroupRow(ledger)) { droppedGroups += 1; continue; }
+    // A recognised Tally group name is a HEADER row, not a ledger — drop it from the
+    // tie-out but remember it as the group the following ledgers sit under, so the
+    // upload carries a group even without an explicit column (best-effort: only the
+    // 28 primary groups are recognised as headers).
+    if (isTallyGroupRow(ledger)) { curGroup = ledger; droppedGroups += 1; continue; }
     // The amounts sit in the <DSPACCINFO> element that follows this <DSPACCNAME>.
     // Stop if we reach the NEXT ledger first (adjacent DSPACCNAMEs) so a name row
     // never borrows the following ledger's amounts.
@@ -311,7 +324,9 @@ export function parseTallyXmlTB(text) {
     const clNode = info ? info.querySelector('DSPCLAMTA') : null;
     const cl = num(clNode ? clNode.textContent.trim() : '');
     if (cl === null || cl === 0) continue; // empty/zero closing (e.g. a pass-through group) — no tie-out signal
-    rows.push({ ledger, closing: -cl });
+    const row = { ledger, closing: -cl };
+    if (curGroup) row.group = curGroup;
+    rows.push(row);
   }
   return { rows, error: rows.length ? '' : 'Trial Balance XML parsed but no ledger closing balances were found.', note: groupedNote(droppedGroups) };
 }

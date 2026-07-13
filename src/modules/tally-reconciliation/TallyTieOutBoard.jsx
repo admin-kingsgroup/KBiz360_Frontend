@@ -136,6 +136,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const [dbFile, setDbFile] = useState(null);   // { rows, name, error } — parsed Day Book file
   const [parsing, setParsing] = useState('');    // 'tb' | 'db' while a file parses
   const [drill, setDrill] = useState(null); // off ledger being drilled (Phase 2)
+  const [onlyFixes, setOnlyFixes] = useState(false); // filter to the "fix in Tally" punch-list
 
   const { data: periodsData } = useQuery({ queryKey: ['tally-tieout', 'periods', branch], queryFn: () => getPeriods({ branch }), enabled: central });
   // Earliest posted date for this branch → the selector spans inception..now. Fall
@@ -203,6 +204,11 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // One authoritative "off" count (accepted variances already excluded on the BE),
   // used by the KPI, the Defects tab badge AND the certificate gate — never diverge.
   const offTotal = counts.offTotal ?? ((counts.off || 0) + (counts.onlyErp || 0) + (counts.onlyTally || 0));
+  // Name/group corrections owed in Tally (the ledger's amount may already tie, but by
+  // policy its Tally name/group must match ERP before certifying). `blocking` = the
+  // single "must fix in Tally before sign-off" tally = amount gaps + name/group fixes.
+  const fixTotal = counts.fixTotal ?? ((counts.nameMismatch || 0) + (counts.groupMismatch || 0));
+  const blocking = counts.blocking ?? (offTotal + fixTotal);
 
   // Defect Register — lazily loaded (the per-off-ledger voucher scan is heavier).
   const { data: defectsData, isLoading: defectsLoading, isError: defectsError, refetch: refetchDefects } = useQuery({
@@ -285,6 +291,13 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       { label: 'Assets', rows: rows.filter((r) => r.nature === 'asset') },
     ];
   }, [tab, rows, counts]);
+
+  // The "fix in Tally" punch-list view: keep only rows the reviewer must act on
+  // (amount off, one-sided, or a name/group that still differs from ERP). The FOOTER
+  // totals stay on the full `sections` so a filtered view never distorts the balance.
+  const viewSections = useMemo(() => (onlyFixes
+    ? sections.map((s) => ({ ...s, rows: s.rows.filter((r) => r.blocking) })).filter((s) => s.rows.length)
+    : sections), [sections, onlyFixes]);
 
   const foot = useMemo(() => {
     // TB self-balances per side (Dr = Cr). Carry the actual boolean (true / false /
@@ -370,7 +383,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 
       {/* Trial Balance import — pick a file (Excel/CSV/XML) OR paste */}
       {showImport && (
-        <PageSection title="Upload Tally Trial Balance" subtitle={`The ${branch} · ${periodLabel(period)} Trial Balance from Tally — export it as Excel/CSV (or paste below). Columns: Ledger, Closing Dr, Closing Cr.`}>
+        <PageSection title="Upload Tally Trial Balance" subtitle={`The ${branch} · ${periodLabel(period)} Trial Balance from Tally — export it as Excel/CSV (or paste below). Columns: Ledger, Closing Dr, Closing Cr. Add a Group/Parent column (or export the grouped TB) so the tie-out can flag any group that differs from ERP.`}>
           <label className="flex flex-wrap items-center gap-3 rounded-brand border border-dashed border-surface-border bg-surface-muted p-3">
             <FileUp size={18} className="text-accent" aria-hidden="true" />
             <span className="text-sm font-semibold text-ink">Choose Trial Balance file</span>
@@ -427,12 +440,13 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       )}
 
       {/* KPI chips */}
-      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-8">
         <Kpi label="In scope" value={counts.total || 0} />
         <Kpi label="Tied" value={counts.tied || 0} tone="success" />
         <Kpi label="Off" value={(counts.off || 0)} tone={(counts.off || 0) > 0 ? 'danger' : 'muted'} />
         <Kpi label="Only in ERP" value={counts.onlyErp || 0} tone={(counts.onlyErp || 0) > 0 ? 'warning' : 'muted'} />
         <Kpi label="Only in Tally" value={counts.onlyTally || 0} tone={(counts.onlyTally || 0) > 0 ? 'warning' : 'muted'} />
+        <Kpi label="Fix in Tally" value={fixTotal} tone={fixTotal > 0 ? 'warning' : 'muted'} />
         <Kpi label="Accepted" value={counts.accepted || 0} tone={(counts.accepted || 0) > 0 ? 'info' : 'muted'} />
         <Kpi label="Net profit Δ" value={fmt(round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)), cur)} tone={round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)) !== 0 ? 'danger' : 'muted'} small />
       </div>
@@ -441,7 +455,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           once uploaded, show the certificate close gate. Deferred until the board
           has loaded so the gate never flashes a wrong state (U4). */}
       {!empty && !isLoading && (imported.count
-        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} staleAccepted={counts.staleAccepted || 0} currentUser={currentUser} />
+        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} fixTotal={fixTotal} staleAccepted={counts.staleAccepted || 0} currentUser={currentUser} />
         : (
           <PageSection icon={Upload} title={`No Tally Trial Balance uploaded — ${branch} · ${periodLabel(period)}`}
             subtitle="Until you upload the period's Tally TB, every ERP ledger below shows as unmatched. This is the starting point, not an error.">
@@ -473,6 +487,13 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             action={<Button variant="primary" icon={Upload} onClick={() => { setShowImport(true); setShowDayBook(false); }}>Upload Tally TB</Button>} />
         )}
         {!isLoading && !empty && (
+          <>
+          {blocking > 0 && (
+            <label className="mb-3 inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted">
+              <input type="checkbox" checked={onlyFixes} onChange={(e) => setOnlyFixes(e.target.checked)} className="accent-accent" />
+              Show only items to fix in Tally <span className="rounded-full bg-warning/15 px-1.5 font-bold text-warning">{blocking}</span>
+            </label>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm" style={{ minWidth: 720 }}>
               <thead>
@@ -485,14 +506,18 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                 </tr>
               </thead>
               <tbody>
-                {sections.map((sec) => (
+                {viewSections.map((sec) => (
                   <React.Fragment key={sec.label || 'all'}>
                     {sec.label && <tr><td colSpan={5} className="bg-surface-alt px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">{sec.label}</td></tr>}
                     {byParent(sec.rows).map((g) => (
                       <React.Fragment key={(sec.label || '') + g.parent}>
                         <tr><td colSpan={5} className="bg-navy px-4 py-2 text-xs font-bold uppercase text-white">{g.parent}</td></tr>
                         {g.items.map((r) => {
-                          const meta = statusMeta(r.status);
+                          // A row whose amount ties but whose Tally NAME or GROUP still
+                          // differs from ERP shows an amber "Fix in Tally" (it blocks the
+                          // close) instead of a green "Tied".
+                          const fixNeeded = r.needsRename || r.needsRegroup;
+                          const meta = (fixNeeded && r.status === 'tied') ? { tone: 'warning', label: 'Fix in Tally' } : statusMeta(r.status);
                           const off = r.status !== 'tied' && !r.synthetic; // the injected P&L Net-Profit row isn't a real ledger to drill
                           const acc = r.status === 'accepted';
                           const drill = () => setDrill(r);
@@ -504,8 +529,16 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                               aria-label={off ? `Drill ${r.ledger} vouchers` : undefined}
                               className={`border-b border-surface-border ${off ? 'cursor-pointer hover:bg-accent-soft focus:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-accent' : 'hover:bg-surface-alt/60'}`}>
                               <td className="px-4 py-2"><span className="block font-semibold text-ink">{r.ledger}
+                                {/* green tick when the Tally name matches ERP exactly */}
+                                {r.nameMatch === true ? <span className="ml-1 align-middle text-success" title="Tally name matches ERP">✓</span> : null}
                                 {r.interBranch ? <span className="ml-1.5 align-middle rounded-full bg-info/10 px-1.5 text-[10px] font-semibold text-info">IB</span> : null}</span>
                                 {r.code ? <span className="font-mono text-xs text-ink-subtle">{r.code}</span> : null}
+                                {/* name differs → the exact rename to make in Tally */}
+                                {r.nameMatch === false ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="Rename this ledger in Tally to match ERP">✎ Tally: “{r.tallyLedger}” → rename to “{r.erpLedger}”</span> : null}
+                                {/* group differs → the ERP group it should sit under */}
+                                {r.groupMatch === false ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="Regroup this ledger in Tally to match ERP">⚠ Group in Tally: “{r.tallyGroup}” → should be “{r.parentGroup}”</span> : null}
+                                {/* only-in-Tally with a close ERP match → did-you-mean hint */}
+                                {r.suggest ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info" title="Closest ERP ledger — if it's the same account, rename it in Tally to match">Did you mean ERP “{r.suggest.ledger}”? — rename in Tally to match</span> : null}
                                 {acc ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info">✓ accepted · {reasonLabel(r.acceptedReason)}
                                   {r.acceptanceStale ? <span className="ml-1 rounded-full bg-warning/15 px-1.5 font-bold text-warning" title={`Accepted for ${fmt(r.acceptedAmount, cur)}, now ${fmt(r.diff, cur)} — re-review`}>⚠ changed</span> : null}</span>
                                   : off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}</td>
@@ -549,6 +582,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
               </tbody>
             </table>
           </div>
+          </>
         )}
         </>)}
       </PageSection>

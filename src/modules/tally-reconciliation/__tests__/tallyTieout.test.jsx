@@ -127,6 +127,33 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText('HDFC Bank A/c')).not.toBeInTheDocument();
   });
 
+  test('name/group mismatch drives the "fix in Tally" workflow (rename hint, badge, KPI, punch-list filter)', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 2, tied: 2, off: 0, onlyErp: 0, onlyTally: 0, nameMismatch: 1, groupMismatch: 1, fixTotal: 2, blocking: 1, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [
+        // Amount ties, but the Tally name lacks the [BOM] tag AND the group differs
+        // (Tally: Duties & Taxes, ERP: Provisions) → both must be fixed in Tally.
+        { ledger: 'Professional Tax [M] [BOM]', erpLedger: 'Professional Tax [M] [BOM]', tallyLedger: 'Professional Tax [M]', code: 'BOM-L1049', group: 'Provisions', parentGroup: 'Provisions', statement: 'BS', nature: 'liability', erpGroup: 'Provisions', tallyGroup: 'Duties & Taxes', nameMatch: false, groupMatch: false, needsRename: true, needsRegroup: true, blocking: true, erp: -800, tally: -800, diff: 0, status: 'tied' },
+        { ledger: 'Salary Payable', erpLedger: 'Salary Payable', tallyLedger: 'Salary Payable', code: 'L1118', group: 'Provisions', parentGroup: 'Provisions', statement: 'BS', nature: 'liability', nameMatch: true, groupMatch: true, needsRename: false, needsRegroup: false, blocking: false, erp: -306667, tally: -306667, diff: 0, status: 'tied' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // The rename hint states the exact ERP name to rename the Tally ledger to.
+    expect(await screen.findByText(/rename to/)).toBeInTheDocument();
+    // The group-fix hint points at the ERP group.
+    expect(screen.getByText(/should be/)).toBeInTheDocument();
+    // "Fix in Tally" appears as both the KPI label and the row badge (amount ties, but
+    // it still blocks) — never a green "Tied" on a row that needs a Tally correction.
+    expect(screen.getAllByText('Fix in Tally').length).toBeGreaterThanOrEqual(2);
+    // The punch-list filter hides the fully-tied Salary row, keeping the one to fix.
+    fireEvent.click(screen.getByRole('checkbox'));
+    await waitFor(() => expect(screen.queryByText('Salary Payable')).not.toBeInTheDocument());
+    expect(screen.getByText('Professional Tax [M] [BOM]')).toBeInTheDocument();
+  });
+
   test('the net-profit line reads Profit / (Loss) — a loss is parenthesised, not a positive Dr', async () => {
     // Mock: netProfitTally -3,24,000 (a LOSS). It must NEVER read as a positive "3,24,000 Dr".
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);

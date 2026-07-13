@@ -120,6 +120,27 @@ describe('normalizeTB', () => {
     expect(names).not.toContain('Current Liabilities'); // true group still dropped
   });
 
+  test('reads a Group/Parent column when the export includes it', () => {
+    // A grouped TB export with an explicit Group column — carried onto each row so the
+    // tie-out can flag a group that differs from ERP (and keep an unmatched Tally
+    // ledger out of Suspense).
+    const matrix = [
+      ['Ledger', 'Group', 'Closing Dr', 'Closing Cr'],
+      ['GST Payable (+) / Receivable (-)', 'Duties & Taxes', '13214', '0'],
+      ['Professional Tax [F]', 'Duties & Taxes', '0', '200'],
+    ];
+    const { rows } = normalizeTB(matrix);
+    expect(rows).toEqual([
+      { ledger: 'GST Payable (+) / Receivable (-)', closingDebit: 13214, closingCredit: 0, group: 'Duties & Taxes' },
+      { ledger: 'Professional Tax [F]', closingDebit: 0, closingCredit: 200, group: 'Duties & Taxes' },
+    ]);
+  });
+
+  test('no Group column → rows keep the exact prior shape (no empty group key)', () => {
+    const matrix = [['Ledger', 'Closing Dr', 'Closing Cr'], ['Rent', '68000', '0']];
+    expect(normalizeTB(matrix).rows).toEqual([{ ledger: 'Rent', closingDebit: 68000, closingCredit: 0 }]);
+  });
+
   test('single signed Closing column (Cr / parentheses / no-space Cr → negative)', () => {
     const matrix = [
       ['Ledger', 'Closing Balance'],
@@ -156,14 +177,15 @@ describe('parseTallyXmlTB', () => {
     <DSPACCINFO><DSPCLAMT><DSPCLAMTA></DSPCLAMTA></DSPCLAMT></DSPACCINFO>
   </ENVELOPE>`;
 
-  test('reads DSPACCNAME/DSPCLAMTA closings (positive = Cr → negative signed)', () => {
+  test('reads DSPACCNAME/DSPCLAMTA closings (positive = Cr → negative signed) + carries the group header', () => {
     const { rows, error, note } = parseTallyXmlTB(tbXml);
     expect(error).toBe('');
-    // Groups (Loans (Liability), Current Assets, Sundry Creditors) dropped; the empty
-    // closing on Sundry Creditors is skipped regardless. Ledgers keep signed closings.
+    // Groups (Loans (Liability), Current Assets, Sundry Creditors) are dropped as
+    // ledger rows but become the GROUP the following ledgers sit under; the empty
+    // closing on Sundry Creditors is skipped regardless.
     expect(rows).toEqual([
-      { ledger: 'ND Loan', closing: -390700 }, // 390700 Cr
-      { ledger: 'Rent', closing: 68000 },      // -68000 → Dr → +68000
+      { ledger: 'ND Loan', closing: -390700, group: 'Loans (Liability)' }, // 390700 Cr
+      { ledger: 'Rent', closing: 68000, group: 'Current Assets' },         // -68000 → Dr → +68000
     ]);
     expect(note).toMatch(/ledger-wise/i);
   });
