@@ -197,6 +197,51 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(window.localStorage.getItem('tally.coaView')).toBe('1');
   });
 
+  test('By Module view pivots the TB by cost centre (ERP-only) with a no-cost-centre bucket; mutually exclusive with CoA', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const sale = { ledger: 'Air Ticket Sales', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -40000, tally: -40000, diff: 0, status: 'tied' };
+    const purch = { ledger: 'Air Ticket Purchase', code: 'P1', group: 'Purchase Accounts', parentGroup: 'Purchase Accounts', statement: 'PL', nature: 'expense', erp: 38500, tally: 38500, diff: 0, status: 'tied' };
+    const bank = { ledger: 'HDFC Bank A/c', code: 'B2', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 1500, tally: 1500, diff: 0, status: 'tied' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 3, tied: 3, off: 0, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
+      rows: [sale, purch, bank],
+      tree: [{ id: 'bank', name: 'Bank Accounts', level: 0, statement: 'BS', erp: 1500, tally: 1500, diff: 0, status: 'tied', rows: [bank], children: [] }],
+      moduleTree: {
+        modules: [
+          { code: 'FLT-INT', label: 'International Flights', erp: -1500, sales: -40000, cogs: 38500, gp: 1500, rows: [
+            { ledger: 'Air Ticket Sales', code: 'S1', head: 'Sales Accounts', erp: -40000 },
+            { ledger: 'Air Ticket Purchase', code: 'P1', head: 'Purchase Accounts', erp: 38500 },
+          ] },
+        ],
+        totals: { erp: -1500, sales: -40000, cogs: 38500, gp: 1500 },
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    const modTick = await screen.findByLabelText(/By Module/);
+    expect(modTick).not.toBeChecked();
+    // Tick By Module → the module header (label + GP), its ledger slices, the ERP-only note,
+    // and the trailing "no cost centre" bucket carrying the Balance-Sheet ledger all render.
+    fireEvent.click(modTick);
+    expect(await screen.findByText('International Flights')).toBeInTheDocument();
+    expect(screen.getByText(/GP 1,500/)).toBeInTheDocument();
+    expect(screen.getAllByText(/ERP only/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Air Ticket Purchase')).toBeInTheDocument();
+    expect(screen.getByText(/no cost centre/i)).toBeInTheDocument();
+    expect(screen.getByText('HDFC Bank A/c')).toBeInTheDocument();        // BS ledger in the trailing bucket
+    expect(window.localStorage.getItem('tally.moduleView')).toBe('1');
+    // Mutually exclusive: ticking Chart of Accounts turns By Module off (module pivot gone).
+    fireEvent.click(screen.getByLabelText(/Chart of Accounts view/));
+    await waitFor(() => expect(screen.queryByText('International Flights')).not.toBeInTheDocument());
+    expect(screen.getByLabelText(/By Module/)).not.toBeChecked();
+    expect(window.localStorage.getItem('tally.moduleView')).toBe('0');
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
   test('name/group mismatch drives the "fix in Tally" workflow (rename hint, badge, KPI, punch-list filter)', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({

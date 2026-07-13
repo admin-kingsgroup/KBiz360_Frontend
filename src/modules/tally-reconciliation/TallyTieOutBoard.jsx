@@ -439,6 +439,9 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     const nonModule = rows.filter((r) => !MODULE_HEADS.has(r.parentGroup)); // BS + non-trading = no cost centre
     return (
       <>
+        {mt.modules.length === 0 && (
+          <tr><td colSpan={5} className="px-4 py-2 text-[11.5px] text-ink-subtle">No cost-centre (module) postings in this period — every ledger below is non-trading.</td></tr>
+        )}
         {mt.modules.map((m) => (
           <React.Fragment key={'mod|' + (m.code || 'unspec')}>
             <tr className="border-b border-surface-border bg-navy">
@@ -472,7 +475,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     );
   };
 
-  const showModule = moduleView && tab === 'tb' && data?.moduleTree && Array.isArray(data.moduleTree.modules) && data.moduleTree.modules.length > 0;
+  const showModule = moduleView && tab === 'tb' && data?.moduleTree && Array.isArray(data.moduleTree.modules);
 
   // Direct-URL guard: a non-central role gets the rule, not the working board.
   if (!central) {
