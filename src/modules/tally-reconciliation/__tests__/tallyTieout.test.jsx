@@ -154,6 +154,23 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('Professional Tax [M] [BOM]')).toBeInTheDocument();
   });
 
+  test('grouped-upload subtotals that did not reconcile surface a review banner', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 1, tied: 1, off: 0, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 1 },
+      // A group subtotal whose upload total (900 Cr) ≠ the sum of its ledgers (400 Cr) —
+      // kept for review, not counted as a ledger mismatch.
+      reviewGroups: [{ ledger: 'Odd Group', group: 'Provisions', parentGroup: 'Provisions', amount: -900, childSum: -400, diff: -500 }],
+      rows: [{ ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 100, tally: 100, diff: 0, status: 'tied' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    const banner = await screen.findByTestId('group-review-warning');
+    expect(banner).toHaveTextContent(/Odd Group/);
+    expect(banner).toHaveTextContent(/reconcile/);
+  });
+
   test('the net-profit line reads Profit / (Loss) — a loss is parenthesised, not a positive Dr', async () => {
     // Mock: netProfitTally -3,24,000 (a LOSS). It must NEVER read as a positive "3,24,000 Dr".
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
