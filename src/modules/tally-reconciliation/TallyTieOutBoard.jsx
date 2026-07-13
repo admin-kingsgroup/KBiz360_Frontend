@@ -436,7 +436,11 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const gpText = (n) => (n === 0 ? '0' : `${n > 0 ? '' : '−'}${Math.abs(n).toLocaleString(localeOf(cur))}`);
   const renderModuleNodes = (mt) => {
     if (!mt || !Array.isArray(mt.modules)) return null;
-    const nonModule = rows.filter((r) => !MODULE_HEADS.has(r.parentGroup)); // BS + non-trading = no cost centre
+    // The bucket is the EXACT complement of the module pivot (BE builds it from trading rows with
+    // an ERP figure): BS + non-trading ledgers AND any Tally-only trading ledger (erp == null → no
+    // ERP slice to pivot). Without the erp check a Sales/Purchase ledger present in Tally but not
+    // ERP would vanish from this view entirely, though it's a real discrepancy.
+    const nonModule = rows.filter((r) => !(MODULE_HEADS.has(r.parentGroup) && r.erp != null));
     return (
       <>
         {mt.modules.length === 0 && (
@@ -758,23 +762,88 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 }
 
 // ── Defect Register — classified discrepancies across every off ledger ────────
+// Triage cuts: a Master/Voucher tier segment (structural vs posting defects) and
+// per-type toggle chips. Both are in-session filters over the already-loaded
+// `defects` array — instant, no refetch. Chip counts stay fixed to the full
+// totals so the distribution reads even while a subset is filtered.
+const DEFECT_TIERS = [
+  { key: 'all', label: 'All' },
+  { key: 'master', label: 'Master mismatches' },
+  { key: 'voucher', label: 'Voucher mismatches' },
+];
 function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
-  if (loading) return <LoadingState label="Scanning off ledgers for defects…" />;
-  if (error) return <ErrorState title="Couldn’t load the Defect Register" message="The service didn’t respond." onRetry={onRetry} />;
+  const [tier, setTier] = useState('all');       // 'all' | 'master' | 'voucher'
+  const [types, setTypes] = useState(() => new Set()); // active type chips; empty = all in tier
+
   const defects = data?.defects || [];
   const byType = data?.summary?.byType || {};
+
+  // Fixed per-tier totals for the segment badges (independent of active filter).
+  const tierCount = useMemo(() => {
+    const c = { all: 0, master: 0, voucher: 0 };
+    for (const [type, n] of Object.entries(byType)) { c.all += n; c[defectMeta(type).tier] += n; }
+    return c;
+  }, [byType]);
+
+  // Chips belonging to the active tier, in a stable severity-then-count order.
+  const chips = useMemo(() => Object.entries(byType)
+    .filter(([type]) => tier === 'all' || defectMeta(type).tier === tier)
+    .sort((a, b) => (defectMeta(b[0]).tone === 'danger') - (defectMeta(a[0]).tone === 'danger') || b[1] - a[1]),
+  [byType, tier]);
+
+  const visible = useMemo(() => defects.filter((d) => {
+    if (tier !== 'all' && defectMeta(d.type).tier !== tier) return false;
+    if (types.size && !types.has(d.type)) return false;
+    return true;
+  }), [defects, tier, types]);
+
+  const selectTier = (k) => { setTier(k); setTypes(new Set()); };  // tier change resets chip picks
+  const toggleType = (t) => setTypes((prev) => { const n = new Set(prev); if (n.has(t)) n.delete(t); else n.add(t); return n; });
+  const clearFilters = () => { setTier('all'); setTypes(new Set()); };
+  const filtered = tier !== 'all' || types.size > 0;
+
+  if (loading) return <LoadingState label="Scanning off ledgers for defects…" />;
+  if (error) return <ErrorState title="Couldn’t load the Defect Register" message="The service didn’t respond." onRetry={onRetry} />;
   if (!defects.length) {
     return <EmptyState title="No defects" hint="Every off ledger's vouchers reconcile — or there are no off ledgers this period." />;
   }
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(byType).map(([type, n]) => {
-          const m = defectMeta(type);
-          return <span key={type} className={`rounded-full px-3 py-1 text-xs font-semibold ${m.tone === 'danger' ? 'bg-danger/10 text-danger' : 'bg-warning/15 text-warning'}`}>{m.label}: {n}</span>;
-        })}
+      {/* Tier segment + scope badge */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-xs font-semibold" role="tablist" aria-label="Defect tier">
+          {DEFECT_TIERS.map((t) => (
+            <button key={t.key} type="button" role="tab" aria-selected={tier === t.key} onClick={() => selectTier(t.key)}
+              className={`rounded-[6px] px-3 py-1 transition focus:outline-none focus:ring-2 focus:ring-accent ${tier === t.key ? 'bg-accent text-white shadow-card' : 'text-ink-muted hover:text-ink'}`}>
+              {t.label} <span className="tabular-nums opacity-80">({tierCount[t.key]})</span>
+            </button>
+          ))}
+        </div>
         <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data.offLedgers} off ledgers</span>
       </div>
+      {/* Type toggle chips */}
+      <div className="flex flex-wrap items-center gap-2">
+        {chips.map(([type, n]) => {
+          const m = defectMeta(type);
+          const on = types.has(type);
+          const dim = types.size > 0 && !on;
+          return (
+            <button key={type} type="button" onClick={() => toggleType(type)} aria-pressed={on}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-accent ${m.tone === 'danger' ? 'bg-danger/10 text-danger' : 'bg-warning/15 text-warning'} ${on ? 'ring-2 ring-accent shadow-card' : dim ? 'opacity-45 hover:opacity-100' : 'hover:opacity-90'}`}>
+              {m.label}: {n}
+            </button>
+          );
+        })}
+        {filtered && (
+          <button type="button" onClick={clearFilters}
+            className="rounded-full px-3 py-1 text-xs font-semibold text-ink-subtle underline decoration-dotted underline-offset-2 hover:text-ink focus:outline-none focus:ring-2 focus:ring-accent">
+            Clear
+          </button>
+        )}
+      </div>
+      {filtered && (
+        <div className="text-xs font-semibold text-ink-subtle">Showing {visible.length} of {defects.length} defects</div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: 640 }}>
           <thead>
@@ -786,7 +855,9 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
             </tr>
           </thead>
           <tbody>
-            {defects.map((d, i) => {
+            {visible.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-ink-subtle">No defects match this filter. <button type="button" onClick={clearFilters} className="font-semibold text-accent underline underline-offset-2">Clear</button></td></tr>
+            ) : visible.map((d, i) => {
               const m = defectMeta(d.type);
               return (
                 <tr key={i} onClick={() => onDrill({ ledger: d.ledger })}

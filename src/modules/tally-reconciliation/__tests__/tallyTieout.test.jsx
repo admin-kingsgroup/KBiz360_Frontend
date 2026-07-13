@@ -204,11 +204,14 @@ describe('Tally Reconciliation · tie-out board render', () => {
     const sale = { ledger: 'Air Ticket Sales', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -40000, tally: -40000, diff: 0, status: 'tied' };
     const purch = { ledger: 'Air Ticket Purchase', code: 'P1', group: 'Purchase Accounts', parentGroup: 'Purchase Accounts', statement: 'PL', nature: 'expense', erp: 38500, tally: 38500, diff: 0, status: 'tied' };
     const bank = { ledger: 'HDFC Bank A/c', code: 'B2', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 1500, tally: 1500, diff: 0, status: 'tied' };
+    // A Sales ledger present in Tally but NOT ERP (erp=null) — a trading head with no ERP slice, so
+    // it's not in the module pivot. It MUST still surface in the trailing no-cost-centre bucket.
+    const onlyTallySale = { ledger: 'Ferry Sales', code: 'S9', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: null, tally: -3000, diff: 3000, status: 'only-tally' };
     getTieOut.mockResolvedValueOnce({
       branch: 'BOM', period: '2026-07', tier: 'month',
-      counts: { total: 3, tied: 3, off: 0, offTotal: 0 },
-      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
-      rows: [sale, purch, bank],
+      counts: { total: 4, tied: 3, off: 1, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 4 },
+      rows: [sale, purch, bank, onlyTallySale],
       tree: [{ id: 'bank', name: 'Bank Accounts', level: 0, statement: 'BS', erp: 1500, tally: 1500, diff: 0, status: 'tied', rows: [bank], children: [] }],
       moduleTree: {
         modules: [
@@ -232,6 +235,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('Air Ticket Purchase')).toBeInTheDocument();
     expect(screen.getByText(/no cost centre/i)).toBeInTheDocument();
     expect(screen.getByText('HDFC Bank A/c')).toBeInTheDocument();        // BS ledger in the trailing bucket
+    expect(screen.getByText('Ferry Sales')).toBeInTheDocument();          // Tally-only trading ledger must NOT vanish
     expect(window.localStorage.getItem('tally.moduleView')).toBe('1');
     // Mutually exclusive: ticking Chart of Accounts turns By Module off (module pivot gone).
     fireEvent.click(screen.getByLabelText(/Chart of Accounts view/));
