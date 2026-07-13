@@ -70,7 +70,7 @@ describe('Accounts voucher chrome (VWrap / VoucherShell)', () => {
 });
 
 describe('SO / PO / GP booking voucher (legacy.jsx)', () => {
-  const legacy = read('modules/bookingOrder/legacy.jsx');
+  const legacy = read('modules/accounts/daily-entry/soPoGpVoucherEntry.jsx');
 
   test('palette constants are the template gold + ink (old hexes gone from the declaration)', () => {
     expect(legacy).toContain(`const GOLD = '${GOLD}', DARK = '${INK}'`);
