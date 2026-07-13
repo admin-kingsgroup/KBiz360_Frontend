@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, AlertTriangle, SearchCheck, RefreshCcw, ClipboardCopy } from 'lucide-react';
-import { scrutinyEntryAction, scrutinyBulkAction, rerunScrutiny } from './api';
-import { fmtAmt, classifyOptionsFor, classificationLabel, MATCH_TYPE_LABELS } from './utils';
-import { Drawer, Badge, Button, Select, Checkbox } from '../../shell/primitives';
+import { scrutinyEntryAction, scrutinyBulkAction, rerunScrutiny } from '../api';
+import { fmtAmt, classifyOptionsFor, classificationLabel, MATCH_TYPE_LABELS } from '../utils';
+import { Drawer, Badge, Button, Select, Checkbox } from '../../../shell/primitives';
 
 // ─── Statement Scrutiny — entry-to-entry report (v2) ─────────────────────────
 // v2 adds: bulk classify (select-all in one write), auto-SUGGESTED classifications

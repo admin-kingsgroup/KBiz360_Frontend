@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2, LayoutDashboard } from 'lucide-react';
-import { getTree, getSummary, getPending, generateCertificates } from './api';
-import { useCockpitFocus } from '../../store/cockpitFocus';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, certPathFor, hubPathFor, reportPathFor, tierMenuName } from './utils';
-import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
-import { CertificateDrawer } from './CertificateDrawer';
+import { getTree, getSummary, getPending, generateCertificates } from '../api';
+import { useCockpitFocus } from '../../../store/cockpitFocus';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, certPathFor, hubPathFor, reportPathFor, tierMenuName } from '../utils';
+import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../../shell/primitives';
+import { CertificateDrawer } from '../shared/CertificateDrawer';
 import { CycleLedgerDrawer } from './CycleLedgerDrawer';
 
 // ─── Certification register — one page per tier ──────────────────────────────

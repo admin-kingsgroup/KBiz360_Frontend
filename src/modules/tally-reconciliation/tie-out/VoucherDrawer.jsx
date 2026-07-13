@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Check, RotateCcw } from 'lucide-react';
-import { getLedgerVouchers, acceptVariance, clearVariance } from './api';
-import { fmt, statusMeta, REASONS, reasonLabel } from './format';
-import { Badge, Button, Select, LoadingState, ErrorState } from '../../shell/primitives';
+import { getLedgerVouchers, acceptVariance, clearVariance } from '../api';
+import { fmt, statusMeta, REASONS, reasonLabel } from '../format';
+import { Badge, Button, Select, LoadingState, ErrorState } from '../../../shell/primitives';
 
 // ─── Voucher drill (Phase 2) + accept-variance (Phase 4) ─────────────────────
 // Opens from an off row: the ledger's ERP postings vs its uploaded Tally Day

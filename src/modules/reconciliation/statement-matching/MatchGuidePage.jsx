@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, CheckCircle2, HelpCircle, FileSearch, AlertTriangle } from 'lucide-react';
-import { PageSection, Badge, Button } from '../../shell/primitives';
+import { PageSection, Badge, Button } from '../../../shell/primitives';
 
 // ─── Statement Matching — the staff Match Guide ──────────────────────────────
 // The line-level companion to the Rule Book: the four buckets every matching

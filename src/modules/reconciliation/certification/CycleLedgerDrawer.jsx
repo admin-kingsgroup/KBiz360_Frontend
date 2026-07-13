@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
-import { getCycleLedgers, addCycleLedger, removeCycleLedger } from './api';
-import { Drawer, Button, Input, FormField, Badge, EmptyState } from '../../shell/primitives';
+import { getCycleLedgers, addCycleLedger, removeCycleLedger } from '../api';
+import { Drawer, Button, Input, FormField, Badge, EmptyState } from '../../../shell/primitives';
 
 // ─── Weekly cycle ledgers — config drawer ────────────────────────────────────
 // Banks / OD (incl. credit cards) / cash join the weekly cycle automatically,

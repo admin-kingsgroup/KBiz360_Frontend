@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Circle, FileUp, ShieldCheck, AlertTriangle, Stamp, Lock, ExternalLink, SearchCheck } from 'lucide-react';
-import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan, getAttachmentUrl, scrutinizeStatement } from './api';
-import { parseStatementFile } from './statementParse';
+import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan, getAttachmentUrl, scrutinizeStatement } from '../api';
+import { parseStatementFile } from '../statementParse';
 import { ScrutinyView } from './ScrutinyView';
-import { tierOf, statusMeta, sourceMeta, chainProgress, fmtAmt, openExceptions } from './utils';
-import { Drawer, Badge, Button, Input, Select, FormField, LoadingState, EmptyState, ErrorState } from '../../shell/primitives';
+import { tierOf, statusMeta, sourceMeta, chainProgress, fmtAmt, openExceptions } from '../utils';
+import { Drawer, Badge, Button, Input, Select, FormField, LoadingState, EmptyState, ErrorState } from '../../../shell/primitives';
 
 // ─── Certificate Drawer — one ledger, one certificate ───────────────────────
 // The working face of a Reconciliation Certificate: freeze the snapshot

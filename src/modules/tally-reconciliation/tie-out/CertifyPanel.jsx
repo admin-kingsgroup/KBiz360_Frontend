@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ShieldCheck, Lock, Snowflake, PenLine, RotateCcw, AlertTriangle } from 'lucide-react';
-import { getTallyCert, freezeTallyCert, signTallyCert, reopenTallyCert } from './api';
-import { isApproverRole } from './format';
-import { PageSection, Badge, Button, ErrorState } from '../../shell/primitives';
+import { getTallyCert, freezeTallyCert, signTallyCert, reopenTallyCert } from '../api';
+import { isApproverRole } from '../format';
+import { PageSection, Badge, Button, ErrorState } from '../../../shell/primitives';
 
 // ─── Tally certificate — the sign-off that gates the month close (Phase 3) ────
 // A month can't hard-lock until this is signed: it certifies "ERP ties to Tally,

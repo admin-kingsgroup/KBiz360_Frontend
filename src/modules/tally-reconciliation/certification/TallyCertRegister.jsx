@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ShieldCheck, RefreshCcw, BookOpenCheck, ExternalLink } from 'lucide-react';
-import { getRegister } from './api';
-import { useCockpitFocus } from '../../store/cockpitFocus';
-import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../shell/primitives';
-import { BRANCHES, CUR, round2, branchCodeOf, fmt, certMeta, TALLY_CHAIN, isCentralRole } from './format';
+import { getRegister } from '../api';
+import { useCockpitFocus } from '../../../store/cockpitFocus';
+import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../../shell/primitives';
+import { BRANCHES, CUR, round2, branchCodeOf, fmt, certMeta, TALLY_CHAIN, isCentralRole } from '../format';
 
 // ─── Tally Certification Register — one page per tier (month / year) ──────────
 // The at-a-glance "which period is certified" overview: every period that has an

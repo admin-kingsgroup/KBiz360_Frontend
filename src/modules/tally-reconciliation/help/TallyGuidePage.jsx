@@ -1,6 +1,6 @@
 import React from 'react';
 import { BookOpenCheck, Upload, ClipboardCheck, ShieldCheck, AlertTriangle, ListChecks, ArrowLeftRight } from 'lucide-react';
-import { PageSection, Badge, Button } from '../../shell/primitives';
+import { PageSection, Badge, Button } from '../../../shell/primitives';
 
 // ─── Tally Reconciliation — the staff Guide ──────────────────────────────────
 // The how-to for the whole-books ERP↔Tally tie-out: what to export from Tally and

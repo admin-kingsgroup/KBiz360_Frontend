@@ -47,10 +47,10 @@ jest.mock('../api', () => ({
   resolveException: jest.fn(), signCertificate: jest.fn(), attachScan: jest.fn(),
 }));
 
-import { ReconciliationHub } from '../ReconciliationHub';
-import { CertificationRegister } from '../CertificationRegister';
-import { ReconReportsPage } from '../ReconReportsPage';
-import { RuleBookPage } from '../RuleBookPage';
+import { ReconciliationHub } from '../hub/ReconciliationHub';
+import { CertificationRegister } from '../certification/CertificationRegister';
+import { ReconReportsPage } from '../reports/ReconReportsPage';
+import { RuleBookPage } from '../certification/RuleBookPage';
 import { getRulebook } from '../api';
 
 const wrap = (ui) => {

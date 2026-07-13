@@ -1,9 +1,9 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Snowflake, FileUp, Scale, PenLine, LockKeyhole, ListChecks, Layers, Users, ShieldCheck } from 'lucide-react';
-import { getRulebook } from './api';
-import { TIERS, GOLDEN_RULES, ROLE_MATRIX, branchCodeOf } from './utils';
-import { PageSection, Badge, Button, cn } from '../../shell/primitives';
+import { getRulebook } from '../api';
+import { TIERS, GOLDEN_RULES, ROLE_MATRIX, branchCodeOf } from '../utils';
+import { PageSection, Badge, Button, cn } from '../../../shell/primitives';
 
 // ─── Reconciliation Rule Book ────────────────────────────────────────────────
 // The single reference for users and staff: the four tiers, who does what,

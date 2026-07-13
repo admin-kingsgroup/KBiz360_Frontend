@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardCheck, ChevronRight, CalendarClock, BookOpenCheck, ListChecks, AlertTriangle, Sparkles } from 'lucide-react';
-import { getScopeTree, getSummary, getPending } from './api';
-import { useCockpitFocus } from '../../store/cockpitFocus';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, visibleTiers, certPathFor, hubPathFor, reportPathFor, tierMenuName } from './utils';
-import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../shell/primitives';
-import { CertificateDrawer } from './CertificateDrawer';
+import { getScopeTree, getSummary, getPending } from '../api';
+import { useCockpitFocus } from '../../../store/cockpitFocus';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, visibleTiers, certPathFor, hubPathFor, reportPathFor, tierMenuName } from '../utils';
+import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../../shell/primitives';
+import { CertificateDrawer } from '../shared/CertificateDrawer';
 
 // ─── Reconciliation Hub — the full-view dashboard, one page per tier ─────────
 // The read-only OVERVIEW of a tier: every ledger that must reconcile this period

@@ -58,11 +58,11 @@ jest.mock('../api', () => ({
   })),
 }));
 
-import { TallyTieOutBoard } from '../TallyTieOutBoard';
-import { CertifyPanel } from '../CertifyPanel';
-import { TallyCertRegister } from '../TallyCertRegister';
-import { TallyReconReport } from '../TallyReconReport';
-import { TallyGuidePage } from '../TallyGuidePage';
+import { TallyTieOutBoard } from '../tie-out/TallyTieOutBoard';
+import { CertifyPanel } from '../tie-out/CertifyPanel';
+import { TallyCertRegister } from '../certification/TallyCertRegister';
+import { TallyReconReport } from '../reports/TallyReconReport';
+import { TallyGuidePage } from '../help/TallyGuidePage';
 import { tallyReconRoutes } from '../routes';
 import { MENU_TALLY_RECON, getMenu } from '../../../core/menus';
 import { crumbsFor } from '../../../core/routeMeta';

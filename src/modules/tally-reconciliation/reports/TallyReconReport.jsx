@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileBarChart, RefreshCcw, AlertTriangle, Clock, ShieldCheck, ExternalLink } from 'lucide-react';
-import { getRegister } from './api';
-import { useCockpitFocus } from '../../store/cockpitFocus';
-import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../shell/primitives';
-import { BRANCHES, CUR, round2, branchCodeOf, fmt, certMeta, TALLY_CHAIN, isCentralRole } from './format';
+import { getRegister } from '../api';
+import { useCockpitFocus } from '../../../store/cockpitFocus';
+import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../../shell/primitives';
+import { BRANCHES, CUR, round2, branchCodeOf, fmt, certMeta, TALLY_CHAIN, isCentralRole } from '../format';
 
 // ─── Tally Reconciliation · per-tier Report ───────────────────────────────────
 // One page per tier (Reports ▸ Monthly / Yearly Report). Three sections,
