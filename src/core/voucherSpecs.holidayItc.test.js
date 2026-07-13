@@ -29,7 +29,8 @@ describe('Holiday package — corrected SO/PO/GP (supplier GST → ITC, off the 
     expect(so.gst).toBeCloseTo(1626.00, 2);          // 5% × 32,520 (base only — not supplier GST)
     expect(so.otherTaxesGst).toBeCloseTo(246.08, 2); // 5% × SVC2
     expect(so.tcs).toBeCloseTo(786.27, 2);           // 2% × 39,313.72
-    expect(so.total).toBeCloseTo(40099.99, 2);
+    expect(so.total).toBeCloseTo(40100, 2);          // 40,099.99 snapped to a whole rupee
+    expect(so.roundOff).toBeCloseTo(0.01, 2);        // +1p → branch Round Off ledger
     // No "Supplier Service GST" head on the sales side anymore.
     expect(headAmt(so.heads, 'psvcGst')).toBeUndefined();
     expect(headAmt(so.heads, 'base')).toBeCloseTo(32520, 2);
@@ -72,8 +73,9 @@ describe('Holiday client invoice — SVC2 hidden, SVC2 GST folded into GST', () 
     expect(html).not.toMatch(/SVC2/);
   });
 
-  test('shows one combined GST and the corrected NET TOTAL', () => {
-    expect(html).toContain('40,099.99');   // net total
+  test('shows one combined GST, a Round Off line, and the corrected NET TOTAL', () => {
+    expect(html).toContain('40,100.00');   // net total (snapped from 40,099.99)
+    expect(html).toMatch(/Round Off/);     // the +1p reconciling line
     expect(html).not.toMatch(/SVC2 CGST/);
   });
 });

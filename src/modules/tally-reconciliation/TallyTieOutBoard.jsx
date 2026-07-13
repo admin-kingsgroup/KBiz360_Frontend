@@ -572,7 +572,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                           const off = r.status !== 'tied' && !r.synthetic; // the injected P&L Net-Profit row isn't a real ledger to drill
                           const acc = r.status === 'accepted';
                           const drill = () => setDrill(r);
-                          const canModule = r.statement === 'PL' && r.erp != null && !r.synthetic && MODULE_HEADS.has(r.parentGroup);
+                          const canModule = r.statement === 'PL' && r.erp != null && !r.synthetic && MODULE_HEADS.has(r.parentGroup) && r.hasModules;
                           const mKey = modKey(r); const mShown = canModule && modOpen[mKey]; const mInfo = modData[mKey];
                           return (
                             <React.Fragment key={`${sec.label || ''}|${g.parent}|${r.code || r.ledger}`}>

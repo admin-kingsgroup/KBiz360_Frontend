@@ -34,13 +34,14 @@ describe('bookingTotals — TCS on an International holiday follows the date', (
   test('pre-cutover booking (2026-02-23) collects TCS @ 5%', () => {
     const so = bookingTotals(SH, [pkgLine()], { ...CTX, date: '2026-02-23' }).so;
     expect(so.tcs).toBeCloseTo(1965.69, 2);          // 5% × 39,313.72
-    expect(so.total).toBeCloseTo(preNet + 1965.69, 2);
+    // so.total = net + GST + TCS, snapped to a whole rupee when within 5p (residue → roundOff).
+    expect(so.total).toBeCloseTo(preNet + 1965.69 + so.roundOff, 2);
   });
 
   test('post-cutover booking (2026-04-15) collects TCS @ 2%', () => {
     const so = bookingTotals(SH, [pkgLine()], { ...CTX, date: '2026-04-15' }).so;
     expect(so.tcs).toBeCloseTo(786.27, 2);           // 2% × 39,313.72
-    expect(so.total).toBeCloseTo(preNet + 786.27, 2);
+    expect(so.total).toBeCloseTo(preNet + 786.27 + so.roundOff, 2);
   });
 
   test('no date passed → unchanged legacy behaviour (2%)', () => {
