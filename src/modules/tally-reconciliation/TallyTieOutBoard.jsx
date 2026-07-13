@@ -99,6 +99,8 @@ function bySubGroup(items) {
 // rows get the Flight/Hotel/Holiday/Visa drill. A TB has no cost-centre axis on the
 // Tally side, so the split is ERP-only (it sums to the row's ERP figure).
 const MODULE_HEADS = new Set(['Sales Accounts', 'Purchase Accounts', 'Direct Income', 'Direct Expenses']);
+// Income-side trading heads (rest are cost) — labels a ledger slice Sales vs Cost in By-Module view.
+const INCOME_HEAD_SET = new Set(['Sales Accounts', 'Direct Income']);
 
 // Parse a pasted Tally Trial Balance: tab/comma columns.
 //   3+ cols → Ledger, Closing Dr, Closing Cr   |   2 cols → Ledger, Closing (Cr negative)
@@ -152,10 +154,14 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const [parsing, setParsing] = useState('');    // 'tb' | 'db' while a file parses
   const [drill, setDrill] = useState(null); // off ledger being drilled (Phase 2)
   const [onlyFixes, setOnlyFixes] = useState(false); // filter to the "fix in Tally" punch-list
-  // "Chart of Accounts view" — render the TB tie-out as the ERP CoA tree (group ▸ sub-group
-  // ▸ ledger with subtotals). Opt-in, remembered per user; default = flat Tally-order table.
-  const [coaView, setCoaView] = useState(() => { try { return localStorage.getItem('tally.coaView') === '1'; } catch { return false; } });
+  // Two opt-in, mutually-exclusive re-views of the TB (each remembered per user); default =
+  // flat Tally-order table. "Chart of Accounts view" = the ERP CoA tree (group ▸ sub-group ▸
+  // ledger + subtotals). "By Module" = the ERP-only cost-centre pivot (Flight/Hotel/…).
+  const lsBool = (k) => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
+  const [coaView, setCoaView] = useState(() => lsBool('tally.coaView'));
+  const [moduleView, setModuleView] = useState(() => lsBool('tally.moduleView') && !lsBool('tally.coaView'));
   useEffect(() => { try { localStorage.setItem('tally.coaView', coaView ? '1' : '0'); } catch { /* private mode */ } }, [coaView]);
+  useEffect(() => { try { localStorage.setItem('tally.moduleView', moduleView ? '1' : '0'); } catch { /* private mode */ } }, [moduleView]);
   const [modOpen, setModOpen] = useState({});  // ledgerKey → expanded (module drill)
   const [modData, setModData] = useState({});  // ledgerKey → { loading, rows, error }
 
@@ -424,6 +430,50 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 
   const showTree = coaView && tab === 'tb' && Array.isArray(data?.tree) && data.tree.length > 0;
 
+  // ── "By Module" (cost-centre) view — the ERP-only pivot. A module header (Σ ERP · GP) with
+  // its trading-ledger slices beneath; the Tally column is "— ERP only" (a Tally TB has no
+  // cost-centre axis). The trailing bucket lists every non-trading ledger (no cost centre). ──
+  const gpText = (n) => (n === 0 ? '0' : `${n > 0 ? '' : '−'}${Math.abs(n).toLocaleString(localeOf(cur))}`);
+  const renderModuleNodes = (mt) => {
+    if (!mt || !Array.isArray(mt.modules)) return null;
+    const nonModule = rows.filter((r) => !MODULE_HEADS.has(r.parentGroup)); // BS + non-trading = no cost centre
+    return (
+      <>
+        {mt.modules.map((m) => (
+          <React.Fragment key={'mod|' + (m.code || 'unspec')}>
+            <tr className="border-b border-surface-border bg-navy">
+              <td className="py-2 pl-4 pr-4"><span className="block text-[11px] font-bold uppercase tracking-wider text-white">{m.label}</span>
+                <span className="text-[10.5px] font-semibold text-white/70">GP {gpText(m.gp)} · {cur}</span></td>
+              <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold text-white">{fmt(m.erp, cur)}</td>
+              <td className="px-4 py-2 text-right text-[11px] font-semibold text-white/70" title="A Tally trial balance has no cost-centre axis — this pivot is ERP-only.">— ERP only</td>
+              <td className="px-4 py-2" />
+              <td className="px-4 py-2" />
+            </tr>
+            {m.rows.map((r) => (
+              <tr key={'mod|' + (m.code || 'unspec') + '|' + (r.code || r.ledger)} className="border-b border-surface-border/60 hover:bg-surface-alt/60">
+                <td className="px-4 py-1.5" style={{ paddingLeft: 32 }}><span className="block font-medium text-ink">{r.ledger}</span>
+                  {r.code ? <span className="font-mono text-[11px] text-ink-subtle">{r.code}</span> : null}
+                  <span className="ml-1 text-[10.5px] text-ink-subtle">· {INCOME_HEAD_SET.has(r.head) ? 'Sales' : 'Cost'}</span></td>
+                <td className="px-4 py-1.5 text-right font-mono tabular-nums">{fmt(r.erp, cur)}</td>
+                <td className="px-4 py-1.5 text-right text-[11px] text-ink-subtle" title="A Tally trial balance has no cost-centre axis — this split is ERP-only.">— ⓘ</td>
+                <td className="px-4 py-1.5" />
+                <td className="px-4 py-1.5" />
+              </tr>
+            ))}
+          </React.Fragment>
+        ))}
+        {nonModule.length > 0 && (
+          <>
+            <tr><td colSpan={5} className="bg-surface-alt px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">Balance Sheet &amp; non-trading · no cost centre</td></tr>
+            {nonModule.map((r) => renderLedgerRow(r, `mod-nc|${r.code || r.ledger}`))}
+          </>
+        )}
+      </>
+    );
+  };
+
+  const showModule = moduleView && tab === 'tb' && data?.moduleTree && Array.isArray(data.moduleTree.modules) && data.moduleTree.modules.length > 0;
+
   // Direct-URL guard: a non-central role gets the rule, not the working board.
   if (!central) {
     return (
@@ -613,15 +663,23 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           <>
           {(tab === 'tb' || blocking > 0) && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              {/* CoA view — TB tab only (BS/P&L are already tree-shaped). Remembered per user. */}
+              {/* Two TB re-views, mutually exclusive (ticking one clears the other) — TB tab only
+                  (BS/P&L are already tree-shaped). Both remembered per user. */}
               {tab === 'tb' && (
                 <label className="inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted"
                   title="Show the ERP-live vs Tally trial balance arranged as your ERP Chart of Accounts — group ▸ sub-group ▸ ledger with running subtotals, fully expanded.">
-                  <input type="checkbox" checked={coaView} onChange={(e) => setCoaView(e.target.checked)} className="accent-accent" />
+                  <input type="checkbox" checked={coaView} onChange={(e) => { const v = e.target.checked; setCoaView(v); if (v) setModuleView(false); }} className="accent-accent" />
                   Chart of Accounts view
                 </label>
               )}
-              {blocking > 0 && !showTree && (
+              {tab === 'tb' && (
+                <label className="inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted"
+                  title="Pivot the trial balance by cost centre / module (Flight · Hotel · Holiday · Visa …) with each module's Sales / COGS / GP. ERP-only — a Tally trial balance has no cost-centre axis. Balance-Sheet ledgers (no cost centre) list in a trailing bucket.">
+                  <input type="checkbox" checked={moduleView} onChange={(e) => { const v = e.target.checked; setModuleView(v); if (v) setCoaView(false); }} className="accent-accent" />
+                  By Module <span className="text-[10px] font-semibold text-ink-subtle">(cost centre · ERP-only)</span>
+                </label>
+              )}
+              {blocking > 0 && !showTree && !showModule && (
                 <label className="inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted">
                   <input type="checkbox" checked={onlyFixes} onChange={(e) => setOnlyFixes(e.target.checked)} className="accent-accent" />
                   Show only items to fix in Tally <span className="rounded-full bg-warning/15 px-1.5 font-bold text-warning">{blocking}</span>
@@ -641,7 +699,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                 </tr>
               </thead>
               <tbody>
-                {showTree ? renderTreeNodes(data.tree, 0) : viewSections.map((sec) => (
+                {showModule ? renderModuleNodes(data.moduleTree) : showTree ? renderTreeNodes(data.tree, 0) : viewSections.map((sec) => (
                   <React.Fragment key={sec.label || 'all'}>
                     {sec.label && <tr><td colSpan={5} className="bg-surface-alt px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">{sec.label}</td></tr>}
                     {byParent(sec.rows).map((g) => (

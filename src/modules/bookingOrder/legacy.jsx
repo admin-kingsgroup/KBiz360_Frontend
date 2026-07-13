@@ -85,6 +85,11 @@ const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 
 // Tiny helper lines under the GST-mode dropdowns (auto-derived vs missing-state).
 const hintOk = { margin: '4px 0 0', fontSize: 10.5, fontWeight: 700, color: '#16794c' };
 const hintWarn = { margin: '4px 0 0', fontSize: 10.5, fontWeight: 700, color: '#a9690a' };
+// Neutral (grey) informational line — for a state that's expected/optional, not a
+// data gap. B2C walk-ins are structurally never in the Customer Master (the pooled
+// per-staff ledger is the voucher party, the passenger is only Bill-To), so the
+// "not in master" note must inform, not alarm — Intra is the correct B2C default.
+const hintMuted = { margin: '4px 0 0', fontSize: 10.5, fontWeight: 700, color: '#5b616e' };
 // Per-section column-header + total-row styles — the section colour carries INTO
 // the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
 const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' };
@@ -1074,7 +1079,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             ) : custRec && !custSupply ? (
               <p style={hintWarn}>⚠ Customer has no State in the Customer Master — add it to auto-pick the mode</p>
             ) : isB2C && customer.name.trim() && !custRec ? (
-              <p style={hintWarn}>⚠ Not in the Customer Master — pick a match or “＋ New” (address + state) to auto-set the mode</p>
+              <p style={hintMuted}>ℹ B2C walk-in — not in the Customer Master. That’s fine for B2C; Sale mode stays as picked above. Add via “＋ New” (address + state) only if the sale is interstate, to auto-set IGST.</p>
             ) : null)}
           </FL>}
           {!isNoSupp && <FL label={interBranch ? 'Supplier ledger (airline / cost) *' : 'Supplier ledger (Pay to) *'}>
