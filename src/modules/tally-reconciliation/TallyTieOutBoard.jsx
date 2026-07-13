@@ -811,10 +811,10 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
     <div className="grid gap-4">
       {/* Tier segment + scope badge */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-xs font-semibold" role="tablist" aria-label="Defect tier">
+        <div className="inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-xs font-semibold" role="group" aria-label="Filter defects by tier">
           {DEFECT_TIERS.map((t) => (
-            <button key={t.key} type="button" role="tab" aria-selected={tier === t.key} onClick={() => selectTier(t.key)}
-              className={`rounded-[6px] px-3 py-1 transition focus:outline-none focus:ring-2 focus:ring-accent ${tier === t.key ? 'bg-accent text-white shadow-card' : 'text-ink-muted hover:text-ink'}`}>
+            <button key={t.key} type="button" aria-pressed={tier === t.key} onClick={() => selectTier(t.key)}
+              className={`rounded-[6px] px-3 py-1 transition focus:outline-none focus:ring-2 focus:ring-accent ${tier === t.key ? 'bg-accent text-navy shadow-card' : 'text-ink-muted hover:text-ink'}`}>
               {t.label} <span className="tabular-nums opacity-80">({tierCount[t.key]})</span>
             </button>
           ))}

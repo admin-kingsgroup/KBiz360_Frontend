@@ -319,6 +319,47 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('3 off ledgers')).toBeInTheDocument();
   });
 
+  test('Defect Register — tier segment + type chips filter the table, Clear resets', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 5,
+      summary: { total: 4, byType: { 'missing-in-tally': 1, 'missing-in-erp': 1, 'ledger-missing-tally': 1, 'ledger-missing-erp': 1 } },
+      defects: [
+        { ledger: 'Alpha Ledger', date: '2026-07-01', ref: 'V1', desc: 'only in erp', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 100, variance: 0, side: 'erp' },
+        { ledger: 'Beta Ledger', date: '2026-07-02', ref: 'V2', desc: 'only in tally', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 200, variance: 0, side: 'tally' },
+        { ledger: 'Gamma Master', date: '', ref: '', desc: 'no daybook', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 300, variance: 300, side: 'balance' },
+        { ledger: 'Delta Master', date: '', ref: '', desc: 'no erp side', type: 'ledger-missing-erp', label: 'Ledger absent in ERP', amount: -400, variance: -400, side: 'balance' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    // All four defect rows visible before any filter.
+    expect(await screen.findByText('Alpha Ledger')).toBeInTheDocument();
+    expect(screen.getByText('Beta Ledger')).toBeInTheDocument();
+    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    expect(screen.getByText('Delta Master')).toBeInTheDocument();
+
+    // Master tier → only the two ledger-absent (structural) rows survive.
+    fireEvent.click(screen.getByRole('button', { name: /Master mismatches/ }));
+    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    expect(screen.getByText('Delta Master')).toBeInTheDocument();
+    expect(screen.queryByText('Alpha Ledger')).not.toBeInTheDocument();
+    expect(screen.queryByText('Beta Ledger')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 2 of 4 defects')).toBeInTheDocument();
+
+    // Toggle the "Ledger absent in Tally" chip → narrows to just Gamma.
+    fireEvent.click(screen.getByRole('button', { name: /Ledger absent in Tally: 1/ }));
+    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    expect(screen.queryByText('Delta Master')).not.toBeInTheDocument();
+
+    // Clear → every row returns and the "Showing X of Y" line is gone.
+    fireEvent.click(screen.getByRole('button', { name: /^Clear$/ }));
+    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
+    expect(screen.getByText('Delta Master')).toBeInTheDocument();
+    expect(screen.queryByText(/Showing \d+ of \d+ defects/)).not.toBeInTheDocument();
+  });
+
   test('clicking an off ledger opens the voucher drill drawer (Phase 2)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     fireEvent.click(await screen.findByText('HDFC Bank A/c')); // an off ledger row
