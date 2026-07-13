@@ -5,9 +5,9 @@ import { isTargetValid, isMasterValid, metricLabel, masterKindLabel } from '../u
 // api/governance pulls core/api (import.meta) → mock for the container tests.
 jest.mock('../api/governance', () => ({ proposeGovernance: jest.fn().mockResolvedValue({}), getPendingByType: jest.fn().mockResolvedValue([]) }));
 // eslint-disable-next-line import/first
-import { TargetsBudgets } from '../TargetsBudgets';
+import { TargetsBudgets } from '../control-configuration/TargetsBudgets';
 // eslint-disable-next-line import/first
-import { MasterControl } from '../MasterControl';
+import { MasterControl } from '../control-configuration/MasterControl';
 // eslint-disable-next-line import/first
 import { proposeGovernance, getPendingByType } from '../api/governance';
 

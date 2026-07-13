@@ -6,7 +6,7 @@ import { render, screen } from '@testing-library/react';
 jest.mock('../api/myRole', () => ({ getMyRole: jest.fn().mockResolvedValue(null) }));
 
 // eslint-disable-next-line import/first
-import { MyRoleView } from '../MyRole';
+import { MyRoleView } from '../setup-roles/MyRole';
 
 const data = {
   name: 'Farhan Aga', role: 'Director',

@@ -19,11 +19,11 @@ jest.mock('../api/monitor', () => ({
 // eslint-disable-next-line import/first
 import { getOverview, getBranchCockpit, getAudit } from '../api/monitor';
 // eslint-disable-next-line import/first
-import { ControlTower } from '../ControlTower';
+import { ControlTower } from '../control-configuration/ControlTower';
 // eslint-disable-next-line import/first
-import { BranchCockpit } from '../BranchCockpit';
+import { BranchCockpit } from '../control-configuration/BranchCockpit';
 // eslint-disable-next-line import/first
-import { AuditTrail } from '../AuditTrail';
+import { AuditTrail } from '../control-configuration/AuditTrail';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -6,7 +6,7 @@ import { PeriodLockPanel } from '../PeriodLockPanel';
 // api/periodLocks pulls core/api (import.meta) → mock it for the container test.
 jest.mock('../api/periodLocks', () => ({ getPeriodLocks: jest.fn(), proposePeriodLock: jest.fn().mockResolvedValue({}) }));
 // eslint-disable-next-line import/first
-import { PeriodLockAdmin } from '../PeriodLockAdmin';
+import { PeriodLockAdmin } from '../control-configuration/PeriodLockAdmin';
 // eslint-disable-next-line import/first
 import { getPeriodLocks, proposePeriodLock } from '../api/periodLocks';
 

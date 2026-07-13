@@ -7,7 +7,7 @@ import { masterIsOn, goLiveStatus, goLiveSteps } from '../utils/goLive';
 jest.mock('../api/flags', () => ({ getFlagState: jest.fn() }));
 jest.mock('../api/governance', () => ({ getPendingByType: jest.fn().mockResolvedValue([]) }));
 // eslint-disable-next-line import/first
-import { GoLive } from '../GoLive';
+import { GoLive } from '../setup-roles/GoLive';
 // eslint-disable-next-line import/first
 import { getFlagState } from '../api/flags';
 

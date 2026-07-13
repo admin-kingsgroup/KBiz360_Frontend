@@ -10,9 +10,9 @@ jest.mock('../api/monitor', () => ({ getBranchCockpit: jest.fn().mockResolvedVal
   { branch: 'AMD', pendingDecisions: 0, pendingGovernance: 0, lockedPeriods: [] },
 ] }) }));
 // eslint-disable-next-line import/first
-import { ExceptionsRisk } from '../ExceptionsRisk';
+import { ExceptionsRisk } from '../performance-oversight/ExceptionsRisk';
 // eslint-disable-next-line import/first
-import { ComplianceClose } from '../ComplianceClose';
+import { ComplianceClose } from '../performance-oversight/ComplianceClose';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

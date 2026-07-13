@@ -6,7 +6,7 @@ import { scorecardRow, fyRange } from '../utils/scorecard';
 // BranchScorecard hits accounting endpoints via core/api (import.meta) → mock it.
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn().mockResolvedValue({ rows: [] }) }));
 // eslint-disable-next-line import/first
-import { BranchScorecard } from '../BranchScorecard';
+import { BranchScorecard } from '../performance-oversight/BranchScorecard';
 
 describe('scorecard utils', () => {
   test('scorecardRow: sales from invoice rows, GP/NP from P&L, branchwise', () => {

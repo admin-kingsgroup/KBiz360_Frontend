@@ -1,11 +1,11 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MyRoleView } from '../MyRole';
+import { MyRoleView } from '../setup-roles/MyRole';
 
 jest.mock('../api/myRole', () => ({ getMyRole: jest.fn(), getAllRoles: jest.fn() }));
 // eslint-disable-next-line import/first
-import { RolesResponsibilities } from '../RolesResponsibilities';
+import { RolesResponsibilities } from '../setup-roles/RolesResponsibilities';
 // eslint-disable-next-line import/first
 import { getAllRoles } from '../api/myRole';
 

@@ -17,7 +17,7 @@ jest.mock('../../../core/referenceCache', () => ({
   ],
 }));
 // eslint-disable-next-line import/first
-import { ApprovalsOverview } from '../ApprovalsOverview';
+import { ApprovalsOverview } from '../approvals/ApprovalsOverview';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

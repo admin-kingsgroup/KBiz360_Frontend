@@ -40,7 +40,7 @@ jest.mock('../api/flags', () => ({ getFlagState: jest.fn().mockResolvedValue({
   flags: { 'core.policy_guard': { enabled: false, label: 'Master control' }, 'branch.hide_statements': { enabled: true, label: 'Hide statements' } },
 }) }));
 // eslint-disable-next-line import/first
-import { ConfigReadiness } from '../ConfigReadiness';
+import { ConfigReadiness } from '../setup-roles/ConfigReadiness';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
