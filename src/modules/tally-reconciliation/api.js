@@ -29,6 +29,11 @@ export function getLedgerVouchers({ branch, period, tier, ledger } = {}) {
 export function getDefects({ branch, period, tier } = {}) {
   return apiGet('/api/tally-tieout/defects', { branch, period, tier });
 }
+// ERP-side cost-centre (module) split of one trading ledger — the drill UNDER a tied
+// Sales/Purchase row (Flight/Hotel/Holiday/Visa…). ERP-only; sums to the ledger's ERP.
+export function getModuleBreakdown({ branch, period, tier, ledger } = {}) {
+  return apiGet('/api/tally-tieout/module-breakdown', { branch, period, tier, ledger });
+}
 // Phase 3 — the Tally Reconciliation certificate (sign-off that gates the close).
 export function getTallyCert({ branch, period, tier } = {}) {
   return apiGet('/api/tally-tieout/certificate', { branch, period, tier });

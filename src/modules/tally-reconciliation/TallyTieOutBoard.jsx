@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Upload, RefreshCcw, AlertTriangle, BookOpenCheck, FileUp, Trash2 } from 'lucide-react';
-import { getTieOut, getPeriods, importTB, getDefects, importDayBook, getDayBookStatus, getInception, clearTB, clearDayBook } from './api';
+import { getTieOut, getPeriods, importTB, getDefects, importDayBook, getDayBookStatus, getInception, clearTB, clearDayBook, getModuleBreakdown } from './api';
 import { useCockpitFocus } from '../../store/cockpitFocus';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../shell/primitives';
 import { VoucherDrawer } from './VoucherDrawer';
@@ -85,6 +85,21 @@ function byParent(rows) {
   return [...m.entries()].map(([parent, items]) => ({ parent, items }));
 }
 
+// Within a parent group, nest by the chart SUB-GROUP (mirrors the ERP CoA) — preserving
+// the incoming order. Rows with no sub-group cluster first, directly under the head.
+function bySubGroup(items) {
+  const m = new Map();
+  for (const r of items) { const k = r.subGroup || ''; if (!m.has(k)) m.set(k, []); m.get(k).push(r); }
+  return [...m.entries()]
+    .sort((a, b) => (a[0] === '' ? -1 : b[0] === '' ? 1 : 0))   // "(direct)" first, then sub-groups in order
+    .map(([sub, rows]) => ({ sub, rows }));
+}
+
+// The trading heads whose ledgers carry a cost-centre (module) dimension — only these
+// rows get the Flight/Hotel/Holiday/Visa drill. A TB has no cost-centre axis on the
+// Tally side, so the split is ERP-only (it sums to the row's ERP figure).
+const MODULE_HEADS = new Set(['Sales Accounts', 'Purchase Accounts', 'Direct Income', 'Direct Expenses']);
+
 // Parse a pasted Tally Trial Balance: tab/comma columns.
 //   3+ cols → Ledger, Closing Dr, Closing Cr   |   2 cols → Ledger, Closing (Cr negative)
 // Number parsing understands parentheses (accounting negatives) and a trailing
@@ -137,6 +152,8 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const [parsing, setParsing] = useState('');    // 'tb' | 'db' while a file parses
   const [drill, setDrill] = useState(null); // off ledger being drilled (Phase 2)
   const [onlyFixes, setOnlyFixes] = useState(false); // filter to the "fix in Tally" punch-list
+  const [modOpen, setModOpen] = useState({});  // ledgerKey → expanded (module drill)
+  const [modData, setModData] = useState({});  // ledgerKey → { loading, rows, error }
 
   const { data: periodsData } = useQuery({ queryKey: ['tally-tieout', 'periods', branch], queryFn: () => getPeriods({ branch }), enabled: central });
   // Earliest posted date for this branch → the selector spans inception..now. Fall
@@ -148,6 +165,18 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const inceptionFrom = branchInception || globalInception;
   const period = periodSel[`${branch}:${tier}`] || defaultPeriod(tier, branch);
   const setPeriod = (p) => setPeriodSel((s) => ({ ...s, [`${branch}:${tier}`]: p }));
+  // Module drill: expand a trading ledger to its ERP cost-centre (Flight/Hotel/…) split.
+  const modKey = (r) => r.code || r.ledger;
+  const toggleModules = async (r) => {
+    const key = modKey(r); const willOpen = !modOpen[key];
+    setModOpen((s) => ({ ...s, [key]: willOpen }));
+    if (willOpen && !modData[key]) {
+      setModData((s) => ({ ...s, [key]: { loading: true } }));
+      try { const res = await getModuleBreakdown({ branch, period, tier, ledger: r.ledger });
+        setModData((s) => ({ ...s, [key]: { loading: false, rows: res?.rows || [] } })); }
+      catch { setModData((s) => ({ ...s, [key]: { loading: false, error: true } })); }
+    }
+  };
   // The Certification Register / Report hand a period to this board via sessionStorage
   // ("Open in Tie-Out"). Consume it ONLY when this board's branch+tier match — the
   // cockpit focus hydrates lazily, so the first mount can carry a transient branch;
@@ -198,6 +227,9 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const rows = data?.rows || [];
   const counts = data?.counts || {};
   const imported = data?.imported || {};
+  // Group subtotal rows a grouped upload carried that DIDN'T reconcile to their ledgers —
+  // kept for review (not ledgers, never in the gate). Surfaced as a banner.
+  const reviewGroups = data?.reviewGroups || [];
   // A certified (signed/locked) period is frozen — re-upload/Clear are blocked by the
   // BE until re-opened; gate the upload controls proactively (not just via the 409).
   const periodCertified = data?.certStatus === 'signed' || data?.certStatus === 'locked';
@@ -384,6 +416,19 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         </div>
       )}
 
+      {/* Grouped-upload subtotals that didn't reconcile to their ledgers — kept for review */}
+      {reviewGroups.length > 0 && (
+        <div className="flex items-start gap-2 rounded-brand border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-ink" data-testid="group-review-warning">
+          <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+          <span>
+            <b>{reviewGroups.length} group subtotal row{reviewGroups.length === 1 ? '' : 's'} didn’t reconcile to {reviewGroups.length === 1 ? 'its' : 'their'} ledgers</b> — check the Tally export.{' '}
+            {reviewGroups.slice(0, 4).map((g, i) => (
+              <span key={g.ledger}>{i > 0 ? ' · ' : ''}<b>{g.ledger}</b> (upload {fmt(g.amount, cur)} vs ledgers {fmt(g.childSum, cur)})</span>
+            ))}{reviewGroups.length > 4 ? ` · +${reviewGroups.length - 4} more` : ''}
+          </span>
+        </div>
+      )}
+
       {/* Trial Balance import — pick a file (Excel/CSV/XML) OR paste */}
       {showImport && (
         <PageSection title="Upload Tally Trial Balance" subtitle={`The ${branch} · ${periodLabel(period)} Trial Balance from Tally — export it as Excel/CSV (or paste below). Columns: Ledger, Closing Dr, Closing Cr. Add a Group/Parent column (or export the grouped TB) so the tie-out can flag any group that differs from ERP.`}>
@@ -409,7 +454,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
               Upload ({tbRows().length} rows)
             </Button>
             {imp.isError && <span className="text-sm text-danger">{imp.error?.message}</span>}
-            {imp.isSuccess && <span className="text-sm text-success">Uploaded {imp.data?.inserted ?? 0} ledgers.</span>}
+            {imp.isSuccess && <span className="text-sm text-success">Uploaded {imp.data?.inserted ?? 0} ledgers{imp.data?.skippedGroups ? ` · skipped ${imp.data.skippedGroups} group row${imp.data.skippedGroups === 1 ? '' : 's'}` : ''}{imp.data?.reviewGroups?.length ? ` · ⚠ ${imp.data.reviewGroups.length} to review` : ''}.</span>}
             <span className="text-xs text-ink-subtle">Re-uploading replaces this period's Tally TB.</span>
           </div>
         </PageSection>
@@ -515,7 +560,10 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                     {byParent(sec.rows).map((g) => (
                       <React.Fragment key={(sec.label || '') + g.parent}>
                         <tr><td colSpan={5} className="bg-navy px-4 py-2 text-xs font-bold uppercase text-white">{g.parent}</td></tr>
-                        {g.items.map((r) => {
+                        {bySubGroup(g.items).map((sg) => (
+                          <React.Fragment key={(sec.label || '') + g.parent + '|' + sg.sub}>
+                            {sg.sub ? <tr><td colSpan={5} className="bg-surface-alt/70 px-4 py-1 pl-8 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">▸ {sg.sub}</td></tr> : null}
+                            {sg.rows.map((r) => {
                           // A row whose amount ties but whose Tally NAME or GROUP still
                           // differs from ERP shows an amber "Fix in Tally" (it blocks the
                           // close) instead of a green "Tied".
@@ -524,8 +572,11 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                           const off = r.status !== 'tied' && !r.synthetic; // the injected P&L Net-Profit row isn't a real ledger to drill
                           const acc = r.status === 'accepted';
                           const drill = () => setDrill(r);
+                          const canModule = r.statement === 'PL' && r.erp != null && !r.synthetic && MODULE_HEADS.has(r.parentGroup);
+                          const mKey = modKey(r); const mShown = canModule && modOpen[mKey]; const mInfo = modData[mKey];
                           return (
-                            <tr key={`${sec.label || ''}|${g.parent}|${r.code || r.ledger}`}
+                            <React.Fragment key={`${sec.label || ''}|${g.parent}|${r.code || r.ledger}`}>
+                            <tr
                               onClick={off ? drill : undefined}
                               onKeyDown={off ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); drill(); } } : undefined}
                               role={off ? 'button' : undefined} tabIndex={off ? 0 : undefined}
@@ -544,14 +595,33 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                                 {r.suggest ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info" title="Closest ERP ledger — if it's the same account, rename it in Tally to match">Did you mean ERP “{r.suggest.ledger}”? — rename in Tally to match</span> : null}
                                 {acc ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info">✓ accepted · {reasonLabel(r.acceptedReason)}
                                   {r.acceptanceStale ? <span className="ml-1 rounded-full bg-warning/15 px-1.5 font-bold text-warning" title={`Accepted for ${fmt(r.acceptedAmount, cur)}, now ${fmt(r.diff, cur)} — re-review`}>⚠ changed</span> : null}</span>
-                                  : off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}</td>
+                                  : off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}
+                                {canModule ? <button type="button" onClick={(e) => { e.stopPropagation(); toggleModules(r); }} className="mt-0.5 block text-[10.5px] font-semibold text-accent hover:underline" title="ERP cost-centre split (Flight/Hotel/Holiday/Visa…). Tally has no cost-centre axis, so this is ERP-only.">{mShown ? '▾' : '▸'} modules (ERP split)</button> : null}</td>
                               <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plErp) : r.erp === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plErp, cur) : fmt(r.erp, cur)}</td>
                               <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plTally) : r.tally === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plTally, cur) : fmt(r.tally, cur)}</td>
                               <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${r.diff === 0 ? 'text-ink-subtle' : acc ? 'text-info' : 'text-danger'}`} title={r.diff > 0 ? 'ERP higher' : r.diff < 0 ? 'Tally higher' : ''}>{r.diff === 0 ? '0' : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(localeOf(cur))}`}</td>
                               <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
                             </tr>
+                            {mShown ? (mInfo?.loading
+                              ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-ink-subtle">Loading module split…</td></tr>
+                              : mInfo?.error
+                                ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-danger">Couldn’t load the module split.</td></tr>
+                                : (mInfo?.rows || []).length === 0
+                                  ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-ink-subtle">No cost-centre split on this ledger.</td></tr>
+                                  : mInfo.rows.map((mr, i) => (
+                                    <tr key={mKey + ':mod:' + i} className="border-b border-surface-border/40 bg-surface-alt/30">
+                                      <td className="px-4 py-1 pl-10 text-[11.5px] text-ink-muted">↳ {mr.module}</td>
+                                      <td className="px-4 py-1 text-right font-mono tabular-nums text-[11.5px] text-ink-muted">{fmt(mr.erp, cur)}</td>
+                                      <td className="px-4 py-1 text-right text-[11px] text-ink-subtle" title="A Tally trial balance has no cost-centre axis — this split is ERP-only.">— ⓘ</td>
+                                      <td className="px-4 py-1" />
+                                      <td className="px-4 py-1" />
+                                    </tr>
+                                  ))) : null}
+                            </React.Fragment>
                           );
-                        })}
+                            })}
+                          </React.Fragment>
+                        ))}
                       </React.Fragment>
                     ))}
                   </React.Fragment>

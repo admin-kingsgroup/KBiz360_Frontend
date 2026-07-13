@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
-  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw, FileEdit,
+  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../core/styles.jsx';
@@ -1789,7 +1789,7 @@ const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].tota
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
-function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onEditPax, onEditPO, onInvoice, busyId, sel, onToggleSel }) {
+function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onEditPax, onInvoice, busyId, sel, onToggleSel }) {
   const chainCfg = useApprovalChain(); // three-level chain assignees (drives the stage-aware button)
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Voucher Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
@@ -1884,10 +1884,9 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                       // numbers). Revoke is approver-only; Delete is admin-only.
                       <div style={{ display: 'flex', gap: 6 }}>
                         {onEditPax && sp && <button disabled={busyId === b.id} onClick={() => onEditPax(b)} title="Edit passenger details (names / ticket & document refs / sectors) in place — amounts unchanged, booking stays approved. No revoke needed." style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit Pax</button>}
-                        {canRevoke && onEditPO && !b.noSupplier && <button disabled={busyId === b.id} onClick={() => onEditPO(b)} title="Edit Purchase Order — fix the cost/tax/fare fields in place; saving re-posts the changes and keeps this booking Approved (no manual re-approval, no Pending step)." style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: PO_BAR, borderColor: '#e3b8c8' }}><FileEdit size={12} /> Edit PO</button>}
                         {canRevoke && onRevoke && <button disabled={busyId === b.id} onClick={() => onRevoke(b)} title="Revoke — un-post the Sales/Purchase and return this booking to Pending so it can be edited & re-approved (numbers kept)" style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: GOLD, borderColor: '#e3cd97' }}><RotateCcw size={12} /> Revoke</button>}
                         {canDelete && <button disabled={busyId === b.id} onClick={() => onDelete(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={12} /> Delete</button>}
-                        {!(onEditPax && sp) && !(canRevoke && onEditPO && !b.noSupplier) && !(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
+                        {!(onEditPax && sp) && !(canRevoke && onRevoke) && !canDelete && <span style={{ fontSize: 10.5, color: '#b0b7cc' }}>—</span>}
                       </div>
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#9197a3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
@@ -2392,9 +2391,9 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const [busyId, setBusyId] = useState(null);
   const [msg, setMsg] = useState('');
   const [editing, setEditing] = useState(null); useModalEsc(() => setEditing(null), !!editing);
-  // Approved-tab "Edit PO" — same compact PO-only modal as `editing`, but saving
-  // auto-re-approves so the booking never sits in Pending waiting on a second click.
-  const [editingPO, setEditingPO] = useState(null); useModalEsc(() => setEditingPO(null), !!editingPO);
+  // Identity-only pax edit (names / ticket-PNR / sectors) — saved in place via
+  // POST /:id/passengers; the booking stays Approved & posted (no revoke, no Pending).
+  const [paxEdit, setPaxEdit] = useState(null); useModalEsc(() => setPaxEdit(null), !!paxEdit);
   const [groupBy, setGroupBy] = useState('none');
   // Refund/Reissue (SO/PO/GP reversal modules RF/RI) live in this same queue and show
   // inline in the normal Pending window alongside forward bookings — no separate filter.
@@ -2444,15 +2443,6 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       if (!confirmed) return;
     }
     setEditing(b);
-  };
-  // Approved tab's "Edit PO" button: opens the same compact PO-only editor, but the
-  // voucher is auto-re-approved on save (see SoPoGpVoucherEntry's autoApprove prop),
-  // so — unlike plain Edit above — it never lands in the Pending queue for the user
-  // to chase down.
-  const onEditPO = async (b) => {
-    const { confirmed } = await confirmDialog({ title: `Edit Purchase Order for ${b.bookingNo}?`, message: `Its posted Sales (${b.saleVno})${b.noSupplier ? '' : ` & Purchase (${b.purchaseVno})`} will be reversed and re-posted with your changes — the booking stays Approved (auto re-approved, no Pending step).`, confirmLabel: 'Edit PO' });
-    if (!confirmed) return;
-    setEditingPO(b);
   };
   const onCancel = async (b) => {
     const { confirmed, reason } = await confirmDialog({ title: `Reject voucher ${b.bookingNo}?`, message: 'Marked Rejected (no books impact).', danger: true, reasonRequired: true, reasonLabel: 'Reason for rejection', confirmLabel: 'Reject' });
@@ -2535,15 +2525,13 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       {status === 'edited'
         ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
         : <>
-            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onEditPO={onEditPO} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onEditPax={setPaxEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
             <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
           </>}
-      {/* Approved tab's "Edit PO" — same compact modal, but autoApprove re-posts &
-          re-approves on save so the booking stays Approved (never drops to Pending). */}
-      {editingPO && (
-        <SoPoGpVoucherEntry key={editingPO.id} poOnly autoApprove branch={branch} setRoute={setRoute} editBooking={editingPO}
-          onDone={() => { setEditingPO(null); setOpen(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }} />
-      )}
+      {/* Identity-only pax edit — POST /:id/passengers; keeps the booking Approved &
+          posted (no revoke → re-approve cycle for a name / PNR fix). */}
+      {paxEdit && <EditPaxModal booking={paxEdit} onClose={() => setPaxEdit(null)}
+        onSaved={() => { setPaxEdit(null); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }} />}
     </div>
   );
 }
