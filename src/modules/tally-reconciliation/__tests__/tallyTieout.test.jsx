@@ -162,6 +162,41 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(getModuleBreakdown).toHaveBeenCalledWith(expect.objectContaining({ ledger: 'Commission A/c' }));
   });
 
+  test('Chart of Accounts view toggle renders the ERP CoA tree (group subtotals + leaves, drill intact) and is remembered', async () => {
+    window.localStorage.removeItem('tally.coaView'); // deterministic: start with the tick off
+    const { getTieOut } = require('../api');
+    // Two Bank leaves that sum to a group subtotal (9,00,000) which appears ONLY on the tree's
+    // group header — never on any leaf — so it uniquely proves the tree (not the flat table) rendered.
+    const hdfc = { ledger: 'HDFC Bank A/c', code: 'B2', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 810000, tally: 805000, diff: 5000, status: 'off' };
+    const icici = { ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 90000, tally: 90000, diff: 0, status: 'tied' };
+    const comm = { ledger: 'Commission A/c', code: 'S1', group: 'Direct Income', parentGroup: 'Direct Income', statement: 'PL', nature: 'income', erp: -60000, tally: -60000, diff: 0, status: 'tied', hasModules: true };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 3, tied: 2, off: 1, offTotal: 5000 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
+      rows: [hdfc, icici, comm],
+      tree: [
+        { id: 'bank', name: 'Bank Accounts', level: 0, statement: 'BS', erp: 900000, tally: 895000, diff: 5000, status: 'off', rows: [hdfc, icici], children: [] },
+        { id: 'direct-income', name: 'Direct Income', level: 0, statement: 'PL', erp: -60000, tally: -60000, diff: 0, status: 'tied', rows: [comm], children: [] },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // Default = the flat Tally-order table; the CoA tick is present and OFF, and the
+    // group subtotal 9,00,000 (which lives only on a tree header) is NOT shown yet.
+    const tick = await screen.findByLabelText(/Chart of Accounts view/);
+    expect(tick).not.toBeChecked();
+    expect(screen.queryByText(/9,00,000/)).not.toBeInTheDocument();
+    // Tick on → the CoA tree renders, fully expanded: the group SUBTOTAL header now shows 9,00,000…
+    fireEvent.click(tick);
+    expect(await screen.findByText(/9,00,000/)).toBeInTheDocument();
+    // …leaf ledgers still render under their group, with the ERP module drill intact…
+    expect(screen.getByText('HDFC Bank A/c')).toBeInTheDocument();
+    expect(screen.getByText('Commission A/c')).toBeInTheDocument();
+    expect(screen.getByText(/modules \(ERP split\)/)).toBeInTheDocument();
+    // …and the choice is remembered per user.
+    expect(window.localStorage.getItem('tally.coaView')).toBe('1');
+  });
+
   test('name/group mismatch drives the "fix in Tally" workflow (rename hint, badge, KPI, punch-list filter)', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({
@@ -184,7 +219,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     // it still blocks) — never a green "Tied" on a row that needs a Tally correction.
     expect(screen.getAllByText('Fix in Tally').length).toBeGreaterThanOrEqual(2);
     // The punch-list filter hides the fully-tied Salary row, keeping the one to fix.
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByLabelText(/Show only items to fix/));
     await waitFor(() => expect(screen.queryByText('Salary Payable')).not.toBeInTheDocument());
     expect(screen.getByText('Professional Tax [M] [BOM]')).toBeInTheDocument();
   });

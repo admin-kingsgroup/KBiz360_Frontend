@@ -152,6 +152,10 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const [parsing, setParsing] = useState('');    // 'tb' | 'db' while a file parses
   const [drill, setDrill] = useState(null); // off ledger being drilled (Phase 2)
   const [onlyFixes, setOnlyFixes] = useState(false); // filter to the "fix in Tally" punch-list
+  // "Chart of Accounts view" — render the TB tie-out as the ERP CoA tree (group ▸ sub-group
+  // ▸ ledger with subtotals). Opt-in, remembered per user; default = flat Tally-order table.
+  const [coaView, setCoaView] = useState(() => { try { return localStorage.getItem('tally.coaView') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('tally.coaView', coaView ? '1' : '0'); } catch { /* private mode */ } }, [coaView]);
   const [modOpen, setModOpen] = useState({});  // ledgerKey → expanded (module drill)
   const [modData, setModData] = useState({});  // ledgerKey → { loading, rows, error }
 
@@ -349,6 +353,77 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const empty = !isLoading && !isError && rows.length === 0;
   const title = tier === 'year' ? 'Yearly Tie-Out' : 'Monthly Tie-Out';
 
+  // ── Shared leaf-ledger row — used by BOTH the flat table and the CoA tree, so the
+  // module drill, rename/regroup hints and drill-on-click behave identically in both. ──
+  const renderLedgerRow = (r, keyStr, indent = 16) => {
+    const fixNeeded = r.needsRename || r.needsRegroup;
+    const meta = (fixNeeded && r.status === 'tied') ? { tone: 'warning', label: 'Fix in Tally' } : statusMeta(r.status);
+    const off = r.status !== 'tied' && !r.synthetic;
+    const acc = r.status === 'accepted';
+    const drill = () => setDrill(r);
+    const canModule = r.statement === 'PL' && r.erp != null && !r.synthetic && MODULE_HEADS.has(r.parentGroup) && r.hasModules;
+    const mKey = modKey(r); const mShown = canModule && modOpen[mKey]; const mInfo = modData[mKey];
+    return (
+      <React.Fragment key={keyStr}>
+        <tr
+          onClick={off ? drill : undefined}
+          onKeyDown={off ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); drill(); } } : undefined}
+          role={off ? 'button' : undefined} tabIndex={off ? 0 : undefined}
+          aria-label={off ? `Drill ${r.ledger} vouchers` : undefined}
+          className={`border-b border-surface-border ${off ? 'cursor-pointer hover:bg-accent-soft focus:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-accent' : 'hover:bg-surface-alt/60'}`}>
+          <td className="px-4 py-2" style={{ paddingLeft: indent }}><span className="block font-semibold text-ink">{r.ledger}
+            {r.nameMatch === true ? <span className="ml-1 align-middle text-success" title="Tally name matches ERP">✓</span> : null}
+            {r.interBranch ? <span className="ml-1.5 align-middle rounded-full bg-info/10 px-1.5 text-[10px] font-semibold text-info">IB</span> : null}</span>
+            {r.code ? <span className="font-mono text-xs text-ink-subtle">{r.code}</span> : null}
+            {r.nameMatch === false ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="Rename this ledger in Tally to match ERP">✎ Tally: “{r.tallyLedger}” → rename to “{r.erpLedger}”</span> : null}
+            {r.groupMatch === false ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="Regroup this ledger in Tally to match ERP">⚠ Group in Tally: “{r.tallyGroup}” → should be “{r.parentGroup}”</span> : null}
+            {r.suggest ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info" title="Closest ERP ledger — if it's the same account, rename it in Tally to match">Did you mean ERP “{r.suggest.ledger}”? — rename in Tally to match</span> : null}
+            {acc ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info">✓ accepted · {reasonLabel(r.acceptedReason)}
+              {r.acceptanceStale ? <span className="ml-1 rounded-full bg-warning/15 px-1.5 font-bold text-warning" title={`Accepted for ${fmt(r.acceptedAmount, cur)}, now ${fmt(r.diff, cur)} — re-review`}>⚠ changed</span> : null}</span>
+              : off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}
+            {canModule ? <button type="button" onClick={(e) => { e.stopPropagation(); toggleModules(r); }} className="mt-0.5 block text-[10.5px] font-semibold text-accent hover:underline" title="ERP cost-centre split (Flight/Hotel/Holiday/Visa…). Tally has no cost-centre axis, so this is ERP-only.">{mShown ? '▾' : '▸'} modules (ERP split)</button> : null}</td>
+          <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plErp) : r.erp === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plErp, cur) : fmt(r.erp, cur)}</td>
+          <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plTally) : r.tally === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plTally, cur) : fmt(r.tally, cur)}</td>
+          <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${r.diff === 0 ? 'text-ink-subtle' : acc ? 'text-info' : 'text-danger'}`} title={r.diff > 0 ? 'ERP higher' : r.diff < 0 ? 'Tally higher' : ''}>{r.diff === 0 ? '0' : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(localeOf(cur))}`}</td>
+          <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
+        </tr>
+        {mShown ? (mInfo?.loading
+          ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-ink-subtle">Loading module split…</td></tr>
+          : mInfo?.error
+            ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-danger">Couldn’t load the module split.</td></tr>
+            : (mInfo?.rows || []).length === 0
+              ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-ink-subtle">No cost-centre split on this ledger.</td></tr>
+              : mInfo.rows.map((mr, i) => (
+                <tr key={mKey + ':mod:' + i} className="border-b border-surface-border/40 bg-surface-alt/30">
+                  <td className="px-4 py-1 pl-10 text-[11.5px] text-ink-muted">↳ {mr.module}</td>
+                  <td className="px-4 py-1 text-right font-mono tabular-nums text-[11.5px] text-ink-muted">{fmt(mr.erp, cur)}</td>
+                  <td className="px-4 py-1 text-right text-[11px] text-ink-subtle" title="A Tally trial balance has no cost-centre axis — this split is ERP-only.">— ⓘ</td>
+                  <td className="px-4 py-1" />
+                  <td className="px-4 py-1" />
+                </tr>
+              ))) : null}
+      </React.Fragment>
+    );
+  };
+
+  // ── CoA tree: group/sub-group SUBTOTAL rows (Σ ERP · Σ Tally · diff · tie badge) with
+  // their leaf ledgers beneath, fully expanded and indented by depth. ──
+  const renderTreeNodes = (nodes, depth = 0) => (nodes || []).map((n) => (
+    <React.Fragment key={'coa|' + depth + '|' + (n.id || n.name)}>
+      <tr className={`border-b border-surface-border ${depth === 0 ? 'bg-navy' : 'bg-surface-alt/60'}`}>
+        <td className={`py-1.5 pr-4 font-bold ${depth === 0 ? 'text-[11px] uppercase tracking-wider text-white' : 'text-[12px] text-ink'}`} style={{ paddingLeft: 16 + depth * 16 }}>{depth > 0 ? '▸ ' : ''}{n.name}</td>
+        <td className={`px-4 py-1.5 text-right font-mono tabular-nums font-semibold ${depth === 0 ? 'text-white' : 'text-ink'}`}>{fmt(n.erp, cur)}</td>
+        <td className={`px-4 py-1.5 text-right font-mono tabular-nums font-semibold ${depth === 0 ? 'text-white' : 'text-ink'}`}>{fmt(n.tally, cur)}</td>
+        <td className={`px-4 py-1.5 text-right font-mono tabular-nums font-semibold ${n.diff === 0 ? (depth === 0 ? 'text-white/70' : 'text-ink-subtle') : 'text-danger'}`}>{n.diff === 0 ? '0' : `${n.diff > 0 ? '+' : '−'}${Math.abs(n.diff).toLocaleString(localeOf(cur))}`}</td>
+        <td className="px-4 py-1.5 text-right"><Badge tone={n.status === 'tied' ? 'success' : 'danger'} size="sm" dot>{n.status === 'tied' ? 'Tied' : 'Off'}</Badge></td>
+      </tr>
+      {(n.rows || []).map((r) => renderLedgerRow(r, 'coa|' + (n.id || n.name) + '|' + (r.code || r.ledger), 16 + (depth + 1) * 16))}
+      {renderTreeNodes(n.children, depth + 1)}
+    </React.Fragment>
+  ));
+
+  const showTree = coaView && tab === 'tb' && Array.isArray(data?.tree) && data.tree.length > 0;
+
   // Direct-URL guard: a non-central role gets the rule, not the working board.
   if (!central) {
     return (
@@ -536,11 +611,23 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         )}
         {!isLoading && !empty && (
           <>
-          {blocking > 0 && (
-            <label className="mb-3 inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted">
-              <input type="checkbox" checked={onlyFixes} onChange={(e) => setOnlyFixes(e.target.checked)} className="accent-accent" />
-              Show only items to fix in Tally <span className="rounded-full bg-warning/15 px-1.5 font-bold text-warning">{blocking}</span>
-            </label>
+          {(tab === 'tb' || blocking > 0) && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {/* CoA view — TB tab only (BS/P&L are already tree-shaped). Remembered per user. */}
+              {tab === 'tb' && (
+                <label className="inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted"
+                  title="Show the ERP-live vs Tally trial balance arranged as your ERP Chart of Accounts — group ▸ sub-group ▸ ledger with running subtotals, fully expanded.">
+                  <input type="checkbox" checked={coaView} onChange={(e) => setCoaView(e.target.checked)} className="accent-accent" />
+                  Chart of Accounts view
+                </label>
+              )}
+              {blocking > 0 && !showTree && (
+                <label className="inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted">
+                  <input type="checkbox" checked={onlyFixes} onChange={(e) => setOnlyFixes(e.target.checked)} className="accent-accent" />
+                  Show only items to fix in Tally <span className="rounded-full bg-warning/15 px-1.5 font-bold text-warning">{blocking}</span>
+                </label>
+              )}
+            </div>
           )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm" style={{ minWidth: 720 }}>
@@ -554,7 +641,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                 </tr>
               </thead>
               <tbody>
-                {viewSections.map((sec) => (
+                {showTree ? renderTreeNodes(data.tree, 0) : viewSections.map((sec) => (
                   <React.Fragment key={sec.label || 'all'}>
                     {sec.label && <tr><td colSpan={5} className="bg-surface-alt px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">{sec.label}</td></tr>}
                     {byParent(sec.rows).map((g) => (
@@ -563,63 +650,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                         {bySubGroup(g.items).map((sg) => (
                           <React.Fragment key={(sec.label || '') + g.parent + '|' + sg.sub}>
                             {sg.sub ? <tr><td colSpan={5} className="bg-surface-alt/70 px-4 py-1 pl-8 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">▸ {sg.sub}</td></tr> : null}
-                            {sg.rows.map((r) => {
-                          // A row whose amount ties but whose Tally NAME or GROUP still
-                          // differs from ERP shows an amber "Fix in Tally" (it blocks the
-                          // close) instead of a green "Tied".
-                          const fixNeeded = r.needsRename || r.needsRegroup;
-                          const meta = (fixNeeded && r.status === 'tied') ? { tone: 'warning', label: 'Fix in Tally' } : statusMeta(r.status);
-                          const off = r.status !== 'tied' && !r.synthetic; // the injected P&L Net-Profit row isn't a real ledger to drill
-                          const acc = r.status === 'accepted';
-                          const drill = () => setDrill(r);
-                          const canModule = r.statement === 'PL' && r.erp != null && !r.synthetic && MODULE_HEADS.has(r.parentGroup) && r.hasModules;
-                          const mKey = modKey(r); const mShown = canModule && modOpen[mKey]; const mInfo = modData[mKey];
-                          return (
-                            <React.Fragment key={`${sec.label || ''}|${g.parent}|${r.code || r.ledger}`}>
-                            <tr
-                              onClick={off ? drill : undefined}
-                              onKeyDown={off ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); drill(); } } : undefined}
-                              role={off ? 'button' : undefined} tabIndex={off ? 0 : undefined}
-                              aria-label={off ? `Drill ${r.ledger} vouchers` : undefined}
-                              className={`border-b border-surface-border ${off ? 'cursor-pointer hover:bg-accent-soft focus:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-accent' : 'hover:bg-surface-alt/60'}`}>
-                              <td className="px-4 py-2"><span className="block font-semibold text-ink">{r.ledger}
-                                {/* green tick when the Tally name matches ERP exactly */}
-                                {r.nameMatch === true ? <span className="ml-1 align-middle text-success" title="Tally name matches ERP">✓</span> : null}
-                                {r.interBranch ? <span className="ml-1.5 align-middle rounded-full bg-info/10 px-1.5 text-[10px] font-semibold text-info">IB</span> : null}</span>
-                                {r.code ? <span className="font-mono text-xs text-ink-subtle">{r.code}</span> : null}
-                                {/* name differs → the exact rename to make in Tally */}
-                                {r.nameMatch === false ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="Rename this ledger in Tally to match ERP">✎ Tally: “{r.tallyLedger}” → rename to “{r.erpLedger}”</span> : null}
-                                {/* group differs → the ERP group it should sit under */}
-                                {r.groupMatch === false ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="Regroup this ledger in Tally to match ERP">⚠ Group in Tally: “{r.tallyGroup}” → should be “{r.parentGroup}”</span> : null}
-                                {/* only-in-Tally with a close ERP match → did-you-mean hint */}
-                                {r.suggest ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info" title="Closest ERP ledger — if it's the same account, rename it in Tally to match">Did you mean ERP “{r.suggest.ledger}”? — rename in Tally to match</span> : null}
-                                {acc ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info">✓ accepted · {reasonLabel(r.acceptedReason)}
-                                  {r.acceptanceStale ? <span className="ml-1 rounded-full bg-warning/15 px-1.5 font-bold text-warning" title={`Accepted for ${fmt(r.acceptedAmount, cur)}, now ${fmt(r.diff, cur)} — re-review`}>⚠ changed</span> : null}</span>
-                                  : off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}
-                                {canModule ? <button type="button" onClick={(e) => { e.stopPropagation(); toggleModules(r); }} className="mt-0.5 block text-[10.5px] font-semibold text-accent hover:underline" title="ERP cost-centre split (Flight/Hotel/Holiday/Visa…). Tally has no cost-centre axis, so this is ERP-only.">{mShown ? '▾' : '▸'} modules (ERP split)</button> : null}</td>
-                              <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plErp) : r.erp === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plErp, cur) : fmt(r.erp, cur)}</td>
-                              <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plTally) : r.tally === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plTally, cur) : fmt(r.tally, cur)}</td>
-                              <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${r.diff === 0 ? 'text-ink-subtle' : acc ? 'text-info' : 'text-danger'}`} title={r.diff > 0 ? 'ERP higher' : r.diff < 0 ? 'Tally higher' : ''}>{r.diff === 0 ? '0' : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(localeOf(cur))}`}</td>
-                              <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
-                            </tr>
-                            {mShown ? (mInfo?.loading
-                              ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-ink-subtle">Loading module split…</td></tr>
-                              : mInfo?.error
-                                ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-danger">Couldn’t load the module split.</td></tr>
-                                : (mInfo?.rows || []).length === 0
-                                  ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-ink-subtle">No cost-centre split on this ledger.</td></tr>
-                                  : mInfo.rows.map((mr, i) => (
-                                    <tr key={mKey + ':mod:' + i} className="border-b border-surface-border/40 bg-surface-alt/30">
-                                      <td className="px-4 py-1 pl-10 text-[11.5px] text-ink-muted">↳ {mr.module}</td>
-                                      <td className="px-4 py-1 text-right font-mono tabular-nums text-[11.5px] text-ink-muted">{fmt(mr.erp, cur)}</td>
-                                      <td className="px-4 py-1 text-right text-[11px] text-ink-subtle" title="A Tally trial balance has no cost-centre axis — this split is ERP-only.">— ⓘ</td>
-                                      <td className="px-4 py-1" />
-                                      <td className="px-4 py-1" />
-                                    </tr>
-                                  ))) : null}
-                            </React.Fragment>
-                          );
-                            })}
+                            {sg.rows.map((r) => renderLedgerRow(r, `${sec.label || ''}|${g.parent}|${r.code || r.ledger}`))}
                           </React.Fragment>
                         ))}
                       </React.Fragment>
