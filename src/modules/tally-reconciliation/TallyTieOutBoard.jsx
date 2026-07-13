@@ -209,6 +209,9 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // single "must fix in Tally before sign-off" tally = amount gaps + name/group fixes.
   const fixTotal = counts.fixTotal ?? ((counts.nameMismatch || 0) + (counts.groupMismatch || 0));
   const blocking = counts.blocking ?? (offTotal + fixTotal);
+  // Once nothing's left to fix (a corrected re-upload cleared the punch-list), drop the
+  // filter so the board never sits on an empty view with its toggle already hidden.
+  useEffect(() => { if (!blocking && onlyFixes) setOnlyFixes(false); }, [blocking, onlyFixes]);
 
   // Defect Register — lazily loaded (the per-off-ledger voucher scan is heavier).
   const { data: defectsData, isLoading: defectsLoading, isError: defectsError, refetch: refetchDefects } = useQuery({
@@ -295,9 +298,9 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // The "fix in Tally" punch-list view: keep only rows the reviewer must act on
   // (amount off, one-sided, or a name/group that still differs from ERP). The FOOTER
   // totals stay on the full `sections` so a filtered view never distorts the balance.
-  const viewSections = useMemo(() => (onlyFixes
+  const viewSections = useMemo(() => ((onlyFixes && blocking > 0)
     ? sections.map((s) => ({ ...s, rows: s.rows.filter((r) => r.blocking) })).filter((s) => s.rows.length)
-    : sections), [sections, onlyFixes]);
+    : sections), [sections, onlyFixes, blocking]);
 
   const foot = useMemo(() => {
     // TB self-balances per side (Dr = Cr). Carry the actual boolean (true / false /

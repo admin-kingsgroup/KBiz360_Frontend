@@ -46,12 +46,15 @@ export function TallyReconReport({ branch: appBranch, currentUser, tier: fixedTi
       if (it.ledgers > 0 && st !== 'locked') pending.push(it);
       if (it.cert) certs.push(it);
       const off = snap ? Number(snap.offTotal || 0) : 0;
+      const fix = snap ? Number(snap.fixTotal || 0) : 0; // name/group corrections owed in Tally
       const stale = snap ? Number(snap.staleAccepted || 0) : 0;
       // Blockers to certifying (never a locked period — it's done): no cert started,
-      // a re-opened/not-tied period with uploaded ledgers, or a frozen-but-dirty snap.
-      if (st !== 'locked' && ((it.ledgers > 0 && (st === 'none' || st === 'open')) || off > 0 || stale > 0)) {
+      // a re-opened/not-tied period with uploaded ledgers, a frozen-but-dirty snap, or
+      // Tally ledger names/groups that still differ from ERP (blocks sign-off).
+      if (st !== 'locked' && ((it.ledgers > 0 && (st === 'none' || st === 'open')) || off > 0 || fix > 0 || stale > 0)) {
         openItems.push({ ...it, reason: st === 'none' ? 'TB uploaded — no certificate started'
           : off > 0 ? `${off} ledger(s) off at freeze`
+          : fix > 0 ? `${fix} name/group fix(es) owed in Tally`
           : stale > 0 ? `${stale} accepted variance(s) changed`
           : 'not tied — clear the off ledgers' });
       }

@@ -468,6 +468,17 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     expect(await screen.findByText(/not tied — clear the off ledgers/)).toBeInTheDocument();
   });
 
+  test('Report Open Items surfaces pending Tally name/group fixes (fixTotal blocker)', async () => {
+    const { getRegister } = require('../api');
+    getRegister.mockResolvedValueOnce([
+      // Frozen but not clean: amounts tie (offTotal 0) yet 2 Tally names/groups still
+      // differ from ERP → an Open Item with the name/group reason (blocks certifying).
+      { period: '2026-05', tier: 'month', ledgers: 40, cert: { status: 'open', signatures: [], snapshot: { offTotal: 0, fixTotal: 2, staleAccepted: 0, frozenAt: '2026-05-31' }, reopened: 0 } },
+    ]);
+    wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
+    expect(await screen.findByText(/2 name\/group fix\(es\) owed in Tally/)).toBeInTheDocument();
+  });
+
   test('every /tally-reconciliation certification + reports href resolves to a route', () => {
     const paths = tallyReconRoutes.map((r) => r.path);
     ['/tally-reconciliation/certification/monthly', '/tally-reconciliation/certification/yearly',
