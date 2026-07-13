@@ -25,6 +25,7 @@ jest.mock('../api', () => ({
     summary: { total: 1, byType: { 'missing-in-erp': 1 } },
     defects: [{ ledger: 'HDFC Bank A/c', date: '2026-07-09', ref: '', desc: 'Bank charge', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: -5000, variance: 0, side: 'tally' }],
   })),
+  getModuleBreakdown: jest.fn(() => Promise.resolve({ rows: [] })),
   getTallyCert: jest.fn(() => Promise.resolve({
     certificate: null,
     chain: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
@@ -125,6 +126,40 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('Air Ticket Purchase')).toBeInTheDocument();
     // The Bank ledger belongs to the Balance Sheet, not the P&L view.
     expect(screen.queryByText('HDFC Bank A/c')).not.toBeInTheDocument();
+  });
+
+  test('chart sub-group nesting + the ERP module drill (toggle ONLY where a real split exists)', async () => {
+    const { getTieOut, getModuleBreakdown } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 4, tied: 4, off: 0, onlyErp: 0, onlyTally: 0, offTotal: 0, netProfitErp: 60500, netProfitTally: 60500 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 4 },
+      rows: [
+        { ledger: 'TRIP JACK Pvt Ltd', code: 'C1', group: 'Sundry Creditors', subGroup: 'Supplier B2B', parentGroup: 'Sundry Creditors', statement: 'BS', nature: 'liability', erp: -1000, tally: -1000, diff: 0, status: 'tied' },
+        { ledger: 'Iconic Signage', code: 'C2', group: 'Sundry Creditors', subGroup: 'Supplier Others', parentGroup: 'Sundry Creditors', statement: 'BS', nature: 'liability', erp: -500, tally: -500, diff: 0, status: 'tied' },
+        // A trading ledger WITH a real multi-module split → gets the drill toggle.
+        { ledger: 'Commission A/c', code: 'S1', group: 'Direct Income', subGroup: 'Commission', parentGroup: 'Direct Income', statement: 'PL', nature: 'income', erp: -60000, tally: -60000, diff: 0, status: 'tied', hasModules: true },
+        // A trading ledger with NO real split → NO toggle (the hasModules gate).
+        { ledger: 'Discount Received', code: 'S2', group: 'Direct Income', subGroup: 'Other Operating Income', parentGroup: 'Direct Income', statement: 'PL', nature: 'income', erp: -500, tally: -500, diff: 0, status: 'tied', hasModules: false },
+      ],
+    });
+    getModuleBreakdown.mockResolvedValueOnce({ rows: [
+      { module: 'International Flights', costCenter: 'FLT-INT', erp: -40000 },
+      { module: 'Hotel', costCenter: 'HOT', erp: -20000 },
+    ] });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // Chart sub-group sub-headers nest under the primary head (mirrors the ERP CoA).
+    expect(await screen.findByText(/Supplier B2B/)).toBeInTheDocument();
+    expect(screen.getByText(/Supplier Others/)).toBeInTheDocument();
+    expect(screen.getByText(/Other Operating Income/)).toBeInTheDocument();   // Direct Income ▸ sub-group
+    // The module-drill toggle appears ONLY on the row flagged with a real split.
+    const toggles = screen.getAllByText(/modules \(ERP split\)/);
+    expect(toggles).toHaveLength(1);                                          // Commission only, NOT Discount Received
+    // Clicking it fetches + shows the ERP cost-centre split, scoped to that ledger.
+    fireEvent.click(toggles[0]);
+    expect(await screen.findByText(/International Flights/)).toBeInTheDocument();
+    expect(screen.getByText(/Hotel/)).toBeInTheDocument();
+    expect(getModuleBreakdown).toHaveBeenCalledWith(expect.objectContaining({ ledger: 'Commission A/c' }));
   });
 
   test('name/group mismatch drives the "fix in Tally" workflow (rename hint, badge, KPI, punch-list filter)', async () => {
