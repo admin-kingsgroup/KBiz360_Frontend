@@ -844,7 +844,14 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
             </button>
           ))}
         </div>
-        <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data.offLedgers} off ledgers</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {data.pairedRenames > 0 && (
+            <span className="rounded-full bg-info/10 px-3 py-1 text-xs font-semibold text-info" title="Ledgers renamed between ERP and Tally — each pair (ERP name absent in Tally + Tally name absent in ERP) is one account, collapsed to a single row instead of two.">
+              {data.pairedRenames} rename pair{data.pairedRenames === 1 ? '' : 's'} collapsed
+            </span>
+          )}
+          <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data.offLedgers} off ledgers</span>
+        </div>
       </div>
       {/* Type toggle chips */}
       <div className="flex flex-wrap items-center gap-2">
@@ -869,20 +876,70 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
       {filtered && (
         <div className="text-xs font-semibold text-ink-subtle">Showing {visible.length} of {defects.length} defects</div>
       )}
+      {/* Two stacked panels — master (ledger-level) and voucher (transaction-level)
+          defects are DIFFERENT problems with different fixes, so they never share one
+          flat table. Under "All" both render, master FIRST because it's the root cause:
+          an absent/renamed ledger turns all its postings into voucher mismatches, so
+          clearing the master usually clears those on the same ledger too. Selecting a
+          tier shows only that panel; a chip filter can empty a panel (its own empty row). */}
+      {(() => {
+        const master = visible.filter((d) => defectMeta(d.type).tier === 'master');
+        const voucher = visible.filter((d) => defectMeta(d.type).tier === 'voucher');
+        const showMaster = (tier === 'all' || tier === 'master') && (master.length > 0 || tier === 'master');
+        const showVoucher = (tier === 'all' || tier === 'voucher') && (voucher.length > 0 || tier === 'voucher');
+        if (!showMaster && !showVoucher) {
+          return (
+            <div className="rounded-brand border border-dashed border-surface-border px-4 py-8 text-center text-sm text-ink-subtle">
+              No defects match this filter. <button type="button" onClick={clearFilters} className="font-semibold text-accent underline underline-offset-2">Clear</button>
+            </div>
+          );
+        }
+        return (
+          <div className="grid gap-4">
+            {showMaster && <DefectPanel kind="master" rows={master} cur={cur} onDrill={onDrill} onClear={clearFilters} />}
+            {showVoucher && <DefectPanel kind="voucher" rows={voucher} cur={cur} onDrill={onDrill} onClear={clearFilters} />}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// One stacked panel of the Defect Register — master (ledger-level) OR voucher
+// (transaction-level). Each shows only the columns that make sense for its kind:
+// a master defect has no single offending voucher (the WHOLE ledger is absent /
+// renamed), so its middle column is the *reason*; a voucher defect names the
+// voucher's date · ref. Rows drill to the same voucher drawer on click.
+function DefectPanel({ kind, rows, cur, onDrill, onClear }) {
+  const master = kind === 'master';
+  return (
+    <section className="overflow-hidden rounded-brand border border-surface-border bg-surface shadow-card">
+      <header className="border-b border-surface-border bg-surface-alt/60 px-4 py-3">
+        <h4 className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
+          {master ? 'Master defects' : 'Voucher defects'}
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">· {master ? 'ledger-level' : 'transaction-level'}</span>
+          <span className="rounded-full bg-surface-alt px-2 text-xs font-bold tabular-nums text-ink-muted">{rows.length}</span>
+        </h4>
+        <p className="mt-0.5 text-xs text-ink-muted">
+          {master
+            ? 'The whole ledger is missing or named differently on one side. Fix in Tally — create / rename / regroup — then re-upload. Clearing these usually clears the voucher mismatches on the same ledger too.'
+            : 'Individual voucher legs that don’t tie. Fix the specific voucher in ERP or Tally.'}
+        </p>
+      </header>
       <div className="overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: 640 }}>
           <thead>
             <tr className="border-b border-surface-border text-xs uppercase tracking-wider text-ink-subtle">
               <th className="px-4 py-2 text-left font-bold">Ledger</th>
-              <th className="px-4 py-2 text-left font-bold">Voucher</th>
+              <th className="px-4 py-2 text-left font-bold">{master ? 'Reason' : 'Voucher'}</th>
               <th className="px-4 py-2 text-right font-bold">Amount</th>
               <th className="px-4 py-2 text-right font-bold">Defect</th>
             </tr>
           </thead>
           <tbody>
-            {visible.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-ink-subtle">No defects match this filter. <button type="button" onClick={clearFilters} className="font-semibold text-accent underline underline-offset-2">Clear</button></td></tr>
-            ) : visible.map((d, i) => {
+            {rows.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-ink-subtle">No {master ? 'master' : 'voucher'} defects match this filter. <button type="button" onClick={onClear} className="font-semibold text-accent underline underline-offset-2">Clear</button></td></tr>
+            ) : rows.map((d, i) => {
               const m = defectMeta(d.type);
               return (
                 <tr key={i} onClick={() => onDrill({ ledger: d.ledger })}
@@ -890,8 +947,16 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
                   role="button" tabIndex={0} aria-label={`Drill ${d.ledger} vouchers`}
                   className="cursor-pointer border-b border-surface-border hover:bg-accent-soft focus:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-accent">
                   <td className="px-4 py-2 font-semibold text-ink">{d.ledger}</td>
-                  <td className="px-4 py-2"><span className="block text-ink">{d.desc || '—'}</span>
-                    <span className="font-mono text-xs text-ink-subtle">{[d.date, d.ref].filter(Boolean).join(' · ') || '—'}</span></td>
+                  {master ? (
+                    <td className="px-4 py-2 text-ink-muted">
+                      <span className="block">{d.desc || '—'}</span>
+                      {d.suggest ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info" title="Closest unmatched Tally ledger — if it's the same account, rename it in Tally to match ERP (counted once, not twice)">Did you mean Tally “{d.suggest.ledger}”? — rename it in Tally to match ERP</span> : null}
+                      {d.strandedCount ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="ERP postings on this ledger with no Tally counterpart — they'll reconcile once this ledger exists in Tally">{d.strandedCount} ERP {d.strandedCount === 1 ? 'entry has' : 'entries have'} no Tally match</span> : null}
+                    </td>
+                  ) : (
+                    <td className="px-4 py-2"><span className="block text-ink">{d.desc || '—'}</span>
+                      <span className="font-mono text-xs text-ink-subtle">{[d.date, d.ref].filter(Boolean).join(' · ') || '—'}</span></td>
+                  )}
                   <td className="px-4 py-2 text-right font-mono tabular-nums">{fmt(d.amount, cur)}</td>
                   <td className="px-4 py-2 text-right"><Badge tone={m.tone} size="sm" dot>{m.label}</Badge></td>
                 </tr>
@@ -900,7 +965,7 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }
 

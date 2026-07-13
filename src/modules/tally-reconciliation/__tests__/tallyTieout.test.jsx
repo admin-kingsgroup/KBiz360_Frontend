@@ -360,6 +360,52 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText(/Showing \d+ of \d+ defects/)).not.toBeInTheDocument();
   });
 
+  test('Defect Register — master and voucher defects render as two separate stacked panels', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 5,
+      summary: { total: 3, byType: { 'missing-in-tally': 1, 'ledger-missing-tally': 1, 'amount-mismatch': 1 } },
+      defects: [
+        { ledger: 'Alpha Ledger', date: '2026-07-01', ref: 'V1', desc: 'only in erp', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 100, variance: 0, side: 'erp' },
+        { ledger: 'Gamma Master', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 300, variance: 300, side: 'balance' },
+        { ledger: 'Zeta Ledger', date: '2026-07-03', ref: 'V3', desc: 'amount off', type: 'amount-mismatch', label: 'Amount differs', amount: 50, variance: 10, side: 'both' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    // Under "All" both panels render, each with its own header — never one merged list.
+    expect(await screen.findByText('Master defects')).toBeInTheDocument();
+    expect(screen.getByText('Voucher defects')).toBeInTheDocument();
+    // The ledger-level defect lives under the master panel; the two posting defects under voucher.
+    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
+    expect(screen.getByText('Zeta Ledger')).toBeInTheDocument();
+    // Selecting the Voucher tier drops the master panel entirely.
+    fireEvent.click(screen.getByRole('button', { name: /Voucher mismatches/ }));
+    expect(screen.queryByText('Master defects')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gamma Master')).not.toBeInTheDocument();
+    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
+  });
+
+  test('Defect Register — master panel shows the rename hint, stranded count and the collapsed-pairs badge', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 4, pairedRenames: 1,
+      summary: { total: 2, byType: { 'ledger-missing-tally': 2 } },
+      defects: [
+        { ledger: 'Round Off', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 0.1, variance: 0.1, side: 'balance', suggest: { ledger: 'Rounded Off', code: '', score: 0.88, side: 'tally' } },
+        { ledger: 'Consultancy Fees', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 5000, variance: 5000, side: 'balance', strandedCount: 7 },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    expect(await screen.findByText(/Did you mean Tally “Rounded Off”/)).toBeInTheDocument(); // fuzzy rename hint
+    expect(screen.getByText(/7 ERP entries have no Tally match/)).toBeInTheDocument();       // stranded-entry blast radius
+    expect(screen.getByText(/1 rename pair collapsed/)).toBeInTheDocument();                 // de-dup badge
+  });
+
   test('clicking an off ledger opens the voucher drill drawer (Phase 2)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     fireEvent.click(await screen.findByText('HDFC Bank A/c')); // an off ledger row
