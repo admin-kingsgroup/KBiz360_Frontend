@@ -124,6 +124,8 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // One box filters the visible list (every view) by Vch No, party, type, entered-by,
   // narration, any posting ledger, or amount. Order is newest-date-first throughout.
   const [search, setSearch] = useState('');
+  const [onlyFlagged, setOnlyFlagged] = useState(false); // "needs fixing" filter — show only un-approvable pending vouchers
+  React.useEffect(() => { setOnlyFlagged(false); }, [status]); // reset when leaving the Pending tab
   const needle = search.trim().toLowerCase();
   const matchEntry = (e) => {
     if (!needle) return true;
@@ -136,7 +138,13 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
     ].filter(Boolean).join(' ').toLowerCase();
     return hay.includes(needle);
   };
-  const visibleEntries = useMemo(() => (needle ? entries.filter(matchEntry) : entries), [entries, needle]); // eslint-disable-line react-hooks/exhaustive-deps
+  const searchedEntries = useMemo(() => (needle ? entries.filter(matchEntry) : entries), [entries, needle]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Pending vouchers the verification gate blocks (postable=false) — e.g. an untagged
+  // Flight/Holiday needing International/Domestic. Count feeds the toolbar chip; the filter
+  // (when on) shows ONLY these so the team can clear the blocked list. Every view builds off
+  // visibleEntries, so this filters all of them (and select-all) at once.
+  const flaggedCount = status === 'pending' ? searchedEntries.filter((e) => !e.postable).length : 0;
+  const visibleEntries = useMemo(() => (status === 'pending' && onlyFlagged ? searchedEntries.filter((e) => !e.postable) : searchedEntries), [searchedEntries, onlyFlagged, status]);
   // Newest first: date desc, then Vch No desc (numeric-aware) as a stable tiebreak.
   const cmpLatest = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.vno || '').localeCompare(String(a.vno || ''), undefined, { numeric: true });
   // Edited tab: same search, ordered most-recently-edited first.
@@ -479,7 +487,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                     return (
                       <tr key={e.id} style={{ background: '#fff', borderTop: '1px solid #dfe2e7' }}>
                         <td style={{ ...flatTd, color: C.dim }}>{ckbox(e)}{fmtDate(e.date)}</td>
-                        <td {...clickable(() => setViewId(e.id))} title="View full voucher" style={{ ...flatTd, color: C.blue, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{e.vno}</td>
+                        <td {...clickable(() => setViewId(e.id))} title="View full voucher" style={{ ...flatTd, whiteSpace: 'normal', maxWidth: 260, overflow: 'visible', color: C.blue, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline', background: flagged.has(e.vno) ? '#FFF6D6' : undefined }}>{e.vno}{status === 'pending' && !e.postable && alertOf(e) ? <div style={{ marginTop: 2, fontSize: 10, fontWeight: 700, fontStyle: 'italic', color: C.red, textDecoration: 'none' }}>⚠ {alertOf(e)}</div> : null}</td>
                         <td style={flatTd} title={e.party}>{e.party || '—'}</td>
                         {hasSupplier && <td style={flatTd} title={e.counterParty}>{e.counterParty || '—'}</td>}
                         {heads.map((h) => {
@@ -553,6 +561,9 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
             {search && <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: C.dim, fontSize: 14, lineHeight: 1 }}>✕</button>}
           </div>
           {needle && <span style={{ fontSize: 11, color: C.dim, fontWeight: 700 }}>{(status === 'edited' ? visibleEdited.length : visibleEntries.length)} match{(status === 'edited' ? visibleEdited.length : visibleEntries.length) === 1 ? '' : 'es'}</span>}
+          {status === 'pending' && flaggedCount > 0 && (
+            <button onClick={() => setOnlyFlagged((v) => !v)} title="Show only vouchers that can’t be approved yet — they need a fix (e.g. tag International vs Domestic) before they can post" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 11px', fontSize: 11, fontWeight: 700, borderRadius: 6, cursor: 'pointer', border: '1px solid ' + (onlyFlagged ? '#b42318' : '#f0c2c2'), background: onlyFlagged ? '#b42318' : '#fdecec', color: onlyFlagged ? '#fff' : '#b42318' }}>⚠ {flaggedCount} need fixing{onlyFlagged ? ' · showing only these' : ''}</button>
+          )}
         </div>
         {status !== 'edited' && <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: '#fafbfe', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
@@ -626,7 +637,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                                         <td style={{ padding: '5px 8px', color: C.dim, whiteSpace: 'nowrap', borderBottom: '1px solid #dfe2e7' }}>{VCH[e.category] || e.type}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.blue, borderBottom: '1px solid #dfe2e7', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.drLedger}>{x.drLedger}</td>
                                         <td style={{ padding: '5px 8px', fontWeight: 600, color: C.red, borderBottom: '1px solid #dfe2e7', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.crLedger}>{x.crLedger}</td>
-                                        <td style={{ padding: '5px 8px', color: e.error ? C.red : C.dim, fontStyle: 'italic', borderBottom: '1px solid #dfe2e7', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.error || e.narration || e.legNarration || ''}>{e.error ? `⚠ ${e.error}` : (e.narration || e.legNarration || '—')}{e.rejectedReason ? ` · ✗ ${e.rejectedReason}` : ''}</td>
+                                        <td style={{ padding: '5px 8px', color: alertOf(e) ? C.red : C.dim, fontStyle: 'italic', borderBottom: '1px solid #dfe2e7', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={alertOf(e) || e.narration || e.legNarration || ''}>{alertOf(e) ? `⚠ ${alertOf(e)}` : (e.narration || e.legNarration || '—')}{e.rejectedReason ? ` · ✗ ${e.rejectedReason}` : ''}</td>
                                         <td style={{ ...num, padding: '5px 8px', color: C.blue, borderBottom: '1px solid #dfe2e7' }}>{x.drAmt ? money(x.drAmt) : ''}</td>
                                         <td style={{ ...num, padding: '5px 8px', color: C.red, borderBottom: '1px solid #dfe2e7' }}>{x.crAmt ? money(x.crAmt) : ''}</td>
                                         <td style={{ padding: '5px 8px', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #dfe2e7' }}>

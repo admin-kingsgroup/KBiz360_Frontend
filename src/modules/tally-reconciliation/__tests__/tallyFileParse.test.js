@@ -50,6 +50,27 @@ describe('normalizeDayBook', () => {
     expect(error).toMatch(/No Day Book header/);
   });
 
+  test('an inline Dr/Cr suffix on the amount WINS over the column it sits in', () => {
+    // The real Tally "Day Book" display export: each amount cell carries its own
+    // "Cr"/"Dr" suffix, and the Debit/Credit headers are shifted so the credits land
+    // in the "Debit" column. The suffix is authoritative — a sales credit like
+    // "13300.00 Cr" must import as a CREDIT, not silently flip to a debit.
+    const matrix = [
+      ['Date', 'Particulars', 'Vch No', 'Debit', 'Credit'],
+      ['6-Dec-25', 'Travkings Tours and Travels FBM', 'DS/01', '15751.00', ''], // party debit (no suffix → column)
+      ['', 'DT-Base Fare', '', '13300.00 Cr', ''],   // credit sitting in the Debit column
+      ['', 'DT- Taxes', '', '1234.00 Cr', ''],
+      ['', 'Round Off', '', '0.01 Dr', ''],          // genuine debit, suffix agrees
+    ];
+    const { rows } = normalizeDayBook(matrix);
+    expect(rows).toEqual([
+      { date: '2025-12-06', vno: 'DS/01', ledger: 'Travkings Tours and Travels FBM', debit: 15751, credit: 0, narration: '' },
+      { date: '2025-12-06', vno: 'DS/01', ledger: 'DT-Base Fare', debit: 0, credit: 13300, narration: '' },
+      { date: '2025-12-06', vno: 'DS/01', ledger: 'DT- Taxes', debit: 0, credit: 1234, narration: '' },
+      { date: '2025-12-06', vno: 'DS/01', ledger: 'Round Off', debit: 0.01, credit: 0, narration: '' },
+    ]);
+  });
+
   test('columnar "To/By" contra legs keep the ledger (prefix stripped, not dropped)', () => {
     const matrix = [
       ['Date', 'Particulars', 'Vch No', 'Debit', 'Credit'],

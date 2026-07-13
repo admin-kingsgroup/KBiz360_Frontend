@@ -26,6 +26,19 @@ const num = (v) => {
   return n; // keep the raw sign
 };
 
+// The explicit Dr/Cr a Tally amount cell carries — 'cr' | 'dr' | '' (none). Same
+// detection num() uses, exposed so the Day Book can TRUST an inline suffix
+// ("13300.00 Cr") over the column an amount happens to sit in: a shifted / mislabelled
+// Debit/Credit header, or a single combined amount column, must never flip a credit
+// into a debit. A suffix-less number falls back to its column (below).
+const crDrSide = (v) => {
+  const raw = String(v ?? '');
+  const s = raw.replace(/USD|INR|KES|TZS/gi, '').replace(/[₹$,\s]/g, '');
+  if (/^\(.*\)$/.test(s) || /cr\.?$/i.test(s) || /\bcr\b/i.test(raw)) return 'cr';
+  if (/dr\.?$/i.test(s) || /\bdr\b/i.test(raw)) return 'dr';
+  return '';
+};
+
 /** '14/07/2026', '14-Jul-2026', '2026-07-14', '14.07.26' → 'YYYY-MM-DD' ('' if not a date). */
 export function toISODate(v) {
   const s = String(v ?? '').trim();
@@ -108,8 +121,19 @@ export function normalizeDayBook(matrix = []) {
     // rather than dropping the leg (which would unbalance the voucher).
     const ledger = String(r[cols.ledger] ?? '').trim().replace(/^(to|by)\s+/i, '');
     if (!ledger || /^(total|grand total|opening balance|closing balance)/i.test(ledger)) continue;
-    const debit = cols.debit !== undefined ? Math.abs(num(r[cols.debit]) || 0) : 0;
-    const credit = cols.credit !== undefined ? Math.abs(num(r[cols.credit]) || 0) : 0;
+    // Amount → Dr/Cr. A Tally Day Book cell usually carries its OWN "Dr"/"Cr" suffix
+    // ("13300.00 Cr"); when it does, that suffix is AUTHORITATIVE — a shifted or
+    // mislabelled Debit/Credit header, or a single combined amount column, must never
+    // flip a credit into a debit (the bug that read every DT-Base Fare sale as a Dr).
+    // Only a suffix-less number is bucketed by the column it sits in.
+    let debit = 0; let credit = 0;
+    for (const [ci, col] of [[cols.debit, 'debit'], [cols.credit, 'credit']]) {
+      if (ci === undefined) continue;
+      const mag = Math.abs(num(r[ci]) || 0);
+      if (!mag) continue;
+      const side = crDrSide(r[ci]);
+      if (side ? side === 'cr' : col === 'credit') credit += mag; else debit += mag;
+    }
     if (!debit && !credit) continue; // a subtotal / narration-only line
     if (!curDate) continue;          // a leg with no voucher date yet — skip noise
     rows.push({ date: curDate, vno: curVno, ledger, debit, credit, narration: cols.narration !== undefined ? String(r[cols.narration] ?? '').trim() : '' });

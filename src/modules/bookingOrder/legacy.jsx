@@ -556,9 +556,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const interBranchParty = !interBranch && (
     IB_NAME.test(customer.name || '') || IB_NAME.test(customer.ledgerName || '')
     || IB_GROUP.test(customer.ledgerGroup || '') || IB_GROUP.test(customer.group || ''));
+  // A Flight/Holiday deal MUST declare International vs Domestic — that choice IS the cost
+  // centre. Blocked on BOTH paths so a blank one can't post into "Unspecified": the customer
+  // path is caught by the approval gate, the inter-branch (INB) path had no such gate, so we
+  // require it here at entry (the INB deal posts on approval with no second Int'l/Dom prompt).
+  const needsScope = hasPackage && !packageType;
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = interBranch
-    ? (!!brCode && !saving && !!toBranch && totals.so.total > 0)  // INB: just need a counterparty branch + a sale value
+    ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope)  // INB: counterparty branch + sale value + Int'l/Domestic for Flights/Holiday
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
       && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)));
 
@@ -1302,6 +1307,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
+        {interBranch && needsScope && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#b42318', alignSelf: 'center' }}>⚠ Pick International / Domestic to save this inter-branch {moduleCode === 'SH' ? 'Holiday' : 'Flight'} deal</span>
+        )}
         <button disabled={!canSave} onClick={() => save()} className="max-tablet:min-h-[44px]"
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
           {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes (Pending)' : 'Save voucher (Pending)')}
@@ -1839,6 +1847,18 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                     )}
                   </td>
                 </tr>
+                {/* Always-visible remark for a pending booking that can't be approved yet
+                    (e.g. an untagged Flight/Holiday needing International/Domestic). The reason
+                    text comes from the same verification gate that blocks Approve, so the team
+                    can read WHY and fix it without hovering the disabled button. */}
+                {mode === 'pending' && b.validation?.hasErrors && (
+                  <tr style={{ background: '#fdf2f2' }}>
+                    <td colSpan={cols.length} style={{ padding: '5px 12px 7px 40px', borderBottom: '1px solid #f3c9c9' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#b42318' }}>⚠ Can’t approve yet — {(b.validation.errors || []).join(' · ')}</span>
+                      {(b.validation.warnings || []).length > 0 && <span style={{ fontSize: 10.5, color: '#9a6a00', marginLeft: 8 }}>· {(b.validation.warnings || []).join(' · ')}</span>}
+                    </td>
+                  </tr>
+                )}
                 {isOpen && (
                   <tr><td colSpan={cols.length} style={{ padding: '12px 16px', background: '#faf9f5', borderBottom: '1px solid #eee3cf' }}>
                     {onInvoice && (b.status === 'approved' || b.status === 'posted') && (
@@ -1859,6 +1879,19 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
       </table>
       {groupBy === 'none' && <Pager pager={pg} />}
     </div>
+  );
+}
+
+// Toolbar chip for the Pending queues: shows how many rows the verification gate blocks
+// (mostly untagged Flights/Holiday needing International/Domestic) and toggles a filter to
+// show ONLY those, so the team can work the blocked list to zero. Hidden when count is 0.
+function NeedsFixingChip({ count, active, onToggle }) {
+  return (
+    <button onClick={onToggle}
+      title="Show only bookings that can’t be approved yet — they need a fix (e.g. tag International vs Domestic) before they can post"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, boxSizing: 'border-box', padding: '0 12px', fontSize: 11.5, fontWeight: 700, borderRadius: 7, cursor: 'pointer', border: '1px solid ' + (active ? '#b42318' : '#f0c2c2'), background: active ? '#b42318' : '#fdecec', color: active ? '#fff' : '#b42318' }}>
+      ⚠ {count} need fixing{active ? ' · showing only these' : ''}
+    </button>
   );
 }
 
@@ -1886,11 +1919,16 @@ export function PendingBookings({ branch, setRoute }) {
   const [editing, setEditing] = useState(null); useModalEsc(() => setEditing(null), !!editing);
   const [groupBy, setGroupBy] = useState('none');
   const [sel, setSel] = useState(() => new Set());
+  const [onlyFlagged, setOnlyFlagged] = useState(false); // "needs fixing" filter — show only un-approvable rows
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
 
   const rows = data.filter((b) => b.status === 'pending' && inRange(b.date || ''));
-  const allIds = rows.map((b) => b.id);
+  // Bookings the verification gate blocks (e.g. untagged Flight/Holiday) — counted for the
+  // toolbar chip and, when the filter is on, the only rows shown so the team clears them to zero.
+  const flaggedCount = rows.filter((b) => b.validation?.hasErrors).length;
+  const visibleRows = onlyFlagged ? rows.filter((b) => b.validation?.hasErrors) : rows;
+  const allIds = visibleRows.map((b) => b.id);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
 
@@ -1949,6 +1987,7 @@ export function PendingBookings({ branch, setRoute }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
         <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
         <GroupByBar value={groupBy} onChange={setGroupBy} />
+        {flaggedCount > 0 && <NeedsFixingChip count={flaggedCount} active={onlyFlagged} onToggle={() => setOnlyFlagged((v) => !v)} />}
         {rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
@@ -1958,7 +1997,7 @@ export function PendingBookings({ branch, setRoute }) {
           </span>
         )}
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+      <BookingTable rows={visibleRows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
     </div>
   );
 }
@@ -2342,6 +2381,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   // Refund/Reissue (SO/PO/GP reversal modules RF/RI) live in this same queue and show
   // inline in the normal Pending window alongside forward bookings — no separate filter.
   const [sel, setSel] = useState(() => new Set());
+  const [onlyFlagged, setOnlyFlagged] = useState(false); // "needs fixing" filter (pending tab only)
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const [search, setSearch] = useState(initialSearch || '');
   const canDelete = isAdminRole(currentUser);
@@ -2369,10 +2409,15 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   // Rows in the current status+range (before the search filter) — the visible list.
   const statusRows = data.filter((b) => bucket(b) === status && inRange(b.date || ''));
   const rows = statusRows.filter((b) => matchBooking(b)).sort(cmpLatest);
-  const allIds = rows.map((b) => b.id);
+  // Pending rows the verification gate blocks (e.g. untagged Flight/Holiday) → toolbar chip
+  // + optional "show only these" filter. Only meaningful on the Pending tab (others carry no
+  // validation flag). visibleRows is what the table + select-all operate on.
+  const flaggedCount = status === 'pending' ? rows.filter((b) => b.validation?.hasErrors).length : 0;
+  const visibleRows = (status === 'pending' && onlyFlagged) ? rows.filter((b) => b.validation?.hasErrors) : rows;
+  const allIds = visibleRows.map((b) => b.id);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
-  React.useEffect(() => { setSel(new Set()); }, [status, brCode]);
+  React.useEffect(() => { setSel(new Set()); setOnlyFlagged(false); }, [status, brCode]);
 
   const onApprove = async (b) => {
     setBusyId(b.id); setMsg('');
@@ -2457,6 +2502,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
           {search && <button onClick={() => setSearch('')} aria-label="Clear search" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'none', cursor: 'pointer', color: '#9197a3', fontSize: 14, lineHeight: 1 }}>✕</button>}
         </div>
         {needle && <span style={{ fontSize: 11, color: '#5b616e', fontWeight: 700 }}>{(status === 'edited' ? editedVisible.length : rows.length)} match{(status === 'edited' ? editedVisible.length : rows.length) === 1 ? '' : 'es'}</span>}
+        {status === 'pending' && flaggedCount > 0 && <NeedsFixingChip count={flaggedCount} active={onlyFlagged} onToggle={() => setOnlyFlagged((v) => !v)} />}
         {status === 'pending' && rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
@@ -2469,7 +2515,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
       {status === 'edited'
         ? <EditedBookingsList rows={editedVisible} isLoading={editedQ.isLoading} cur={cur} open={open} setOpen={setOpen} />
         : <>
-            <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onEditPax={setPaxEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+            <BookingTable rows={visibleRows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode={status} groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={onEdit} onEditPax={setPaxEdit} onDelete={onDelete} canDelete={canDelete} onRevoke={onRevoke} canRevoke={canRevoke} onInvoice={(b, side) => { const master = side === 'sale' ? custMap[String(b.customer?.name || '').toLowerCase().trim()] : supMap[String(b.supplier?.name || '').toLowerCase().trim()]; printBookingInvoice({ booking: b, side, branch, master, title: `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${b.bookingNo}` }); }} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
             <SopogpRefunds branch={branch} status={status} needle={needle} currentUser={currentUser} />
           </>}
       {/* Identity-only pax edit — POST /:id/passengers; keeps the booking Approved &

@@ -613,9 +613,34 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
               Upload Day Book ({dbFile ? dbFile.rows.length : 0} legs)
             </Button>
             {impDB.isError && <span className="text-sm text-danger">{impDB.error?.message}</span>}
-            {impDB.isSuccess && <span className="text-sm text-success">Loaded {impDB.data?.inserted ?? 0} voucher legs across {impDB.data?.ledgers ?? 0} ledgers.</span>}
+            {impDB.isSuccess && <span className="text-sm text-success">Loaded {impDB.data?.inserted ?? 0} voucher legs across {impDB.data?.ledgers ?? 0} ledgers{impDB.data?.signMismatchCount ? ` · ⚠ ${impDB.data.signMismatchCount} sign mismatch${impDB.data.signMismatchCount === 1 ? '' : 'es'}` : ''}{impDB.data?.unbalancedCount ? ` · ⚠ ${impDB.data.unbalancedCount} unbalanced` : ''}.</span>}
             <span className="text-xs text-ink-subtle">Only rows dated within {period} are kept; re-uploading replaces this period's Day Book.</span>
           </div>
+          {/* Import guardrails — a sign-flipped export (Debit/Credit swapped) or a voucher
+              that doesn't balance is caught here, before it becomes a wall of phantom defects. */}
+          {impDB.isSuccess && (impDB.data?.signMismatchCount > 0 || impDB.data?.unbalancedCount > 0) && (
+            <div className="mt-3 flex items-start gap-2 rounded-brand border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm text-ink" data-testid="daybook-import-warning">
+              <AlertTriangle size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+              <span className="space-y-1">
+                {impDB.data?.signMismatchCount > 0 && (
+                  <span className="block">
+                    <b>{impDB.data.signMismatchCount} ledger{impDB.data.signMismatchCount === 1 ? '' : 's'} whose Day Book side disagrees with the Trial Balance</b> — a likely sign-flipped export; check the Debit/Credit columns and re-upload.{' '}
+                    {(impDB.data.signMismatches || []).slice(0, 4).map((s, i) => (
+                      <span key={s.ledger}>{i > 0 ? ' · ' : ''}<b>{s.ledger}</b> (Day Book {s.dayBookSide} {fmt(Math.abs(s.dayBook), cur)} vs TB {s.tbSide} {fmt(Math.abs(s.tb), cur)})</span>
+                    ))}{impDB.data.signMismatchCount > 4 ? ` · +${impDB.data.signMismatchCount - 4} more` : ''}
+                  </span>
+                )}
+                {impDB.data?.unbalancedCount > 0 && (
+                  <span className="block">
+                    <b>{impDB.data.unbalancedCount} voucher{impDB.data.unbalancedCount === 1 ? '' : 's'} don’t balance (Σ Dr ≠ Σ Cr)</b> — a dropped leg or a flipped side.{' '}
+                    {(impDB.data.unbalancedVouchers || []).slice(0, 4).map((v, i) => (
+                      <span key={`${v.date}|${v.vno}`}>{i > 0 ? ' · ' : ''}<b>{v.vno || v.date}</b> (Dr {fmt(v.debit, cur)} vs Cr {fmt(v.credit, cur)})</span>
+                    ))}{impDB.data.unbalancedCount > 4 ? ` · +${impDB.data.unbalancedCount - 4} more` : ''}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
         </PageSection>
       )}
 
