@@ -21,10 +21,13 @@ export { PageAccessControl } from './organization/pageAccess';
 
 // ── Business sub-module regroup — compliance-workflow/ ───────────────────────
 export { ApprovalWorkflow } from './compliance-workflow/approvalWorkflow';
+export { StatutoryFilingRegister } from './compliance-workflow/statutoryFilingRegister';
+export { DelegationsManager } from './compliance-workflow/delegationsManager';
 
 // ── Business sub-module regroup — integrations/ ──────────────────────────────
 export { ApiKeySettings } from './integrations/apiKeys';
 export { GspIrpSettings } from './integrations/gspIrp';
+export { BankingApiSettings } from './integrations/bankingApi';
 
 // ── Business sub-module regroup — tools/ ─────────────────────────────────────
 export { SettingsAudit } from './tools/audit';

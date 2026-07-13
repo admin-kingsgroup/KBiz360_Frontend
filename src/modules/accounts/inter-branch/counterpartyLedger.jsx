@@ -5,10 +5,10 @@
 // from them (payable); the net is the inter-branch position with that branch. Read
 // only — complements the Trade Matrix (pivot) and Register & P&L Breakdown.
 // Driven by /api/inter-branch/counterparty.
-import React, { useMemo, useState } from 'react';
-import { bc } from '../../core/styles';
-import { localeOf } from '../../core/format';
-import { useInbCounterparty } from '../../core/useInterBranchVoucher';
+import { useMemo, useState } from 'react';
+import { bc } from '../../../core/styleTokens';
+import { localeOf } from '../../../core/format';
+import { useInbCounterparty } from '../../../core/useInterBranchVoucher';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));

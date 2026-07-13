@@ -3,10 +3,10 @@
 // (open = seller raised it, buyer hasn't booked · booked = matched both sides).
 // The "open" rows are the unbooked-legs worklist — what each branch still owes an
 // entry for. Driven by /api/inter-branch/reconcile (no consolidation/elimination).
-import React, { useMemo, useState } from 'react';
-import { bc } from '../../core/styles';
-import { localeOf } from '../../core/format';
-import { useInbReconcile, useInbPnlBreakdown } from '../../core/useInterBranchVoucher';
+import { useMemo, useState } from 'react';
+import { bc } from '../../../core/styleTokens';
+import { localeOf } from '../../../core/format';
+import { useInbReconcile, useInbPnlBreakdown } from '../../../core/useInterBranchVoucher';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));

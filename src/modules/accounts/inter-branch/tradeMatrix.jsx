@@ -3,10 +3,9 @@
 //   • Trade Matrix — seller × buyer grid of inter-branch turnover
 //   • Margin       — per seller→buyer pair: SVF income vs discount passed → GP
 // Branch-pair driven; no consolidation/elimination (branches stay independent).
-import React from 'react';
-import { bc } from '../../core/styles';
-import { localeOf } from '../../core/format';
-import { useInbMatrix } from '../../core/useInterBranchVoucher';
+import { bc } from '../../../core/styleTokens';
+import { localeOf } from '../../../core/format';
+import { useInbMatrix } from '../../../core/useInterBranchVoucher';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));

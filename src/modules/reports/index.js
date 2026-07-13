@@ -28,12 +28,14 @@ export { RptShell, NotWired } from './components/scaffold';
 // ── Business sub-module regroup — financial-statements/ ─────────────────────
 export { ReportViewerTabbed } from './financial-statements/reportViewer';
 export { ReportCF } from './financial-statements/cashFlowStatement';
+export { RPT_InterbranchElim } from './financial-statements/interbranchElimination';
 
 // ── Business sub-module regroup — profitability-gp/ ──────────────────────────
 export { ReportPackagePnL } from './profitability-gp/packagePnL';
 export { ReportBranch } from './profitability-gp/branchComparison';
 export { MisReport } from './profitability-gp/misReport';
 export { ReportGP } from './profitability-gp/gpReport';
+export { GroupDashboard } from './profitability-gp/groupDashboard';
 
 // ── Business sub-module regroup — operational/ ───────────────────────────────
 export { ConsultantReport } from './operational/consultantReport';
