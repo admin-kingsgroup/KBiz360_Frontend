@@ -4,7 +4,7 @@
    register renders. */
 
 import { AlertTriangle } from 'lucide-react';
-import { GratuityRegister } from '../../../core/helpers';
+import { GratuityRegister } from './gratuityRegister';
 
 export function GratuityEstimateView({branch}){
   return(

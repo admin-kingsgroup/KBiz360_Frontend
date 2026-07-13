@@ -20,7 +20,7 @@ import { exportToCSV } from '../../core/business-logic';
 import { BRANCH_CODES, CASH, EXP_ACTUALS, FX_RATES, GP_BILLS, LOAN_REGISTER, CONSOLIDATED_LABEL } from '../../core/data';
 import { fmt, fmtINR } from '../../core/format';
 import { CUR_MONTH, MONTH_OPTIONS, FY_MONTHS, monthLabel, todayISO, fmtDate, CUR_FY, rangeNote } from '../../core/dates';
-import { BANK_ACCOUNTS_DATA, GratuityRegister, INVESTMENT_DATA, INVESTMENT_SECTIONS, _ADVANCES, cardStyle } from '../../core/helpers';
+import { BANK_ACCOUNTS_DATA, INVESTMENT_DATA, INVESTMENT_SECTIONS, _ADVANCES, cardStyle } from '../../core/helpers';
 import { useMobile } from '../../core/hooks';
 import { useChartOfAccounts, useTrialBalance } from '../../core/useAccounting';
 import { useCrud, useAdvances } from '../../core/useRegisters';
