@@ -885,7 +885,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
  
   const subtotal = r2((form?.lines || []).reduce((s, l) => s + (l.drCr === 'Cr' ? -1 : 1) * (Number(l.amt) || 0), 0));
  
-  const total = editorVoucherTotal({ subtotal, taxAmt: form?.taxAmt, otherTaxesGst: v?.otherTaxesGst, tcsAmt: form?.tcsAmt });
+  const total = editorVoucherTotal({ subtotal, taxAmt: form?.taxAmt, otherTaxesGst: v?.otherTaxesGst, tcsAmt: form?.tcsAmt, roundOff: v?.roundOff });
   const previewBody = (v && form) ? {
     ...v, branch: form.branch, party: form.party, taxAmt: Number(form.taxAmt) || 0,
     tdsAmt: Number(form.tdsAmt) || 0, tcsAmt: Number(form.tcsAmt) || 0, subtotal, total,

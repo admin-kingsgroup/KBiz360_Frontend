@@ -445,12 +445,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // N-PO: fold the ADDITIONAL purchase legs into the headline Gross Profit so the entry
   // screen shows the same folder GP the booking saves with (backend gpForMulti), not the
-  // primary-PO-only figure. Mirrors backend purchaseNetOf (total − GST − TCS − incentive)
-  // and the save-time leg filter. The per-passenger table below stays the PRIMARY view.
+  // primary-PO-only figure. Mirrors backend purchaseNetOf (total − roundOff − GST − TCS −
+  // incentive) and the save-time leg filter. The per-passenger table below stays PRIMARY.
   const extraLegsFilled = (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0);
   const extraLegNet = extraLegsFilled.reduce((s, leg) => {
     const po = legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name)).po;
-    return s + (num(po.total) - num(po.gst) - num(po.tcs) - num(po.incentiveAmt));
+    return s + (num(po.total) - num(po.roundOff) - num(po.gst) - num(po.tcs) - num(po.incentiveAmt));
   }, 0);
   const hasExtraLegs = Math.abs(extraLegNet) > 0.005;
   const folderGpTotal = Math.round((num(totals.gp.total) - extraLegNet) * 100) / 100;

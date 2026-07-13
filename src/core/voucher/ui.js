@@ -121,11 +121,13 @@ export function pxpTotals(s) {
 // hits the books:
 //   subtotal (Σ lines, Dr +ve / Cr −ve) + taxAmt (regular GST) + otherTaxesGst (the
 //   SVC2 margin GST — a SEPARATE per-branch Output head) + tcsAmt (collected/recoverable,
-//   rides inside total).
+//   rides inside total) + roundOff (the whole-rupee SO/PO/GP invoice round-off booked to
+//   the branch "Round Off" ledger).
 // Omitting otherTaxesGst made every SVC2-bearing sale read "✗ Out by <SVC2 GST>" in the
-// live preview and blocked the edit from saving, even though the saved books balance.
-export function editorVoucherTotal({ subtotal, taxAmt, otherTaxesGst, tcsAmt } = {}) {
-  return r2((Number(subtotal) || 0) + (Number(taxAmt) || 0) + (Number(otherTaxesGst) || 0) + (Number(tcsAmt) || 0));
+// live preview and blocked the edit from saving; likewise a booking voucher whose total
+// was snapped to a rupee reads "✗ Out by <paise>" unless roundOff is carried here too.
+export function editorVoucherTotal({ subtotal, taxAmt, otherTaxesGst, tcsAmt, roundOff } = {}) {
+  return r2((Number(subtotal) || 0) + (Number(taxAmt) || 0) + (Number(otherTaxesGst) || 0) + (Number(tcsAmt) || 0) + (Number(roundOff) || 0));
 }
 
 // Debit-Note totals — a purchase return with per-line Dr/Cr (like Purchase-Expense).
