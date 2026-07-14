@@ -1,96 +1,36 @@
+/* ════════════════════════════════════════════════════════════════════
+   DIRECTOR DASHBOARDS  /dashboards/*
+   The whole-company MENU_DASHBOARDS suite (Financials, Business, Targets,
+   Control groups) — one dispatcher (DirectorDash) picks the panel by the
+   route's `which` segment (see App.jsx's /dashboards/(...) regex route).
+
+   BUSINESS SUB-MODULE REORG (2026-07-13): moved out of
+   directorDashboards/directorDashboards.jsx into dashboard/ (this file's
+   folder-name mismatch was the ONLY reorg issue here — directorDashboards/
+   and dashboard/ both serve MENU_DASHBOARDS and belong in one module).
+   TargetsMaster (the only MENU_FINANCE-bound export in the original file)
+   moved separately to finance/targetsMaster.jsx.
+   ════════════════════════════════════════════════════════════════════ */
 import React, { useMemo, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { apiGet } from '../../core/api';
-import { FocusBanner } from '../../core/ux/FocusBanner';
-import { bc } from '../../core/styles';
-import { PeriodBar, periodRange } from '../../core/period';
-import { Button, Select, Input, FormField } from '../../shell/primitives';
+import { apiGet } from '../../../core/api';
+import { FocusBanner } from '../../../core/ux/FocusBanner';
+import { bc } from '../../../core/styles';
+import { PeriodBar } from '../../../core/period';
+import { Button, Select, Input, FormField } from '../../../shell/primitives';
 import {
   useProfitAndLoss, useModulePL, useBalanceSheet, useAgeing, useInvoiceGP,
   useTaxSummary, useTrialBalance, useVoucherApprovals, useYearOverYear,
-  useBudgetVsActual, useTargetsVsActual, useSalesTargets, useSaveTargets,
+  useBudgetVsActual, useTargetsVsActual,
   useCashForecast, useCustomerLtv, useAbcAnalysis,
-} from '../../core/useAccounting';
-import { CONSOLIDATED_LABEL, BRANCHES as LIVE_BRANCHES } from '../../core/data';
-import { liquidityKind, isLiquidRow } from '../../core/ledgerKind';
-import { openPrintPreview } from '../../core/PrintPreview';
-import { PnlWaterfallPanel } from '../dashboard/components/shared/PnlWaterfallPanel';
+} from '../../../core/useAccounting';
+import { CONSOLIDATED_LABEL } from '../../../core/data';
+import { liquidityKind, isLiquidRow } from '../../../core/ledgerKind';
+import { openPrintPreview } from '../../../core/PrintPreview';
+import { PnlWaterfallPanel } from '../components/shared/PnlWaterfallPanel';
 import { TrendingUp, PieChart, Receipt, CircleDollarSign, ArrowRight } from 'lucide-react';
+import { C, REGION, curSym, branchList, r0, money, pct, pad2, iso, fyStr, MOD_OPTS, Toolbar, KPI, Card, th, td, num, usePeriod } from './shared';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#1f7a3d', amber: '#b8860b', dim: '#5a6691', border: '#cdd1d8', bg: '#f3f4f8' };
-
-const REGION = { '₹': 'India', '$': 'Africa' };
-const curSym = (b) => (b.cur ? b.cur : (b.currency === 'USD' || b.curCode === 'USD') ? '$' : '₹');
-const branchList = () => (LIVE_BRANCHES || []).filter((b) => b && b.code && b.code !== 'ALL').map((b) => ({ code: b.code, cur: curSym(b) }));
-
-
-const r0 = (n) => Math.round(Number(n) || 0);
-const money = (cur, n) => { const c = cur || '₹'; const loc = (c === '₹' || c === '₨' || c === 'Rs') ? 'en-IN' : 'en-US'; return (n < 0 ? '-' : '') + c + Math.abs(r0(n)).toLocaleString(loc); };
-const pct = (n) => (Number(n) || 0).toFixed(1) + '%';
-const pad2 = (n) => String(n).padStart(2, '0');
-const iso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const fyStr = (now = new Date()) => { const y = now.getFullYear(); const s = now.getMonth() >= 3 ? y : y - 1; return `${s}-${String(s + 1).slice(-2)}`; };
-const MOD_OPTS = [['', 'All modules'], ['SF', 'Flight'], ['SH', 'Holiday'], ['SHT', 'Hotel'], ['SV', 'Visa'], ['SI', 'Insurance'], ['SC', 'Car'], ['SM', 'Misc']];
-
-// ── shared UI bits ──────────────────────────────────────────────────────────────
-// Header with title + the uniform PeriodBar (driven via the usePeriod object `p`).
-function Toolbar({ title, sub, branch, p, hidePeriod }) {
-  return (
-    <div className="mb-3.5 flex flex-wrap items-center gap-3 border-b border-surface-border pb-3">
-      <div>
-        <div className="text-lg font-extrabold text-ink">{title}</div>
-        {sub && <div className="text-xs text-ink-muted">{sub}</div>}
-      </div>
-      <div className="ml-auto flex flex-wrap items-center gap-2">
-        {!hidePeriod && <PeriodBar branch={branch} defaultPreset={p && p.def} onChange={p && p.setRange} />}
-        <span className="rounded bg-info-soft px-2 py-1 text-[11px] font-bold text-info">{branch === 'ALL' || !branch ? CONSOLIDATED_LABEL : (branch.code || branch)}</span>
-        <button onClick={() => openPrintPreview({ selector: 'main', title, recommend: 'portrait' })} title="Export / print this dashboard"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', fontSize: 11.5, fontWeight: 700, color: C.dark, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 6, cursor: 'pointer' }}>⎙ Export</button>
-      </div>
-    </div>
-  );
-}
-
-function KPI({ label, value, sub, tone, delta, onClick, icon: Icon }) {
-  const col = tone === 'bad' ? C.red : tone === 'good' ? C.green : C.dark;
-  const clickable = typeof onClick === 'function';
-  return (
-    <div onClick={onClick} role={clickable ? 'button' : undefined} tabIndex={clickable ? 0 : undefined}
-      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
-      title={clickable ? 'Open details →' : undefined}
-      className="min-w-[180px] flex-1 basis-[180px] rounded-brand bg-surface p-4 shadow-sm transition-shadow hover:shadow-md"
-      style={{ cursor: clickable ? 'pointer' : 'default', border: `1px solid ${C.border}`, borderLeft: `4px solid ${col}` }}>
-      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
-        {Icon && <Icon size={13} style={{ color: col, flexShrink: 0 }} />}
-        {label}
-      </div>
-      <div className="mt-1.5 text-[22px] font-black tabular-nums" style={{ color: col }}>{value}</div>
-      <div className="mt-0.5 flex items-center justify-between">
-        {sub && <span className="text-[11px] text-ink-muted">{sub}{clickable && <ArrowRight size={11} className="ml-1 inline align-middle" />}</span>}
-        {delta != null && <span className="text-[11px] font-bold" style={{ color: delta >= 0 ? C.green : C.red }}>{delta >= 0 ? '▲' : '▼'} {pct(Math.abs(delta))}</span>}
-      </div>
-    </div>
-  );
-}
-const Card = ({ title, children, right }) => (
-  <div className="mt-3.5 overflow-hidden rounded-brand border border-surface-border bg-surface shadow-card">
-    <div className="flex items-center justify-between border-b border-surface-border bg-surface-alt px-3.5 py-2.5">
-      <strong className="text-[13.5px] text-ink">{title}</strong>{right}
-    </div>
-    <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">{children}</div>
-  </div>
-);
-const th = { padding: '8px 12px', background: C.bg, color: C.dim, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', textAlign: 'left', whiteSpace: 'nowrap' };
-const td = { padding: '7px 12px', borderBottom: '1px solid #dfe2e7', fontSize: 12.5 };
-const num = { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
-
-// usePeriod — holds the active range; the PeriodBar inside Toolbar drives setRange.
-function usePeriod(def = 'all') {
-  const [range, setRange] = useState(() => periodRange(def, {}));
-  return { range, setRange, def };
-}
-
-// ── 1) Executive Overview ─────────────────────────────────────────────────────
 export function ExecutiveOverview({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
@@ -922,72 +862,6 @@ export function PerformanceDash({ branch, go }) {
   );
 }
 
-// ── Targets master (set targets that the vs-Target dashboards compare to) ──────
-export function TargetsMaster({ branch }) {
-  const [brCode, setBrCode] = useState((branch && branch.code) || 'BOM');
-  const [fy, setFy] = useState(fyStr());
-  const [metric, setMetric] = useState('sales');
-  const [draft, setDraft] = useState({});
-  // Currency follows the branch picked in THIS screen's dropdown (brCode), not the
-  // global branch — USD branches (NBO/DAR/FBM) must show $ in the target header.
-  const cur = (branchList().find((b) => b.code === brCode) || {}).cur || '₹';
-  const q = useSalesTargets({ code: brCode }, fy, metric);
-  const save = useSaveTargets();
-  const existing = {}; (q.data || []).forEach((t) => { if ((t.month || 0) === 0) existing[t.module || ''] = t.amount; });
-  const valOf = (mod) => (draft[mod] !== undefined ? draft[mod] : (existing[mod] ?? ''));
-  const onSave = () => {
-    // Collections AND Nett Profit are company-wide only — the engine ignores per-module
-    // rows for them, so don't persist module rows (avoids orphan 0-amount DB rows).
-    const companyOnly = metric === 'collections' || metric === 'np';
-    const opts = MOD_OPTS.filter(([mod]) => !companyOnly || mod === '');
-    const rows = opts.map(([mod]) => ({ month: 0, metric, module: mod, amount: Number(valOf(mod)) || 0 }));
-    save.mutate({ branch: brCode, fy, rows }, { onSuccess: () => setDraft({}) });
-  };
-  const metricLabel = { sales: 'Sales', gp: 'GP', collections: 'Collections', np: 'Nett Profit' }[metric];
-  const companyOnly = metric === 'collections' || metric === 'np';
-  const rows = MOD_OPTS.filter(([mod]) => !companyOnly || mod === '');
-  return (
-    <div className="w-full px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
-      <FocusBanner />
-      <div className="mb-4 border-b border-surface-border pb-3">
-        <div className="text-lg font-extrabold text-ink">Sales Targets</div>
-        <div className="mt-0.5 text-xs text-ink-muted">Set whole-FY targets per module. The Director "vs Target" dashboards pro-rate these to the period and compare against actuals.</div>
-      </div>
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-brand border border-surface-border bg-surface-alt/60 px-3.5 py-3">
-        <FormField label="Branch" className="w-28">
-          <Select value={brCode} onChange={(e) => setBrCode(e.target.value)} className="font-semibold">
-            {branchList().map((b) => <option key={b.code} value={b.code}>{b.code}</option>)}
-          </Select>
-        </FormField>
-        <FormField label="Financial Year" className="w-36">
-          <Input value={fy} onChange={(e) => setFy(e.target.value)} placeholder="e.g. 2026-27" />
-        </FormField>
-        <FormField label="Metric" className="w-44">
-          <Select value={metric} onChange={(e) => setMetric(e.target.value)} className="font-semibold">
-            <option value="sales">Sales</option><option value="gp">Gross Profit</option><option value="collections">Collections</option><option value="np">Nett Profit</option>
-          </Select>
-        </FormField>
-      </div>
-      <Card title={`${metricLabel} target · ${brCode} · FY ${fy}`} right={<Button variant="accent" size="sm" loading={save.isPending} onClick={onSave}>Save</Button>}>
-        <div className="mb-1.5 grid grid-cols-1 gap-3 p-3.5 tablet:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-4">
-          {rows.map(([mod, label]) => (
-            <div key={mod || 'all'}
-              className={`rounded-brand border p-3 transition-colors ${mod === '' ? 'border-navy/25 bg-navy/5' : 'border-surface-border bg-surface hover:border-ink-subtle'}`}>
-              <div className="mb-1.5 truncate text-[12.5px] font-semibold text-ink">{label}{mod === '' ? ' (company)' : ''}</div>
-              <div className="flex items-center overflow-hidden rounded-md border border-surface-border bg-surface focus-within:border-gold focus-within:shadow-gold-glow">
-                <span className="shrink-0 border-r border-surface-border bg-surface-alt px-2.5 py-2 text-xs font-bold text-ink-muted">{cur}</span>
-                <input type="number" value={valOf(mod)} onChange={(e) => setDraft((d) => ({ ...d, [mod]: e.target.value }))}
-                  className="w-full min-w-0 border-0 bg-transparent px-2.5 py-2 text-right text-[13px] tabular-nums text-ink outline-none" placeholder="0" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-      {save.isSuccess && <div className="mt-2 text-xs text-success">✓ Saved.</div>}
-      {companyOnly && <div className="mt-2 text-[11px] text-ink-muted">{metricLabel} targets are company-wide — only the "All modules" row is used.</div>}
-    </div>
-  );
-}
 
 // ── 17) Cash Forecast (13-week) ───────────────────────────────────────────────
 // Forward liquidity projection from /api/accounting/cash-forecast: opening cash &
