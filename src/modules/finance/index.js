@@ -1,25 +1,45 @@
 /* ════════════════════════════════════════════════════════════════════
    Finance feature — public barrel
    ════════════════════════════════════════════════════════════════════
-   STRANGLER-FIG MIGRATION: the original 1900-line monolith now lives in
-   `./legacy.jsx`. Each screen is being moved into the canonical feature
-   layout (api → service → hook → page) one at a time. This barrel re-exports
-   the not-yet-migrated screens AND the migrated ones under their ORIGINAL
-   names, so `App.jsx` / `transactions.jsx` / `taxation.jsx` keep importing
-   from `modules/finance` with zero changes.
-
-   When a screen is migrated:
-     1. add its page under `pages/` (live API via hooks/services)
-     2. add an explicit re-export below (it shadows the legacy `export *`)
-     3. delete the dead component from `legacy.jsx`
+   BUSINESS SUB-MODULE REORG (2026-07-14): the old 1900-line legacy.jsx
+   monolith is gone — every export has moved to its correct business
+   module. Genuinely Finance-bound screens moved into business-sub-module
+   folders (matching MENU_FINANCE's nav groups): period-end-targets-accruals/
+   (Loan/EMI Register, Investment Register) and tools-calculators/ (Interest
+   Calculator, Loan Amortization). Six screens that were misfiled in the
+   monolith moved OUT to their real modules: CashFlowForecast,
+   WorkingCapitalDashboard, CashFlowDirect → reports/working-capital/
+   (MENU_REPORTS ▸ Working Capital); BankReco, ReconciliationQueue →
+   reconciliation/statement-matching/ (MENU_RECONCILIATION ▸ Statement
+   Matching); TDSCalculator → taxation/ (Taxation regime menus);
+   BankBalanceDashboard → accounts/cash-bank/ (MENU_ACCOUNTS ▸ Cash & Bank);
+   InvestmentDeclaration → hr/self-service/ (MENU_HR ▸ Self-Service).
+   All re-exported below under their ORIGINAL names so App.jsx's single
+   `lazyModule(() => import('./modules/finance'))` destructure needed zero
+   changes.
    ──────────────────────────────────────────────────────────────────── */
 
-// Not-yet-migrated screens (BankReco, CashFlowForecast, YearEndClose, …) +
-// shared exports such as TDS_SECTIONS. Explicit named re-exports below take
-// precedence. The dead legacy reports (DayBook, LedgerAc, TrialBalanceLegacy,
-// AdvanceDepositLedger, CashBookReport) were DELETED 2026-07-10 — live
-// replacements are in modules/accountingLive.
-export * from './legacy';
+// ── Business sub-module regroup — period-end-targets-accruals/ ──────────────
+export { LoanEmiRegister } from './period-end-targets-accruals/loanEmiRegister';
+export { InvestmentRegister } from './period-end-targets-accruals/investmentRegister';
+
+// ── Business sub-module regroup — tools-calculators/ ─────────────────────────
+export { InterestCalculator } from './tools-calculators/interestCalculator';
+export { LoanAmortization } from './tools-calculators/loanAmortization';
+
+// ── Misfiled in the old monolith — actually other business modules ──────────
+export { CashFlowForecast, WorkingCapitalDashboard, CashFlowDirect } from '../reports';
+// BankReco/ReconciliationQueue import the sibling files directly rather than
+// via '../reconciliation' — that barrel is eagerly evaluated in full by
+// reconciliation/routes/index.jsx's dynamic import('../index') for every lazy
+// route, so re-exporting a live-data screen from it would pull the whole
+// api/data hook chain into every reconciliation route (see the NOTE in
+// reconciliation/index.js).
+export { BankReco } from '../reconciliation/statement-matching/bankReco';
+export { ReconciliationQueue } from '../reconciliation/statement-matching/reconciliationQueue';
+export { TDSCalculator } from '../taxation';
+export { BankBalanceDashboard } from '../accounts/cash-bank/bankBalanceDashboard';
+export { InvestmentDeclaration } from '../hr';
 
 // ── Migrated → live, feature-folder, DataTable-based ────────────────────────
 export { TrialBalancePage as TrialBalance } from './pages/trial-balance';

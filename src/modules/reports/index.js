@@ -45,6 +45,13 @@ export { ReportCommission } from './operational/commissionIncome';
 
 // ── Business sub-module regroup — working-capital/ ───────────────────────────
 export { RatioAnalysis } from './working-capital/ratioAnalysis';
+// CashFlowForecast/WorkingCapitalDashboard/CashFlowDirect moved in from
+// finance/legacy.jsx (2026-07-14) — misfiled there; they're MENU_REPORTS ▸
+// Working Capital screens (CashFlowDirect isn't menu-linked but is
+// thematically grouped with the other two).
+export { CashFlowForecast } from './working-capital/cashFlowForecast';
+export { WorkingCapitalDashboard } from './working-capital/workingCapitalDashboard';
+export { CashFlowDirect } from './working-capital/cashFlowDirect';
 
 // ── Business sub-module regroup — compliance-tax/ ────────────────────────────
 export { VarianceAnalysis } from './compliance-tax/varianceAnalysis';

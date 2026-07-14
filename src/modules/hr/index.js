@@ -42,3 +42,6 @@ export { MyForm16 } from './self-service/form16';
 export { PerformanceReview } from './self-service/performanceReview';
 export { Feedback360 } from './self-service/feedback360';
 export { SkillMatrix } from './self-service/skillMatrix';
+// InvestmentDeclaration moved in from finance/legacy.jsx (2026-07-14) —
+// misfiled there; it's MENU_HR ▸ Self-Service (href /hr/investment-declaration).
+export { InvestmentDeclaration } from './self-service/investmentDeclaration';

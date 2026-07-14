@@ -11,3 +11,7 @@ export { CertificateDrawer } from './shared/CertificateDrawer';
 // barrel is eagerly evaluated in full by routes/index.jsx's dynamic
 // import('../index') for every lazy route — adding them here would pull the
 // live api/data hook chain into every one of this module's routes.
+// Same reason BankReco + ReconciliationQueue (moved in from finance/legacy.jsx,
+// 2026-07-14) live in ./statement-matching/ but aren't re-exported here —
+// they're routed via finance's barrel (App.jsx imports them from
+// './modules/finance').
