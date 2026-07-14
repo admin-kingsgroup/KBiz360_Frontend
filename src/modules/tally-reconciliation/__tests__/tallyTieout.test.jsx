@@ -497,6 +497,36 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('3 off ledgers')).toBeInTheDocument();
   });
 
+  test('drilling an inter-branch ledger from the Defect Register opens the drawer WITH the inter-branch badge', async () => {
+    const { getTieOut, getDefects, getLedgerVouchers } = require('../api');
+    // The tie-out marks inter-branch ledgers (BE: Travkings / inter-branch / inter-co regex → row.interBranch).
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', periodEnd: '2026-07-31',
+      counts: { total: 1, tied: 0, off: 1, onlyErp: 0, onlyTally: 0, absDiff: 5000, netProfitErp: 0, netProfitTally: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 1 },
+      rows: [
+        { ledger: 'Travkings NBO', code: 'IB1', group: 'Sundry Creditors', parentGroup: 'Sundry Creditors', statement: 'BS', nature: 'liability', erp: 100000, tally: 95000, diff: 5000, status: 'off', interBranch: true },
+      ],
+    });
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 1,
+      summary: { total: 1, byType: { 'missing-in-erp': 1 } },
+      defects: [{ ledger: 'Travkings NBO', date: '2026-07-09', ref: '', desc: 'IB settlement not in ERP', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: -5000, variance: 0, side: 'tally' }],
+    });
+    getLedgerVouchers.mockResolvedValueOnce({
+      ledger: 'Travkings NBO', branch: 'BOM', period: '2026-07', tier: 'month', from: '2026-07-01', to: '2026-07-31',
+      erpBalance: 100000, tallyImported: 1, summary: { total: 0 }, lines: [], defects: [],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('Travkings NBO');                              // tie-out loaded (default TB tab)
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ }));      // → Defect Register
+    await screen.findByText(/In Tally, not ERP: 1/);                       // register rendered
+    fireEvent.click(screen.getByText('Travkings NBO'));                    // drill the inter-branch defect row
+    // Regression guard: onDrill resolves the FULL tie-out row so the drawer's inter-branch badge shows.
+    // Under the old onDrill={setDrill} the drawer received only { ledger } and the badge was absent.
+    expect(await screen.findByText('inter-branch')).toBeInTheDocument();
+  });
+
   test('Defect Register — tier segment + type chips filter the table, Clear resets', async () => {
     const { getDefects } = require('../api');
     getDefects.mockResolvedValueOnce({
