@@ -53,7 +53,6 @@ export const isApproverRole = (role) => {
 export const STATUS_META = {
   tied: { tone: 'success', label: 'Tied' },
   off: { tone: 'danger', label: 'Off' },
-  accepted: { tone: 'info', label: 'Accepted' },
   matched: { tone: 'success', label: 'Matched' },
   'amount-diff': { tone: 'danger', label: 'Amount differs' },
   'only-erp': { tone: 'warning', label: 'Only in ERP' },
@@ -72,17 +71,6 @@ export const CERT_META = {
 };
 export const certMeta = (s) => CERT_META[s] || CERT_META.none;
 export const TALLY_CHAIN = ['AE', 'FM', 'Director', 'Owner'];
-
-// Accepted-variance reasons (why an off ledger is explained, not chased).
-export const REASONS = [
-  { value: 'inter-branch', label: 'Inter-branch (reconciled by hand)' },
-  { value: 'timing', label: 'Timing difference' },
-  { value: 'fx-rounding', label: 'FX rounding' },
-  { value: 'rate-difference', label: 'Rate difference' },
-  { value: 'migration', label: 'Migration / opening item' },
-  { value: 'other', label: 'Other (explain in the note)' },
-];
-export const reasonLabel = (v) => (REASONS.find((r) => r.value === v) || {}).label || v;
 
 // Defect type → tone + short label + tier (Defect Register). `tier` splits the
 // defects into two triage cuts: 'master' = the whole ledger is absent on one

@@ -20,15 +20,13 @@ const STATUSES = [
   ['off', 'Off', 'Both have the ledger but the balances differ.', 'danger'],
   ['only-erp', 'Only in ERP', 'A real balance in the ERP that the Tally upload doesn’t have.', 'warning'],
   ['only-tally', 'Only in Tally', 'A balance in Tally with no ERP counterpart.', 'warning'],
-  ['accepted', 'Accepted', 'An off ledger you’ve marked as an explained/expected difference — it no longer blocks the close.', 'info'],
 ];
 
 const ROUTINE = [
   ['1', 'Upload the Tally Trial Balance', 'On the Tie-Out board, click “Upload Tally TB” and paste the period’s TB. The ERP puts its own live numbers next to it — you never type the ERP side.'],
   ['2', 'Read the tie-out', 'Scan the three tabs (Trial Balance / Balance Sheet / P&L). Green = tied. Anything red or amber needs a look.'],
-  ['3', 'Drill the off ledgers', 'Click an off ledger to open its vouchers (ERP ↔ Tally Day Book). Import the Day Book in the Ledger Matcher if you haven’t yet.'],
-  ['4', 'Accept explained variances', 'Inter-branch (reconciled by hand), timing, FX rounding — accept them with a reason. The real difference stays visible; it just stops blocking the close.'],
-  ['5', 'Freeze & certify', 'When every ledger is Tied or Accepted, freeze the tie-out and sign the certificate up the chain. Only then can the month hard-lock.'],
+  ['3', 'Drill the off ledgers', 'Click an off ledger to open its vouchers (ERP ↔ Tally Day Book). Import the Day Book in the Ledger Matcher if you haven’t yet, then correct the entry at source (in ERP or Tally) until it ties.'],
+  ['4', 'Freeze & certify', 'When every ledger is Tied, freeze the tie-out and sign the certificate up the chain. Only then can the month hard-lock.'],
 ];
 
 const CHAIN = [
@@ -103,7 +101,7 @@ export function TallyGuidePage({ setRoute }) {
 
       {/* 3 · reading the board */}
       <PageSection title="3 · Reading the board — the statuses" icon={ClipboardCheck}
-        subtitle="Left is ERP (live), middle is Tally (your upload), right is the difference. The goal: every ledger Tied or Accepted.">
+        subtitle="Left is ERP (live), middle is Tally (your upload), right is the difference. The goal: every ledger Tied.">
         <div className="grid gap-2 tablet:grid-cols-2">
           {STATUSES.map((s) => (
             <div key={s[0]} className="flex items-start gap-3 rounded-brand border border-surface-border p-3">

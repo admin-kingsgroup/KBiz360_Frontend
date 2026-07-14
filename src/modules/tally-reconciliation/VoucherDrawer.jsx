@@ -1,27 +1,21 @@
 import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Check, RotateCcw, ArrowLeft } from 'lucide-react';
-import { getLedgerVouchers, acceptVariance, clearVariance } from './api';
-import { fmt, statusMeta, REASONS, reasonLabel } from './format';
-import { Badge, Button, Select, LoadingState, ErrorState } from '../../shell/primitives';
+import { useQuery } from '@tanstack/react-query';
+import { X, ArrowLeft } from 'lucide-react';
+import { getLedgerVouchers } from './api';
+import { fmt, statusMeta } from './format';
+import { Badge, LoadingState, ErrorState } from '../../shell/primitives';
 
 // The full ERP voucher (all legs + header), opened on demand from a drill line. Lazy so the heavy
 // accounting module (legacy.jsx) is code-split out of the tally bundle until a voucher is opened.
 const VoucherEditor = lazy(() => import('../accountingLive/legacy').then((m) => ({ default: m.VoucherEditor })));
 
-// ─── Voucher drill (Phase 2) + accept-variance (Phase 4) ─────────────────────
+// ─── Voucher drill (Phase 2) ─────────────────────────────────────────────────
 // Opens from an off row: the ledger's ERP postings vs its uploaded Tally Day
-// Book, matched voucher-by-voucher. When a difference is EXPECTED (inter-branch —
-// reconciled by hand — timing, FX rounding), accept it with a reason so it stops
-// blocking the certificate. The real difference is still shown; nothing is hidden.
+// Book, matched voucher-by-voucher — so the accounts team can find the exact
+// voucher that's off and correct it at source until the ledger ties.
 
 export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClose }) {
   const ledger = typeof row === 'string' ? row : (row && row.ledger);
-  const rowStatus = row && row.status;
-  const accepted = rowStatus === 'accepted';
-  const qc = useQueryClient();
-  const [reason, setReason] = useState(row && row.interBranch ? 'inter-branch' : 'timing');
-  const [note, setNote] = useState('');
   const [expanded, setExpanded] = useState(null);   // which voucher row is expanded to its entries
   const [openVoucher, setOpenVoucher] = useState(null);   // { id, vno } — the full voucher opened over the drill
 
@@ -38,10 +32,6 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose, openVoucher]);
-
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['tally-tieout'] });
-  const accept = useMutation({ mutationFn: () => acceptVariance({ branch, period, tier, ledger, reason, note }), onSuccess: () => { invalidate(); onClose(); } });
-  const unaccept = useMutation({ mutationFn: () => clearVariance({ branch, period, tier, ledger }), onSuccess: () => { invalidate(); onClose(); } });
 
   const lines = data?.lines || [];
   const summary = data?.summary || { total: 0 };
@@ -97,7 +87,7 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
                 <button type="button" onClick={() => { onClose(); setRoute && setRoute('/accounts/tally-reco'); }}
                   className="font-semibold text-accent underline underline-offset-2 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent rounded">
                   Ledger Matcher (Day Book)
-                </button>{' '}to drill to the voucher that's off. You can still <b>accept</b> the balance gap below when it's an explained (e.g. inter-branch) difference.</>)
+                </button>{' '}to drill to the voucher that's off and correct it at source.</>)
                 : 'No vouchers to show for this ledger this period.'}
             </div>
           )}
@@ -163,31 +153,6 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
           )}
         </div>
 
-        {/* accept-variance footer (Phase 4) */}
-        <div className="border-t border-surface-border bg-surface-sunk px-5 py-4">
-          {accepted ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge tone="info" size="sm" dot>Accepted</Badge>
-              <span className="text-sm text-ink">Explained as <b>{reasonLabel(row.acceptedReason)}</b>{row.acceptedNote ? ` — ${row.acceptedNote}` : ''}. It no longer blocks the certificate.</span>
-              <Button variant="ghost" icon={RotateCcw} loading={unaccept.isPending} onClick={() => unaccept.mutate()}>Remove acceptance</Button>
-              {unaccept.isError && <span className="text-xs text-danger">{unaccept.error?.message}</span>}
-            </div>
-          ) : (
-            <div className="grid gap-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Accept this difference as explained</div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Select value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason">
-                  {REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-                </Select>
-                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)"
-                  className="min-w-0 flex-1 rounded-brand border border-surface-border bg-surface px-3 py-1.5 text-sm text-ink" />
-                <Button variant="secondary" icon={Check} loading={accept.isPending} disabled={isError} title={isError ? 'Load the drill before accepting' : undefined} onClick={() => accept.mutate()}>Accept variance</Button>
-              </div>
-              {accept.isError && <span className="text-xs text-danger">{accept.error?.message}</span>}
-              <span className="text-xs text-ink-subtle">Use for permanent explained gaps (inter-branch, timing, FX rounding). The real difference stays visible — it just stops blocking the close.</span>
-            </div>
-          )}
-        </div>
       </aside>
 
       {/* Full ERP voucher, opened from a drill line's number — all legs + header, over the drill.

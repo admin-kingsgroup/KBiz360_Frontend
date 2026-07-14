@@ -35,8 +35,6 @@ jest.mock('../api', () => ({
   freezeTallyCert: jest.fn(),
   signTallyCert: jest.fn(),
   reopenTallyCert: jest.fn(() => Promise.resolve({ certificate: { status: 'open', signatures: [] } })),
-  acceptVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
-  clearVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
   getLedgerVouchers: jest.fn(() => Promise.resolve({
     ledger: 'HDFC Bank A/c', branch: 'BOM', period: '2026-07', tier: 'month', from: '2026-07-01', to: '2026-07-31',
     erpBalance: 810000, tallyImported: 2, summary: { total: 1 },
@@ -393,7 +391,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     window.localStorage.removeItem('tally.moduleView');
   });
 
-  test('By Module: a shared slice whose ledger reconciles at ledger level (tied full row) is NOT drillable (no accept-variance on a tied ledger)', async () => {
+  test('By Module: a shared slice whose ledger reconciles at ledger level (tied full row) is NOT drillable', async () => {
     window.localStorage.removeItem('tally.coaView');
     window.localStorage.removeItem('tally.moduleView');
     const { getTieOut } = require('../api');
@@ -675,12 +673,12 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('Dr ≠ Cr')).toBeInTheDocument();
   });
 
-  test('accept an explained variance from the drill drawer (Phase 4)', async () => {
-    const { acceptVariance } = require('../api');
+  test('an off ledger opens the voucher drill drawer (no accept-variance escape hatch)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     fireEvent.click(await screen.findByText('HDFC Bank A/c')); // off ledger → drawer
-    fireEvent.click(await screen.findByText('Accept variance'));
-    await waitFor(() => expect(acceptVariance).toHaveBeenCalledWith(expect.objectContaining({ ledger: 'HDFC Bank A/c', period: '2026-07' })));
+    // The drill opens (voucher-by-voucher); there is NO way to accept/wave the difference.
+    expect(await screen.findByText(/Voucher-by-voucher/)).toBeInTheDocument();
+    expect(screen.queryByText('Accept variance')).not.toBeInTheDocument();
   });
 
   test('both upload buttons live on the board; Day Book panel opens a file picker', async () => {
@@ -803,7 +801,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
   });
 });
 
-describe('Tally Reconciliation · certificate re-open + stale acceptance', () => {
+describe('Tally Reconciliation · certificate re-open', () => {
   const lockedCert = {
     certificate: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { frozenAt: '2026-07-05' } },
     chain: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
@@ -832,17 +830,6 @@ describe('Tally Reconciliation · certificate re-open + stale acceptance', () =>
     expect(await screen.findByText(/close gate is satisfied/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Re-open to correct/ })).not.toBeInTheDocument();
     getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
-  });
-
-  test('a stale accepted variance BLOCKS Freeze/Sign (the flag is not toothless)', async () => {
-    const { getTallyCert } = require('../api');
-    // Clean gate + tied, but a stale acceptance → the buttons must still be disabled.
-    getTallyCert.mockResolvedValue({ certificate: { status: 'reconciled', snapshot: { frozenAt: '2026-07-05' }, signatures: [] }, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: true, step: { role: 'AE' } } });
-    wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} staleAccepted={2} currentUser={{ role: 'Owner' }} />);
-    expect(await screen.findByText(/2 accepted variances changed/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Sign/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Freeze|Re-freeze/ })).toBeDisabled();
-    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false } });
   });
 
   test('a certified period disables the Upload buttons (re-open first)', async () => {
