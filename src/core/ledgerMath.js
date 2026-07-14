@@ -37,6 +37,9 @@ export function mapLedger(d) {
     opening: { amt: d.openingBalance || 0, side: d.openingSide || 'Dr' },
     rows: (d.lines || []).map((e) => ({
       date: e.date, vno: e.vno, tallyRef: e.sourceRef || '', voucherId: e.voucherId, branch: e.branch || '', category: e.category || e.type || '',
+      // Raw voucher type (module code, e.g. SF/PF) — kept so a sale/purchase row can be
+      // recognised as an SO/PO/GP booking leg (→ opens the whole Booking Folder).
+      type: e.type || '',
       part: (e.particulars && e.particulars[0] && e.particulars[0].ledger) || e.party || vtLabel(e.category),
       toBy: e.debit > 0 ? 'To' : 'By',
       vt: vtLabel(e.category || e.type),

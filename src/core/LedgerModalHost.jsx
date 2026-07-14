@@ -17,6 +17,7 @@ import { LedgerAccountView } from './ledgerUI';
 import { pushModal } from './ux/modalStore';
 import { useDock } from './ux/dock';
 import { openModuleRegister } from './registerNav';
+import { openBookingFolder } from './BookingFolderHost';
 import { bc } from './styleTokens';
 
 /* VoucherEditor lives in the 2000-line accountingLive module. It's only needed
@@ -106,6 +107,9 @@ export function LedgerModalHost({ branch: shellBranch }) {
             onPickInvoice={job.invoiceToRegister
               ? (inv) => { close(); openModuleRegister(inv.category, inv.vno); }
               : undefined}
+            onPickFolder={job.invoiceToRegister
+              ? undefined  // the P&L drill keeps its Sales/Purchase Register hop
+              : (inv) => { close(); openBookingFolder(inv.vno, { branch, voucherId: inv.id, vno: inv.vno }); }}
             maxHeight="calc(100vh - 360px)"
           />
         </div>

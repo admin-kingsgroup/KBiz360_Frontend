@@ -10,6 +10,7 @@ import { bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
 import { PeriodBar, periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
+import { openBookingFolder } from '../../core/BookingFolderHost';
 import { useReportExport } from '../../core/reportExportContext';
 import { Search, X, Receipt, FileText, ChevronDown } from 'lucide-react';
 import { PageLayout } from '../../shell/PageLayout';
@@ -154,7 +155,9 @@ export function ModuleRegister({ branch, mode = 'both' }) {
       ledgerCol,
       ...(showSale ? [{ key: 'so.total', header: mode === 'both' ? 'Sale (incl GST)' : 'Invoice Value', num: true, render: (r) => fmt(r.so?.total) }] : []),
       ...(showPur ? [{ key: 'po.total', header: mode === 'both' ? 'Purchase (incl GST)' : 'Invoice Value', num: true, render: (r) => (r.noSupplier ? '—' : fmt(r.po?.total)) }] : []),
-      { key: 'linkNo', header: 'Link No', className: 'font-mono text-[#185FA5]', render: (r) => r.linkNo || '—' },
+      { key: 'linkNo', header: 'Link No', className: 'font-mono text-[#185FA5]', render: (r) => (r.linkNo
+        ? <button type="button" onClick={() => openBookingFolder(r.linkNo, { branch, vno: r.saleVno })} title="Open the whole SO / PO / GP deal" className="font-mono text-[#185FA5] underline decoration-dotted underline-offset-2 hover:text-[#0d3f73]">{r.linkNo}</button>
+        : '—') },
       { key: 'saleVno', header: 'Sales Invoice No', className: 'font-mono text-[11px] text-ink-muted', render: (r) => r.saleVno || '—' },
       { key: 'purchaseVno', header: 'Purchase Invoice No', className: 'font-mono text-[11px] text-ink-muted', render: (r) => (r.noSupplier ? '—' : (r.purchaseVno || '—')) },
       // ── the rest ──

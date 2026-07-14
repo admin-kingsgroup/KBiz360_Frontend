@@ -89,13 +89,14 @@ function headRows(heads, isOpen, keyOf, labelOf = (s) => s) {
   });
 }
 
-/** The "Less: Refunds / Reissues" row for a module/sub-centre side, so the head
- *  breakdown foots to the NET total (heads are gross sale/purchase; the refund row
- *  is the signed net−Σheads contribution). [] when there's no refund movement. */
+/** The residual "Reissues / Adjustments" row for a module/sub-centre side, so the head
+ *  breakdown foots to the NET total. Refunds now post to their own Sales/Purchase Refunds
+ *  head (shown in the breakdown above); this row is only the leftover signed net−Σheads
+ *  contribution — reissue income and any posting-only trading adjustments. [] when nil. */
 export function refundRows(node, side) {
   const amt = node && node.refunds && Number(node.refunds[side]);
   return Math.abs(amt || 0) > 0.5
-    ? [{ label: 'Less: Refunds / Reissues', amount: amt, refund: true, ledgerHead: true }]
+    ? [{ label: 'Reissues / Adjustments', amount: amt, refund: true, ledgerHead: true }]
     : [];
 }
 

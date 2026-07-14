@@ -31,6 +31,7 @@ import {
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../../core/useAccounting';
 import { apiGet } from '../../core/api';
+import { openBookingFolder } from '../../core/BookingFolderHost';
 import { LedgerVouchers } from '../reportsFinancial/pnlTally.jsx';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
@@ -819,7 +820,7 @@ export function LedgerAcLive({ branch }) {
     >
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
         {display
-          ? <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+          ? <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} onPickFolder={(inv) => openBookingFolder(inv.vno, { branch, voucherId: inv.id, vno: inv.vno })} maxHeight="calc(100vh - 330px)" />
           : <div style={{ padding: '64px 24px', textAlign: 'center', color: DIM, fontSize: 13, lineHeight: 1.7 }}>
               Search and select a ledger above, then press <b style={{ color: GREEN }}>View</b><br />to open its account statement.
             </div>}
@@ -1630,8 +1631,14 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     () => buildCaptureSheet(rows, { tab, tag: brTag, linkIndex, bookingByLink, showType }),
     [rows, tab, brTag, linkIndex, bookingByLink, showType],
   );
-  // Final Invoice Value → open the voucher's journal (JV). Per-row Invoice → print PDF.
-  const openJV = (v) => { if (v) setDetail(v); };
+  // Final Invoice Value → open the WHOLE SO/PO/GP deal (Booking Folder) when this row is
+  // a booking leg (it carries a Link No); a manual sale/purchase voucher with no booking
+  // behind it still opens the single-voucher JV. Per-row Invoice → print PDF.
+  const openJV = (v) => {
+    if (!v) return;
+    if (v.linkNo) { openBookingFolder(v.linkNo, { branch, voucherId: v.id || v._id, vno: v.vno }); return; }
+    setDetail(v);
+  };
   const printInvoice = async (r) => {
     const b = r && r._booking;
     if (!b) return;

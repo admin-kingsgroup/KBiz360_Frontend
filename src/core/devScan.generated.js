@@ -11,7 +11,7 @@
 // scan's timestamp and labels these findings "from last build".
 export const DEV_SCAN = {
   "tree": "FE",
-  "filesScanned": 531,
+  "filesScanned": 532,
   "counts": {
     "total": 6,
     "bySeverity": {
@@ -78,7 +78,7 @@ export const DEV_SCAN = {
       "source": "build"
     },
     {
-      "id": "FE:App.jsx:258:empty-catch",
+      "id": "FE:App.jsx:259:empty-catch",
       "tree": "FE",
       "rule": "empty-catch",
       "category": "broken-code",
@@ -86,7 +86,7 @@ export const DEV_SCAN = {
       "title": "Empty catch — error silently swallowed",
       "remark": "This catch block is empty with no comment, so failures disappear silently. Handle the error, surface it, or at least add a note on why it is safe to ignore.",
       "file": "App.jsx",
-      "line": 258,
+      "line": 259,
       "snippet": "try{ Object.keys(localStorage).filter(k=>k.startsWith(\"kb360-\")).forEach(k=>localStorage.removeItem(k)); }catch{}",
       "source": "build"
     },

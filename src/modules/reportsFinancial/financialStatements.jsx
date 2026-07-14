@@ -132,10 +132,11 @@ function tkfPnLStatement(sd, sCur) {
       rows.push({ label: h.ledger, amount: h.amount, ledger: h.ledger, indent: 1 });
       for (const comp of (h.components || [])) rows.push({ label: comp.label, amount: comp.amount, indent: 2 });
     }
-    // "Less: Refunds / Reissues" — foots the gross heads to the module's net total
-    // (signed contribution; refunds reduce). Only when there's refund movement.
+    // Residual "Reissues / Adjustments" — foots the heads to the module's net total.
+    // Refunds now have their own Sales/Purchase Refunds head (rendered in `heads` above);
+    // this is only the leftover reissue income + posting-only trading adjustments.
     const rf = Number(m.refunds && m.refunds[side]);
-    if (heads.length && Math.abs(rf || 0) > 0.5) rows.push({ label: 'Less: Refunds / Reissues', amount: rf, indent: 1 });
+    if (heads.length && Math.abs(rf || 0) > 0.5) rows.push({ label: 'Reissues / Adjustments', amount: rf, indent: 1 });
     return rows;
   };
   const incomeRows = [
