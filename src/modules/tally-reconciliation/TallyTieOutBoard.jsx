@@ -430,48 +430,96 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 
   const showTree = coaView && tab === 'tb' && Array.isArray(data?.tree) && data.tree.length > 0;
 
-  // ── "By Module" (cost-centre) view — the ERP-only pivot. A module header (Σ ERP · GP) with
-  // its trading-ledger slices beneath; the Tally column is "— ERP only" (a Tally TB has no
-  // cost-centre axis). The trailing bucket lists every non-trading ledger (no cost centre). ──
-  const gpText = (n) => (n === 0 ? '0' : `${n > 0 ? '' : '−'}${Math.abs(n).toLocaleString(localeOf(cur))}`);
-  const renderModuleNodes = (mt) => {
+  // ── "By Module" (cost-centre) pivot — now ERP↔Tally. A module header (Σ ERP · Σ Tally · diff)
+  // with its trading-ledger slices beneath. A single-module ledger carries its Tally straight
+  // across (real diff); a ledger split across ≥2 cost centres can't attribute its one Tally figure
+  // to a module, so it shows "— at ledger" (reconcile By CoA); an ERP posting with no Tally match
+  // shows "— not in Tally". On the P&L tab a module is a mini-P&L — Sales / COGS subtotals + a
+  // per-module GP tie-out in the header. The trailing bucket holds every ledger with no cost centre
+  // (BS + non-trading on TB; indirect income/expense on P&L). ──
+  const gpText = (n) => (n === 0 || n == null ? '0' : `${n > 0 ? '' : '−'}${Math.abs(n).toLocaleString(localeOf(cur))}`);
+  const diffCell = (n) => (n == null ? '—' : n === 0 ? '0' : `${n > 0 ? '+' : '−'}${Math.abs(n).toLocaleString(localeOf(cur))}`);
+  const modBadge = (st) => st === 'tied' ? { tone: 'success', label: 'Tied' }
+    : st === 'off' ? { tone: 'danger', label: 'Off' }
+    : st === 'shared' ? { tone: 'info', label: 'At ledger' }
+    : { tone: 'warning', label: 'Not in Tally' };
+  // Tally cell for a module slice: the real figure, or a typed "why it's absent" note.
+  const sliceTallyCell = (r) => (r.tally != null
+    ? <span className="font-mono tabular-nums">{fmt(r.tally, cur)}</span>
+    : r.shared
+      ? <span className="text-[11px] text-info" title="This ledger posts to more than one cost centre — Tally holds one figure for it, reconciled at ledger level (By CoA), not split by module.">— at ledger</span>
+      : <span className="text-[11px] text-warning" title="ERP has a posting here but no matching Tally ledger — rename / regroup it in Tally to match.">— not in Tally</span>);
+  const renderModuleSlice = (r, keyStr) => {
+    const meta = modBadge(r.status);
+    return (
+      <tr key={keyStr} className="border-b border-surface-border/60 hover:bg-surface-alt/60">
+        <td className="px-4 py-1.5" style={{ paddingLeft: 32 }}><span className="block font-medium text-ink">{r.ledger}</span>
+          {r.code ? <span className="font-mono text-[11px] text-ink-subtle">{r.code}</span> : null}
+          <span className="ml-1 text-[10.5px] text-ink-subtle">· {INCOME_HEAD_SET.has(r.head) ? 'Sales' : 'Cost'}</span></td>
+        <td className="px-4 py-1.5 text-right font-mono tabular-nums">{fmt(r.erp, cur)}</td>
+        <td className="px-4 py-1.5 text-right">{sliceTallyCell(r)}</td>
+        <td className={`px-4 py-1.5 text-right font-mono tabular-nums ${r.diff == null || r.diff === 0 ? 'text-ink-subtle' : 'text-danger'}`}>{diffCell(r.diff)}</td>
+        <td className="px-4 py-1.5 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
+      </tr>
+    );
+  };
+  const renderModuleNodes = (mt, { pl = false } = {}) => {
     if (!mt || !Array.isArray(mt.modules)) return null;
-    // The bucket is the EXACT complement of the module pivot (BE builds it from trading rows with
-    // an ERP figure): BS + non-trading ledgers AND any Tally-only trading ledger (erp == null → no
-    // ERP slice to pivot). Without the erp check a Sales/Purchase ledger present in Tally but not
-    // ERP would vanish from this view entirely, though it's a real discrepancy.
-    const nonModule = rows.filter((r) => !(MODULE_HEADS.has(r.parentGroup) && r.erp != null));
+    // Bucket = the EXACT complement of the module pivot. On P&L keep only P&L rows with no cost
+    // centre (indirect income/expense); on TB keep everything non-trading (BS + indirect + any
+    // Tally-only trading ledger with erp == null, which has no ERP slice to pivot — without the erp
+    // check a Sales/Purchase ledger in Tally but not ERP would vanish, though it's a real gap).
+    const nonModule = rows.filter((r) => !(MODULE_HEADS.has(r.parentGroup) && r.erp != null) && (!pl || r.statement === 'PL'));
+    const bucketLabel = pl ? 'Other P&L · no cost centre (indirect income & expense)' : 'Balance Sheet & non-trading · no cost centre';
+    const modHead = (m) => {
+      const meta = modBadge(m.status || 'unmatched');
+      const gpTie = pl && m.gpTally != null;
+      return (
+        <tr className="border-b border-surface-border bg-navy">
+          <td className="py-2 pl-4 pr-4"><span className="block text-[11px] font-bold uppercase tracking-wider text-white">{m.label}</span>
+            <span className="text-[10.5px] font-semibold text-white/70">GP {gpText(m.gp)}{gpTie ? ` · Tally ${gpText(m.gpTally)} · Δ ${diffCell(m.gpDiff)}` : ''} · {cur}</span></td>
+          <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold text-white">{fmt(m.erp, cur)}</td>
+          <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold text-white">{m.tally == null ? <span className="text-[11px] font-semibold text-white/70" title="No attributable Tally in this module — its ledgers are shared across cost centres or absent from Tally.">—</span> : fmt(m.tally, cur)}</td>
+          <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${m.diff == null || m.diff === 0 ? 'text-white/70' : 'text-warning'}`}>{diffCell(m.diff)}</td>
+          <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
+        </tr>
+      );
+    };
+    const subTotal = (label, erp, tally) => (
+      <tr className="border-b border-surface-border bg-surface-alt/70">
+        <td className="px-4 py-1 pl-8 text-[11px] font-bold uppercase tracking-wide text-ink-muted">{label}</td>
+        <td className="px-4 py-1 text-right font-mono tabular-nums font-semibold text-ink">{fmt(erp, cur)}</td>
+        <td className="px-4 py-1 text-right font-mono tabular-nums font-semibold text-ink">{tally == null ? '—' : fmt(tally, cur)}</td>
+        <td className="px-4 py-1 text-right font-mono tabular-nums text-ink-subtle">{diffCell(tally == null ? null : round2(erp - tally))}</td>
+        <td className="px-4 py-1" />
+      </tr>
+    );
     return (
       <>
         {mt.modules.length === 0 && (
           <tr><td colSpan={5} className="px-4 py-2 text-[11.5px] text-ink-subtle">No cost-centre (module) postings in this period — every ledger below is non-trading.</td></tr>
         )}
-        {mt.modules.map((m) => (
-          <React.Fragment key={'mod|' + (m.code || 'unspec')}>
-            <tr className="border-b border-surface-border bg-navy">
-              <td className="py-2 pl-4 pr-4"><span className="block text-[11px] font-bold uppercase tracking-wider text-white">{m.label}</span>
-                <span className="text-[10.5px] font-semibold text-white/70">GP {gpText(m.gp)} · {cur}</span></td>
-              <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold text-white">{fmt(m.erp, cur)}</td>
-              <td className="px-4 py-2 text-right text-[11px] font-semibold text-white/70" title="A Tally trial balance has no cost-centre axis — this pivot is ERP-only.">— ERP only</td>
-              <td className="px-4 py-2" />
-              <td className="px-4 py-2" />
-            </tr>
-            {m.rows.map((r) => (
-              <tr key={'mod|' + (m.code || 'unspec') + '|' + (r.code || r.ledger)} className="border-b border-surface-border/60 hover:bg-surface-alt/60">
-                <td className="px-4 py-1.5" style={{ paddingLeft: 32 }}><span className="block font-medium text-ink">{r.ledger}</span>
-                  {r.code ? <span className="font-mono text-[11px] text-ink-subtle">{r.code}</span> : null}
-                  <span className="ml-1 text-[10.5px] text-ink-subtle">· {INCOME_HEAD_SET.has(r.head) ? 'Sales' : 'Cost'}</span></td>
-                <td className="px-4 py-1.5 text-right font-mono tabular-nums">{fmt(r.erp, cur)}</td>
-                <td className="px-4 py-1.5 text-right text-[11px] text-ink-subtle" title="A Tally trial balance has no cost-centre axis — this split is ERP-only.">— ⓘ</td>
-                <td className="px-4 py-1.5" />
-                <td className="px-4 py-1.5" />
-              </tr>
-            ))}
-          </React.Fragment>
-        ))}
+        {mt.modules.map((m) => {
+          const inc = m.rows.filter((r) => INCOME_HEAD_SET.has(r.head));
+          const cost = m.rows.filter((r) => !INCOME_HEAD_SET.has(r.head));
+          const kp = 'mod|' + (m.code || 'unspec');
+          return (
+            <React.Fragment key={kp}>
+              {modHead(m)}
+              {pl ? (
+                <>
+                  {subTotal('Sales (income)', m.sales, m.salesTally)}
+                  {inc.map((r) => renderModuleSlice(r, kp + '|s|' + (r.code || r.ledger)))}
+                  {subTotal('Less: COGS (cost)', m.cogs, m.cogsTally)}
+                  {cost.map((r) => renderModuleSlice(r, kp + '|c|' + (r.code || r.ledger)))}
+                </>
+              ) : m.rows.map((r) => renderModuleSlice(r, kp + '|' + (r.code || r.ledger)))}
+            </React.Fragment>
+          );
+        })}
         {nonModule.length > 0 && (
           <>
-            <tr><td colSpan={5} className="bg-surface-alt px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">Balance Sheet &amp; non-trading · no cost centre</td></tr>
+            <tr><td colSpan={5} className="bg-surface-alt px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">{bucketLabel}</td></tr>
             {nonModule.map((r) => renderLedgerRow(r, `mod-nc|${r.code || r.ledger}`))}
           </>
         )}
@@ -479,7 +527,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     );
   };
 
-  const showModule = moduleView && tab === 'tb' && data?.moduleTree && Array.isArray(data.moduleTree.modules);
+  const showModule = moduleView && (tab === 'tb' || tab === 'pl') && data?.moduleTree && Array.isArray(data.moduleTree.modules);
 
   // Direct-URL guard: a non-central role gets the rule, not the working board.
   if (!central) {
@@ -693,10 +741,12 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         )}
         {!isLoading && !empty && (
           <>
-          {(tab === 'tb' || blocking > 0) && (
+          {(tab === 'tb' || tab === 'pl' || blocking > 0) && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              {/* Two TB re-views, mutually exclusive (ticking one clears the other) — TB tab only
-                  (BS/P&L are already tree-shaped). Both remembered per user. */}
+              {/* Re-views, mutually exclusive (ticking one clears the other). Chart of Accounts is
+                  a TB re-view; By Module works on the Trial Balance AND the Profit & Loss (both
+                  carry the cost-centre pivot). Balance Sheet has no cost centre, so no By Module
+                  there. All remembered per user. */}
               {tab === 'tb' && (
                 <label className="inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted"
                   title="Show the ERP-live vs Tally trial balance arranged as your ERP Chart of Accounts — group ▸ sub-group ▸ ledger with running subtotals, fully expanded.">
@@ -704,11 +754,13 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                   Chart of Accounts view
                 </label>
               )}
-              {tab === 'tb' && (
+              {(tab === 'tb' || tab === 'pl') && (
                 <label className="inline-flex items-center gap-2 rounded-brand border border-surface-border bg-surface-muted px-3 py-1.5 text-xs font-semibold text-ink-muted"
-                  title="Pivot the trial balance by cost centre / module (Flight · Hotel · Holiday · Visa …) with each module's Sales / COGS / GP. ERP-only — a Tally trial balance has no cost-centre axis. Balance-Sheet ledgers (no cost centre) list in a trailing bucket.">
+                  title={tab === 'pl'
+                    ? "Pivot the P&L by cost centre / module (Flight · Hotel · Holiday · Visa …) as a mini-P&L per module — Sales / COGS and a per-module Gross Profit tie-out (ERP vs Tally). A ledger split across cost centres reconciles at ledger level."
+                    : "Pivot the trial balance by cost centre / module (Flight · Hotel · Holiday · Visa …) with each module's Sales / COGS / GP, ERP vs Tally. Balance-Sheet ledgers (no cost centre) list in a trailing bucket."}>
                   <input type="checkbox" checked={moduleView} onChange={(e) => { const v = e.target.checked; setModuleView(v); if (v) setCoaView(false); }} className="accent-accent" />
-                  By Module <span className="text-[10px] font-semibold text-ink-subtle">(cost centre · ERP-only)</span>
+                  By Module <span className="text-[10px] font-semibold text-ink-subtle">{tab === 'pl' ? '(cost centre · GP)' : '(cost centre)'}</span>
                 </label>
               )}
               {blocking > 0 && !showTree && !showModule && (
@@ -731,7 +783,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                 </tr>
               </thead>
               <tbody>
-                {showModule ? renderModuleNodes(data.moduleTree) : showTree ? renderTreeNodes(data.tree, 0) : viewSections.map((sec) => (
+                {showModule ? renderModuleNodes(data.moduleTree, { pl: tab === 'pl' }) : showTree ? renderTreeNodes(data.tree, 0) : viewSections.map((sec) => (
                   <React.Fragment key={sec.label || 'all'}>
                     {sec.label && <tr><td colSpan={5} className="bg-surface-alt px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">{sec.label}</td></tr>}
                     {byParent(sec.rows).map((g) => (

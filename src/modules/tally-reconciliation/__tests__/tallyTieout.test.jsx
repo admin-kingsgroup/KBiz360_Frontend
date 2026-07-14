@@ -215,23 +215,27 @@ describe('Tally Reconciliation · tie-out board render', () => {
       tree: [{ id: 'bank', name: 'Bank Accounts', level: 0, statement: 'BS', erp: 1500, tally: 1500, diff: 0, status: 'tied', rows: [bank], children: [] }],
       moduleTree: {
         modules: [
-          { code: 'FLT-INT', label: 'International Flights', erp: -1500, sales: -40000, cogs: 38500, gp: 1500, rows: [
-            { ledger: 'Air Ticket Sales', code: 'S1', head: 'Sales Accounts', erp: -40000 },
-            { ledger: 'Air Ticket Purchase', code: 'P1', head: 'Purchase Accounts', erp: 38500 },
-          ] },
+          { code: 'FLT-INT', label: 'International Flights', erp: -1500, tally: -1500, diff: 0,
+            sales: -40000, cogs: 38500, salesTally: -40000, cogsTally: 38500,
+            gp: 1500, gpTally: 1500, gpDiff: 0, status: 'tied', unmatched: 0, shared: 0, rows: [
+              { ledger: 'Air Ticket Sales', code: 'S1', head: 'Sales Accounts', erp: -40000, tally: -40000, diff: 0, status: 'tied', shared: false },
+              { ledger: 'Air Ticket Purchase', code: 'P1', head: 'Purchase Accounts', erp: 38500, tally: 38500, diff: 0, status: 'tied', shared: false },
+            ] },
         ],
-        totals: { erp: -1500, sales: -40000, cogs: 38500, gp: 1500 },
+        totals: { erp: -1500, tally: -1500, sales: -40000, cogs: 38500, salesTally: -40000, cogsTally: 38500, gp: 1500, gpTally: 1500 },
       },
     });
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     const modTick = await screen.findByLabelText(/By Module/);
     expect(modTick).not.toBeChecked();
-    // Tick By Module → the module header (label + GP), its ledger slices, the ERP-only note,
-    // and the trailing "no cost centre" bucket carrying the Balance-Sheet ledger all render.
+    // Tick By Module → the module header (label + GP), its ledger slices WITH the Tally column now
+    // populated (no more "ERP only" note), and the trailing "no cost centre" bucket carrying the
+    // Balance-Sheet ledger all render.
     fireEvent.click(modTick);
     expect(await screen.findByText('International Flights')).toBeInTheDocument();
     expect(screen.getByText(/GP 1,500/)).toBeInTheDocument();
-    expect(screen.getAllByText(/ERP only/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/ERP only/)).not.toBeInTheDocument();     // Tally is shown now, not suppressed
+    expect(screen.getAllByText('Tied').length).toBeGreaterThan(0);      // slice/module tie-out status
     expect(screen.getByText('Air Ticket Purchase')).toBeInTheDocument();
     expect(screen.getByText(/no cost centre/i)).toBeInTheDocument();
     expect(screen.getByText('HDFC Bank A/c')).toBeInTheDocument();        // BS ledger in the trailing bucket
@@ -243,6 +247,49 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByLabelText(/By Module/)).not.toBeChecked();
     expect(window.localStorage.getItem('tally.moduleView')).toBe('0');
     window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
+  test('P&L · By Module shows the per-module GP tie-out (ERP vs Tally) with Sales/COGS subtotals + a P&L bucket', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const sale = { ledger: 'IT-Base Fare', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -100000, tally: -110000, diff: 10000, status: 'off' };
+    const purch = { ledger: 'IT-Base Fare [Pur]', code: 'P1', group: 'Purchase Accounts', parentGroup: 'Purchase Accounts', statement: 'PL', nature: 'expense', erp: 90000, tally: 99000, diff: -9000, status: 'off' };
+    // An indirect expense (no cost centre) — must land in the P&L bucket, never a module.
+    const bankChg = { ledger: 'Bank Charges', code: 'E9', group: 'Indirect Expenses', parentGroup: 'Indirect Expenses', statement: 'PL', nature: 'expense', erp: 500, tally: 500, diff: 0, status: 'tied' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 3, tied: 1, off: 2, offTotal: 2, netProfitErp: 9500, netProfitTally: 10500 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
+      rows: [sale, purch, bankChg],
+      tree: [],
+      moduleTree: {
+        modules: [
+          { code: 'FLT-INT', label: 'International Flights', erp: -10000, tally: -11000, diff: 1000,
+            sales: -100000, cogs: 90000, salesTally: -110000, cogsTally: 99000,
+            gp: 10000, gpTally: 11000, gpDiff: -1000, status: 'off', unmatched: 0, shared: 0, rows: [
+              { ledger: 'IT-Base Fare', code: 'S1', head: 'Sales Accounts', erp: -100000, tally: -110000, diff: 10000, status: 'off', shared: false },
+              { ledger: 'IT-Base Fare [Pur]', code: 'P1', head: 'Purchase Accounts', erp: 90000, tally: 99000, diff: -9000, status: 'off', shared: false },
+            ] },
+        ],
+        totals: { erp: -10000, tally: -11000, sales: -100000, cogs: 90000, salesTally: -110000, cogsTally: 99000, gp: 10000, gpTally: 11000 },
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // Switch to the P&L tab, then tick By Module.
+    fireEvent.click(await screen.findByRole('button', { name: /Profit & Loss/i }));
+    const modTick = await screen.findByLabelText(/By Module/);
+    fireEvent.click(modTick);
+    expect(await screen.findByText('International Flights')).toBeInTheDocument();
+    // Per-module GP tie-out on the header: GP ERP 10,000 · Tally 11,000.
+    expect(screen.getByText(/GP 10,000.*Tally 11,000/)).toBeInTheDocument();
+    // Mini-P&L subtotals present.
+    expect(screen.getByText(/Sales \(income\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Less: COGS/)).toBeInTheDocument();
+    // Indirect expense drops into the P&L bucket (not the module), which is P&L-scoped.
+    expect(screen.getByText(/Other P&L · no cost centre/i)).toBeInTheDocument();
+    expect(screen.getByText('Bank Charges')).toBeInTheDocument();
     window.localStorage.removeItem('tally.moduleView');
   });
 
