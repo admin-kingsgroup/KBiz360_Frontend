@@ -64,6 +64,10 @@ const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE =
 const GOLD_DEEP = '#6B4E0F', GOLD_SOFT = '#FBF3DE', GOLD_LINE = '#E8D9A8';
 const HELV = "'Helvetica Neue', Helvetica, Arial, sans-serif";
 const SO_BAR = '#1D4E89', PO_BAR = '#8A1F3D', GP_BAR = GOLD;
+// GOLD_SOFT/GOLD_LINE/PO_BAR are also exported — BookingTable (moved to
+// modules/approvals/bookingApprovals.jsx) reuses this exact theme for its
+// revoked-badge and Edit PO button, since both screens edit the same booking.
+export { GOLD_SOFT, GOLD_LINE, PO_BAR };
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
 // module bar as Flight/Hotel, but they open the reversal entry (ReversalEntry) instead
 // of the fare grid and spawn one RF/RI voucher on approval.
@@ -1710,7 +1714,9 @@ function PostingTable({ side, accent, title }) {
   return <JvBlock title={title} sub={`${side.vno || ''}${side.type ? ' · ' + side.type : ''}`} postings={side.postings} color={accent} />;
 }
 
-function JournalView({ id, cur, date }) {
+// Exported — BookingTable (modules/approvals/bookingApprovals.jsx) reuses this
+// exact JV expansion for its own booking rows.
+export function JournalView({ id, cur, date }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['booking-journal', id],
     queryFn: () => apiGet('/api/booking-orders/' + id + '/journal'),
