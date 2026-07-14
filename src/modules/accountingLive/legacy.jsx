@@ -1631,12 +1631,13 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     () => buildCaptureSheet(rows, { tab, tag: brTag, linkIndex, bookingByLink, showType }),
     [rows, tab, brTag, linkIndex, bookingByLink, showType],
   );
-  // Final Invoice Value → open the WHOLE SO/PO/GP deal (Booking Folder) when this row is
-  // a booking leg (it carries a Link No); a manual sale/purchase voucher with no booking
-  // behind it still opens the single-voucher JV. Per-row Invoice → print PDF.
+  // Final Invoice Value → open the WHOLE SO/PO/GP deal (Booking Folder) when this row is a
+  // FORWARD booking leg (carries a Link No and isn't an INB deal); an INB row or a manual
+  // sale/purchase voucher with no booking behind it still opens the single-voucher JV
+  // (the folder can't render an INB deal — it has no BookingOrder). Per-row Invoice → print.
   const openJV = (v) => {
     if (!v) return;
-    if (v.linkNo) { openBookingFolder(v.linkNo, { branch, voucherId: v.id || v._id, vno: v.vno }); return; }
+    if (v.linkNo && v.type !== 'INB') { openBookingFolder(v.linkNo, { branch, voucherId: v.id || v._id, vno: v.vno }); return; }
     setDetail(v);
   };
   const printInvoice = async (r) => {

@@ -25,7 +25,7 @@ import { pushModal } from './ux/modalStore';
 import { bc } from './styleTokens';
 import { VSPECS } from './voucherSpecs';
 import { printBookingInvoice } from './printInvoice';
-import { openModuleRegister } from './registerNav';
+import { setNavFocus } from './ux/navFocus';
 
 // VoucherEditor lives in the heavy accountingLive module — load it lazily, and only
 // for the rare fallback (a manual sale/purchase voucher that has no booking behind it).
@@ -125,6 +125,11 @@ export function BookingFolderHost({ branch: shellBranch }) {
   const inb = d && d.kind === 'inb' ? d.deal : null;
   const st = (b && STATUS[b.status]) || STATUS.pending;
   const modName = b ? (VSPECS[b.module]?.name || b.module) : '';
+  const jerr = d && d.journalError;
+  // A rejected/cancelled/deleted deal's journal was reversed out (or never posted) — its
+  // recomputed JV must NOT be read as live. Pending = a preview that posts on approval.
+  const voidDeal = b && (b.status === 'rejected' || b.status === 'cancelled' || b.status === 'deleted');
+  const note = (bg, bd, fg) => ({ padding: '8px 12px', borderRadius: 7, background: bg, border: `1px solid ${bd}`, color: fg, fontSize: 12, margin: '2px 0 10px' });
 
   const doPrint = async (side) => {
     if (!b) return;
@@ -132,9 +137,16 @@ export function BookingFolderHost({ branch: shellBranch }) {
     try { if (b.id) full = await apiGet(`/api/booking-orders/${b.id}`); } catch { full = b; }
     await printBookingInvoice({ booking: full, side, branch, title: `${side === 'sale' ? 'Sales' : 'Purchase'} Invoice · ${full.bookingNo || full.linkNo || ''}` });
   };
-  // Correction path: bookings are edit-locked as vouchers — the SO/PO/GP form (register)
-  // is where a whole deal is edited (edit → pending reverses all legs together).
-  const openBookingForm = () => { if (b) { openModuleRegister('sale', b.linkNo || b.bookingNo); close(); } };
+  // Correction path: bookings are edit-locked as vouchers, so the deal is managed in
+  // SO/PO/GP Approvals — edit it there if still pending, or revoke → edit if approved
+  // (all legs move together). Deep-link focused on this booking (mirrors openParentFile);
+  // the host closes itself on the kb:open-register it fires.
+  const manageInApprovals = () => {
+    if (!b) return;
+    const ref = b.bookingNo || b.linkNo || '';
+    setNavFocus('/transactions/approvals', { kind: 'file', domain: 'sopogp', status: b.status === 'pending' ? 'pending' : 'approved', search: ref, label: 'SO / PO / GP booking', ref });
+    try { window.dispatchEvent(new CustomEvent('kb:open-register', { detail: { route: '/transactions/approvals' } })); } catch { /* ignore */ }
+  };
 
   return (
     <div onMouseDown={close} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.55)', zIndex: 8850, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '3.5vh 2vw' }}>
@@ -193,7 +205,19 @@ export function BookingFolderHost({ branch: shellBranch }) {
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: st.fg, background: st.bg, border: `1px solid ${st.bd}`, padding: '4px 11px', borderRadius: 999, whiteSpace: 'nowrap' }}>{st.lbl}</div>
               </div>
 
-              <Totals branch={branch} so={b.so} po={b.po} gp={b.gp} noSupplier={b.noSupplier} />
+              {/* Currency follows the BOOKING's own branch, not the shell branch — so a USD
+                  (Africa) deal shown while the shell is on ₹ / consolidated still reads in $. */}
+              <Totals branch={b.branch ? { code: b.branch } : branch} so={b.so} po={b.po} gp={b.gp} noSupplier={b.noSupplier} />
+
+              {/* Status truth about the journal below, so a recomputed JV is never mistaken
+                  for one that's actually on the books. */}
+              {jerr ? (
+                <div style={note('#FBE9E7', '#E6B4AC', '#8A2C1C')}>⚠ The journal couldn’t be built for this deal — showing the booking only. <span style={{ opacity: 0.8 }}>{jerr}</span></div>
+              ) : voidDeal ? (
+                <div style={note('#FBE9E7', '#E6B4AC', '#8A2C1C')}>⚠ This deal is <b>{b.status}</b> — the journal below is <b>not on the books</b> (reversed out / never posted). Shown for reference only.</div>
+              ) : b.status === 'pending' ? (
+                <div style={note('#FBF3DE', '#E8D9A8', '#6B4E0F')}>Preview — <b>not yet posted</b>. Approving this booking posts the journal below.</div>
+              ) : null}
 
               {/* Sale JV */}
               {jv && jv.sale && (
@@ -218,13 +242,17 @@ export function BookingFolderHost({ branch: shellBranch }) {
         {/* Footer actions */}
         {!state.loading && b && (
           <div style={{ display: 'flex', gap: 9, alignItems: 'center', flexWrap: 'wrap', padding: '11px 16px', borderTop: '1px solid #DEDBD4', background: '#FAFBFD' }}>
-            <span style={{ fontSize: 11.5, color: jv && jv.balanced ? '#155F42' : '#8A2C1C', fontWeight: 700 }}>
-              {jv && jv.balanced ? '● Balanced' : '● Check balance'} — 1 Sale JV{!b.noSupplier ? ` + ${1 + (b.purchases || []).length} Purchase JV` : ''}
+            <span style={{ fontSize: 11.5, color: voidDeal ? '#8A93A2' : !jv ? '#8A2C1C' : jv.balanced ? '#155F42' : '#8A2C1C', fontWeight: 700 }}>
+              {voidDeal
+                ? `● Not on the books (${b.status})`
+                : !jv
+                  ? '● Journal unavailable'
+                  : `${jv.balanced ? '● Balanced' : '● Check balance'} — 1 Sale JV${!b.noSupplier ? ` + ${1 + (b.purchases || []).length} Purchase JV` : ''}`}
             </span>
             <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 9, flexWrap: 'wrap' }}>
               <button onClick={() => doPrint('sale')} style={btn('')}>🖨 Print SO</button>
               {!b.noSupplier && <button onClick={() => doPrint('purchase')} style={btn('')}>🖨 Print PO</button>}
-              <button onClick={openBookingForm} title="Open in the SO/PO/GP register (edit → pending reverses all legs together)" style={btn('#A07828')}>Edit booking →</button>
+              <button onClick={manageInApprovals} title="Open this deal in SO/PO/GP Approvals — edit it if pending, or revoke → edit if approved (all legs move together)" style={btn('#A07828')}>Open in Approvals →</button>
             </span>
           </div>
         )}
