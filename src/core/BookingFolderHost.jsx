@@ -135,7 +135,10 @@ export function BookingFolderHost({ branch: shellBranch }) {
     if (!b) return;
     let full = b;
     try { if (b.id) full = await apiGet(`/api/booking-orders/${b.id}`); } catch { full = b; }
-    await printBookingInvoice({ booking: full, side, branch, title: `${side === 'sale' ? 'Sales' : 'Purchase'} Invoice · ${full.bookingNo || full.linkNo || ''}` });
+    // Print in the BOOKING's own branch/currency (not the shell branch) — else a USD/Africa
+    // deal opened from a ₹ / consolidated view would print in ₹.
+    const printBranch = full.branch ? { code: full.branch } : branch;
+    await printBookingInvoice({ booking: full, side, branch: printBranch, title: `${side === 'sale' ? 'Sales' : 'Purchase'} Invoice · ${full.bookingNo || full.linkNo || ''}` });
   };
   // Correction path: bookings are edit-locked as vouchers, so the deal is managed in
   // SO/PO/GP Approvals — edit it there if still pending, or revoke → edit if approved
@@ -149,7 +152,7 @@ export function BookingFolderHost({ branch: shellBranch }) {
   };
 
   return (
-    <div onMouseDown={close} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.55)', zIndex: 8850, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '3.5vh 2vw' }}>
+    <div onMouseDown={close} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.55)', zIndex: 8950, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '3.5vh 2vw' }}>
       <div onMouseDown={(e) => e.stopPropagation()} style={{ width: 'min(1000px, 96vw)', maxHeight: '93vh', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.4)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 16px', borderBottom: '1px solid #DEDBD4', background: '#FDFAF4' }}>
           <strong style={{ fontSize: 13.5, color: DARK, letterSpacing: '.2px' }}>🗂 Booking Folder{b ? <> — {b.bookingNo}</> : ''}</strong>

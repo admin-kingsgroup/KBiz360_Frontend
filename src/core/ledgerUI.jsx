@@ -29,7 +29,10 @@ import {
 // voucher type is a forward booking module (mirror of the backend FORWARD_GP_TYPES).
 // Such a row opens the whole Booking Folder; every other row opens its plain voucher.
 const FORWARD_GP_TYPES = ['SF', 'PF', 'SH', 'PH', 'SHT', 'PHT', 'SV', 'PV', 'SC', 'PC', 'SI', 'PI', 'SM', 'PM'];
-const isBookingLegRow = (r) => r && /sale|purchase/i.test(r.category || '') && FORWARD_GP_TYPES.includes(r.type);
+// Exported so the Sales/Purchase Register reuses the SAME guard — it must exclude a
+// refund/reissue row (whose linkNo points at the ORIGINAL sale) and INB rows, routing
+// only genuine forward booking legs to the folder.
+export const isBookingLegRow = (r) => !!r && /sale|purchase/i.test(r.category || '') && FORWARD_GP_TYPES.includes(r.type);
 
 export { billwiseSide, isBillwiseLedger } from './ledgerMath';
 
