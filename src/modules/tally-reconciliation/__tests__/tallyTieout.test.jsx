@@ -601,6 +601,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     await screen.findByText('BSP settlement');                           // wait for the voucher lines to load
     expect(screen.getByText('PV')).toBeInTheDocument();                  // voucher type shown
     expect(screen.getByText(/BSP\/W27/)).toBeInTheDocument();            // source / booking ref shown (within the meta line)
+    expect(screen.getByTitle('Open the full voucher')).toHaveTextContent('PAY/0412');   // voucher no is a link → opens the full voucher
     // Expand the voucher → its double-entry legs appear.
     fireEvent.click(screen.getByText(/2 entries/));
     expect(screen.getByText('Entries in this voucher')).toBeInTheDocument();

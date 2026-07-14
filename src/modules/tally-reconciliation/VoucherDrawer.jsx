@@ -1,9 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Check, RotateCcw } from 'lucide-react';
+import { X, Check, RotateCcw, ArrowLeft } from 'lucide-react';
 import { getLedgerVouchers, acceptVariance, clearVariance } from './api';
 import { fmt, statusMeta, REASONS, reasonLabel } from './format';
 import { Badge, Button, Select, LoadingState, ErrorState } from '../../shell/primitives';
+
+// The full ERP voucher (all legs + header), opened on demand from a drill line. Lazy so the heavy
+// accounting editor module isn't pulled into the tally bundle until a voucher is actually opened.
+const VoucherEditor = lazy(() => import('../accountingLive/legacy').then((m) => ({ default: m.VoucherEditor })));
 
 // ─── Voucher drill (Phase 2) + accept-variance (Phase 4) ─────────────────────
 // Opens from an off row: the ledger's ERP postings vs its uploaded Tally Day
@@ -19,6 +23,7 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
   const [reason, setReason] = useState(row && row.interBranch ? 'inter-branch' : 'timing');
   const [note, setNote] = useState('');
   const [expanded, setExpanded] = useState(null);   // which voucher row is expanded to its entries
+  const [openVoucher, setOpenVoucher] = useState(null);   // { id, vno } — the full voucher opened over the drill
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['tally-tieout', 'ledger', branch, period, tier, ledger],
@@ -109,7 +114,9 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
                         <td className="px-4 py-2 align-top">
                           <span className="block font-semibold text-ink">{canExpand ? <span className="mr-1 inline-block text-ink-subtle">{open ? '▾' : '▸'}</span> : null}{label}
                             {l.vtype ? <span className="ml-1.5 align-middle rounded bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted">{l.vtype}</span> : null}</span>
-                          <span className="mt-0.5 block font-mono text-xs text-ink-subtle">{l.ref || '(no vno)'}{l.tallyRef && l.tallyRef !== l.ref ? ` · Tally ${l.tallyRef}` : ''}{l.date ? ` · ${l.date}` : ''}{l.sourceRef ? ` · ${l.sourceRef}` : ''}</span>
+                          <span className="mt-0.5 block font-mono text-xs text-ink-subtle">{l.voucherId
+                            ? <button type="button" title="Open the full voucher" onClick={(e) => { e.stopPropagation(); setOpenVoucher({ id: l.voucherId, vno: l.ref }); }} className="rounded font-semibold text-accent hover:underline focus:outline-none focus:ring-1 focus:ring-accent">{l.ref || 'voucher'} ↗</button>
+                            : (l.ref || '(no vno)')}{l.tallyRef && l.tallyRef !== l.ref ? ` · Tally ${l.tallyRef}` : ''}{l.date ? ` · ${l.date}` : ''}{l.sourceRef ? ` · ${l.sourceRef}` : ''}</span>
                           {l.narration && l.narration !== l.desc ? <span className="mt-0.5 block text-[11px] text-ink-muted">{l.narration}</span> : null}
                           {l.desc && l.desc !== label ? <span className="mt-0.5 block text-[11px] text-ink-subtle">{l.desc}</span> : null}
                           {canExpand ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">{open ? '▾ hide entries' : `▸ ${legs.length} entries`}</span> : null}
@@ -167,6 +174,25 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
           )}
         </div>
       </aside>
+
+      {/* Full ERP voucher, opened from a drill line's number — all legs + header, over the drill.
+          Read-only for posted vouchers (VoucherShell's viewOnly), role-gated otherwise. */}
+      {openVoucher && (
+        <div className="fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-surface" role="dialog" aria-modal="true" aria-label={`Voucher ${openVoucher.vno || ''}`}>
+          <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-surface-border bg-surface px-5 py-3">
+            <button type="button" onClick={() => setOpenVoucher(null)}
+              className="inline-flex items-center gap-1.5 rounded-brand border border-surface-border px-3 py-1.5 text-sm font-semibold text-ink-muted hover:border-accent hover:text-accent focus:outline-none focus:ring-2 focus:ring-accent">
+              <ArrowLeft size={15} /> Back to drill
+            </button>
+            <span className="truncate text-sm font-semibold text-ink">Voucher {openVoucher.vno || ''}</span>
+          </div>
+          <div className="flex-1">
+            <Suspense fallback={<div className="p-8 text-center text-sm text-ink-subtle">Loading voucher…</div>}>
+              <VoucherEditor voucherId={openVoucher.id} cur={cur} onBack={() => setOpenVoucher(null)} onClose={() => setOpenVoucher(null)} />
+            </Suspense>
+          </div>
+        </div>
+      )}
     </>
   );
 }
