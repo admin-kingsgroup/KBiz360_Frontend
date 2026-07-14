@@ -482,7 +482,7 @@ function LedgerDrill({ branch, ledger, from, to, onClose }) {
         </div>
         {voucher
           ? <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />
-          : <LedgerVouchers name={ledger} branch={branch} from={from} to={to} onPick={(f) => f?.kind === 'voucher' && setVoucher({ id: f.id, vno: f.vno })} />}
+          : <LedgerVouchers name={ledger} branch={branch} from={from} to={to} onPick={(f) => { if (f?.kind !== 'voucher') return; if (isBookingLegRow(f)) openBookingFolder(f.vno, { branch, voucherId: f.id, vno: f.vno }); else setVoucher({ id: f.id, vno: f.vno }); }} />}
       </div>
     </div>
   );
@@ -742,7 +742,7 @@ export function DayBookLive({ branch }) {
                     </tr>
                   )}
                   <tr style={{ ...rowBg(i), cursor: r.voucherId ? 'pointer' : 'default' }}
-                    {...clickable(() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno }))}
+                    {...clickable(() => { if (!r.voucherId) return; if (isBookingLegRow(r)) openBookingFolder(r.vno, { branch, voucherId: r.voucherId, vno: r.vno }); else setVoucher({ id: r.voucherId, vno: r.vno }); })}
                     onMouseEnter={(e) => { if (r.voucherId) e.currentTarget.style.background = '#eff6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                     <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>
@@ -1917,7 +1917,10 @@ export function InvoiceGPLive({ branch }) {
                 <React.Fragment key={r.ref + '-' + i}>
                   <tr style={{ ...rowBg(i), cursor: 'pointer', background: isOpen ? '#eef4ff' : rowBg(i).background }} {...clickable(() => setOpen(isOpen ? null : i))}>
                     <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10.5, color: r.linked ? '#6b21a8' : '#64748b', fontWeight: 700 }}>
-                      <span style={{ color: DIM, marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{f.ref}
+                      <span style={{ color: DIM, marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>
+                      {r.linked && r.linkNo
+                        ? <span {...clickable((e) => { if (e && e.stopPropagation) e.stopPropagation(); openBookingFolder(r.linkNo, { branch, vno: r.ref }); })} title="Open the whole SO / PO / GP deal" style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>{f.ref}</span>
+                        : f.ref}
                     </td>
                     <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{f.date}</td>
                     <td style={{ padding: '8px 12px', color: DARK }}>{f.customer}</td>

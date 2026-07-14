@@ -11,6 +11,8 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { apiGet } from '../../core/api';
 import { openLedgerModal } from '../../core/LedgerModalHost';
+import { openBookingFolder } from '../../core/BookingFolderHost';
+import { isBookingLegRow } from '../../core/ledgerUI';
 import { useLedgerMeta, SourceBadge } from '../../core/LedgerLabel';
 import { bc } from '../../core/styles.jsx';
 import { localeOf } from '../../core/format';
@@ -369,7 +371,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
             </tr>
             {(d.lines || []).map((ln, i) => (
               <React.Fragment key={i}>
-                <tr {...clickable(() => ln.voucherId && onPick({ kind: 'voucher', id: ln.voucherId, vno: ln.vno }))}
+                <tr {...clickable(() => ln.voucherId && onPick({ kind: 'voucher', id: ln.voucherId, vno: ln.vno, category: ln.category, type: ln.type }))}
                   style={{ cursor: ln.voucherId ? 'pointer' : 'default', borderBottom: showNarration ? 'none' : '1px solid #dfe2e7' }}
                   onMouseEnter={(e) => ln.voucherId && (e.currentTarget.style.background = '#eef4ff')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
@@ -429,7 +431,7 @@ function LedgerBillwise({ name, branch, side }) {
         {bills.map((b, i) => (
           <tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}>
             <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{dmy(b.date)}</td>
-            <td style={{ ...tdName, fontWeight: 600, fontFamily: 'monospace', fontSize: 11 }}>{b.billVno}</td>
+            <td style={{ ...tdName, fontWeight: 600, fontFamily: 'monospace', fontSize: 11 }}><span {...clickable(() => openBookingFolder(b.billVno, { branch, vno: b.billVno }))} title="Open the whole SO / PO / GP deal" style={{ cursor: 'pointer', color: '#185FA5', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>{b.billVno}</span></td>
             <td style={{ ...tdName, color: DIM, whiteSpace: 'nowrap' }}>{b.creditDays ? dmy(addDaysStr(b.date, b.creditDays)) : '—'}</td>
             <td style={tdNum}>{money(b.total, cur)}</td>
             <td style={{ ...tdNum, color: b.allocated ? '#27500A' : DIM, fontWeight: b.allocated ? 700 : 400 }}>{b.allocated ? money(b.allocated, cur) : ''}</td>
@@ -522,7 +524,12 @@ export function VoucherView({ id, cur }) {
     <div style={{ padding: 14 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid ' + LINE }}>
         {[['Voucher', v.vno], ['Tally Ref', v.sourceRef], ['Date', dmy(v.date)], [v.category === 'purchase' ? 'Supplier' : 'Party', v.party], ['Type', `${v.type} · ${v.category}`], ['Link No', v.linkNo], ['Total', cur + ' ' + money(v.total, cur)]].map(([k, val]) => (
-          <div key={k}><div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>{k}</div><div style={{ fontSize: 12.5, fontWeight: 600, color: DARK }}>{val || '—'}</div></div>
+          <div key={k}><div style={{ fontSize: 9, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>{k}</div>
+            {/* On a forward SO/PO/GP booking leg, the Link No opens the whole deal (folder). */}
+            {k === 'Link No' && isBookingLegRow(v) && v.linkNo
+              ? <button type="button" onClick={() => openBookingFolder(v.linkNo, { branch: v.branch ? { code: v.branch } : undefined, voucherId: id, vno: v.vno })} title="Open the whole SO / PO / GP deal" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#185FA5', fontSize: 12.5, fontWeight: 600, fontFamily: 'inherit', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>{v.linkNo} ↗</button>
+              : <div style={{ fontSize: 12.5, fontWeight: 600, color: DARK }}>{val || '—'}</div>}
+          </div>
         ))}
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>

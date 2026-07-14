@@ -14,6 +14,7 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { bc } from './styleTokens';
 import { clickable } from './ux/clickable';
+import { openBookingFolder } from './BookingFolderHost';
 import { PeriodBar } from './period';
 import { useLedgerStatement, useOpenBills, useBillSettlements, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';
@@ -759,7 +760,7 @@ function BillwiseTable({ side, bills: rawBills, name, branch, cur, maxHeight, le
                   <tr className={'bill' + (i === cursor ? ' sel' : '')} data-billrow={i}
                     onClick={() => { setCursor(i); toggle(b.ref); if (wrapRef.current) wrapRef.current.focus(); }}
                     title="Click or Shift+Enter — settlement history">
-                    <td className="l part"><span className="caret">{isOpen ? '▾' : '▸'}</span>{b.ref}</td>
+                    <td className="l part"><span className="caret">{isOpen ? '▾' : '▸'}</span><span className="vlink" {...clickable((e) => { if (e && e.stopPropagation) e.stopPropagation(); openBookingFolder(b.ref, { branch, vno: b.ref }); })} title="Open the whole SO / PO / GP deal">{b.ref}</span></td>
                     <td className="l dt">{b.bdate}</td>
                     <td className="num">{fmt(b.amt)}</td>
                     <td className="num drc">{fmt(b.settled)}</td>

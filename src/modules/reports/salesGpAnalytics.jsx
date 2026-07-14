@@ -39,6 +39,7 @@ import { Printer, FileSpreadsheet, FileText } from 'lucide-react';
 import { PageLayout } from '../../shell/PageLayout';
 import { Button, Card, ResponsiveGrid, LoadingState, EmptyState } from '../../shell/primitives';
 import { clickable } from '../../core/ux/clickable';
+import { openBookingFolder } from '../../core/BookingFolderHost';
 import { openPrintPreview } from '../../core/PrintPreview';
 
 /* ── service (product) from voucher type ── */
@@ -453,7 +454,9 @@ function InvoiceTable({ title, invoices, onVoucher, drill, clearDrill, money }) 
                 <React.Fragment key={inv.key}>
                   <tr {...clickable(() => setOpen(isOpen ? '' : inv.key))} style={{ cursor: 'pointer', background: isOpen ? '#f7f8fb' : '' }}>
                     <td style={{ ...RPT_tdStyle, fontWeight: 600 }}><span style={{ color: '#9197a3', marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{inv.customer}</td>
-                    <td style={{ ...RPT_tdStyle, fontFamily: 'monospace', fontSize: 10, color: '#2563eb' }}>{inv.ref || '—'}</td>
+                    <td style={{ ...RPT_tdStyle, fontFamily: 'monospace', fontSize: 10, color: '#2563eb' }}>{inv.linkNo
+                      ? <span {...clickable((e) => { if (e && e.stopPropagation) e.stopPropagation(); openBookingFolder(inv.linkNo, { branch: inv.branch ? { code: inv.branch } : undefined, vno: inv.ref }); })} title="Open the whole SO / PO / GP deal" style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>{inv.ref}</span>
+                      : (inv.ref || '—')}</td>
                     <td style={RPT_tdStyle}>{inv.service}</td>
                     <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#2563eb' }}>{money(inv.sale)}</td>
                     <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#d97706' }}>{money(inv.cost)}</td>

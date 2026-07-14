@@ -14,11 +14,14 @@ import { ALL_TIME_FROM, todayISO } from '../core/dates';
 import { apiGet } from '../core/api';
 import { filterGpBills } from '../core/registerSearch';
 import { btnGh, card, inp } from '../core/styleTokens';
+import { openBookingFolder } from '../core/BookingFolderHost';
 
-export function GlobalSearch({setRoute}){
+export function GlobalSearch(){
   const [q,setQ]=useState("");
-  const MOD_ROUTES={Flight:"/sales/flight",Holiday:"/sales/holiday",Hotel:"/sales/hotel",
-    Car:"/sales/car",Visa:"/sales/visa",Insurance:"/sales/insurance",Misc:"/sales/misc"};
+  // A search hit is a booking file → open the WHOLE SO/PO/GP deal (folder) rather than
+  // navigating to the generic module page (which lost the specific deal). Resolves by
+  // Link No / sale invoice no; the folder falls back gracefully for a non-booking ref.
+  const openDeal=(r)=>openBookingFolder(r.linkNo||r.saleVno||r.id,{branch:r.branch?{code:r.branch}:undefined,vno:r.saleVno||r.id});
 
   // Live GP bills across every branch, inception → today (so prior-FY data is
   // searchable too). Cached; one fetch backs every keystroke.
@@ -61,7 +64,7 @@ export function GlobalSearch({setRoute}){
                 <tr key={r.id+'_'+i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}}
                   onMouseEnter={e=>e.currentTarget.style.background="#f0f4ff"}
                   onMouseLeave={e=>e.currentTarget.style.background=i%2===0?"#fff":"#fafafa"}
-                  onClick={()=>setRoute(MOD_ROUTES[r.mod]||"/sales/flight")}>
+                  onClick={()=>openDeal(r)}>
                   <td style={{padding:"8px 10px",fontFamily:"monospace",fontSize:9.5,color:"#185FA5"}}>{r.id}</td>
                   <td style={{padding:"8px 10px",fontSize:10,color:"#5a6691"}}>{r.date}</td>
                   <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{r.mod}</span></td>
@@ -72,7 +75,7 @@ export function GlobalSearch({setRoute}){
                   <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>{r.branch}</span></td>
                   <td style={{padding:"8px 10px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{bc2.cur}{Number(r.sell).toLocaleString()}</td>
                   <td style={{padding:"8px 10px",textAlign:"right"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,fontWeight:800,background:r.gpPct>=12?"#EAF3DE":"#FAEEDA",color:r.gpPct>=12?"#27500A":"#854F0B"}}>{r.gpPct}%</span></td>
-                  <td style={{padding:"8px 10px"}}><button onClick={()=>setRoute(MOD_ROUTES[r.mod]||"/sales/flight")} style={{...btnGh,padding:"2px 8px",fontSize:9}}>Open</button></td>
+                  <td style={{padding:"8px 10px"}}><button onClick={(e)=>{e.stopPropagation();openDeal(r);}} style={{...btnGh,padding:"2px 8px",fontSize:9}}>Open</button></td>
                 </tr>
               );
             })}</tbody>
