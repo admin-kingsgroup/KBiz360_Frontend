@@ -459,13 +459,25 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     : r.shared
       ? <span className="text-[11px] text-info" title="This ledger posts to more than one cost centre — Tally holds one figure for it, reconciled at ledger level (By CoA), not split by module.">— at ledger</span>
       : <span className="text-[11px] text-warning" title="ERP has a posting here but no matching Tally ledger — rename / regroup it in Tally to match.">— not in Tally</span>);
+  // Slice → full tie-out row, so a click opens the SAME voucher drawer the flat/CoA rows do
+  // (voucher-by-voucher ERP ↔ Tally ↔ match). Matched by code first, then ledger name.
+  const nkFE = (s) => String(s || '').trim().toLowerCase();
   const renderModuleSlice = (r, keyStr) => {
     const meta = modBadge(r.status);
+    const canDrill = r.status !== 'tied';   // Off / Not in Tally / Partial / At ledger → verify against vouchers
+    const full = canDrill ? (rows.find((x) => (r.code && x.code === r.code) || nkFE(x.ledger) === nkFE(r.ledger)) || { ledger: r.ledger, status: r.status }) : null;
+    const drill = () => setDrill(full);
     return (
-      <tr key={keyStr} className="border-b border-surface-border/60 hover:bg-surface-alt/60">
+      <tr key={keyStr}
+        onClick={canDrill ? drill : undefined}
+        onKeyDown={canDrill ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); drill(); } } : undefined}
+        role={canDrill ? 'button' : undefined} tabIndex={canDrill ? 0 : undefined}
+        aria-label={canDrill ? `Drill ${r.ledger} vouchers` : undefined}
+        className={`border-b border-surface-border/60 ${canDrill ? 'cursor-pointer hover:bg-accent-soft focus:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-accent' : 'hover:bg-surface-alt/60'}`}>
         <td className="px-4 py-1.5" style={{ paddingLeft: 32 }}><span className="block font-medium text-ink">{r.ledger}</span>
           {r.code ? <span className="font-mono text-[11px] text-ink-subtle">{r.code}</span> : null}
-          <span className="ml-1 text-[10.5px] text-ink-subtle">· {INCOME_HEAD_SET.has(r.head) ? 'Sales' : 'Cost'}</span></td>
+          <span className="ml-1 text-[10.5px] text-ink-subtle">· {INCOME_HEAD_SET.has(r.head) ? 'Sales' : 'Cost'}</span>
+          {canDrill ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}</td>
         <td className="px-4 py-1.5 text-right font-mono tabular-nums">{fmt(r.erp, cur)}</td>
         <td className="px-4 py-1.5 text-right">{sliceTallyCell(r)}</td>
         <td className={`px-4 py-1.5 text-right font-mono tabular-nums ${r.diff == null || r.diff === 0 ? 'text-ink-subtle' : 'text-danger'}`}>{diffCell(r.diff)}</td>

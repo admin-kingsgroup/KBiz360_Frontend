@@ -360,6 +360,39 @@ describe('Tally Reconciliation · tie-out board render', () => {
     window.localStorage.removeItem('tally.moduleView');
   });
 
+  test('By Module: clicking an off module slice drills to its vouchers (same drawer as the flat view)', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const sale = { ledger: 'IT-Base Fare', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -100000, tally: -110000, diff: 10000, status: 'off' };
+    const bank = { ledger: 'HDFC Bank A/c', code: 'B2', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 1500, tally: 1500, diff: 0, status: 'tied' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 2, tied: 1, off: 1, offTotal: 1 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [sale, bank], tree: [],
+      moduleTree: {
+        modules: [
+          { code: 'FLT-INT', label: 'International Flights', erp: -100000, tally: -110000, diff: 10000,
+            sales: -100000, cogs: 0, salesTally: -110000, cogsTally: null,
+            gp: 100000, gpTally: 110000, gpDiff: -10000, status: 'off', unmatched: 0, shared: 0, rows: [
+              { ledger: 'IT-Base Fare', code: 'S1', head: 'Sales Accounts', erp: -100000, tally: -110000, diff: 10000, status: 'off', shared: false },
+            ] },
+        ],
+        totals: { erp: -100000, tally: -110000, sales: -100000, cogs: 0, salesTally: -110000, cogsTally: null, gp: 100000, gpTally: 110000 },
+        bucketTree: [], bucketTreePL: [],
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByLabelText(/By Module/));
+    const slice = await screen.findByText('IT-Base Fare');
+    expect(screen.getByText('▸ drill vouchers')).toBeInTheDocument();   // affordance appears on the off slice
+    fireEvent.click(slice);
+    // The SAME voucher-by-voucher drawer the flat/CoA rows open.
+    expect(await screen.findByText(/Voucher-by-voucher/)).toBeInTheDocument();
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
   test('name/group mismatch drives the "fix in Tally" workflow (rename hint, badge, KPI, punch-list filter)', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({
