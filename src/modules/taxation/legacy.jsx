@@ -170,28 +170,3 @@ export function Form16Generator(){
   );
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   7. PERFORMANCE REVIEW MODULE
-   ════════════════════════════════════════════════════════════════════ */
-
-// GSTR-1 B2B is generated from real sale vouchers — no bundled demo invoices.
-export const GSTR1_B2B = [];
-
-
-export const GSTR1_B2C = [];
-
-
-export const GSTR3B_SUMMARY = {
-  period:"April 2026",
-  outwardSupplies:{taxable:12500000,exempt:450000,nilRated:0,nonGST:0,igst:1845000,cgst:972000,sgst:972000,cess:0},
-  inwardRCM:{taxable:85000,igst:15300,cgst:0,sgst:0},
-  itcAvailable:{igst:1240000,cgst:485000,sgst:485000,total:2210000},
-  itcReversed:{igst:0,cgst:45000,sgst:45000,total:90000},
-  netITC:2120000,
-  taxPayable:{igst:605300,cgst:487000,sgst:487000,cess:0,total:1579300},
-  taxFromITC:{igst:605300,cgst:487000,sgst:487000,total:1579300},
-  cashPayable:0,
-  interestPenalty:0,
-};
-
-

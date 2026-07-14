@@ -26,6 +26,14 @@ import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { SampleBanner } from '../../../core/ux/SampleBanner';
 
+// GSTR-1 B2B is generated from real sale vouchers — no bundled demo invoices.
+// BUSINESS SUB-MODULE REORG (2026-07-14): these two were left behind in
+// taxation/legacy.jsx during the move — GSTR1Prep is their only consumer, so
+// they belong here, not there. Fixed after the move exposed a runtime
+// ReferenceError (GSTR1_B2B/GSTR1_B2C were undefined).
+export const GSTR1_B2B = [];
+export const GSTR1_B2C = [];
+
 export function GSTR1Prep(){
   const [period,setPeriod]=useState(CUR_MONTH);
   const [entity,setEntity]=useState("Head Office — 27AAACT1234A1ZF");

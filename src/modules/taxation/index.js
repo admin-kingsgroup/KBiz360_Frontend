@@ -4,10 +4,12 @@
    menus in core/data.js (TAX_INDIA/TAX_AFRICA/TAX_ALL) — into gst-returns/,
    tds-tcs/, compliance/, reconciliation/ and auto-prep-tools/ folders.
    TallyExport was misfiled here (an Admin ▸ Import/Export screen) and moved
-   to modules/dataImport/. The remaining dead/unrouted content (TaxCalendar,
-   shadowed by TaxCalendarV2 which registers first in App.jsx; GSTR_FILING_STATUS,
-   Form16Generator, GSTR1_B2B/B2C, GSTR3B_SUMMARY, never referenced anywhere)
-   stays in ./legacy. */
+   to modules/dataImport/. GSTR1_B2B/GSTR1_B2C and GSTR3B_SUMMARY moved with
+   GSTR1Prep/GSTR3BPrep respectively (their only consumers — leaving them
+   behind caused a runtime ReferenceError, fixed 2026-07-14). The remaining
+   dead/unrouted content (TaxCalendar, shadowed by TaxCalendarV2 which
+   registers first in App.jsx; GSTR_FILING_STATUS and Form16Generator, never
+   referenced anywhere) stays in ./legacy. */
 export * from './legacy';
 export { TaxReco } from './taxReco';
 // TDSCalculator moved in from finance/legacy.jsx (2026-07-14) — misfiled
