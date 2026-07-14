@@ -521,6 +521,9 @@ describe('Tally Reconciliation · tie-out board render', () => {
     await screen.findByText('Travkings NBO');                              // tie-out loaded (default TB tab)
     fireEvent.click(screen.getByRole('button', { name: /Defects/ }));      // → Defect Register
     await screen.findByText(/In Tally, not ERP: 1/);                       // register rendered
+    // The Voucher-defect panel defaults to the By-Voucher lens (ledger names live inside the
+    // expandable legs); switch to By ledger to click the ledger row directly.
+    fireEvent.click(screen.getByRole('button', { name: /^By ledger$/ }));
     fireEvent.click(screen.getByText('Travkings NBO'));                    // drill the inter-branch defect row
     // Regression guard: onDrill resolves the FULL tie-out row so the drawer's inter-branch badge shows.
     // Under the old onDrill={setDrill} the drawer received only { ledger } and the badge was absent.
@@ -542,9 +545,10 @@ describe('Tally Reconciliation · tie-out board render', () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
     fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
-    // All four defect rows visible before any filter.
-    expect(await screen.findByText('Alpha Ledger')).toBeInTheDocument();
-    expect(screen.getByText('Beta Ledger')).toBeInTheDocument();
+    // All four defects present. Voucher-tier rows render BY VOUCHER (their ref); master-tier
+    // rows render under the master panel (by ledger).
+    expect(await screen.findByText('V1')).toBeInTheDocument();   // Alpha's voucher
+    expect(screen.getByText('V2')).toBeInTheDocument();          // Beta's voucher
     expect(screen.getByText('Gamma Master')).toBeInTheDocument();
     expect(screen.getByText('Delta Master')).toBeInTheDocument();
 
@@ -552,8 +556,8 @@ describe('Tally Reconciliation · tie-out board render', () => {
     fireEvent.click(screen.getByRole('button', { name: /Master mismatches/ }));
     expect(screen.getByText('Gamma Master')).toBeInTheDocument();
     expect(screen.getByText('Delta Master')).toBeInTheDocument();
-    expect(screen.queryByText('Alpha Ledger')).not.toBeInTheDocument();
-    expect(screen.queryByText('Beta Ledger')).not.toBeInTheDocument();
+    expect(screen.queryByText('V1')).not.toBeInTheDocument();
+    expect(screen.queryByText('V2')).not.toBeInTheDocument();
     expect(screen.getByText('Showing 2 of 4 defects')).toBeInTheDocument();
 
     // Toggle the "Ledger absent in Tally" chip → narrows to just Gamma.
@@ -563,7 +567,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
 
     // Clear → every row returns and the "Showing X of Y" line is gone.
     fireEvent.click(screen.getByRole('button', { name: /^Clear$/ }));
-    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
+    expect(screen.getByText('V1')).toBeInTheDocument();
     expect(screen.getByText('Delta Master')).toBeInTheDocument();
     expect(screen.queryByText(/Showing \d+ of \d+ defects/)).not.toBeInTheDocument();
   });
@@ -585,15 +589,45 @@ describe('Tally Reconciliation · tie-out board render', () => {
     // Under "All" both panels render, each with its own header — never one merged list.
     expect(await screen.findByText('Master defects')).toBeInTheDocument();
     expect(screen.getByText('Voucher defects')).toBeInTheDocument();
-    // The ledger-level defect lives under the master panel; the two posting defects under voucher.
+    // The ledger-level defect lives under the master panel (by ledger); the two posting defects
+    // under the voucher panel — shown BY VOUCHER (their refs).
     expect(screen.getByText('Gamma Master')).toBeInTheDocument();
-    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
-    expect(screen.getByText('Zeta Ledger')).toBeInTheDocument();
+    expect(screen.getByText('V1')).toBeInTheDocument();   // Alpha's voucher
+    expect(screen.getByText('V3')).toBeInTheDocument();   // Zeta's voucher
     // Selecting the Voucher tier drops the master panel entirely.
     fireEvent.click(screen.getByRole('button', { name: /Voucher mismatches/ }));
     expect(screen.queryByText('Master defects')).not.toBeInTheDocument();
     expect(screen.queryByText('Gamma Master')).not.toBeInTheDocument();
-    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
+    expect(screen.getByText('V1')).toBeInTheDocument();
+  });
+
+  test('Defect Register — By Voucher collapses one voucher’s many ledger legs into a single row', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 1,
+      summary: { total: 3, byType: { 'missing-in-tally': 3 } },
+      // ONE voucher (RF/BOM/26/0039) across THREE ledger legs — the flat register lists it 3×.
+      defects: [
+        { ledger: 'SVC2 CGST Output [BOM]', date: '2025-12-27', ref: 'RF/BOM/26/0039', desc: 'SVC2 CGST', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 24.26, variance: 0, side: 'erp', voucherId: 'v1', vtype: 'RF', sourceRef: 'SO/BOM/26/0128', party: 'Global' },
+        { ledger: 'SVC2 SGST Output [BOM]', date: '2025-12-27', ref: 'RF/BOM/26/0039', desc: 'SVC2 SGST', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 24.26, variance: 0, side: 'erp', voucherId: 'v1', vtype: 'RF', sourceRef: 'SO/BOM/26/0128', party: 'Global' },
+        { ledger: 'SVC2 Income [BOM]', date: '2025-12-27', ref: 'RF/BOM/26/0039', desc: 'SVC2', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: -48.52, variance: 0, side: 'erp', voucherId: 'v1', vtype: 'RF', sourceRef: 'SO/BOM/26/0128', party: 'Global' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ }));
+    // ONE voucher row by default, not three; the ledger legs are hidden until expanded.
+    expect(await screen.findByText('RF/BOM/26/0039')).toBeInTheDocument();
+    expect(screen.getByText(/SO\/BOM\/26\/0128/)).toBeInTheDocument();               // link no shown on the row
+    expect(screen.queryByText(/↳ SVC2 CGST Output \[BOM\]/)).not.toBeInTheDocument(); // legs collapsed
+    // Expand → the three ledger legs appear.
+    fireEvent.click(screen.getByRole('button', { name: /show 3 ledger legs/ }));
+    expect(screen.getByText(/↳ SVC2 CGST Output \[BOM\]/)).toBeInTheDocument();
+    expect(screen.getByText(/↳ SVC2 SGST Output \[BOM\]/)).toBeInTheDocument();
+    expect(screen.getByText(/↳ SVC2 Income \[BOM\]/)).toBeInTheDocument();
+    // By ledger → the three legs render as three separate rows again.
+    fireEvent.click(screen.getByRole('button', { name: /^By ledger$/ }));
+    expect(screen.getByText('SVC2 CGST Output [BOM]')).toBeInTheDocument();
   });
 
   test('Defect Register — master panel shows the rename hint, stranded count and the collapsed-pairs badge', async () => {

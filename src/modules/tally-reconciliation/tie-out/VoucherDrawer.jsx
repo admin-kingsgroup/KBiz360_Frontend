@@ -18,6 +18,12 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
   const ledger = typeof row === 'string' ? row : (row && row.ledger);
   const [expanded, setExpanded] = useState(null);   // which voucher row is expanded to its entries
   const [openVoucher, setOpenVoucher] = useState(null);   // { id, vno } — the full voucher opened over the drill
+  // A By-Voucher drill from the Defect Register carries a focus: the exact voucher to
+  // land on. With an ERP voucherId we open the full JV straight away (fix once, clears
+  // every ledger leg); a Tally-only voucher (no id) just auto-expands its matched line.
+  const focusVoucherId = (row && typeof row === 'object' && row._focusVoucherId) || null;
+  const focusRef = (row && typeof row === 'object' && row._focusRef) || null;
+  const focused = useRef(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['tally-tieout', 'ledger', branch, period, tier, ledger],
@@ -37,6 +43,17 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
   const summary = data?.summary || { total: 0 };
   const noDayBook = !isLoading && !isError && (data?.tallyImported === 0);
   const ready = !isLoading && !isError && !!data;   // header numbers are only meaningful once the drill loaded
+
+  // Land on the focused voucher exactly once: open the full JV if we have its id,
+  // else expand its matched drill line once the vouchers have loaded.
+  useEffect(() => {
+    if (focused.current) return;
+    if (focusVoucherId) { setOpenVoucher({ id: focusVoucherId, vno: focusRef }); focused.current = true; return; }
+    if (focusRef && lines.length) {
+      const idx = lines.findIndex((l) => (l.ref && l.ref === focusRef) || (l.tallyRef && l.tallyRef === focusRef));
+      if (idx >= 0) { setExpanded(idx); focused.current = true; }
+    }
+  }, [focusVoucherId, focusRef, lines]);
 
   return (
     <>
