@@ -441,8 +441,17 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const diffCell = (n) => (n == null ? '—' : n === 0 ? '0' : `${n > 0 ? '+' : '−'}${Math.abs(n).toLocaleString(localeOf(cur))}`);
   const modBadge = (st) => st === 'tied' ? { tone: 'success', label: 'Tied' }
     : st === 'off' ? { tone: 'danger', label: 'Off' }
+    : st === 'partial' ? { tone: 'warning', label: 'Partial' }
     : st === 'shared' ? { tone: 'info', label: 'At ledger' }
     : { tone: 'warning', label: 'Not in Tally' };
+  // "N not in Tally · M at ledger" — makes a module header's Tally/Δ composition transparent, so a
+  // reviewer sees WHY a Δ is large (unattributed ledgers, not necessarily a real amount gap).
+  const modNote = (m) => {
+    const bits = [];
+    if (m.unmatched) bits.push(`${m.unmatched} not in Tally`);
+    if (m.shared) bits.push(`${m.shared} at ledger`);
+    return bits.length ? ' · ' + bits.join(' · ') : '';
+  };
   // Tally cell for a module slice: the real figure, or a typed "why it's absent" note.
   const sliceTallyCell = (r) => (r.tally != null
     ? <span className="font-mono tabular-nums">{fmt(r.tally, cur)}</span>
@@ -477,23 +486,27 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       return (
         <tr className="border-b border-surface-border bg-navy">
           <td className="py-2 pl-4 pr-4"><span className="block text-[11px] font-bold uppercase tracking-wider text-white">{m.label}</span>
-            <span className="text-[10.5px] font-semibold text-white/70">GP {gpText(m.gp)}{gpTie ? ` · Tally ${gpText(m.gpTally)} · Δ ${diffCell(m.gpDiff)}` : ''} · {cur}</span></td>
+            <span className="text-[10.5px] font-semibold text-white/70">GP {gpText(m.gp)}{gpTie ? ` · Tally ${gpText(m.gpTally)} · Δ ${diffCell(m.gpDiff)}` : ''} · {cur}{modNote(m)}</span></td>
           <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold text-white">{fmt(m.erp, cur)}</td>
           <td className="px-4 py-2 text-right font-mono tabular-nums font-semibold text-white">{m.tally == null ? <span className="text-[11px] font-semibold text-white/70" title="No attributable Tally in this module — its ledgers are shared across cost centres or absent from Tally.">—</span> : fmt(m.tally, cur)}</td>
-          <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${m.diff == null || m.diff === 0 ? 'text-white/70' : 'text-warning'}`}>{diffCell(m.diff)}</td>
+          <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${m.diff == null || m.diff === 0 ? 'text-white/70' : 'text-danger'}`}
+            title={(m.unmatched || m.shared) ? 'Δ = ERP − Tally. This module also has ledgers not in Tally / shared across cost centres (listed below) — the tie/untie status is judged on the ledgers present in both books.' : undefined}>{diffCell(m.diff)}</td>
           <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
         </tr>
       );
     };
-    const subTotal = (label, erp, tally) => (
-      <tr className="border-b border-surface-border bg-surface-alt/70">
-        <td className="px-4 py-1 pl-8 text-[11px] font-bold uppercase tracking-wide text-ink-muted">{label}</td>
-        <td className="px-4 py-1 text-right font-mono tabular-nums font-semibold text-ink">{fmt(erp, cur)}</td>
-        <td className="px-4 py-1 text-right font-mono tabular-nums font-semibold text-ink">{tally == null ? '—' : fmt(tally, cur)}</td>
-        <td className="px-4 py-1 text-right font-mono tabular-nums text-ink-subtle">{diffCell(tally == null ? null : round2(erp - tally))}</td>
-        <td className="px-4 py-1" />
-      </tr>
-    );
+    const subTotal = (label, erp, tally) => {
+      const d = tally == null ? null : round2(erp - tally);   // null when this subtotal has no matched slice
+      return (
+        <tr className="border-b border-surface-border bg-surface-alt/70">
+          <td className="px-4 py-1 pl-8 text-[11px] font-bold uppercase tracking-wide text-ink-muted">{label}</td>
+          <td className="px-4 py-1 text-right font-mono tabular-nums font-semibold text-ink">{fmt(erp, cur)}</td>
+          <td className="px-4 py-1 text-right font-mono tabular-nums font-semibold text-ink">{tally == null ? '—' : fmt(tally, cur)}</td>
+          <td className={`px-4 py-1 text-right font-mono tabular-nums ${d == null || d === 0 ? 'text-ink-subtle' : 'text-danger'}`}>{diffCell(d)}</td>
+          <td className="px-4 py-1" />
+        </tr>
+      );
+    };
     return (
       <>
         {mt.modules.length === 0 && (

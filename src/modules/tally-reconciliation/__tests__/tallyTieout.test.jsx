@@ -293,6 +293,40 @@ describe('Tally Reconciliation · tie-out board render', () => {
     window.localStorage.removeItem('tally.moduleView');
   });
 
+  test("P&L · By Module: a module whose comparable ledgers tie but has one absent from Tally reads 'Partial' + a transparency note, not red 'Off'", async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const sale = { ledger: 'HOT Sales', code: 'H1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -8000, tally: -8000, diff: 0, status: 'tied' };
+    const purch = { ledger: 'HOT Purchase', code: 'H2', group: 'Purchase Accounts', parentGroup: 'Purchase Accounts', statement: 'PL', nature: 'expense', erp: 5000, tally: null, diff: 5000, status: 'only-erp' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 2, tied: 1, off: 1, offTotal: 1 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [sale, purch], tree: [],
+      moduleTree: {
+        modules: [
+          { code: 'HOT', label: 'Hotel', erp: -3000, tally: -8000, diff: 5000,
+            sales: -8000, cogs: 5000, salesTally: -8000, cogsTally: null,
+            gp: 3000, gpTally: 8000, gpDiff: -5000, status: 'partial', unmatched: 1, shared: 0, rows: [
+              { ledger: 'HOT Sales', code: 'H1', head: 'Sales Accounts', erp: -8000, tally: -8000, diff: 0, status: 'tied', shared: false },
+              { ledger: 'HOT Purchase', code: 'H2', head: 'Purchase Accounts', erp: 5000, tally: null, diff: null, status: 'unmatched', shared: false },
+            ] },
+        ],
+        totals: { erp: -3000, tally: -8000, sales: -8000, cogs: 5000, salesTally: -8000, cogsTally: null, gp: 3000, gpTally: 8000 },
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Profit & Loss/i }));
+    fireEvent.click(await screen.findByLabelText(/By Module/));
+    expect(await screen.findByText('Hotel')).toBeInTheDocument();
+    // Comparable ledger ties → module is 'Partial', with a transparency note, not a scary red 'Off'.
+    expect(screen.getByText('Partial')).toBeInTheDocument();
+    expect(screen.getByText(/1 not in Tally/)).toBeInTheDocument();
+    expect(screen.getByText(/Less: COGS/)).toBeInTheDocument();   // subtotal present (its Tally renders as —, not 0)
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
   test('name/group mismatch drives the "fix in Tally" workflow (rename hint, badge, KPI, punch-list filter)', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({
