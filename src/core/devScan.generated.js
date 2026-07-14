@@ -13,15 +13,14 @@ export const DEV_SCAN = {
   "tree": "FE",
   "filesScanned": 683,
   "counts": {
-    "total": 9,
+    "total": 6,
     "bySeverity": {
-      "high": 7,
+      "high": 4,
       "medium": 0,
       "low": 2
     },
     "byCategory": {
       "placeholder": 4,
-      "structure": 3,
       "broken-code": 2
     }
   },
@@ -76,45 +75,6 @@ export const DEV_SCAN = {
       "file": "modules/reports/report-tools/metaDemo.jsx",
       "line": 5,
       "snippet": "return <NotWired title=\"Report Meta Features (Demo)\" note=\"Demo screen — it showcases report meta-features (comparatives, sparklines, drill-downs) and is not wired to live data.\"/>;",
-      "source": "build"
-    },
-    {
-      "id": "FE:modules/tally-reconciliation/tie-out/TallyTieOutBoard.jsx:9:broken-import",
-      "tree": "FE",
-      "rule": "broken-import",
-      "category": "structure",
-      "severity": "high",
-      "title": "Broken import — module not found",
-      "remark": "This relative import/require does not resolve to a file on disk. Fix the path, restore the missing module, or remove the dead import — the bundle/route will crash when this file loads.",
-      "file": "modules/tally-reconciliation/tie-out/TallyTieOutBoard.jsx",
-      "line": 9,
-      "snippet": "'./api'",
-      "source": "build"
-    },
-    {
-      "id": "FE:modules/tally-reconciliation/tie-out/TallyTieOutBoard.jsx:10:broken-import",
-      "tree": "FE",
-      "rule": "broken-import",
-      "category": "structure",
-      "severity": "high",
-      "title": "Broken import — module not found",
-      "remark": "This relative import/require does not resolve to a file on disk. Fix the path, restore the missing module, or remove the dead import — the bundle/route will crash when this file loads.",
-      "file": "modules/tally-reconciliation/tie-out/TallyTieOutBoard.jsx",
-      "line": 10,
-      "snippet": "'../../store/cockpitFocus'",
-      "source": "build"
-    },
-    {
-      "id": "FE:modules/tally-reconciliation/tie-out/TallyTieOutBoard.jsx:11:broken-import",
-      "tree": "FE",
-      "rule": "broken-import",
-      "category": "structure",
-      "severity": "high",
-      "title": "Broken import — module not found",
-      "remark": "This relative import/require does not resolve to a file on disk. Fix the path, restore the missing module, or remove the dead import — the bundle/route will crash when this file loads.",
-      "file": "modules/tally-reconciliation/tie-out/TallyTieOutBoard.jsx",
-      "line": 11,
-      "snippet": "'../../shell/primitives'",
       "source": "build"
     },
     {
