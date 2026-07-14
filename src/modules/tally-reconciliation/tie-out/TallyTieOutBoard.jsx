@@ -459,14 +459,18 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     : r.shared
       ? <span className="text-[11px] text-info" title="This ledger posts to more than one cost centre — Tally holds one figure for it, reconciled at ledger level (By CoA), not split by module.">— at ledger</span>
       : <span className="text-[11px] text-warning" title="ERP has a posting here but no matching Tally ledger — rename / regroup it in Tally to match.">— not in Tally</span>);
-  // Slice → full tie-out row, so a click opens the SAME voucher drawer the flat/CoA rows do
-  // (voucher-by-voucher ERP ↔ Tally ↔ match). Matched by code first, then ledger name.
+  // Slice → its FULL tie-out ledger row, so a click opens the SAME voucher drawer the flat/CoA rows
+  // do (voucher-by-voucher ERP ↔ Tally ↔ match). Matched by ledger name (canonical, unique per
+  // branch). Drill-ability is gated on the FULL row's status — exactly like the flat view
+  // (off = status !== 'tied') — so a multi-cost-centre ledger that reconciles at ledger level
+  // ('tied' full row) is NOT drillable and can't open accept-variance, even though its per-module
+  // slice reads 'shared'/'off'.
   const nkFE = (s) => String(s || '').trim().toLowerCase();
   const renderModuleSlice = (r, keyStr) => {
     const meta = modBadge(r.status);
-    const canDrill = r.status !== 'tied';   // Off / Not in Tally / Partial / At ledger → verify against vouchers
-    const full = canDrill ? (rows.find((x) => (r.code && x.code === r.code) || nkFE(x.ledger) === nkFE(r.ledger)) || { ledger: r.ledger, status: r.status }) : null;
-    const drill = () => setDrill(full);
+    const full = rows.find((x) => nkFE(x.ledger) === nkFE(r.ledger));
+    const canDrill = !!full && full.status !== 'tied' && !full.synthetic;   // verify only where the ledger is genuinely off
+    const drill = () => { if (full) setDrill(full); };
     return (
       <tr key={keyStr}
         onClick={canDrill ? drill : undefined}

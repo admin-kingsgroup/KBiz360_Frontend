@@ -393,6 +393,39 @@ describe('Tally Reconciliation · tie-out board render', () => {
     window.localStorage.removeItem('tally.moduleView');
   });
 
+  test('By Module: a shared slice whose ledger reconciles at ledger level (tied full row) is NOT drillable (no accept-variance on a tied ledger)', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    // The FULL ledger row is TIED (reconciles at ledger level); per-module it only reads 'shared'.
+    const shared = { ledger: 'DT-Base Fare [IB]', code: 'S9', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -5000, tally: -5000, diff: 0, status: 'tied' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 1, tied: 1, off: 0, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 1 },
+      rows: [shared], tree: [],
+      moduleTree: {
+        modules: [
+          { code: 'INB-FLT-DOM', label: 'Inter-Branch · Domestic Flights', erp: -5000, tally: null, diff: null,
+            sales: -5000, cogs: 0, salesTally: null, cogsTally: null,
+            gp: 5000, gpTally: null, gpDiff: null, status: 'shared', unmatched: 0, shared: 1, rows: [
+              { ledger: 'DT-Base Fare [IB]', code: 'S9', head: 'Sales Accounts', erp: -5000, tally: null, diff: null, status: 'shared', shared: true },
+            ] },
+        ],
+        totals: { erp: -5000, tally: null, sales: -5000, cogs: 0, salesTally: null, cogsTally: null, gp: 5000, gpTally: null },
+        bucketTree: [], bucketTreePL: [],
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByLabelText(/By Module/));
+    const slice = await screen.findByText('DT-Base Fare [IB]');
+    expect(screen.getAllByText('At ledger').length).toBeGreaterThan(0);           // module + slice badge
+    expect(screen.queryByText('▸ drill vouchers')).not.toBeInTheDocument();       // NOT a drill target
+    fireEvent.click(slice);
+    expect(screen.queryByText(/Voucher-by-voucher/)).not.toBeInTheDocument();     // drawer does not open on a tied ledger
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
   test('name/group mismatch drives the "fix in Tally" workflow (rename hint, badge, KPI, punch-list filter)', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({
