@@ -22,6 +22,23 @@ export const PKG_GST = 0.05;
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
+
+// Absorb the GST double-rounding paise on the invoice total. A GST-exclusive service
+// charge is often back-derived from a round gross by ÷1.18, so `base + round(base×18%)`
+// misses that round gross by ≤ a couple of paise (e.g. supplier service 84.75 + GST
+// 15.26 = 100.01 → purchase total 7,100.01). When the total lands within EPS of a whole
+// rupee we snap it there and stamp the ±paise as `roundOff` (→ the branch "Round Off"
+// ledger); a total with GENUINE paise (a 5% GST + TCS holiday value like 378857.13) is
+// left untouched, so it never disturbs the ERP↔Tally tie-out. Applied AFTER GP / saleNet
+// / costNet / heads (on the TRUE net), so round-off never moves gross profit. Legacy
+// snapshots without `roundOff` read 0 → unchanged.
+const ROUND_OFF_EPS = 0.05;
+const applyRoundOff = (side) => {
+  const raw = num(side.total);
+  const off = r2(Math.round(raw) - raw);
+  if (off !== 0 && Math.abs(off) <= ROUND_OFF_EPS) { side.total = Math.round(raw); side.roundOff = off; }
+  else side.roundOff = 0;
+};
 const isIntl = (pt) => String(pt || '').toLowerCase().startsWith('int');
 const isPkg = (spec) => !!spec && spec.model === 'package';
 
@@ -426,6 +443,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'incentiveAmt', 'incentiveGst', 'incentiveTds', 'total'].forEach((k) => { po[k] = 0; });
     po.lines = []; po.heads = [];
     const pct0 = so.total > 0 ? r2((saleNet / so.total) * 100) : 0;
+    applyRoundOff(so); po.roundOff = 0;
     return { po, so, gp: { total: saleNet, pct: pct0, saleNet, costNet: 0 } };
   }
   // Commission (our income, netted off the payable) ADDS to GP → off the cost; the 2%
@@ -433,5 +451,9 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
   const costNetForGp = r2(costNet - po.incentiveAmt);
   const total = r2(saleNet - costNetForGp);
   const pct = so.total > 0 ? r2((total / so.total) * 100) : 0;
+  // Snap each side's invoice total to a whole rupee (residue → `roundOff`). Done last,
+  // so pct and every net/head above stay on the un-rounded value → GP is untouched.
+  applyRoundOff(so);
+  applyRoundOff(po);
   return { po, so, gp: { total, pct, saleNet, costNet: costNetForGp } };
 }

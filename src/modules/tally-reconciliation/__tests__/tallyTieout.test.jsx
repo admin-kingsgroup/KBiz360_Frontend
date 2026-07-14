@@ -25,6 +25,7 @@ jest.mock('../api', () => ({
     summary: { total: 1, byType: { 'missing-in-erp': 1 } },
     defects: [{ ledger: 'HDFC Bank A/c', date: '2026-07-09', ref: '', desc: 'Bank charge', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: -5000, variance: 0, side: 'tally' }],
   })),
+  getModuleBreakdown: jest.fn(() => Promise.resolve({ rows: [] })),
   getTallyCert: jest.fn(() => Promise.resolve({
     certificate: null,
     chain: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
@@ -127,6 +128,315 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText('HDFC Bank A/c')).not.toBeInTheDocument();
   });
 
+  test('chart sub-group nesting + the ERP module drill (toggle ONLY where a real split exists)', async () => {
+    const { getTieOut, getModuleBreakdown } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 4, tied: 4, off: 0, onlyErp: 0, onlyTally: 0, offTotal: 0, netProfitErp: 60500, netProfitTally: 60500 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 4 },
+      rows: [
+        { ledger: 'TRIP JACK Pvt Ltd', code: 'C1', group: 'Sundry Creditors', subGroup: 'Supplier B2B', parentGroup: 'Sundry Creditors', statement: 'BS', nature: 'liability', erp: -1000, tally: -1000, diff: 0, status: 'tied' },
+        { ledger: 'Iconic Signage', code: 'C2', group: 'Sundry Creditors', subGroup: 'Supplier Others', parentGroup: 'Sundry Creditors', statement: 'BS', nature: 'liability', erp: -500, tally: -500, diff: 0, status: 'tied' },
+        // A trading ledger WITH a real multi-module split → gets the drill toggle.
+        { ledger: 'Commission A/c', code: 'S1', group: 'Direct Income', subGroup: 'Commission', parentGroup: 'Direct Income', statement: 'PL', nature: 'income', erp: -60000, tally: -60000, diff: 0, status: 'tied', hasModules: true },
+        // A trading ledger with NO real split → NO toggle (the hasModules gate).
+        { ledger: 'Discount Received', code: 'S2', group: 'Direct Income', subGroup: 'Other Operating Income', parentGroup: 'Direct Income', statement: 'PL', nature: 'income', erp: -500, tally: -500, diff: 0, status: 'tied', hasModules: false },
+      ],
+    });
+    getModuleBreakdown.mockResolvedValueOnce({ rows: [
+      { module: 'International Flights', costCenter: 'FLT-INT', erp: -40000 },
+      { module: 'Hotel', costCenter: 'HOT', erp: -20000 },
+    ] });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // Chart sub-group sub-headers nest under the primary head (mirrors the ERP CoA).
+    expect(await screen.findByText(/Supplier B2B/)).toBeInTheDocument();
+    expect(screen.getByText(/Supplier Others/)).toBeInTheDocument();
+    expect(screen.getByText(/Other Operating Income/)).toBeInTheDocument();   // Direct Income ▸ sub-group
+    // The module-drill toggle appears ONLY on the row flagged with a real split.
+    const toggles = screen.getAllByText(/modules \(ERP split\)/);
+    expect(toggles).toHaveLength(1);                                          // Commission only, NOT Discount Received
+    // Clicking it fetches + shows the ERP cost-centre split, scoped to that ledger.
+    fireEvent.click(toggles[0]);
+    expect(await screen.findByText(/International Flights/)).toBeInTheDocument();
+    expect(screen.getByText(/Hotel/)).toBeInTheDocument();
+    expect(getModuleBreakdown).toHaveBeenCalledWith(expect.objectContaining({ ledger: 'Commission A/c' }));
+  });
+
+  test('Chart of Accounts view toggle renders the ERP CoA tree (group subtotals + leaves, drill intact) and is remembered', async () => {
+    window.localStorage.removeItem('tally.coaView'); // deterministic: start with the tick off
+    const { getTieOut } = require('../api');
+    // Two Bank leaves that sum to a group subtotal (9,00,000) which appears ONLY on the tree's
+    // group header — never on any leaf — so it uniquely proves the tree (not the flat table) rendered.
+    const hdfc = { ledger: 'HDFC Bank A/c', code: 'B2', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 810000, tally: 805000, diff: 5000, status: 'off' };
+    const icici = { ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 90000, tally: 90000, diff: 0, status: 'tied' };
+    const comm = { ledger: 'Commission A/c', code: 'S1', group: 'Direct Income', parentGroup: 'Direct Income', statement: 'PL', nature: 'income', erp: -60000, tally: -60000, diff: 0, status: 'tied', hasModules: true };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 3, tied: 2, off: 1, offTotal: 5000 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
+      rows: [hdfc, icici, comm],
+      tree: [
+        { id: 'bank', name: 'Bank Accounts', level: 0, statement: 'BS', erp: 900000, tally: 895000, diff: 5000, status: 'off', rows: [hdfc, icici], children: [] },
+        { id: 'direct-income', name: 'Direct Income', level: 0, statement: 'PL', erp: -60000, tally: -60000, diff: 0, status: 'tied', rows: [comm], children: [] },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // Default = the flat Tally-order table; the CoA tick is present and OFF, and the
+    // group subtotal 9,00,000 (which lives only on a tree header) is NOT shown yet.
+    const tick = await screen.findByLabelText(/Chart of Accounts view/);
+    expect(tick).not.toBeChecked();
+    expect(screen.queryByText(/9,00,000/)).not.toBeInTheDocument();
+    // Tick on → the CoA tree renders, fully expanded: the group SUBTOTAL header now shows 9,00,000…
+    fireEvent.click(tick);
+    expect(await screen.findByText(/9,00,000/)).toBeInTheDocument();
+    // …leaf ledgers still render under their group, with the ERP module drill intact…
+    expect(screen.getByText('HDFC Bank A/c')).toBeInTheDocument();
+    expect(screen.getByText('Commission A/c')).toBeInTheDocument();
+    expect(screen.getByText(/modules \(ERP split\)/)).toBeInTheDocument();
+    // …and the choice is remembered per user.
+    expect(window.localStorage.getItem('tally.coaView')).toBe('1');
+  });
+
+  test('By Module view pivots the TB by cost centre (ERP-only) with a no-cost-centre bucket; mutually exclusive with CoA', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const sale = { ledger: 'Air Ticket Sales', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -40000, tally: -40000, diff: 0, status: 'tied' };
+    const purch = { ledger: 'Air Ticket Purchase', code: 'P1', group: 'Purchase Accounts', parentGroup: 'Purchase Accounts', statement: 'PL', nature: 'expense', erp: 38500, tally: 38500, diff: 0, status: 'tied' };
+    const bank = { ledger: 'HDFC Bank A/c', code: 'B2', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 1500, tally: 1500, diff: 0, status: 'tied' };
+    // A Sales ledger present in Tally but NOT ERP (erp=null) — a trading head with no ERP slice, so
+    // it's not in the module pivot. It MUST still surface in the trailing no-cost-centre bucket.
+    const onlyTallySale = { ledger: 'Ferry Sales', code: 'S9', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: null, tally: -3000, diff: 3000, status: 'only-tally' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 4, tied: 3, off: 1, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 4 },
+      rows: [sale, purch, bank, onlyTallySale],
+      tree: [{ id: 'bank', name: 'Bank Accounts', level: 0, statement: 'BS', erp: 1500, tally: 1500, diff: 0, status: 'tied', rows: [bank], children: [] }],
+      moduleTree: {
+        modules: [
+          { code: 'FLT-INT', label: 'International Flights', erp: -1500, tally: -1500, diff: 0,
+            sales: -40000, cogs: 38500, salesTally: -40000, cogsTally: 38500,
+            gp: 1500, gpTally: 1500, gpDiff: 0, status: 'tied', unmatched: 0, shared: 0, rows: [
+              { ledger: 'Air Ticket Sales', code: 'S1', head: 'Sales Accounts', erp: -40000, tally: -40000, diff: 0, status: 'tied', shared: false },
+              { ledger: 'Air Ticket Purchase', code: 'P1', head: 'Purchase Accounts', erp: 38500, tally: 38500, diff: 0, status: 'tied', shared: false },
+            ] },
+        ],
+        totals: { erp: -1500, tally: -1500, sales: -40000, cogs: 38500, salesTally: -40000, cogsTally: 38500, gp: 1500, gpTally: 1500 },
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    const modTick = await screen.findByLabelText(/By Module/);
+    expect(modTick).not.toBeChecked();
+    // Tick By Module → the module header (label + GP), its ledger slices WITH the Tally column now
+    // populated (no more "ERP only" note), and the trailing "no cost centre" bucket carrying the
+    // Balance-Sheet ledger all render.
+    fireEvent.click(modTick);
+    expect(await screen.findByText('International Flights')).toBeInTheDocument();
+    expect(screen.getByText(/GP 1,500/)).toBeInTheDocument();
+    expect(screen.queryByText(/ERP only/)).not.toBeInTheDocument();     // Tally is shown now, not suppressed
+    expect(screen.getAllByText('Tied').length).toBeGreaterThan(0);      // slice/module tie-out status
+    expect(screen.getByText('Air Ticket Purchase')).toBeInTheDocument();
+    // On the TB tab the module now splits into Sales / Purchase sub-headers (with subtotals) too.
+    expect(screen.getByText('Sales')).toBeInTheDocument();
+    expect(screen.getByText('Purchase')).toBeInTheDocument();
+    expect(screen.getByText(/no cost centre/i)).toBeInTheDocument();
+    expect(screen.getByText('HDFC Bank A/c')).toBeInTheDocument();        // BS ledger in the trailing bucket
+    expect(screen.getByText('Ferry Sales')).toBeInTheDocument();          // Tally-only trading ledger must NOT vanish
+    expect(window.localStorage.getItem('tally.moduleView')).toBe('1');
+    // Mutually exclusive: ticking Chart of Accounts turns By Module off (module pivot gone).
+    fireEvent.click(screen.getByLabelText(/Chart of Accounts view/));
+    await waitFor(() => expect(screen.queryByText('International Flights')).not.toBeInTheDocument());
+    expect(screen.getByLabelText(/By Module/)).not.toBeChecked();
+    expect(window.localStorage.getItem('tally.moduleView')).toBe('0');
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
+  test('By Module bucket groups the no-cost-centre ledgers as the Chart of Accounts (group header + subtotal, ledgers nested)', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const adCap = { ledger: 'AD Capital', code: 'L1044', group: 'Capital Account', parentGroup: 'Capital Account', statement: 'BS', nature: 'liability', erp: -50000, tally: -50000, diff: 0, status: 'tied' };
+    const ndCap = { ledger: 'ND Capital', code: 'L1045', group: 'Capital Account', parentGroup: 'Capital Account', statement: 'BS', nature: 'liability', erp: -100000, tally: -100000, diff: 0, status: 'tied' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 2, tied: 2, off: 0, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [adCap, ndCap], tree: [],
+      moduleTree: {
+        modules: [],
+        totals: { erp: 0, sales: 0, cogs: 0, gp: 0 },
+        // The BE ships the bucket pre-grouped as the CoA (group node with a subtotal + its ledgers).
+        bucketTree: [
+          { id: 'capital', name: 'Capital Account', level: 0, statement: 'BS', erp: -150000, tally: -150000, diff: 0, status: 'tied', rows: [adCap, ndCap], children: [] },
+        ],
+        bucketTreePL: [],
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByLabelText(/By Module/));
+    // The bucket now nests its ledgers under their CoA group (with a per-group subtotal row).
+    expect(await screen.findByText('Capital Account')).toBeInTheDocument();
+    expect(screen.getByText('AD Capital')).toBeInTheDocument();
+    expect(screen.getByText('ND Capital')).toBeInTheDocument();
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
+  test('P&L · By Module shows the per-module GP tie-out (ERP vs Tally) with Sales/COGS subtotals + a P&L bucket', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const sale = { ledger: 'IT-Base Fare', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -100000, tally: -110000, diff: 10000, status: 'off' };
+    const purch = { ledger: 'IT-Base Fare [Pur]', code: 'P1', group: 'Purchase Accounts', parentGroup: 'Purchase Accounts', statement: 'PL', nature: 'expense', erp: 90000, tally: 99000, diff: -9000, status: 'off' };
+    // An indirect expense (no cost centre) — must land in the P&L bucket, never a module.
+    const bankChg = { ledger: 'Bank Charges', code: 'E9', group: 'Indirect Expenses', parentGroup: 'Indirect Expenses', statement: 'PL', nature: 'expense', erp: 500, tally: 500, diff: 0, status: 'tied' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 3, tied: 1, off: 2, offTotal: 2, netProfitErp: 9500, netProfitTally: 10500 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
+      rows: [sale, purch, bankChg],
+      tree: [],
+      moduleTree: {
+        modules: [
+          { code: 'FLT-INT', label: 'International Flights', erp: -10000, tally: -11000, diff: 1000,
+            sales: -100000, cogs: 90000, salesTally: -110000, cogsTally: 99000,
+            gp: 10000, gpTally: 11000, gpDiff: -1000, status: 'off', unmatched: 0, shared: 0, rows: [
+              { ledger: 'IT-Base Fare', code: 'S1', head: 'Sales Accounts', erp: -100000, tally: -110000, diff: 10000, status: 'off', shared: false },
+              { ledger: 'IT-Base Fare [Pur]', code: 'P1', head: 'Purchase Accounts', erp: 90000, tally: 99000, diff: -9000, status: 'off', shared: false },
+            ] },
+        ],
+        totals: { erp: -10000, tally: -11000, sales: -100000, cogs: 90000, salesTally: -110000, cogsTally: 99000, gp: 10000, gpTally: 11000 },
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // Switch to the P&L tab, then tick By Module.
+    fireEvent.click(await screen.findByRole('button', { name: /Profit & Loss/i }));
+    const modTick = await screen.findByLabelText(/By Module/);
+    fireEvent.click(modTick);
+    expect(await screen.findByText('International Flights')).toBeInTheDocument();
+    // Per-module GP tie-out on the header: GP ERP 10,000 · Tally 11,000.
+    expect(screen.getByText(/GP 10,000.*Tally 11,000/)).toBeInTheDocument();
+    // Mini-P&L subtotals present.
+    expect(screen.getByText(/Sales \(income\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Less: COGS/)).toBeInTheDocument();
+    // Indirect expense drops into the P&L bucket (not the module), which is P&L-scoped.
+    expect(screen.getByText(/Other P&L · no cost centre/i)).toBeInTheDocument();
+    expect(screen.getByText('Bank Charges')).toBeInTheDocument();
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
+  test("P&L · By Module: a module whose comparable ledgers tie but has one absent from Tally reads 'Partial' + a transparency note, not red 'Off'", async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const sale = { ledger: 'HOT Sales', code: 'H1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -8000, tally: -8000, diff: 0, status: 'tied' };
+    const purch = { ledger: 'HOT Purchase', code: 'H2', group: 'Purchase Accounts', parentGroup: 'Purchase Accounts', statement: 'PL', nature: 'expense', erp: 5000, tally: null, diff: 5000, status: 'only-erp' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 2, tied: 1, off: 1, offTotal: 1 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [sale, purch], tree: [],
+      moduleTree: {
+        modules: [
+          { code: 'HOT', label: 'Hotel', erp: -3000, tally: -8000, diff: 5000,
+            sales: -8000, cogs: 5000, salesTally: -8000, cogsTally: null,
+            gp: 3000, gpTally: 8000, gpDiff: -5000, status: 'partial', unmatched: 1, shared: 0, rows: [
+              { ledger: 'HOT Sales', code: 'H1', head: 'Sales Accounts', erp: -8000, tally: -8000, diff: 0, status: 'tied', shared: false },
+              { ledger: 'HOT Purchase', code: 'H2', head: 'Purchase Accounts', erp: 5000, tally: null, diff: null, status: 'unmatched', shared: false },
+            ] },
+        ],
+        totals: { erp: -3000, tally: -8000, sales: -8000, cogs: 5000, salesTally: -8000, cogsTally: null, gp: 3000, gpTally: 8000 },
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Profit & Loss/i }));
+    fireEvent.click(await screen.findByLabelText(/By Module/));
+    expect(await screen.findByText('Hotel')).toBeInTheDocument();
+    // Comparable ledger ties → module is 'Partial', with a transparency note, not a scary red 'Off'.
+    expect(screen.getByText('Partial')).toBeInTheDocument();
+    expect(screen.getByText(/1 not in Tally/)).toBeInTheDocument();
+    expect(screen.getByText(/Less: COGS/)).toBeInTheDocument();   // subtotal present (its Tally renders as —, not 0)
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
+  test('By Module: clicking an off module slice drills to its vouchers (same drawer as the flat view)', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const sale = { ledger: 'IT-Base Fare', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -100000, tally: -110000, diff: 10000, status: 'off' };
+    const bank = { ledger: 'HDFC Bank A/c', code: 'B2', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 1500, tally: 1500, diff: 0, status: 'tied' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 2, tied: 1, off: 1, offTotal: 1 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [sale, bank], tree: [],
+      moduleTree: {
+        modules: [
+          { code: 'FLT-INT', label: 'International Flights', erp: -100000, tally: -110000, diff: 10000,
+            sales: -100000, cogs: 0, salesTally: -110000, cogsTally: null,
+            gp: 100000, gpTally: 110000, gpDiff: -10000, status: 'off', unmatched: 0, shared: 0, rows: [
+              { ledger: 'IT-Base Fare', code: 'S1', head: 'Sales Accounts', erp: -100000, tally: -110000, diff: 10000, status: 'off', shared: false },
+            ] },
+        ],
+        totals: { erp: -100000, tally: -110000, sales: -100000, cogs: 0, salesTally: -110000, cogsTally: null, gp: 100000, gpTally: 110000 },
+        bucketTree: [], bucketTreePL: [],
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByLabelText(/By Module/));
+    const slice = await screen.findByText('IT-Base Fare');
+    expect(screen.getByText('▸ drill vouchers')).toBeInTheDocument();   // affordance appears on the off slice
+    fireEvent.click(slice);
+    // The SAME voucher-by-voucher drawer the flat/CoA rows open.
+    expect(await screen.findByText(/Voucher-by-voucher/)).toBeInTheDocument();
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
+  test('name/group mismatch drives the "fix in Tally" workflow (rename hint, badge, KPI, punch-list filter)', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 2, tied: 2, off: 0, onlyErp: 0, onlyTally: 0, nameMismatch: 1, groupMismatch: 1, fixTotal: 2, blocking: 1, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [
+        // Amount ties, but the Tally name lacks the [BOM] tag AND the group differs
+        // (Tally: Duties & Taxes, ERP: Provisions) → both must be fixed in Tally.
+        { ledger: 'Professional Tax [M] [BOM]', erpLedger: 'Professional Tax [M] [BOM]', tallyLedger: 'Professional Tax [M]', code: 'BOM-L1049', group: 'Provisions', parentGroup: 'Provisions', statement: 'BS', nature: 'liability', erpGroup: 'Provisions', tallyGroup: 'Duties & Taxes', nameMatch: false, groupMatch: false, needsRename: true, needsRegroup: true, blocking: true, erp: -800, tally: -800, diff: 0, status: 'tied' },
+        { ledger: 'Salary Payable', erpLedger: 'Salary Payable', tallyLedger: 'Salary Payable', code: 'L1118', group: 'Provisions', parentGroup: 'Provisions', statement: 'BS', nature: 'liability', nameMatch: true, groupMatch: true, needsRename: false, needsRegroup: false, blocking: false, erp: -306667, tally: -306667, diff: 0, status: 'tied' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // The rename hint states the exact ERP name to rename the Tally ledger to.
+    expect(await screen.findByText(/rename to/)).toBeInTheDocument();
+    // The group-fix hint points at the ERP group.
+    expect(screen.getByText(/should be/)).toBeInTheDocument();
+    // "Fix in Tally" appears as both the KPI label and the row badge (amount ties, but
+    // it still blocks) — never a green "Tied" on a row that needs a Tally correction.
+    expect(screen.getAllByText('Fix in Tally').length).toBeGreaterThanOrEqual(2);
+    // The punch-list filter hides the fully-tied Salary row, keeping the one to fix.
+    fireEvent.click(screen.getByLabelText(/Show only items to fix/));
+    await waitFor(() => expect(screen.queryByText('Salary Payable')).not.toBeInTheDocument());
+    expect(screen.getByText('Professional Tax [M] [BOM]')).toBeInTheDocument();
+  });
+
+  test('grouped-upload subtotals that did not reconcile surface a review banner', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 1, tied: 1, off: 0, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 1 },
+      // A group subtotal whose upload total (900 Cr) ≠ the sum of its ledgers (400 Cr) —
+      // kept for review, not counted as a ledger mismatch.
+      reviewGroups: [{ ledger: 'Odd Group', group: 'Provisions', parentGroup: 'Provisions', amount: -900, childSum: -400, diff: -500 }],
+      rows: [{ ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 100, tally: 100, diff: 0, status: 'tied' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    const banner = await screen.findByTestId('group-review-warning');
+    expect(banner).toHaveTextContent(/Odd Group/);
+    expect(banner).toHaveTextContent(/reconcile/);
+  });
+
   test('the net-profit line reads Profit / (Loss) — a loss is parenthesised, not a positive Dr', async () => {
     // Mock: netProfitTally -3,24,000 (a LOSS). It must NEVER read as a positive "3,24,000 Dr".
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
@@ -154,6 +464,93 @@ describe('Tally Reconciliation · tie-out board render', () => {
     fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab (word also appears in the certificate message)
     expect(await screen.findByText(/In Tally, not ERP: 1/)).toBeInTheDocument(); // summary chip
     expect(screen.getByText('3 off ledgers')).toBeInTheDocument();
+  });
+
+  test('Defect Register — tier segment + type chips filter the table, Clear resets', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 5,
+      summary: { total: 4, byType: { 'missing-in-tally': 1, 'missing-in-erp': 1, 'ledger-missing-tally': 1, 'ledger-missing-erp': 1 } },
+      defects: [
+        { ledger: 'Alpha Ledger', date: '2026-07-01', ref: 'V1', desc: 'only in erp', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 100, variance: 0, side: 'erp' },
+        { ledger: 'Beta Ledger', date: '2026-07-02', ref: 'V2', desc: 'only in tally', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 200, variance: 0, side: 'tally' },
+        { ledger: 'Gamma Master', date: '', ref: '', desc: 'no daybook', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 300, variance: 300, side: 'balance' },
+        { ledger: 'Delta Master', date: '', ref: '', desc: 'no erp side', type: 'ledger-missing-erp', label: 'Ledger absent in ERP', amount: -400, variance: -400, side: 'balance' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    // All four defect rows visible before any filter.
+    expect(await screen.findByText('Alpha Ledger')).toBeInTheDocument();
+    expect(screen.getByText('Beta Ledger')).toBeInTheDocument();
+    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    expect(screen.getByText('Delta Master')).toBeInTheDocument();
+
+    // Master tier → only the two ledger-absent (structural) rows survive.
+    fireEvent.click(screen.getByRole('button', { name: /Master mismatches/ }));
+    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    expect(screen.getByText('Delta Master')).toBeInTheDocument();
+    expect(screen.queryByText('Alpha Ledger')).not.toBeInTheDocument();
+    expect(screen.queryByText('Beta Ledger')).not.toBeInTheDocument();
+    expect(screen.getByText('Showing 2 of 4 defects')).toBeInTheDocument();
+
+    // Toggle the "Ledger absent in Tally" chip → narrows to just Gamma.
+    fireEvent.click(screen.getByRole('button', { name: /Ledger absent in Tally: 1/ }));
+    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    expect(screen.queryByText('Delta Master')).not.toBeInTheDocument();
+
+    // Clear → every row returns and the "Showing X of Y" line is gone.
+    fireEvent.click(screen.getByRole('button', { name: /^Clear$/ }));
+    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
+    expect(screen.getByText('Delta Master')).toBeInTheDocument();
+    expect(screen.queryByText(/Showing \d+ of \d+ defects/)).not.toBeInTheDocument();
+  });
+
+  test('Defect Register — master and voucher defects render as two separate stacked panels', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 5,
+      summary: { total: 3, byType: { 'missing-in-tally': 1, 'ledger-missing-tally': 1, 'amount-mismatch': 1 } },
+      defects: [
+        { ledger: 'Alpha Ledger', date: '2026-07-01', ref: 'V1', desc: 'only in erp', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 100, variance: 0, side: 'erp' },
+        { ledger: 'Gamma Master', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 300, variance: 300, side: 'balance' },
+        { ledger: 'Zeta Ledger', date: '2026-07-03', ref: 'V3', desc: 'amount off', type: 'amount-mismatch', label: 'Amount differs', amount: 50, variance: 10, side: 'both' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    // Under "All" both panels render, each with its own header — never one merged list.
+    expect(await screen.findByText('Master defects')).toBeInTheDocument();
+    expect(screen.getByText('Voucher defects')).toBeInTheDocument();
+    // The ledger-level defect lives under the master panel; the two posting defects under voucher.
+    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
+    expect(screen.getByText('Zeta Ledger')).toBeInTheDocument();
+    // Selecting the Voucher tier drops the master panel entirely.
+    fireEvent.click(screen.getByRole('button', { name: /Voucher mismatches/ }));
+    expect(screen.queryByText('Master defects')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gamma Master')).not.toBeInTheDocument();
+    expect(screen.getByText('Alpha Ledger')).toBeInTheDocument();
+  });
+
+  test('Defect Register — master panel shows the rename hint, stranded count and the collapsed-pairs badge', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 4, pairedRenames: 1,
+      summary: { total: 2, byType: { 'ledger-missing-tally': 2 } },
+      defects: [
+        { ledger: 'Round Off', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 0.1, variance: 0.1, side: 'balance', suggest: { ledger: 'Rounded Off', code: '', score: 0.88, side: 'tally' } },
+        { ledger: 'Consultancy Fees', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 5000, variance: 5000, side: 'balance', strandedCount: 7 },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    expect(await screen.findByText(/Did you mean Tally “Rounded Off”/)).toBeInTheDocument(); // fuzzy rename hint
+    expect(screen.getByText(/7 ERP entries have no Tally match/)).toBeInTheDocument();       // stranded-entry blast radius
+    expect(screen.getByText(/1 rename pair collapsed/)).toBeInTheDocument();                 // de-dup badge
   });
 
   test('clicking an off ledger opens the voucher drill drawer (Phase 2)', async () => {
@@ -439,6 +836,17 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     ]);
     wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
     expect(await screen.findByText(/not tied — clear the off ledgers/)).toBeInTheDocument();
+  });
+
+  test('Report Open Items surfaces pending Tally name/group fixes (fixTotal blocker)', async () => {
+    const { getRegister } = require('../api');
+    getRegister.mockResolvedValueOnce([
+      // Frozen but not clean: amounts tie (offTotal 0) yet 2 Tally names/groups still
+      // differ from ERP → an Open Item with the name/group reason (blocks certifying).
+      { period: '2026-05', tier: 'month', ledgers: 40, cert: { status: 'open', signatures: [], snapshot: { offTotal: 0, fixTotal: 2, staleAccepted: 0, frozenAt: '2026-05-31' }, reopened: 0 } },
+    ]);
+    wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
+    expect(await screen.findByText(/2 name\/group fix\(es\) owed in Tally/)).toBeInTheDocument();
   });
 
   test('every /tally-reconciliation certification + reports href resolves to a route', () => {

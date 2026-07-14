@@ -16,10 +16,19 @@ const C = { dark: '#0d1326', blue: '#185FA5', red: '#A32D2D', green: '#27500A', 
 const ACTION = {
   create:  { label: 'Created',  bg: '#EAF3DE', fg: '#27500A' },
   edit:    { label: 'Edited',   bg: '#FFF6D6', fg: '#8a6d12' },
+  'edit-passengers': { label: 'Pax edited', bg: '#FFF6D6', fg: '#8a6d12' },
   approve: { label: 'Approved', bg: '#E6F0FA', fg: '#185FA5' },
   reject:  { label: 'Rejected', bg: '#FCEBEB', fg: '#A32D2D' },
   delete:  { label: 'Deleted',  bg: '#FCEBEB', fg: '#A32D2D' },
   cancel:  { label: 'Cancelled', bg: '#f0f1f5', fg: '#5a6691' },
+  revoke:  { label: 'Revoked',  bg: '#FBF3DE', fg: '#8a6d12' },
+  push:    { label: 'Pushed',   bg: '#E6F0FA', fg: '#185FA5' },
+  unallocate: { label: 'Un-allocated', bg: '#f0f1f5', fg: '#5a6691' },
+  // Three-level review chain (Check → Verify → Director/Owner sign-off).
+  check:   { label: 'Checked',  bg: '#E6F0FA', fg: '#185FA5' },
+  verify:  { label: 'Verified', bg: '#FFF6D6', fg: '#8a6d12' },
+  director:{ label: 'Director OK', bg: '#E6F0FA', fg: '#185FA5' },
+  owner:   { label: 'Owner OK',  bg: '#EAF3DE', fg: '#27500A' },
 };
 
 // Plain-English label for a stored field name.

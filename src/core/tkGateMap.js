@@ -67,6 +67,7 @@ const OVERRIDES = {
   // Tax reports live under the branch Tax pill — tax is SPLIT (branch prepares &
   // views, central files), so these are NOT central despite the /reports/ family.
   '/reports/tax-summary': SPLIT,           // GST / VAT Summary (Return)
+  '/reports/tax-rate-summary': SPLIT,      // GST Rate-Wise Report (branch prepares, central files)
   '/reports/statutory-dues': SPLIT,        // Statutory Dues Calendar
   '/reports/tax-board': SPLIT,             // Tax Filing Status Board
 

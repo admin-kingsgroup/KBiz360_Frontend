@@ -84,12 +84,15 @@ export const REASONS = [
 ];
 export const reasonLabel = (v) => (REASONS.find((r) => r.value === v) || {}).label || v;
 
-// Defect type → tone + short label (Defect Register).
+// Defect type → tone + short label + tier (Defect Register). `tier` splits the
+// defects into two triage cuts: 'master' = the whole ledger is absent on one
+// side (chart/mapping fix), 'voucher' = a posting inside a ledger that exists on
+// both sides (data-entry/correction fix).
 export const DEFECT_META = {
-  'missing-in-tally': { tone: 'warning', label: 'In ERP, not Tally' },
-  'missing-in-erp': { tone: 'warning', label: 'In Tally, not ERP' },
-  'amount-mismatch': { tone: 'danger', label: 'Amount differs' },
-  'ledger-missing-tally': { tone: 'warning', label: 'Ledger absent in Tally' },
-  'ledger-missing-erp': { tone: 'warning', label: 'Ledger absent in ERP' },
+  'missing-in-tally': { tone: 'warning', label: 'In ERP, not Tally', tier: 'voucher' },
+  'missing-in-erp': { tone: 'warning', label: 'In Tally, not ERP', tier: 'voucher' },
+  'amount-mismatch': { tone: 'danger', label: 'Amount differs', tier: 'voucher' },
+  'ledger-missing-tally': { tone: 'warning', label: 'Ledger absent in Tally', tier: 'master' },
+  'ledger-missing-erp': { tone: 'warning', label: 'Ledger absent in ERP', tier: 'master' },
 };
-export const defectMeta = (t) => DEFECT_META[t] || { tone: 'danger', label: t };
+export const defectMeta = (t) => DEFECT_META[t] || { tone: 'danger', label: t, tier: 'voucher' };

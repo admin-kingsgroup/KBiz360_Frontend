@@ -240,8 +240,8 @@ export const CONTROL_LISTS = {
   ],
   entry: [
     { nm: 'Block future-dated entries', ds: 'Already active: no posting beyond today (two-layer guard; travel dates excepted). Nothing to switch.', applied: true },
-    { nm: 'Duplicate detection', ds: 'Not built yet (roadmap): would warn / block a repeat of the same invoice / voucher.', planned: true },
-    { nm: 'GP-floor block', ds: 'Not built yet (roadmap): a booking under the GP floor would need central approval.', planned: true },
+    { nm: 'Duplicate-bill detection', ds: 'Already active: a supplier expense bill with the same supplier + Bill/Invoice no. as an existing entry is blocked on save (overridable with a reason). Nothing to switch.', applied: true },
+    { nm: 'Negative-GP block', ds: 'Already active: a loss-making SO/PO/GP booking or INB deal (gross profit below 0) is hard-blocked on save for EVERY branch — no exemptions. Zero GP (at-cost) is allowed. Nothing to switch.', applied: true },
     { nm: 'Mandatory documents', ds: "ON = a money-out / expense / ADM-ACM voucher can't be created without a supporting attachment. OFF = attachment optional.", flag: 'entry.mandatory_docs' },
     { nm: 'Tax filing lock', ds: 'Not a switch — engages with the master guard: a filed period locks (no edits after filing, via period lock).', guarded: true },
     { nm: 'Reconciliation before close', ds: "ON = a period can't hard-close until bank / client / supplier reconciliation is signed off (no open lines through period end). OFF = close not gated on recon.", flag: 'close.require_recon' },
@@ -251,7 +251,7 @@ export const CONTROL_LISTS = {
     { nm: 'Approval-request alerts', ds: 'Already active: pending work surfaces on the Alerts feed and the Inbox badge for the next approver. Nothing to switch.', applied: true },
     { nm: 'Stale-approval SLA + escalation', ds: 'Already active: change-requests are aged against the clearance SLA — on-time / at-risk / breached — on the governance queue.', applied: true },
     { nm: 'Exception & risk alerts', ds: 'Already active: GP≤0 · negative cash · over-limit surface on the Alerts feed. Nothing to switch.', applied: true },
-    { nm: 'Daily digest to Owner / Director', ds: 'Not built yet (roadmap): one scheduled email summary of pending, exceptions and close status.', planned: true },
+    { nm: 'Daily digest to Owner / Director', ds: 'Already active: an in-app Daily Digest (Oversight → Daily Digest) summarises pending approvals, exceptions and close readiness at a glance. Nothing to switch.', applied: true },
   ],
   reports: [
     { nm: 'Restrict export of sensitive data', ds: 'ON = only permitted roles may export ledgers / registers / P&L (a view-only user is blocked at the shared export helper). OFF = export open to anyone with view access.', flag: 'reports.restrict_export' },

@@ -19,7 +19,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
-  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw, FileEdit,
+  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inp, card, btnG, btnGh, FL, bc } from '../../../core/styles.jsx';
@@ -99,6 +99,11 @@ const tfTd = { borderTop: '2px solid ' + DARK, padding: '10px 8px', fontWeight: 
 // Tiny helper lines under the GST-mode dropdowns (auto-derived vs missing-state).
 const hintOk = { margin: '4px 0 0', fontSize: 10.5, fontWeight: 700, color: '#16794c' };
 const hintWarn = { margin: '4px 0 0', fontSize: 10.5, fontWeight: 700, color: '#a9690a' };
+// Neutral (grey) informational line — for a state that's expected/optional, not a
+// data gap. B2C walk-ins are structurally never in the Customer Master (the pooled
+// per-staff ledger is the voucher party, the passenger is only Bill-To), so the
+// "not in master" note must inform, not alarm — Intra is the correct B2C default.
+const hintMuted = { margin: '4px 0 0', fontSize: 10.5, fontWeight: 700, color: '#5b616e' };
 // Per-section column-header + total-row styles — the section colour carries INTO
 // the table (SO blue, PO maroon), matching the SO/PO/GP voucher theme.
 const thBaseHdr = { padding: '10px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '1.2px', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' };
@@ -268,7 +273,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
   );
 }
 
-export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false, poOnly = false, autoApprove = false }) {
+export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDone = null, initialModule = null, interBranch = false }) {
   const qc = useQueryClient();
   const editing = !!editBooking;
   // Editing keeps the booking's own branch; a fresh voucher uses the top-bar branch.
@@ -459,12 +464,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // N-PO: fold the ADDITIONAL purchase legs into the headline Gross Profit so the entry
   // screen shows the same folder GP the booking saves with (backend gpForMulti), not the
-  // primary-PO-only figure. Mirrors backend purchaseNetOf (total − GST − TCS − incentive)
-  // and the save-time leg filter. The per-passenger table below stays the PRIMARY view.
+  // primary-PO-only figure. Mirrors backend purchaseNetOf (total − roundOff − GST − TCS −
+  // incentive) and the save-time leg filter. The per-passenger table below stays PRIMARY.
   const extraLegsFilled = (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0);
   const extraLegNet = extraLegsFilled.reduce((s, leg) => {
     const po = legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name)).po;
-    return s + (num(po.total) - num(po.gst) - num(po.tcs) - num(po.incentiveAmt));
+    return s + (num(po.total) - num(po.roundOff) - num(po.gst) - num(po.tcs) - num(po.incentiveAmt));
   }, 0);
   const hasExtraLegs = Math.abs(extraLegNet) > 0.005;
   const folderGpTotal = Math.round((num(totals.gp.total) - extraLegNet) * 100) / 100;
@@ -565,9 +570,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const interBranchParty = !interBranch && (
     IB_NAME.test(customer.name || '') || IB_NAME.test(customer.ledgerName || '')
     || IB_GROUP.test(customer.ledgerGroup || '') || IB_GROUP.test(customer.group || ''));
+  // A Flight/Holiday deal MUST declare International vs Domestic — that choice IS the cost
+  // centre. Blocked on BOTH paths so a blank one can't post into "Unspecified": the customer
+  // path is caught by the approval gate, the inter-branch (INB) path had no such gate, so we
+  // require it here at entry (the INB deal posts on approval with no second Int'l/Dom prompt).
+  const needsScope = hasPackage && !packageType;
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = interBranch
-    ? (!!brCode && !saving && !!toBranch && totals.so.total > 0)  // INB: just need a counterparty branch + a sale value
+    ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope)  // INB: counterparty branch + sale value + Int'l/Domestic for Flights/Holiday
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
       && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)));
 
@@ -625,9 +635,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     // Editing an existing booking requires a reason (saved to the audit trail).
     let editReason = '';
     if (editing) {
-      const { confirmed, reason } = await confirmDialog(autoApprove
-        ? { title: 'Save changes & keep Approved?', message: 'This reverses the posted entry, re-posts it with your changes, and re-approves automatically — the booking stays Approved with no Pending step.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save & keep Approved' }
-        : { title: 'Save changes to this voucher?', message: 'Editing reverses any posted entry and returns it to Pending for re-approval.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save changes' });
+      const { confirmed, reason } = await confirmDialog({ title: 'Save changes to this voucher?', message: 'Editing reverses any posted entry and returns it to Pending for re-approval.', reasonRequired: true, reasonLabel: 'Reason for editing (saved to the audit trail)', confirmLabel: 'Save changes' });
       if (!confirmed) return; // cancelled — nothing saved
       editReason = reason;
     }
@@ -654,32 +662,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
         : await apiPost('/api/booking-orders', payload);
-      // autoApprove (Edit PO from the Approved tab): the edit above reverses & returns
-      // the voucher to Pending same as any edit — immediately re-approve it here so the
-      // caller never sees a Pending stop; if re-approval fails (e.g. validation), the
-      // edit itself still stands and the voucher is left in Pending for manual approval.
-      let reapproved = false, reapproveErr = '';
-      if (editing && autoApprove && booking?.id) {
-        try { const approveRes = await apiPost('/api/booking-orders/' + booking.id + '/approve'); Object.assign(booking, approveRes); reapproved = true; }
-        catch (e) { reapproveErr = e.message || 'Re-approve failed'; }
-      }
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
       if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
-      if (reapproveErr) toast(`Voucher ${booking.bookingNo || ''} saved — but auto re-approve failed (${reapproveErr}); approve it manually from Pending`, 'error');
-      else toast(reapproved ? `Voucher ${booking.bookingNo || ''} saved — stays Approved` : `Voucher ${booking.bookingNo || ''} saved — pending approval`);
+      toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
       // If this PO was fetched from an open inter-branch leg, consume it (mark the
       // INB link booked). Non-fatal: a miss leaves the link open to retry.
       if (inbId && booking?.bookingNo) {
         try { await bookInb.mutateAsync({ id: inbId, purchaseVno: booking.bookingNo }); setInbLinkNo(''); setInbId(''); }
         catch (_) { /* link stays open; surfaced in the INB reconciliation */ }
       }
-      // poOnly (the Approved tab's compact PO-only modal) closes straight back to the
-      // caller on success instead of falling through to the full-page "result" screen
-      // below — that screen isn't wrapped in the modal's backdrop, so it left the table
-      // underneath clickable and a second "Edit PO" click reused this same mounted
-      // instance (stale customer/supplier/lines state) instead of getting a fresh one.
-      if (poOnly) { if (onDone) onDone(); return; }
-      setResult({ ...booking, _approved: reapproved, _edited: editing });
+      setResult({ ...booking, _approved: false, _edited: editing });
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
@@ -831,8 +823,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     );
   };
 
-  // The Purchase Order section — extracted so it can render either inline (step ② of
-  // the full form) or alone inside the poOnly modal below, with no duplicated JSX.
+  // The Purchase Order section — step ② of the full entry form.
   const poSection = !isNoSupp && (
     <Section n="2" badge="PO" name="Purchase Order" sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
       {!editing && (openInbQ.data || []).length > 0 && (
@@ -872,29 +863,21 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{l[col.key] || '—'}</td>)}
                   {spec.fareCols.map((col) => (
                     <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
-                      {poOnly
-                        ? <span style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700, color: '#3A3A3A' }}>{fmt(l[col.key] || 0)}</span>
-                        : <input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} />}
+                      <input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} />
                     </td>
                   ))}
                   <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
-                    {poOnly
-                      ? <span style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700, color: '#3A3A3A' }}>{fmt(l.psvc || 0)}</span>
-                      : <input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} />}
+                    <input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} />
                   </td>
                   {pkg
                     ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
                         {suppForeign
                           ? <span title="Overseas supplier — no Indian GST (import of service)" style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', color: '#9197a3', fontWeight: 700 }}>—</span>
-                          : poOnly
-                            ? <span style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700, color: '#3A3A3A' }}>{fmt(l.psvcGst || 0)}</span>
-                            : <input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} />}
+                          : <input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} />}
                       </td>
                     : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
                   <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
-                    {poOnly
-                      ? <span style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', fontWeight: 700, color: '#3A3A3A' }}>{fmt(l.incentive || 0)}</span>
-                      : <input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} />}
+                    <input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} />
                   </td>
                   <td style={{ ...tdAuto, width: 85, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.tds)}</td>
                   <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', width: 110, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.finalPurchase)}</td>
@@ -913,46 +896,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <td style={poTf}>{pkg && !suppForeign ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
-            <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}</td>
+            <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}{num(totals.po.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.po.roundOff > 0 ? '+' : ''}{fmt(totals.po.roundOff)}</span> : null}</td>
           </tr></tfoot>
         </table>
       </div>
     </Section>
   );
-
-  // poOnly: a compact modal (used from the approvals queue's Edit button) showing
-  // ONLY the Purchase Order fields — not the full multi-section entry page. Reuses the
-  // SAME state/save() as the full form (so GST/TDS/TCS/GP computation and the save
-  // payload are byte-identical), it just renders a smaller view. Customer, supplier,
-  // Sales Order markup/Service Fee and everything else stay exactly as loaded from
-  // editBooking — untouched here, so they save back unchanged.
-  if (poOnly) {
-    const close = () => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'));
-    return (
-      <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,19,38,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-        <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: 'min(1180px, 96vw)', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(13,19,38,.28)', padding: '18px 20px', fontFamily: HELV }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: 15, color: DARK, display: 'flex', alignItems: 'center', gap: 7 }}><Pencil size={15} style={{ color: PO_BAR }} /> Edit Purchase Order · {editBooking.bookingNo}</h3>
-              <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#5b616e' }}>{spec.icon} {spec.name} · Link <b style={{ fontFamily: 'monospace' }}>{editBooking.linkNo}</b> · {autoApprove ? <>saving re-posts the changes and <b>keeps this voucher Approved</b> — no Pending step.</> : 'saving returns this voucher to Pending for re-approval.'}</p>
-            </div>
-            <button onClick={close} style={{ ...btnGh, padding: '4px 10px' }}>✕</button>
-          </div>
-          {isNoSupp ? (
-            <div style={{ padding: 18, fontSize: 12, color: '#9197a3' }}>This voucher has no purchase leg (no-supplier sale) — nothing to edit here.</div>
-          ) : poSection}
-          {error && <div style={{ margin: '10px 0', padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>{error}</div>}
-          <div style={{ display: 'flex', gap: 9, justifyContent: 'flex-end', marginTop: 14 }}>
-            <button onClick={close} disabled={saving} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
-            <button disabled={!canSave || isNoSupp || saving} onClick={() => save()} className="max-tablet:min-h-[44px]"
-              style={{ ...btnG, background: (canSave && !isNoSupp) ? DARK : '#9ca3af', cursor: (canSave && !isNoSupp) ? 'pointer' : 'not-allowed', opacity: (canSave && !isNoSupp) ? 1 : 0.7 }}>
-              {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (autoApprove ? 'Save & keep Approved' : 'Save changes (Pending)')}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div ref={formKeys.ref} onKeyDown={formKeys.onKeyDown} style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px 90px', fontFamily: HELV, color: '#1F2328', WebkitFontSmoothing: 'antialiased' }}>
@@ -1149,7 +1098,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             ) : custRec && !custSupply ? (
               <p style={hintWarn}>⚠ Customer has no State in the Customer Master — add it to auto-pick the mode</p>
             ) : isB2C && customer.name.trim() && !custRec ? (
-              <p style={hintWarn}>⚠ Not in the Customer Master — pick a match or “＋ New” (address + state) to auto-set the mode</p>
+              <p style={hintMuted}>ℹ B2C walk-in — not in the Customer Master. That’s fine for B2C; Sale mode stays as picked above. Add via “＋ New” (address + state) only if the sale is interstate, to auto-set IGST.</p>
             ) : null)}
           </FL>}
           {!isNoSupp && <FL label={interBranch ? 'Supplier ledger (airline / cost) *' : 'Supplier ledger (Pay to) *'}>
@@ -1269,7 +1218,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {!pkg && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
               {!pkg && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={soTf}>{fmt(pkg ? totals.so.gst + totals.so.otherTaxesGst : totals.so.otherTaxesGst)}</td>}
               {spec.tcs && <td style={soTf}>{fmt(totals.so.tcs)}</td>}
-              <td style={{ ...soTf, color: DR }}>{fmt(totals.so.total)}</td><td style={soTf} />
+              <td style={{ ...soTf, color: DR }}>{fmt(totals.so.total)}{num(totals.so.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.so.roundOff > 0 ? '+' : ''}{fmt(totals.so.roundOff)}</span> : null}</td><td style={soTf} />
             </tr></tfoot>
           </table>
         </div>
@@ -1371,6 +1320,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         {!isNoSupp && <FL label="Purchase Tally Ref"><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>}
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
+        )}
+        {interBranch && needsScope && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#b42318', alignSelf: 'center' }}>⚠ Pick International / Domestic to save this inter-branch {moduleCode === 'SH' ? 'Holiday' : 'Flight'} deal</span>
         )}
         <button disabled={!canSave} onClick={() => save()} className="max-tablet:min-h-[44px]"
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>

@@ -31,6 +31,14 @@ describe('editorVoucherTotal — SVC2 GST must ride inside the bill total', () =
     expect(editorVoucherTotal({ subtotal: 46194, taxAmt: 90 })).toBe(46284);
   });
 
+  test('SO/PO/GP round-off rides inside the total so it foots to the snapped rupee', () => {
+    // supplier svc 84.75 + GST 15.26 = 100.01 → purchase snapped to 7,100.00, roundOff -0.01.
+    const total = editorVoucherTotal({ subtotal: 7084.75, taxAmt: 15.26, otherTaxesGst: 0, tcsAmt: 0, roundOff: -0.01 });
+    expect(total).toBe(7100);
+    // Without carrying roundOff the editor would read the un-rounded 7,100.01 → "✗ Out by ₹0.01".
+    expect(editorVoucherTotal({ subtotal: 7084.75, taxAmt: 15.26 })).toBe(7100.01);
+  });
+
   test('blank / missing fields default to 0, never NaN', () => {
     expect(editorVoucherTotal({})).toBe(0);
     expect(editorVoucherTotal()).toBe(0);

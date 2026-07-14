@@ -18,9 +18,16 @@ const STATUS = {
   open: { tone: 'warning', label: 'Not tied' },
 };
 
-export function CertifyPanel({ branch, period, tier, offTotal, staleAccepted = 0, currentUser }) {
+export function CertifyPanel({ branch, period, tier, offTotal, fixTotal = 0, staleAccepted = 0, currentUser }) {
   const qc = useQueryClient();
-  const tied = (offTotal || 0) === 0;
+  // "Tied" for the close gate now also requires every Tally ledger name/group to match
+  // ERP (policy: correct Tally before sign-off) — mirrors the backend fixTotal gate.
+  const tied = (offTotal || 0) === 0 && (fixTotal || 0) === 0;
+  // What still blocks the close, in words (amount gaps and/or name-group fixes).
+  const blockParts = [];
+  if ((offTotal || 0) > 0) blockParts.push(`${offTotal} ledger${offTotal === 1 ? '' : 's'} off`);
+  if ((fixTotal || 0) > 0) blockParts.push(`${fixTotal} name/group fix${fixTotal === 1 ? '' : 'es'} owed in Tally`);
+  const blockLabel = blockParts.join(' · ');
   const { data, isError, refetch } = useQuery({
     queryKey: ['tally-tieout', 'cert', branch, tier, period],
     queryFn: () => getTallyCert({ branch, period, tier }),
@@ -75,7 +82,10 @@ export function CertifyPanel({ branch, period, tier, offTotal, staleAccepted = 0
           </div>
         ) : !tied && !frozen ? (
           <div className="rounded-brand border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-ink">
-            <b className="text-danger">Not certifiable yet.</b> The ERP doesn't tie to Tally — {offTotal} ledger{offTotal === 1 ? '' : 's'} still off. Clear them in the <b>Defects</b> tab, then freeze &amp; certify.
+            <b className="text-danger">Not certifiable yet.</b>{' '}
+            {(offTotal || 0) > 0 && <>The ERP doesn't tie to Tally — {offTotal} ledger{offTotal === 1 ? '' : 's'} still off. Clear them in the <b>Defects</b> tab. </>}
+            {(fixTotal || 0) > 0 && <>{fixTotal} Tally ledger name/group{fixTotal === 1 ? '' : 's'} still differ{fixTotal === 1 ? 's' : ''} from ERP — rename/regroup in Tally and re-upload (use “Show only items to fix in Tally”). </>}
+            Then freeze &amp; certify.
           </div>
         ) : (
           <>
@@ -112,8 +122,8 @@ export function CertifyPanel({ branch, period, tier, offTotal, staleAccepted = 0
                 {progress.next ? `Sign as ${progress.next.role}` : 'Sign'}
               </Button>
               {stale && <span className="text-xs font-semibold text-warning">Re-review the changed accepted variance{staleAccepted === 1 ? '' : 's'} before certifying.</span>}
-              {frozen && !tied && <span className="text-xs font-semibold text-danger">Tie-out changed since freezing — {offTotal} now off. Clear/accept them, then re-freeze.</span>}
-              {!tied && !frozen && <span className="text-xs font-semibold text-danger">{offTotal} off — clear before signing</span>}
+              {frozen && !tied && <span className="text-xs font-semibold text-danger">Tie-out changed since freezing — {blockLabel}. Fix, then re-freeze.</span>}
+              {!tied && !frozen && <span className="text-xs font-semibold text-danger">{blockLabel} — fix before signing</span>}
               {tied && !frozen && <span className="text-xs text-ink-subtle">Freeze the snapshot, then the chain can sign.</span>}
               {tied && frozen && !gate.ok && gate.reason && <span className="text-xs text-ink-subtle">{gate.reason}</span>}
               {freeze.isError && <span className="text-xs text-danger">{freeze.error?.message}</span>}

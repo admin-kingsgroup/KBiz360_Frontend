@@ -25,17 +25,15 @@
    ════════════════════════════════════════════════════════════════════════════ */
 import { useState } from 'react';
 import {
-  Plus, Trash2, Save, RefreshCw, Clock, CheckCircle2, XCircle, FileCheck2, Pencil,
+  Plus, Trash2, RefreshCw, Clock, CheckCircle2, XCircle, FileCheck2,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { inp, card, btnG, btnGh, bc } from '../../core/styles.jsx';
+import { card, btnG, btnGh, bc } from '../../core/styles.jsx';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { PeriodBar, periodRange } from '../../core/period';
 import { apiPost } from '../../core/api';
 import { toast } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
-import { SmartDateInput } from '../../core/ux/SmartDateInput';
-import { VSPECS } from '../../core/voucherSpecs.js';
 import { invalidateBooks } from '../../core/useAccounting';
 import {
   rowsForEdit, inbRowsFromDeal, ALLOWED_LEG_MODULES, legToPayload, SoPoGpVoucherEntry,
@@ -55,11 +53,19 @@ export function PendingBookings({ branch, setRoute }) {
   const [editing, setEditing] = useState(null); useModalEsc(() => setEditing(null), !!editing);
   const [groupBy, setGroupBy] = useState('none');
   const [sel, setSel] = useState(() => new Set());
+  const [onlyFlagged, setOnlyFlagged] = useState(false); // "needs fixing" filter — show only un-approvable rows
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
 
   const rows = data.filter((b) => b.status === 'pending' && inRange(b.date || ''));
-  const allIds = rows.map((b) => b.id);
+  // Bookings the verification gate blocks (e.g. untagged Flight/Holiday) — counted for the
+  // toolbar chip and, when the filter is on, the only rows shown so the team clears them to zero.
+  const flaggedCount = rows.filter((b) => b.validation?.hasErrors).length;
+  const visibleRows = onlyFlagged ? rows.filter((b) => b.validation?.hasErrors) : rows;
+  const allIds = visibleRows.map((b) => b.id);
+  // Auto-clear the filter once nothing is flagged, so "work the list to zero" never leaves
+  // the filter stuck ON hiding the remaining (non-flagged) pending rows behind a vanished chip.
+  React.useEffect(() => { if (flaggedCount === 0 && onlyFlagged) setOnlyFlagged(false); }, [flaggedCount, onlyFlagged]);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
 
@@ -118,6 +124,7 @@ export function PendingBookings({ branch, setRoute }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
         <PeriodBar branch={branch} compact defaultPreset="all" onChange={setRange} />
         <GroupByBar value={groupBy} onChange={setGroupBy} />
+        {flaggedCount > 0 && <NeedsFixingChip count={flaggedCount} active={onlyFlagged} onToggle={() => setOnlyFlagged((v) => !v)} />}
         {rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
@@ -127,104 +134,15 @@ export function PendingBookings({ branch, setRoute }) {
           </span>
         )}
       </div>
-      <BookingTable rows={rows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
+      <BookingTable rows={visibleRows} isLoading={isLoading} cur={cur} open={open} setOpen={setOpen} mode="pending" groupBy={groupBy} onApprove={onApprove} onReview={onReview} onCancel={onCancel} onEdit={setEditing} busyId={busyId} sel={sel} onToggleSel={toggleSel} />
     </div>
   );
 }
 
-// ── Edit passenger details on an APPROVED booking ────────────────────────────
-// Identity-only fix — names, document refs (Ticket/PNR, Hotel/Conf, Passport…)
-// and Flight sectors — saved in place via POST /:id/passengers. The server applies
-// ONLY these identity columns, so amounts/ledgers can't change: the booking stays
-// approved and its posted Sales/Purchase stay posted. No Revoke → Edit → re-Approve
-// cycle for a name typo.
-function EditPaxModal({ booking, onClose, onSaved }) {
-  const spec = VSPECS[booking.module];
-  const [rows, setRows] = useState(() => (Array.isArray(booking.rows) ? booking.rows : []).map((r) => JSON.parse(JSON.stringify(r || {}))));
-  const [reason, setReason] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState('');
-  useModalEsc(onClose, true);
-  if (!spec) return null;
-  const setId = (i, key, val) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
-  const setSector = (i, si, key, val) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: (r.sectors || []).map((s, sx) => (sx === si ? { ...s, [key]: val } : s)) } : r)));
-  const addSector = (i) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: [...(r.sectors || []), Object.fromEntries(spec.sectorCols.map((c) => [c.key, '']))] } : r)));
-  const delSector = (i, si) => setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, sectors: (r.sectors || []).filter((_, sx) => sx !== si) } : r)));
-  const save = async () => {
-    setSaving(true); setErr('');
-    try {
-      await apiPost('/api/booking-orders/' + booking.id + '/passengers', { rows, editReason: reason });
-      toast('Passenger details saved — booking stays approved & posted');
-      onSaved();
-    } catch (e) { setErr(e.message || 'Save failed'); setSaving(false); }
-  };
-  const smallInp = { ...inp, height: 30, fontSize: 12, padding: '4px 8px' };
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,19,38,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 10, width: 'min(860px, 96vw)', maxHeight: '88vh', overflowY: 'auto', boxShadow: '0 18px 50px rgba(13,19,38,.28)', padding: '18px 20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: 15, color: DARK, display: 'flex', alignItems: 'center', gap: 7 }}><Pencil size={15} style={{ color: BLUE }} /> Edit passenger details · {booking.bookingNo}</h3>
-            <p style={{ margin: '3px 0 0', fontSize: 11.5, color: '#5b616e' }}>
-              {spec.icon} {spec.name} · Link <b style={{ fontFamily: 'monospace' }}>{booking.linkNo}</b> · saved in place — <b>amounts are untouched and the booking stays approved</b> (no revoke needed).
-            </p>
-          </div>
-          <button onClick={onClose} style={{ ...btnGh, padding: '4px 10px' }}>✕</button>
-        </div>
-        {err && <div style={{ margin: '10px 0', padding: '8px 12px', borderRadius: 8, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 11.5, fontWeight: 700 }}>{err}</div>}
-        {!rows.length && <div style={{ padding: 18, fontSize: 12, color: '#9197a3' }}>This booking has no passenger grid to edit (legacy import). Use Revoke → Edit for changes.</div>}
-        {rows.map((l, i) => (
-          <div key={i} style={{ border: '1px solid #e3e6ee', borderRadius: 8, padding: '10px 12px', marginTop: 10, background: '#fbfaf7' }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#9197a3', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>Passenger {i + 1}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${spec.idCols.length}, minmax(140px, 1fr))`, gap: 8 }}>
-              {spec.idCols.map((c) => (
-                <label key={c.key} style={{ fontSize: 10.5, color: '#5b616e', fontWeight: 600 }}>{c.label}
-                  <input value={l[c.key] ?? ''} onChange={(e) => setId(i, c.key, e.target.value)} style={{ ...smallInp, marginTop: 3, width: '100%' }} />
-                </label>
-              ))}
-            </div>
-            {spec.sectors && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, color: '#9197a3', textTransform: 'uppercase', letterSpacing: '.5px' }}>Sectors / Tickets</span>
-                  <button onClick={() => addSector(i)} style={{ ...btnGh, padding: '2px 8px', fontSize: 10 }}><Plus size={11} /> Sector</button>
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 640 }}>
-                    <thead><tr>{spec.sectorCols.map((c) => <th key={c.key} style={{ padding: '3px 6px', fontSize: 9.5, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', textAlign: 'left' }}>{c.label}</th>)}<th /></tr></thead>
-                    <tbody>
-                      {(l.sectors || []).map((s, si) => (
-                        <tr key={si}>
-                          {spec.sectorCols.map((c) => (
-                            <td key={c.key} style={{ padding: 2 }}>
-                              {c.type === 'date'
-                                ? <SmartDateInput value={s[c.key] ?? ''} onChange={(v) => setSector(i, si, c.key, v)} style={{ ...smallInp, width: '100%' }} />
-                                : <input value={s[c.key] ?? ''} onChange={(e) => setSector(i, si, c.key, e.target.value)} style={{ ...smallInp, width: '100%' }} />}
-                            </td>
-                          ))}
-                          <td style={{ padding: 2 }}><button onClick={() => delSector(i, si)} title="Remove sector" style={{ ...btnGh, padding: '4px 7px', color: '#dc2626', borderColor: '#f3c9c9' }}><Trash2 size={11} /></button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-        {rows.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-            <label style={{ flex: 1, minWidth: 260, fontSize: 10.5, color: '#5b616e', fontWeight: 600 }}>Reason (audit trail — optional)
-              <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Name spelling corrected per passport" style={{ ...smallInp, marginTop: 3, width: '100%' }} />
-            </label>
-            <button onClick={onClose} disabled={saving} style={btnGh}>Cancel</button>
-            <button onClick={save} disabled={saving} style={btnG}>{saving ? <RefreshCw size={13} className="spin" /> : <Save size={13} />} Save passenger details</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// EditPaxModal moved to modules/approvals/bookingApprovals.jsx — the live
+// BookingApprovals now uses it too (main's identity-only pax edit feature,
+// merged 2026-07-14). The dead ApprovedBookings below still references it —
+// harmless, since ApprovedBookings is never called.
 
 export function ApprovedBookings({ branch, setRoute, currentUser }) {
   const brCode = brCodeOf(branch) || 'ALL';

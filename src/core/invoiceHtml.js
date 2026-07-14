@@ -356,17 +356,21 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
       ? `<div class="r"><span class="k">IGST</span><span class="v">${cur}${n2(gst)}</span></div>`
       : `<div class="r"><span class="k">CGST</span><span class="v">${cur}${n2(half)}</span></div><div class="r"><span class="k">SGST</span><span class="v">${cur}${n2(r2(gst - half))}</span></div>`);
   const tcsRow = tcs ? `<div class="r"><span class="k">TCS</span><span class="v">${cur}${n2(tcs)}</span></div>` : '';
+  // Whole-rupee invoice round-off (GST double-rounding paise) — shown so the line items
+  // still foot to the clean NET TOTAL. Blank when the total already lands on a rupee.
+  const roundOff = r2(snap.roundOff || 0);
+  const roundRow = roundOff ? `<div class="r"><span class="k">Round Off</span><span class="v">${roundOff < 0 ? '-' : ''}${cur}${n2(Math.abs(roundOff))}</span></div>` : '';
   const sumtbl = isSale
     ? `
     <div class="r"><span class="k">Sub Total</span><span class="v">${cur}${n2(subTotal)}</span></div>
     ${service ? `<div class="r"><span class="k">Service Fee</span><span class="v">${cur}${n2(service)}</span></div>` : ''}
-    ${gst ? gstRows : ''}${tcsRow}
+    ${gst ? gstRows : ''}${tcsRow}${roundRow}
     <div class="net"><span class="k">NET TOTAL (${esc(curCode)})</span><span class="v">${cur}${n2(net)}</span></div>`
     : `
     <div class="r"><span class="k">Sub Total (Fares + Svc)</span><span class="v">${cur}${n2(subTotal)}</span></div>
     ${incentive ? `<div class="r" style="color:#A32D2D"><span class="k">Supplier Incentive</span><span class="v">-${cur}${n2(incentive)}</span></div>` : ''}
     ${gst ? gstRows : ''}
-    ${tds ? `<div class="r" style="color:#A07828"><span class="k">${isVat ? 'WHT' : 'TDS (2%)'}</span><span class="v">${cur}${n2(tds)}</span></div>` : ''}
+    ${tds ? `<div class="r" style="color:#A07828"><span class="k">${isVat ? 'WHT' : 'TDS (2%)'}</span><span class="v">${cur}${n2(tds)}</span></div>` : ''}${roundRow}
     <div class="net"><span class="k">NET COST (${esc(curCode)})</span><span class="v">${cur}${n2(r2(net - incentive + tds))}</span></div>`;
 
   // bank (sales) from company-profile

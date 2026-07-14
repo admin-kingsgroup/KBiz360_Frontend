@@ -26,6 +26,19 @@ const num = (v) => {
   return n; // keep the raw sign
 };
 
+// The explicit Dr/Cr a Tally amount cell carries — 'cr' | 'dr' | '' (none). Same
+// detection num() uses, exposed so the Day Book can TRUST an inline suffix
+// ("13300.00 Cr") over the column an amount happens to sit in: a shifted / mislabelled
+// Debit/Credit header, or a single combined amount column, must never flip a credit
+// into a debit. A suffix-less number falls back to its column (below).
+const crDrSide = (v) => {
+  const raw = String(v ?? '');
+  const s = raw.replace(/USD|INR|KES|TZS/gi, '').replace(/[₹$,\s]/g, '');
+  if (/^\(.*\)$/.test(s) || /cr\.?$/i.test(s) || /\bcr\b/i.test(raw)) return 'cr';
+  if (/dr\.?$/i.test(s) || /\bdr\b/i.test(raw)) return 'dr';
+  return '';
+};
+
 /** '14/07/2026', '14-Jul-2026', '2026-07-14', '14.07.26' → 'YYYY-MM-DD' ('' if not a date). */
 export function toISODate(v) {
   const s = String(v ?? '').trim();
@@ -108,8 +121,19 @@ export function normalizeDayBook(matrix = []) {
     // rather than dropping the leg (which would unbalance the voucher).
     const ledger = String(r[cols.ledger] ?? '').trim().replace(/^(to|by)\s+/i, '');
     if (!ledger || /^(total|grand total|opening balance|closing balance)/i.test(ledger)) continue;
-    const debit = cols.debit !== undefined ? Math.abs(num(r[cols.debit]) || 0) : 0;
-    const credit = cols.credit !== undefined ? Math.abs(num(r[cols.credit]) || 0) : 0;
+    // Amount → Dr/Cr. A Tally Day Book cell usually carries its OWN "Dr"/"Cr" suffix
+    // ("13300.00 Cr"); when it does, that suffix is AUTHORITATIVE — a shifted or
+    // mislabelled Debit/Credit header, or a single combined amount column, must never
+    // flip a credit into a debit (the bug that read every DT-Base Fare sale as a Dr).
+    // Only a suffix-less number is bucketed by the column it sits in.
+    let debit = 0; let credit = 0;
+    for (const [ci, col] of [[cols.debit, 'debit'], [cols.credit, 'credit']]) {
+      if (ci === undefined) continue;
+      const mag = Math.abs(num(r[ci]) || 0);
+      if (!mag) continue;
+      const side = crDrSide(r[ci]);
+      if (side ? side === 'cr' : col === 'credit') credit += mag; else debit += mag;
+    }
     if (!debit && !credit) continue; // a subtotal / narration-only line
     if (!curDate) continue;          // a leg with no voucher date yet — skip noise
     rows.push({ date: curDate, vno: curVno, ledger, debit, credit, narration: cols.narration !== undefined ? String(r[cols.narration] ?? '').trim() : '' });
@@ -133,6 +157,10 @@ const TB_COLS = [
   ['credit', /^(credit|cr)(\s*amount)?$/i],
 ];
 const TB_LEDGER = /^(ledger(\s*name)?|particulars|account(\s*name)?|name)$/i;
+// Tally's TB can carry the ledger's GROUP when exported with it shown (F12 → Parent).
+// Reading it lets the tie-out flag a group that differs from ERP (and stops an
+// unmatched Tally ledger falling into Suspense). Not an amount column.
+const TB_GROUP = /^(group(\s*name)?|under|parent(\s*group)?|primary\s*group)$/i;
 const TB_BALANCE = /^balance$/i; // bare "Balance" — Tally uses it for opening AND closing
 
 function classifyTBHeaderRow(row = []) {
@@ -143,6 +171,7 @@ function classifyTBHeaderRow(row = []) {
     const c = String(cell ?? '').trim();
     if (!c) return;
     if (cols.ledger === undefined && TB_LEDGER.test(c)) { cols.ledger = i; return; }
+    if (cols.group === undefined && TB_GROUP.test(c)) { cols.group = i; return; }
     if (TB_BALANCE.test(c)) { balances.push(i); amtMatches += 1; return; }
     for (const [k, re] of TB_COLS) if (re.test(c)) { if (cols[k] === undefined) cols[k] = i; amtMatches += 1; break; }
   });
@@ -198,6 +227,19 @@ export function normalizeTB(matrix = []) {
       const o = (cols.openingDebit !== undefined ? Math.abs(num(r[cols.openingDebit]) || 0) : 0) - (cols.openingCredit !== undefined ? Math.abs(num(r[cols.openingCredit]) || 0) : 0);
       const dr = Math.abs(num(r[cols.debit]) || 0); const cr = Math.abs(num(r[cols.credit]) || 0);
       row = { ledger, opening: o, debit: dr, credit: cr };
+    }
+    // Carry the Tally group when the export included it (only when non-empty, so a
+    // group-less export keeps the exact prior row shape).
+    if (row && cols.group !== undefined) { const g = String(r[cols.group] ?? '').trim(); if (g) row.group = g; }
+    // Keep a ledger that had ACTIVITY (Debit/Credit movement) even when its balance nets
+    // to ZERO — otherwise an all-zero-closing row is dropped below and a ledger that had
+    // real transactions this month silently vanishes from the reconciliation. Only a row
+    // with NO balance reads its movement columns (so non-zero rows keep their exact prior
+    // shape); a closing-only export that carries no movement still can't tell these apart
+    // from truly dormant ledgers, and those stay dropped.
+    if (row && !(row.closingDebit || row.closingCredit || row.closing || row.opening)) {
+      if (row.debit === undefined && cols.debit !== undefined) { const dr = Math.abs(num(r[cols.debit]) || 0); if (dr) row.debit = dr; }
+      if (row.credit === undefined && cols.credit !== undefined) { const cr = Math.abs(num(r[cols.credit]) || 0); if (cr) row.credit = cr; }
     }
     if (row && (row.closingDebit || row.closingCredit || row.closing || row.debit || row.credit || row.opening)) rows.push(row);
   }
@@ -298,11 +340,16 @@ export function parseTallyXmlTB(text) {
   if (!names.length) return { rows: [], error: 'No <DSPACCNAME> ledger rows found — this is not a Tally Trial Balance XML export (export the TB, or use Excel/CSV).' };
   const rows = [];
   let droppedGroups = 0;
+  let curGroup = ''; // best-effort: the last group HEADER seen becomes the context
   for (const n of names) {
     const nameNode = n.querySelector('DSPDISPNAME');
     const ledger = (nameNode ? nameNode.textContent : '').trim();
     if (!ledger || isTBNoiseRow(ledger)) continue;
-    if (isTallyGroupRow(ledger)) { droppedGroups += 1; continue; }
+    // A recognised Tally group name is a HEADER row, not a ledger — drop it from the
+    // tie-out but remember it as the group the following ledgers sit under, so the
+    // upload carries a group even without an explicit column (best-effort: only the
+    // 28 primary groups are recognised as headers).
+    if (isTallyGroupRow(ledger)) { curGroup = ledger; droppedGroups += 1; continue; }
     // The amounts sit in the <DSPACCINFO> element that follows this <DSPACCNAME>.
     // Stop if we reach the NEXT ledger first (adjacent DSPACCNAMEs) so a name row
     // never borrows the following ledger's amounts.
@@ -311,7 +358,9 @@ export function parseTallyXmlTB(text) {
     const clNode = info ? info.querySelector('DSPCLAMTA') : null;
     const cl = num(clNode ? clNode.textContent.trim() : '');
     if (cl === null || cl === 0) continue; // empty/zero closing (e.g. a pass-through group) — no tie-out signal
-    rows.push({ ledger, closing: -cl });
+    const row = { ledger, closing: -cl };
+    if (curGroup) row.group = curGroup;
+    rows.push(row);
   }
   return { rows, error: rows.length ? '' : 'Trial Balance XML parsed but no ledger closing balances were found.', note: groupedNote(droppedGroups) };
 }

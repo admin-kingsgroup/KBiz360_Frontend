@@ -19,6 +19,7 @@ export { SalesGpAnalytics } from './salesGpAnalytics';
 export { Statistics, voucherRegister } from './statistics';
 export { ClientStatement } from './pages/client-statement';
 export { RPT_TaxSummary } from './pages/tax-summary';
+export { RPT_TaxRateSummary } from './pages/tax-rate-summary';
 export { ConsolidatedBS } from './pages/consolidated-bs';
 export { ScheduleIIIBS } from './pages/schedule-iii-bs';
 

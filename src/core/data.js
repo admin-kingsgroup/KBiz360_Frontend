@@ -111,6 +111,7 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
   /* — Tax & Statutory (moved here from the Accounts pill) — */
   {divider:true, label:"Tax & Statutory"},
   {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"GST Rate-Wise Report",       href:"/reports/tax-rate-summary"},
   {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
   {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
   {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
@@ -129,6 +130,7 @@ export const TAX_AFRICA = {label:"Taxation — VAT", icon:FileText, _regime:"VAT
   /* — Tax & Statutory (moved here from the Accounts pill) — */
   {divider:true, label:"Tax & Statutory"},
   {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"GST Rate-Wise Report",       href:"/reports/tax-rate-summary"},
   {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
   {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
   {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
@@ -154,6 +156,7 @@ export const TAX_ALL = {label:"Taxation", icon:FileText, _regime:"ALL", children
   /* — Tax & Statutory (moved here from the Accounts pill) — */
   {divider:true, label:"Tax & Statutory"},
   {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},
+  {label:"GST Rate-Wise Report",       href:"/reports/tax-rate-summary"},
   {label:"TDS Auto-Calculator",        href:"/finance/tds-calculator"},
   {label:"Statutory Dues Calendar",    href:"/reports/statutory-dues"},
   {label:"Tax Filing Status Board",    href:"/reports/tax-board"},
