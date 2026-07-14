@@ -41,7 +41,7 @@ jest.mock('../api', () => ({
     ledger: 'HDFC Bank A/c', branch: 'BOM', period: '2026-07', tier: 'month', from: '2026-07-01', to: '2026-07-31',
     erpBalance: 810000, tallyImported: 2, summary: { total: 1 },
     lines: [
-      { date: '2026-07-02', ref: 'PAY/0412', tallyRef: 'BP/88', desc: 'BSP settlement', narration: 'Weekly BSP payout', sourceRef: 'BSP/W27', vtype: 'PV', voucherId: 'v123', erp: -200000, tally: -200000, status: 'matched', variance: 0, particulars: [{ ledger: 'IATA Clearing A/c', side: 'Dr', amount: 200000 }, { ledger: 'HDFC Bank A/c', side: 'Cr', amount: 200000 }] },
+      { date: '2026-07-02', ref: 'PAY/0412', tallyRef: 'BP/88', desc: 'BSP settlement', narration: 'Weekly BSP payout', sourceRef: 'BSP/W27', vtype: 'PV', voucherId: 'v123', erp: -200000, tally: -200000, status: 'matched', variance: 0, particulars: [{ ledger: 'IATA Clearing A/c', side: 'Dr', amount: 190000 }, { ledger: 'HDFC Bank A/c', side: 'Cr', amount: 10000 }] },
       { date: '2026-07-09', ref: '', desc: 'Bank charge', erp: null, tally: -5000, status: 'only-tally', variance: 0 },
     ],
     defects: [{ ledger: 'HDFC Bank A/c', date: '2026-07-09', ref: '', desc: 'Bank charge', type: 'missing-in-erp', amount: -5000 }],
@@ -607,6 +607,8 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('Entries in this voucher')).toBeInTheDocument();
     expect(screen.getByText(/IATA Clearing/)).toBeInTheDocument();             // a contra leg of the voucher
     expect(screen.getAllByText(/HDFC Bank A\/c/).length).toBeGreaterThan(0);   // the other leg (board + drawer header also show it)
+    // A Cr leg renders a single, correct side ("10,000 Cr") — not the old contradictory "Cr 10,000 Dr".
+    expect(screen.getByText(/10,000 Cr/)).toBeInTheDocument();
   });
 
   test('certificate panel gates the close — blocked while ledgers are off (Phase 3)', async () => {

@@ -6,7 +6,7 @@ import { fmt, statusMeta, REASONS, reasonLabel } from './format';
 import { Badge, Button, Select, LoadingState, ErrorState } from '../../shell/primitives';
 
 // The full ERP voucher (all legs + header), opened on demand from a drill line. Lazy so the heavy
-// accounting editor module isn't pulled into the tally bundle until a voucher is actually opened.
+// accounting module (legacy.jsx) is code-split out of the tally bundle until a voucher is opened.
 const VoucherEditor = lazy(() => import('../accountingLive/legacy').then((m) => ({ default: m.VoucherEditor })));
 
 // ─── Voucher drill (Phase 2) + accept-variance (Phase 4) ─────────────────────
@@ -33,10 +33,11 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
   const closeRef = useRef(null);
   useEffect(() => { closeRef.current?.focus(); }, []); // move focus into the dialog on open (a11y)
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    // Modal stack: Escape pops the full-voucher overlay first, then the drill drawer.
+    const onKey = (e) => { if (e.key === 'Escape') { if (openVoucher) setOpenVoucher(null); else onClose(); } };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, openVoucher]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['tally-tieout'] });
   const accept = useMutation({ mutationFn: () => acceptVariance({ branch, period, tier, ledger, reason, note }), onSuccess: () => { invalidate(); onClose(); } });
@@ -115,11 +116,11 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
                           <span className="block font-semibold text-ink">{canExpand ? <span className="mr-1 inline-block text-ink-subtle">{open ? '▾' : '▸'}</span> : null}{label}
                             {l.vtype ? <span className="ml-1.5 align-middle rounded bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted">{l.vtype}</span> : null}</span>
                           <span className="mt-0.5 block font-mono text-xs text-ink-subtle">{l.voucherId
-                            ? <button type="button" title="Open the full voucher" onClick={(e) => { e.stopPropagation(); setOpenVoucher({ id: l.voucherId, vno: l.ref }); }} className="rounded font-semibold text-accent hover:underline focus:outline-none focus:ring-1 focus:ring-accent">{l.ref || 'voucher'} ↗</button>
+                            ? <button type="button" title="Open the full voucher" onClick={(e) => { e.stopPropagation(); setOpenVoucher({ id: l.voucherId, vno: l.ref }); }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }} className="rounded font-semibold text-accent hover:underline focus:outline-none focus:ring-1 focus:ring-accent">{l.ref || 'voucher'} ↗</button>
                             : (l.ref || '(no vno)')}{l.tallyRef && l.tallyRef !== l.ref ? ` · Tally ${l.tallyRef}` : ''}{l.date ? ` · ${l.date}` : ''}{l.sourceRef ? ` · ${l.sourceRef}` : ''}</span>
                           {l.narration && l.narration !== l.desc ? <span className="mt-0.5 block text-[11px] text-ink-muted">{l.narration}</span> : null}
                           {l.desc && l.desc !== label ? <span className="mt-0.5 block text-[11px] text-ink-subtle">{l.desc}</span> : null}
-                          {canExpand ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">{open ? '▾ hide entries' : `▸ ${legs.length} entries`}</span> : null}
+                          {canExpand ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">{open ? '▾ hide entries' : `▸ ${legs.length} ${legs.length === 1 ? 'entry' : 'entries'}`}</span> : null}
                         </td>
                         <td className={`px-4 py-2 text-right align-top font-mono tabular-nums ${l.erp === null ? 'text-ink-subtle' : ''}`}>{fmt(l.erp, cur)}</td>
                         <td className={`px-4 py-2 text-right align-top font-mono tabular-nums ${l.tally === null ? 'text-ink-subtle' : ''}`}>{fmt(l.tally, cur)}</td>
@@ -133,7 +134,7 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
                               {legs.map((p, j) => (
                                 <div key={j} className="flex items-center justify-between gap-3 text-xs">
                                   <span className="truncate text-ink">↳ {p.ledger}</span>
-                                  <span className="shrink-0 font-mono tabular-nums text-ink-muted">{p.side} {fmt(p.amount, cur)}</span>
+                                  <span className="shrink-0 font-mono tabular-nums text-ink-muted">{fmt(p.side === 'Cr' ? -Math.abs(p.amount) : Math.abs(p.amount), cur)}</span>
                                 </div>
                               ))}
                             </div>
