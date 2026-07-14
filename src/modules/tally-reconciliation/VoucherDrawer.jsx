@@ -18,6 +18,7 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
   const qc = useQueryClient();
   const [reason, setReason] = useState(row && row.interBranch ? 'inter-branch' : 'timing');
   const [note, setNote] = useState('');
+  const [expanded, setExpanded] = useState(null);   // which voucher row is expanded to its entries
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['tally-tieout', 'ledger', branch, period, tier, ledger],
@@ -93,16 +94,46 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
               <tbody>
                 {lines.map((l, i) => {
                   const meta = statusMeta(l.status);
+                  const label = l.party || l.desc || '—';
+                  const legs = Array.isArray(l.particulars) ? l.particulars : [];
+                  const canExpand = legs.length > 0;
+                  const open = expanded === i;
+                  const toggle = () => setExpanded(open ? null : i);
                   return (
-                    <tr key={i} className={`border-b border-surface-border ${l.status === 'matched' ? '' : 'bg-danger/5'}`}>
-                      <td className="px-4 py-2">
-                        <span className="block font-semibold text-ink">{l.desc || '—'}</span>
-                        <span className="font-mono text-xs text-ink-subtle">{l.date}{l.ref ? ` · ${l.ref}` : ''}</span>
-                      </td>
-                      <td className={`px-4 py-2 text-right font-mono tabular-nums ${l.erp === null ? 'text-ink-subtle' : ''}`}>{fmt(l.erp, cur)}</td>
-                      <td className={`px-4 py-2 text-right font-mono tabular-nums ${l.tally === null ? 'text-ink-subtle' : ''}`}>{fmt(l.tally, cur)}</td>
-                      <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
-                    </tr>
+                    <React.Fragment key={i}>
+                      <tr className={`border-b border-surface-border ${l.status === 'matched' ? '' : 'bg-danger/5'} ${canExpand ? 'cursor-pointer hover:bg-surface-alt/60 focus:bg-surface-alt/60 focus:outline-none focus:ring-2 focus:ring-accent' : ''}`}
+                        onClick={canExpand ? toggle : undefined}
+                        role={canExpand ? 'button' : undefined} tabIndex={canExpand ? 0 : undefined}
+                        aria-expanded={canExpand ? open : undefined}
+                        onKeyDown={canExpand ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } } : undefined}>
+                        <td className="px-4 py-2 align-top">
+                          <span className="block font-semibold text-ink">{canExpand ? <span className="mr-1 inline-block text-ink-subtle">{open ? '▾' : '▸'}</span> : null}{label}
+                            {l.vtype ? <span className="ml-1.5 align-middle rounded bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted">{l.vtype}</span> : null}</span>
+                          <span className="mt-0.5 block font-mono text-xs text-ink-subtle">{l.ref || '(no vno)'}{l.tallyRef && l.tallyRef !== l.ref ? ` · Tally ${l.tallyRef}` : ''}{l.date ? ` · ${l.date}` : ''}{l.sourceRef ? ` · ${l.sourceRef}` : ''}</span>
+                          {l.narration && l.narration !== l.desc ? <span className="mt-0.5 block text-[11px] text-ink-muted">{l.narration}</span> : null}
+                          {l.desc && l.desc !== label ? <span className="mt-0.5 block text-[11px] text-ink-subtle">{l.desc}</span> : null}
+                          {canExpand ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">{open ? '▾ hide entries' : `▸ ${legs.length} entries`}</span> : null}
+                        </td>
+                        <td className={`px-4 py-2 text-right align-top font-mono tabular-nums ${l.erp === null ? 'text-ink-subtle' : ''}`}>{fmt(l.erp, cur)}</td>
+                        <td className={`px-4 py-2 text-right align-top font-mono tabular-nums ${l.tally === null ? 'text-ink-subtle' : ''}`}>{fmt(l.tally, cur)}</td>
+                        <td className="px-4 py-2 text-right align-top"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
+                      </tr>
+                      {open && canExpand ? (
+                        <tr className="border-b border-surface-border bg-surface-sunk/60">
+                          <td colSpan={4} className="px-4 py-2 pl-8">
+                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Entries in this voucher</div>
+                            <div className="grid gap-0.5">
+                              {legs.map((p, j) => (
+                                <div key={j} className="flex items-center justify-between gap-3 text-xs">
+                                  <span className="truncate text-ink">↳ {p.ledger}</span>
+                                  <span className="shrink-0 font-mono tabular-nums text-ink-muted">{p.side} {fmt(p.amount, cur)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

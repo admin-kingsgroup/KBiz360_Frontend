@@ -41,7 +41,7 @@ jest.mock('../api', () => ({
     ledger: 'HDFC Bank A/c', branch: 'BOM', period: '2026-07', tier: 'month', from: '2026-07-01', to: '2026-07-31',
     erpBalance: 810000, tallyImported: 2, summary: { total: 1 },
     lines: [
-      { date: '2026-07-02', ref: 'PAY/0412', desc: 'BSP settlement', erp: -200000, tally: -200000, status: 'matched', variance: 0 },
+      { date: '2026-07-02', ref: 'PAY/0412', tallyRef: 'BP/88', desc: 'BSP settlement', narration: 'Weekly BSP payout', sourceRef: 'BSP/W27', vtype: 'PV', voucherId: 'v123', erp: -200000, tally: -200000, status: 'matched', variance: 0, particulars: [{ ledger: 'IATA Clearing A/c', side: 'Dr', amount: 200000 }, { ledger: 'HDFC Bank A/c', side: 'Cr', amount: 200000 }] },
       { date: '2026-07-09', ref: '', desc: 'Bank charge', erp: null, tally: -5000, status: 'only-tally', variance: 0 },
     ],
     defects: [{ ledger: 'HDFC Bank A/c', date: '2026-07-09', ref: '', desc: 'Bank charge', type: 'missing-in-erp', amount: -5000 }],
@@ -593,6 +593,19 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(await screen.findByText(/Voucher-by-voucher/)).toBeInTheDocument();
     expect(await screen.findByText('BSP settlement')).toBeInTheDocument();
     expect(screen.getByText('Bank charge')).toBeInTheDocument();
+  });
+
+  test('voucher drill: a voucher shows its detail (type · source ref) and expands to its entries (particulars)', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByText('HDFC Bank A/c'));            // drill an off ledger
+    await screen.findByText('BSP settlement');                           // wait for the voucher lines to load
+    expect(screen.getByText('PV')).toBeInTheDocument();                  // voucher type shown
+    expect(screen.getByText(/BSP\/W27/)).toBeInTheDocument();            // source / booking ref shown (within the meta line)
+    // Expand the voucher → its double-entry legs appear.
+    fireEvent.click(screen.getByText(/2 entries/));
+    expect(screen.getByText('Entries in this voucher')).toBeInTheDocument();
+    expect(screen.getByText(/IATA Clearing/)).toBeInTheDocument();             // a contra leg of the voucher
+    expect(screen.getAllByText(/HDFC Bank A\/c/).length).toBeGreaterThan(0);   // the other leg (board + drawer header also show it)
   });
 
   test('certificate panel gates the close — blocked while ledgers are off (Phase 3)', async () => {
