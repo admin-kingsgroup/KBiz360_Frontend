@@ -730,7 +730,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       )}
 
       {/* KPI chips */}
-      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-7">
         <Kpi label="In scope" value={counts.total || 0} />
         <Kpi label="Tied" value={counts.tied || 0} tone="success" />
         <Kpi label="Off" value={(counts.off || 0)} tone={(counts.off || 0) > 0 ? 'danger' : 'muted'} />

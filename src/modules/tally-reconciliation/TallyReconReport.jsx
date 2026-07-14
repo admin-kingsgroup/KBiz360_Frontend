@@ -149,7 +149,7 @@ export function TallyReconReport({ branch: appBranch, currentUser, tier: fixedTi
 
           {/* 3 · Open Items */}
           <PageSection icon={AlertTriangle} title="Open Items"
-            subtitle="Blockers to certifying — off ledgers or changed accepted variances at freeze, or an uploaded period with no certificate started."
+            subtitle="Blockers to certifying — off ledgers, name/group fixes owed in Tally, or an uploaded period with no certificate started."
             actions={<Badge tone={openItems.length ? 'danger' : 'success'} size="sm" dot>{openItems.length} open</Badge>}>
             {!openItems.length ? <EmptyState title="No open blockers" hint="Every uploaded period is either certified or cleanly in progress." /> : (
               <div className="overflow-x-auto">

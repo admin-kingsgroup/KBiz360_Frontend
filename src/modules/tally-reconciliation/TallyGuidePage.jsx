@@ -4,8 +4,8 @@ import { PageSection, Badge, Button } from '../../shell/primitives';
 
 // ─── Tally Reconciliation — the staff Guide ──────────────────────────────────
 // The how-to for the whole-books ERP↔Tally tie-out: what to export from Tally and
-// where each file goes, the monthly routine, how to read the board, accepting
-// explained variances, and the certificate that gates the close. Pure content.
+// where each file goes, the monthly routine, how to read the board, and the
+// certificate that gates the close. Pure content.
 
 const cell = 'px-3 py-2.5 text-sm border-b border-surface-border align-top';
 const head = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-ink-muted bg-surface-alt border-b border-surface-border whitespace-nowrap';

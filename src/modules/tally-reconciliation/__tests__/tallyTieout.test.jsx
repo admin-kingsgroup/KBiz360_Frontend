@@ -887,7 +887,7 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
   test('Report lists a re-opened (not-tied) period as an Open Item, never a locked one', async () => {
     const { getRegister } = require('../api');
     getRegister.mockResolvedValueOnce([
-      { period: '2025-09', tier: 'month', ledgers: 63, cert: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { offTotal: 0, staleAccepted: 0, frozenAt: '2025-09-30' }, reopened: 0 } },
+      { period: '2025-09', tier: 'month', ledgers: 63, cert: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { offTotal: 0, frozenAt: '2025-09-30' }, reopened: 0 } },
       { period: '2026-06', tier: 'month', ledgers: 10, cert: { status: 'open', signatures: [], snapshot: { frozenAt: null }, reopened: 1 } }, // re-opened → not tied
     ]);
     wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
@@ -899,7 +899,7 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     getRegister.mockResolvedValueOnce([
       // Frozen but not clean: amounts tie (offTotal 0) yet 2 Tally names/groups still
       // differ from ERP → an Open Item with the name/group reason (blocks certifying).
-      { period: '2026-05', tier: 'month', ledgers: 40, cert: { status: 'open', signatures: [], snapshot: { offTotal: 0, fixTotal: 2, staleAccepted: 0, frozenAt: '2026-05-31' }, reopened: 0 } },
+      { period: '2026-05', tier: 'month', ledgers: 40, cert: { status: 'open', signatures: [], snapshot: { offTotal: 0, fixTotal: 2, frozenAt: '2026-05-31' }, reopened: 0 } },
     ]);
     wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
     expect(await screen.findByText(/2 name\/group fix\(es\) owed in Tally/)).toBeInTheDocument();
