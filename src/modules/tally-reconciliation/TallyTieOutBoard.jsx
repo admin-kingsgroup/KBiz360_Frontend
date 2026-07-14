@@ -767,7 +767,10 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       <PageSection title={tab === 'defects' ? `Defect Register — ${branch} · ${periodLabel(period)}` : tab === 'names' ? `Name Matcher — ${branch} · ${periodLabel(period)}` : `${branch} · ${periodLabel(period)}`}
         subtitle={tab === 'defects' ? 'Every off ledger drilled to its voucher defects — click a row to see the vouchers.' : tab === 'names' ? 'Unmatched ledger names paired ERP ↔ Tally — a guide for the rename / regroup / split to make in Tally. Nothing is saved; the fix is made at source.' : 'Left: ERP (live) · Middle: Tally (upload) · Right: difference. Click an off ledger to drill its vouchers.'}>
         {tab === 'defects' ? (
-          <DefectRegister data={defectsData} loading={defectsLoading} error={defectsError} onRetry={refetchDefects} cur={cur} onDrill={setDrill} />
+          <DefectRegister data={defectsData} loading={defectsLoading} error={defectsError} onRetry={refetchDefects} cur={cur}
+            /* Resolve the FULL tie-out row for the drilled ledger (inter-branch badge etc. ride along),
+               so a Defect-Register drill matches a board-row drill. Falls back to the passed object. */
+            onDrill={(x) => setDrill(rows.find((r) => nkFE(r.ledger) === nkFE(x.ledger)) || x)} />
         ) : tab === 'names' ? (
           <NameMatcherPane rows={rows} cur={cur} />
         ) : (<>
