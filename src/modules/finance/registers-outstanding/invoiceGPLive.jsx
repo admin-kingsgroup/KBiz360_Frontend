@@ -22,6 +22,7 @@ import { exportToExcel, vouchersToSheet } from '../../../core/exportExcel';
 import { useSalesRegister, usePurchaseRegister, useInvoiceGP } from '../../../core/useAccounting';
 import { card, inp } from '../../../core/styles';
 import { clickable } from '../../../core/ux/clickable';
+import { openBookingFolder } from '../../../core/BookingFolderHost';
 import { VoucherLines } from '../../accountingLive/legacy.jsx';
 import {
   DARK, GOLD, DIM, BLUE, RED, GREEN, curOf, money, branchLabel, Page, Banner, State, ExportBtn,
@@ -188,7 +189,10 @@ export function InvoiceGPLive({ branch }) {
                 <React.Fragment key={r.ref + '-' + i}>
                   <tr style={{ ...rowBg(i), cursor: 'pointer', background: isOpen ? '#eef4ff' : rowBg(i).background }} {...clickable(() => setOpen(isOpen ? null : i))}>
                     <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10.5, color: r.linked ? '#6b21a8' : '#64748b', fontWeight: 700 }}>
-                      <span style={{ color: DIM, marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{f.ref}
+                      <span style={{ color: DIM, marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>
+                      {r.linked && r.linkNo
+                        ? <span {...clickable((e) => { if (e && e.stopPropagation) e.stopPropagation(); openBookingFolder(r.linkNo, { branch, vno: r.ref }); })} title="Open the whole SO / PO / GP deal" style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>{f.ref}</span>
+                        : f.ref}
                     </td>
                     <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{f.date}</td>
                     <td style={{ padding: '8px 12px', color: DARK }}>{f.customer}</td>

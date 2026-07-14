@@ -105,6 +105,7 @@ import { ConfirmHost } from './core/ux/confirm';
 import { ContextBar } from './shell/ContextBar';
 import { LedgerSwitcher } from './shell/LedgerSwitcher';
 import { LedgerModalHost } from './core/LedgerModalHost';
+import { BookingFolderHost } from './core/BookingFolderHost';
 import { ShortcutHelp } from './shell/ShortcutHelp';
 import { DockProvider } from './core/ux/dock';
 
@@ -881,6 +882,7 @@ export default function KB360App(){
       <ConfirmHost/>
       <LedgerSwitcher branch={branch}/>
       <LedgerModalHost branch={branch}/>
+      <BookingFolderHost branch={branch}/>
       <ShortcutHelp/>
     </>
     </ReferenceProvider>

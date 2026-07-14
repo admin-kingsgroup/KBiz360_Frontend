@@ -6,8 +6,9 @@ import { useCockpitFocus } from '../../../store/cockpitFocus';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../../shell/primitives';
 import { VoucherDrawer } from './VoucherDrawer';
 import { CertifyPanel } from './CertifyPanel';
+import { NameMatcherPane } from '../NameMatcherPane';
 import { parseTBFile, parseDayBookFile } from '../tallyFileParse';
-import { BRANCHES, AFRICA, CUR, localeOf, round2, branchCodeOf, fmt, statusOf, statusMeta, defectMeta, reasonLabel, isCentralRole } from '../format';
+import { BRANCHES, AFRICA, CUR, localeOf, round2, branchCodeOf, fmt, statusOf, statusMeta, defectMeta, isCentralRole } from '../format';
 
 // ─── Tally Reconciliation — the whole-books tie-out board (one page per tier) ──
 // Puts the ERP's LIVE trial balance next to the UPLOADED Tally TB for a branch +
@@ -140,7 +141,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // Tally recon is a central Month/Year control — a non-central role that reaches
   // this by direct URL gets the rule, not the board. Access requires an ACTUAL
   // central role (NOT a page-visibility grant): the whole board is write-oriented
-  // (Upload / Accept / Freeze / Sign) and the backend refuses those to non-central
+  // (Upload / Freeze / Sign) and the backend refuses those to non-central
   // roles — a grant would only produce a board where every action 403s.
   const central = isCentralRole(currentUser?.role);
 
@@ -243,9 +244,11 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // A certified (signed/locked) period is frozen — re-upload/Clear are blocked by the
   // BE until re-opened; gate the upload controls proactively (not just via the 409).
   const periodCertified = data?.certStatus === 'signed' || data?.certStatus === 'locked';
-  // One authoritative "off" count (accepted variances already excluded on the BE),
-  // used by the KPI, the Defects tab badge AND the certificate gate — never diverge.
+  // One authoritative "off" count (every non-tied ledger), used by the KPI, the
+  // Defects tab badge AND the certificate gate — never diverge.
   const offTotal = counts.offTotal ?? ((counts.off || 0) + (counts.onlyErp || 0) + (counts.onlyTally || 0));
+  // Unmatched ledger NAMES (present on one side only) — the Name Matcher tab's badge.
+  const nameOrphans = (counts.onlyErp || 0) + (counts.onlyTally || 0);
   // Name/group corrections owed in Tally (the ledger's amount may already tie, but by
   // policy its Tally name/group must match ERP before certifying). `blocking` = the
   // single "must fix in Tally before sign-off" tally = amount gaps + name/group fixes.
@@ -365,7 +368,6 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     const fixNeeded = r.needsRename || r.needsRegroup;
     const meta = (fixNeeded && r.status === 'tied') ? { tone: 'warning', label: 'Fix in Tally' } : statusMeta(r.status);
     const off = r.status !== 'tied' && !r.synthetic;
-    const acc = r.status === 'accepted';
     const drill = () => setDrill(r);
     const canModule = r.statement === 'PL' && r.erp != null && !r.synthetic && MODULE_HEADS.has(r.parentGroup) && r.hasModules;
     const mKey = modKey(r); const mShown = canModule && modOpen[mKey]; const mInfo = modData[mKey];
@@ -384,13 +386,11 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             {r.nameMatch === false ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="Rename this ledger in Tally to match ERP">✎ Tally: “{r.tallyLedger}” → rename to “{r.erpLedger}”</span> : null}
             {r.groupMatch === false ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="Regroup this ledger in Tally to match ERP">⚠ Group in Tally: “{r.tallyGroup}” → should be “{r.parentGroup}”</span> : null}
             {r.suggest ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info" title="Closest ERP ledger — if it's the same account, rename it in Tally to match">Did you mean ERP “{r.suggest.ledger}”? — rename in Tally to match</span> : null}
-            {acc ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info">✓ accepted · {reasonLabel(r.acceptedReason)}
-              {r.acceptanceStale ? <span className="ml-1 rounded-full bg-warning/15 px-1.5 font-bold text-warning" title={`Accepted for ${fmt(r.acceptedAmount, cur)}, now ${fmt(r.diff, cur)} — re-review`}>⚠ changed</span> : null}</span>
-              : off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}
+            {off ? <span className="mt-0.5 block text-[10.5px] font-semibold text-accent">▸ drill vouchers</span> : null}
             {canModule ? <button type="button" onClick={(e) => { e.stopPropagation(); toggleModules(r); }} className="mt-0.5 block text-[10.5px] font-semibold text-accent hover:underline" title="ERP cost-centre split (Flight/Hotel/Holiday/Visa…). Tally has no cost-centre axis, so this is ERP-only.">{mShown ? '▾' : '▸'} modules (ERP split)</button> : null}</td>
           <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plErp) : r.erp === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plErp, cur) : fmt(r.erp, cur)}</td>
           <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plTally) : r.tally === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plTally, cur) : fmt(r.tally, cur)}</td>
-          <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${r.diff === 0 ? 'text-ink-subtle' : acc ? 'text-info' : 'text-danger'}`} title={r.diff > 0 ? 'ERP higher' : r.diff < 0 ? 'Tally higher' : ''}>{r.diff === 0 ? '0' : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(localeOf(cur))}`}</td>
+          <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${r.diff === 0 ? 'text-ink-subtle' : 'text-danger'}`} title={r.diff > 0 ? 'ERP higher' : r.diff < 0 ? 'Tally higher' : ''}>{r.diff === 0 ? '0' : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(localeOf(cur))}`}</td>
           <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
         </tr>
         {mShown ? (mInfo?.loading
@@ -463,8 +463,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // do (voucher-by-voucher ERP ↔ Tally ↔ match). Matched by ledger name (canonical, unique per
   // branch). Drill-ability is gated on the FULL row's status — exactly like the flat view
   // (off = status !== 'tied') — so a multi-cost-centre ledger that reconciles at ledger level
-  // ('tied' full row) is NOT drillable and can't open accept-variance, even though its per-module
-  // slice reads 'shared'/'off'.
+  // ('tied' full row) is NOT drillable, even though its per-module slice reads 'shared'/'off'.
   const nkFE = (s) => String(s || '').trim().toLowerCase();
   const renderModuleSlice = (r, keyStr) => {
     const meta = modBadge(r.status);
@@ -731,14 +730,13 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       )}
 
       {/* KPI chips */}
-      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-7">
         <Kpi label="In scope" value={counts.total || 0} />
         <Kpi label="Tied" value={counts.tied || 0} tone="success" />
         <Kpi label="Off" value={(counts.off || 0)} tone={(counts.off || 0) > 0 ? 'danger' : 'muted'} />
         <Kpi label="Only in ERP" value={counts.onlyErp || 0} tone={(counts.onlyErp || 0) > 0 ? 'warning' : 'muted'} />
         <Kpi label="Only in Tally" value={counts.onlyTally || 0} tone={(counts.onlyTally || 0) > 0 ? 'warning' : 'muted'} />
         <Kpi label="Fix in Tally" value={fixTotal} tone={fixTotal > 0 ? 'warning' : 'muted'} />
-        <Kpi label="Accepted" value={counts.accepted || 0} tone={(counts.accepted || 0) > 0 ? 'info' : 'muted'} />
         <Kpi label="Net profit Δ" value={fmt(round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)), cur)} tone={round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)) !== 0 ? 'danger' : 'muted'} small />
       </div>
 
@@ -746,7 +744,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           once uploaded, show the certificate close gate. Deferred until the board
           has loaded so the gate never flashes a wrong state (U4). */}
       {!empty && !isLoading && (imported.count
-        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} fixTotal={fixTotal} staleAccepted={counts.staleAccepted || 0} currentUser={currentUser} />
+        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} fixTotal={fixTotal} currentUser={currentUser} />
         : (
           <PageSection icon={Upload} title={`No Tally Trial Balance uploaded — ${branch} · ${periodLabel(period)}`}
             subtitle="Until you upload the period's Tally TB, every ERP ledger below shows as unmatched. This is the starting point, not an error.">
@@ -756,19 +754,27 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 
       {/* tabs */}
       <div className="flex gap-1 border-b border-surface-border">
-        {[['tb', 'All Ledgers · Trial Balance'], ['bs', 'Balance Sheet'], ['pl', 'Profit & Loss'], ['defects', 'Defects']].map(([k, lbl]) => (
+        {[['tb', 'All Ledgers · Trial Balance'], ['bs', 'Balance Sheet'], ['pl', 'Profit & Loss'], ['defects', 'Defects'], ['names', 'Name Matcher']].map(([k, lbl]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-semibold ${tab === k ? 'border-accent text-accent' : 'border-transparent text-ink-muted hover:text-ink'}`}>
             {k === 'defects' && <AlertTriangle size={14} aria-hidden="true" />}{lbl}
             {k === 'defects' && offTotal > 0 ? <span className="rounded-full bg-danger/15 px-1.5 text-xs font-bold text-danger">{offTotal}</span> : null}
+            {k === 'names' && nameOrphans > 0 ? <span className="rounded-full bg-warning/15 px-1.5 text-xs font-bold text-warning">{nameOrphans}</span> : null}
           </button>
         ))}
       </div>
 
-      <PageSection title={tab === 'defects' ? `Defect Register — ${branch} · ${periodLabel(period)}` : `${branch} · ${periodLabel(period)}`}
-        subtitle={tab === 'defects' ? 'Every off ledger drilled to its voucher defects — click a row to see the vouchers.' : 'Left: ERP (live) · Middle: Tally (upload) · Right: difference. Click an off ledger to drill its vouchers.'}>
+      <PageSection title={tab === 'defects' ? `Defect Register — ${branch} · ${periodLabel(period)}` : tab === 'names' ? `Name Matcher — ${branch} · ${periodLabel(period)}` : `${branch} · ${periodLabel(period)}`}
+        subtitle={tab === 'defects' ? 'Every off ledger drilled to its voucher defects — click a row to see the vouchers.' : tab === 'names' ? 'Unmatched ledger names paired ERP ↔ Tally — a guide for the rename / regroup / split to make in Tally. Nothing is saved; the fix is made at source.' : 'Left: ERP (live) · Middle: Tally (upload) · Right: difference. Click an off ledger to drill its vouchers.'}>
         {tab === 'defects' ? (
-          <DefectRegister data={defectsData} loading={defectsLoading} error={defectsError} onRetry={refetchDefects} cur={cur} onDrill={setDrill} />
+          <DefectRegister data={defectsData} loading={defectsLoading} error={defectsError} onRetry={refetchDefects} cur={cur}
+            /* Resolve the FULL tie-out row for the drilled ledger (inter-branch badge etc. ride along),
+               so a Defect-Register drill matches a board-row drill. Falls back to the passed object. */
+            onDrill={(x) => setDrill(rows.find((r) => nkFE(r.ledger) === nkFE(x.ledger)) || x)} />
+        ) : tab === 'names' ? (
+          isLoading ? <LoadingState label="Computing the tie-out…" />
+            : isError ? <ErrorState title="Couldn’t load the tie-out" message="The service didn’t respond. Check the connection and retry." onRetry={() => refetch()} />
+              : <NameMatcherPane rows={rows} cur={cur} />
         ) : (<>
         {isLoading && <LoadingState label="Computing the tie-out…" />}
         {isError && <ErrorState title="Couldn’t load the tie-out" message="The service didn’t respond. Check the connection and retry." onRetry={() => refetch()} />}

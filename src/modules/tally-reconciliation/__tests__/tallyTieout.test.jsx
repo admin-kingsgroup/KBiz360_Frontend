@@ -35,13 +35,11 @@ jest.mock('../api', () => ({
   freezeTallyCert: jest.fn(),
   signTallyCert: jest.fn(),
   reopenTallyCert: jest.fn(() => Promise.resolve({ certificate: { status: 'open', signatures: [] } })),
-  acceptVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
-  clearVariance: jest.fn(() => Promise.resolve({ rows: [], counts: {} })),
   getLedgerVouchers: jest.fn(() => Promise.resolve({
     ledger: 'HDFC Bank A/c', branch: 'BOM', period: '2026-07', tier: 'month', from: '2026-07-01', to: '2026-07-31',
     erpBalance: 810000, tallyImported: 2, summary: { total: 1 },
     lines: [
-      { date: '2026-07-02', ref: 'PAY/0412', desc: 'BSP settlement', erp: -200000, tally: -200000, status: 'matched', variance: 0 },
+      { date: '2026-07-02', ref: 'PAY/0412', tallyRef: 'BP/88', desc: 'BSP settlement', narration: 'Weekly BSP payout', sourceRef: 'BSP/W27', vtype: 'PV', voucherId: 'v123', erp: -200000, tally: -200000, status: 'matched', variance: 0, particulars: [{ ledger: 'IATA Clearing A/c', side: 'Dr', amount: 190000 }, { ledger: 'HDFC Bank A/c', side: 'Cr', amount: 10000 }] },
       { date: '2026-07-09', ref: '', desc: 'Bank charge', erp: null, tally: -5000, status: 'only-tally', variance: 0 },
     ],
     defects: [{ ledger: 'HDFC Bank A/c', date: '2026-07-09', ref: '', desc: 'Bank charge', type: 'missing-in-erp', amount: -5000 }],
@@ -393,7 +391,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     window.localStorage.removeItem('tally.moduleView');
   });
 
-  test('By Module: a shared slice whose ledger reconciles at ledger level (tied full row) is NOT drillable (no accept-variance on a tied ledger)', async () => {
+  test('By Module: a shared slice whose ledger reconciles at ledger level (tied full row) is NOT drillable', async () => {
     window.localStorage.removeItem('tally.coaView');
     window.localStorage.removeItem('tally.moduleView');
     const { getTieOut } = require('../api');
@@ -499,6 +497,36 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('3 off ledgers')).toBeInTheDocument();
   });
 
+  test('drilling an inter-branch ledger from the Defect Register opens the drawer WITH the inter-branch badge', async () => {
+    const { getTieOut, getDefects, getLedgerVouchers } = require('../api');
+    // The tie-out marks inter-branch ledgers (BE: Travkings / inter-branch / inter-co regex → row.interBranch).
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', periodEnd: '2026-07-31',
+      counts: { total: 1, tied: 0, off: 1, onlyErp: 0, onlyTally: 0, absDiff: 5000, netProfitErp: 0, netProfitTally: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 1 },
+      rows: [
+        { ledger: 'Travkings NBO', code: 'IB1', group: 'Sundry Creditors', parentGroup: 'Sundry Creditors', statement: 'BS', nature: 'liability', erp: 100000, tally: 95000, diff: 5000, status: 'off', interBranch: true },
+      ],
+    });
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 1,
+      summary: { total: 1, byType: { 'missing-in-erp': 1 } },
+      defects: [{ ledger: 'Travkings NBO', date: '2026-07-09', ref: '', desc: 'IB settlement not in ERP', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: -5000, variance: 0, side: 'tally' }],
+    });
+    getLedgerVouchers.mockResolvedValueOnce({
+      ledger: 'Travkings NBO', branch: 'BOM', period: '2026-07', tier: 'month', from: '2026-07-01', to: '2026-07-31',
+      erpBalance: 100000, tallyImported: 1, summary: { total: 0 }, lines: [], defects: [],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('Travkings NBO');                              // tie-out loaded (default TB tab)
+    fireEvent.click(screen.getByRole('button', { name: /Defects/ }));      // → Defect Register
+    await screen.findByText(/In Tally, not ERP: 1/);                       // register rendered
+    fireEvent.click(screen.getByText('Travkings NBO'));                    // drill the inter-branch defect row
+    // Regression guard: onDrill resolves the FULL tie-out row so the drawer's inter-branch badge shows.
+    // Under the old onDrill={setDrill} the drawer received only { ledger } and the badge was absent.
+    expect(await screen.findByText('inter-branch')).toBeInTheDocument();
+  });
+
   test('Defect Register — tier segment + type chips filter the table, Clear resets', async () => {
     const { getDefects } = require('../api');
     getDefects.mockResolvedValueOnce({
@@ -595,6 +623,42 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('Bank charge')).toBeInTheDocument();
   });
 
+  test('voucher drill: a voucher shows its detail (type · source ref) and expands to its entries (particulars)', async () => {
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByText('HDFC Bank A/c'));            // drill an off ledger
+    await screen.findByText('BSP settlement');                           // wait for the voucher lines to load
+    expect(screen.getByText('PV')).toBeInTheDocument();                  // voucher type shown
+    expect(screen.getByText(/BSP\/W27/)).toBeInTheDocument();            // source / booking ref shown (within the meta line)
+    expect(screen.getByTitle('Open the full voucher')).toHaveTextContent('PAY/0412');   // voucher no is a link → opens the full voucher
+    // Expand the voucher → its double-entry legs appear.
+    fireEvent.click(screen.getByText(/2 entries/));
+    expect(screen.getByText('Entries in this voucher')).toBeInTheDocument();
+    expect(screen.getByText(/IATA Clearing/)).toBeInTheDocument();             // a contra leg of the voucher
+    expect(screen.getAllByText(/HDFC Bank A\/c/).length).toBeGreaterThan(0);   // the other leg (board + drawer header also show it)
+    // A Cr leg renders a single, correct side ("10,000 Cr") — not the old contradictory "Cr 10,000 Dr".
+    expect(screen.getByText(/10,000 Cr/)).toBeInTheDocument();
+  });
+
+  test('voucher drill: an ERP-only ledger with NO Tally Day Book still LISTS its ERP vouchers (not hidden)', async () => {
+    const { getLedgerVouchers } = require('../api');
+    getLedgerVouchers.mockResolvedValueOnce({
+      ledger: 'HR Consultancy Expenses', branch: 'BOM', period: '2026-07', tier: 'month',
+      erpBalance: 45138, tallyImported: 0, summary: { total: 1 },   // NO Day Book, but an ERP voucher exists
+      lines: [{ date: '2025-12-15', ref: 'PXP/BOM/26/0283', desc: 'HR consultancy', party: 'Singh Consultancy', vtype: 'PXP', sourceRef: '', voucherId: 'v9', erp: 45138, tally: null, status: 'only-erp', variance: 0, particulars: [{ ledger: 'GST Input', side: 'Dr', amount: 8100 }] }],
+      defects: [],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByText('HDFC Bank A/c'));   // any off ledger → opens the drawer with this mock
+    // The ERP voucher is listed (used to be hidden behind the "no Day Book" banner), with a soft note.
+    expect(await screen.findByText('Singh Consultancy')).toBeInTheDocument();
+    expect(screen.getByText(/ERP vouchers only/)).toBeInTheDocument();
+    expect(screen.getByText('PXP')).toBeInTheDocument();   // voucher type still shown
+    // An only-erp row is tinted amber (warning), matching its badge — not alarming danger-red.
+    const row = screen.getByText('Singh Consultancy').closest('tr');
+    expect(row.className).toMatch(/bg-warning/);
+    expect(row.className).not.toMatch(/bg-danger/);
+  });
+
   test('certificate panel gates the close — blocked while ledgers are off (Phase 3)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     expect(await screen.findByText('Month-End Tally Certificate')).toBeInTheDocument();
@@ -639,12 +703,12 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('Dr ≠ Cr')).toBeInTheDocument();
   });
 
-  test('accept an explained variance from the drill drawer (Phase 4)', async () => {
-    const { acceptVariance } = require('../api');
+  test('an off ledger opens the voucher drill drawer (no accept-variance escape hatch)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     fireEvent.click(await screen.findByText('HDFC Bank A/c')); // off ledger → drawer
-    fireEvent.click(await screen.findByText('Accept variance'));
-    await waitFor(() => expect(acceptVariance).toHaveBeenCalledWith(expect.objectContaining({ ledger: 'HDFC Bank A/c', period: '2026-07' })));
+    // The drill opens (voucher-by-voucher); there is NO way to accept/wave the difference.
+    expect(await screen.findByText(/Voucher-by-voucher/)).toBeInTheDocument();
+    expect(screen.queryByText('Accept variance')).not.toBeInTheDocument();
   });
 
   test('both upload buttons live on the board; Day Book panel opens a file picker', async () => {
@@ -767,7 +831,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
   });
 });
 
-describe('Tally Reconciliation · certificate re-open + stale acceptance', () => {
+describe('Tally Reconciliation · certificate re-open', () => {
   const lockedCert = {
     certificate: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { frozenAt: '2026-07-05' } },
     chain: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
@@ -796,17 +860,6 @@ describe('Tally Reconciliation · certificate re-open + stale acceptance', () =>
     expect(await screen.findByText(/close gate is satisfied/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Re-open to correct/ })).not.toBeInTheDocument();
     getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
-  });
-
-  test('a stale accepted variance BLOCKS Freeze/Sign (the flag is not toothless)', async () => {
-    const { getTallyCert } = require('../api');
-    // Clean gate + tied, but a stale acceptance → the buttons must still be disabled.
-    getTallyCert.mockResolvedValue({ certificate: { status: 'reconciled', snapshot: { frozenAt: '2026-07-05' }, signatures: [] }, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: true, step: { role: 'AE' } } });
-    wrap(<CertifyPanel branch="BOM" period="2026-07" tier="month" offTotal={0} staleAccepted={2} currentUser={{ role: 'Owner' }} />);
-    expect(await screen.findByText(/2 accepted variances changed/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Sign/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Freeze|Re-freeze/ })).toBeDisabled();
-    getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false } });
   });
 
   test('a certified period disables the Upload buttons (re-open first)', async () => {
@@ -864,7 +917,7 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
   test('Report lists a re-opened (not-tied) period as an Open Item, never a locked one', async () => {
     const { getRegister } = require('../api');
     getRegister.mockResolvedValueOnce([
-      { period: '2025-09', tier: 'month', ledgers: 63, cert: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { offTotal: 0, staleAccepted: 0, frozenAt: '2025-09-30' }, reopened: 0 } },
+      { period: '2025-09', tier: 'month', ledgers: 63, cert: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }], snapshot: { offTotal: 0, frozenAt: '2025-09-30' }, reopened: 0 } },
       { period: '2026-06', tier: 'month', ledgers: 10, cert: { status: 'open', signatures: [], snapshot: { frozenAt: null }, reopened: 1 } }, // re-opened → not tied
     ]);
     wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
@@ -876,7 +929,7 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     getRegister.mockResolvedValueOnce([
       // Frozen but not clean: amounts tie (offTotal 0) yet 2 Tally names/groups still
       // differ from ERP → an Open Item with the name/group reason (blocks certifying).
-      { period: '2026-05', tier: 'month', ledgers: 40, cert: { status: 'open', signatures: [], snapshot: { offTotal: 0, fixTotal: 2, staleAccepted: 0, frozenAt: '2026-05-31' }, reopened: 0 } },
+      { period: '2026-05', tier: 'month', ledgers: 40, cert: { status: 'open', signatures: [], snapshot: { offTotal: 0, fixTotal: 2, frozenAt: '2026-05-31' }, reopened: 0 } },
     ]);
     wrap(<TallyReconReport branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
     expect(await screen.findByText(/2 name\/group fix\(es\) owed in Tally/)).toBeInTheDocument();

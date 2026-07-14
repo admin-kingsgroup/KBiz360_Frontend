@@ -7,6 +7,8 @@ import { useDayBook } from '../../../core/useAccounting';
 import { localeOf } from '../../../core/format';
 import { exportToExcel } from '../../../core/exportExcel';
 import { clickable } from '../../../core/ux/clickable';
+import { isBookingLegRow } from '../../../core/ledgerUI';
+import { openBookingFolder } from '../../../core/BookingFolderHost';
 import { VoucherEditor } from '../../accountingLive';
 import {
   DARK, GOLD, DIM, BLUE, RED, curOf, money, branchLabel, Page, State, ExportBtn, PrintBtn,
@@ -140,7 +142,7 @@ export function DayBookLive({ branch }) {
                     </tr>
                   )}
                   <tr style={{ ...rowBg(i), cursor: r.voucherId ? 'pointer' : 'default' }}
-                    {...clickable(() => r.voucherId && setVoucher({ id: r.voucherId, vno: r.vno }))}
+                    {...clickable(() => { if (!r.voucherId) return; if (isBookingLegRow(r)) openBookingFolder(r.vno, { branch, voucherId: r.voucherId, vno: r.vno }); else setVoucher({ id: r.voucherId, vno: r.vno }); })}
                     onMouseEnter={(e) => { if (r.voucherId) e.currentTarget.style.background = '#eff6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
                     <td style={{ padding: '7px 12px', color: DIM, whiteSpace: 'nowrap' }}>{r.date}</td>

@@ -19,6 +19,8 @@ import { pushModal } from '../../../core/ux/modalStore';
 import { clickable } from '../../../core/ux/clickable';
 import { card } from '../../../core/styles';
 import { useTrialBalance } from '../../../core/useAccounting';
+import { isBookingLegRow } from '../../../core/ledgerUI';
+import { openBookingFolder } from '../../../core/BookingFolderHost';
 import { LedgerVouchers } from '../../reportsFinancial/pnlTally.jsx';
 import { VoucherEditor } from '../../accountingLive/legacy.jsx';
 import {
@@ -44,7 +46,7 @@ function LedgerDrill({ branch, ledger, from, to, onClose }) {
         </div>
         {voucher
           ? <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />
-          : <LedgerVouchers name={ledger} branch={branch} from={from} to={to} onPick={(f) => f?.kind === 'voucher' && setVoucher({ id: f.id, vno: f.vno })} />}
+          : <LedgerVouchers name={ledger} branch={branch} from={from} to={to} onPick={(f) => { if (f?.kind !== 'voucher') return; if (isBookingLegRow(f)) openBookingFolder(f.vno, { branch, voucherId: f.id, vno: f.vno }); else setVoucher({ id: f.id, vno: f.vno }); }} />}
       </div>
     </div>
   );

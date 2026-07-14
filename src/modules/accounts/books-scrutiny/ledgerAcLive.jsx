@@ -10,6 +10,7 @@ import { LedgerPicker } from '../../../core/voucher/LedgerPicker';
 import { usePrefs } from '../../../core/prefs';
 import { pushModal } from '../../../core/ux/modalStore';
 import { useNavFocus, useNavFocusStore } from '../../../core/ux/navFocus';
+import { openBookingFolder } from '../../../core/BookingFolderHost';
 import { VoucherEditor } from '../../accountingLive';
 import { DIM, GREEN, curOf, Page, Crumb } from '../../accountingLive/shared';
 
@@ -54,7 +55,7 @@ export function LedgerAcLive({ branch }) {
     >
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
         {display
-          ? <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} maxHeight="calc(100vh - 330px)" />
+          ? <LedgerAccountView name={display} branch={branch} cur={cur} showPeriod onPickVoucher={setVoucher} onPickFolder={(inv) => openBookingFolder(inv.vno, { branch, voucherId: inv.id, vno: inv.vno })} maxHeight="calc(100vh - 330px)" />
           : <div style={{ padding: '64px 24px', textAlign: 'center', color: DIM, fontSize: 13, lineHeight: 1.7 }}>
               Search and select a ledger above, then press <b style={{ color: GREEN }}>View</b><br />to open its account statement.
             </div>}

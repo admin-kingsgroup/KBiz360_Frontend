@@ -17,6 +17,7 @@ import { LedgerAccountView } from './ledgerUI';
 import { pushModal } from './ux/modalStore';
 import { useDock } from './ux/dock';
 import { openModuleRegister } from './registerNav';
+import { openBookingFolder } from './BookingFolderHost';
 import { bc } from './styleTokens';
 
 /* VoucherEditor lives in the 2000-line accountingLive module. It's only needed
@@ -55,7 +56,12 @@ export function LedgerModalHost({ branch: shellBranch }) {
   useEffect(() => {
     const onNav = () => { setVoucher(null); setJob(null); };
     window.addEventListener('kb:open-register', onNav);
-    return () => window.removeEventListener('kb:open-register', onNav);
+    // Opening the Booking Folder from a surface INSIDE this modal (e.g. the bill-wise tab,
+    // which fires openBookingFolder directly) must close this ledger too — else the folder
+    // (z 8950) stacks over a still-dimmed ledger (8800). Mirrors the ledger vno path, which
+    // already calls close() before openBookingFolder.
+    window.addEventListener('kb:booking-folder', onNav);
+    return () => { window.removeEventListener('kb:open-register', onNav); window.removeEventListener('kb:booking-folder', onNav); };
   }, []);
 
   useEffect(() => {
@@ -106,6 +112,9 @@ export function LedgerModalHost({ branch: shellBranch }) {
             onPickInvoice={job.invoiceToRegister
               ? (inv) => { close(); openModuleRegister(inv.category, inv.vno); }
               : undefined}
+            onPickFolder={job.invoiceToRegister
+              ? undefined  // the P&L drill keeps its Sales/Purchase Register hop
+              : (inv) => { close(); openBookingFolder(inv.vno, { branch, voucherId: inv.id, vno: inv.vno }); }}
             maxHeight="calc(100vh - 360px)"
           />
         </div>

@@ -14,6 +14,8 @@ import { usePager, Pager } from '../../../core/ux/pager';
 import { PeriodBar } from '../../../core/period';
 import { useSalesRegister, usePurchaseRegister, useRefundReissue, useBookingOrders } from '../../../core/useAccounting';
 import { apiGet } from '../../../core/api';
+import { isBookingLegRow } from '../../../core/ledgerUI';
+import { openBookingFolder } from '../../../core/BookingFolderHost';
 import { VoucherLines, buildCaptureSheet } from '../../accountingLive';
 import {
   DARK, GOLD, DIM, BLUE, GREEN, curOf, money, branchLabel, Page, State, ExportBtn, DetailedTable,
@@ -195,8 +197,16 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
     () => buildCaptureSheet(rows, { tab, tag: brTag, linkIndex, bookingByLink, showType }),
     [rows, tab, brTag, linkIndex, bookingByLink, showType],
   );
-  // Final Invoice Value → open the voucher's journal (JV). Per-row Invoice → print PDF.
-  const openJV = (v) => { if (v) setDetail(v); };
+  // Final Invoice Value → open the WHOLE SO/PO/GP deal (Booking Folder) ONLY when this row
+  // is a genuine FORWARD booking leg (isBookingLegRow: sale/purchase category AND a forward
+  // module type). A refund/reissue row must NOT — its linkNo points at the ORIGINAL sale, so
+  // the folder would wrongly open the forward deal instead of the refund's own reversing JV;
+  // INB rows have empty linkNo. Everything else keeps the single-voucher JV. Invoice → print.
+  const openJV = (v) => {
+    if (!v) return;
+    if (isBookingLegRow(v) && v.linkNo) { openBookingFolder(v.linkNo, { branch, voucherId: v.id || v._id, vno: v.vno }); return; }
+    setDetail(v);
+  };
   const printInvoice = async (r) => {
     const b = r && r._booking;
     if (!b) return;

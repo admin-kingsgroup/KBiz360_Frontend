@@ -926,15 +926,16 @@ function FioriLedgerRows({ m, heads: headsProp, refunds: refundsProp, keyBase, o
         </tr>
       ));
     }
-    // "Less: Refunds / Reissues" — foots the gross heads to the net total (signed
-    // contribution; refunds reduce). Shown only when there's refund movement on this side.
+    // Residual "Reissues / Adjustments" — foots the heads to the net total. Refunds now
+    // post to their own Sales/Purchase Refunds head (shown among the heads above); this
+    // row is only the leftover reissue income + posting-only trading adjustments.
     const rf = Number(nodeRefunds[side]);
     if (heads.length && Math.abs(rf || 0) > 0.5) {
       const salesCol = side === 'sales';
       rows.push(
         <tr key={`${base}:${side}:__refund`} style={{ background: '#fff', borderBottom: `1px solid ${SAP.borderLt}` }}>
           <td style={{ padding: '5px 16px 5px 62px', color: SAP.sec, fontStyle: 'italic', fontWeight: 600 }}>
-            <span style={{ display: 'inline-block', width: 21 }} />Less: Refunds / Reissues
+            <span style={{ display: 'inline-block', width: 21 }} />Reissues / Adjustments
           </td>
           <td style={num}>{salesCol ? inr(rf) : ''}</td>
           <td style={num}>{salesCol ? '' : inr(rf)}</td>

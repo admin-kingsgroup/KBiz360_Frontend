@@ -49,13 +49,6 @@ export function signTallyCert({ branch, period, tier }) {
 export function reopenTallyCert({ branch, period, tier, reason }) {
   return apiPost('/api/tally-tieout/certificate/reopen', { branch, period, tier, reason });
 }
-// Phase 4 — accept / un-accept an off ledger's difference (explained variance).
-export function acceptVariance({ branch, period, tier, ledger, code, reason, note }) {
-  return apiPost('/api/tally-tieout/accept', { branch, period, tier, ledger, code, reason, note });
-}
-export function clearVariance({ branch, period, tier, ledger }) {
-  return apiDelete(`/api/tally-tieout/accept?branch=${encodeURIComponent(branch)}&period=${encodeURIComponent(period)}&tier=${encodeURIComponent(tier)}&ledger=${encodeURIComponent(ledger)}`);
-}
 export function importTB({ branch, period, tier, rows }) {
   return apiPost('/api/tally-tieout/import', { branch, period, tier, rows });
 }

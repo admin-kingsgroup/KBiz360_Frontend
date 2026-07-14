@@ -14,6 +14,7 @@
 import React, { useMemo, useState, useRef } from 'react';
 import { bc } from './styleTokens';
 import { clickable } from './ux/clickable';
+import { openBookingFolder } from './BookingFolderHost';
 import { PeriodBar } from './period';
 import { useLedgerStatement, useOpenBills, useBillSettlements, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';
@@ -24,6 +25,20 @@ import {
   esc, fmt, fmtB, dmy, vtLabel, billwiseSide, isBillwiseLedger,
   mapLedger, mapBills, groupByBranch, branchSeg, AGE_BUCKETS, AGE_COLORS, ageingOf, billwiseStatus,
 } from './ledgerMath';
+
+// A ledger row is a leg of an SO/PO/GP booking when it's a sale/purchase posting whose
+// voucher type is a forward booking module (mirror of the backend FORWARD_GP_TYPES).
+// Such a row opens the whole Booking Folder; every other row opens its plain voucher.
+const FORWARD_GP_TYPES = ['SF', 'PF', 'SH', 'PH', 'SHT', 'PHT', 'SV', 'PV', 'SC', 'PC', 'SI', 'PI', 'SM', 'PM'];
+// Exported so the Sales/Purchase Register reuses the SAME guard — it must exclude a
+// refund/reissue row (whose linkNo points at the ORIGINAL sale) and INB rows, routing
+// only genuine forward booking legs to the folder.
+// Function DECLARATION (hoisted) not a const arrow — this is imported across the
+// ledgerUI ↔ BookingFolderHost ↔ pnlTally region, so hoisting keeps it init-safe even
+// if a future edit ever references it during module load.
+export function isBookingLegRow(r) {
+  return !!r && /sale|purchase/i.test(r.category || '') && FORWARD_GP_TYPES.includes(r.type);
+}
 
 export { billwiseSide, isBillwiseLedger } from './ledgerMath';
 
@@ -197,7 +212,7 @@ export const LEDGER_CSS = `
    ════════════════════════════════════════════════════════════════════════ */
 export function LedgerAccountView({
   name, branch, from: fromProp, to: toProp,
-  showPeriod = true, onPickVoucher, onPickInvoice, maxHeight = 'calc(100vh - 320px)',
+  showPeriod = true, onPickVoucher, onPickInvoice, onPickFolder, maxHeight = 'calc(100vh - 320px)',
 }) {
   // Branch is controlled SOLELY by the top-right global selector (the `branch`
   // prop). BOM selected ⇒ only BOM data; consolidated (TK HO Group) ⇒ all
@@ -334,7 +349,7 @@ export function LedgerAccountView({
         </div>
 
         {q.isLoading && <div className="loading">Loading ledger…</div>}
-        {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} onPickInvoice={onPickInvoice} maxHeight={maxHeight} party={name} branch={branch} side={side} />}
+        {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} onPickInvoice={onPickInvoice} onPickFolder={onPickFolder} maxHeight={maxHeight} party={name} branch={branch} side={side} />}
         {!q.isLoading && view === 'bill' && (
           <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} branch={branch} cur={cur} maxHeight={maxHeight} ledgerRows={d?.rows} />
         )}
@@ -348,7 +363,7 @@ export function LedgerAccountView({
 /* ── Ledger (T-account) body ─────────────────────────────────────────────── */
 const SETTLE_RX = /receipt|payment|debit-note|refund|acm/i;
 
-function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, onPickInvoice, maxHeight, party, branch, side }) {
+function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, onPickInvoice, onPickFolder, maxHeight, party, branch, side }) {
   const opSigned = d.opening.side === 'Dr' ? d.opening.amt : -d.opening.amt;
   let bal = opSigned;
   const closing = d.closing;
@@ -447,11 +462,13 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
         </td>
         <td className="l"><span className="vt">{r.vt}</span></td>
         <td className="l vno">
-          {r.voucherId && onPickInvoice && /sale|purchase/i.test(r.category || '')
-            ? <span className="vlink" {...clickable(() => onPickInvoice({ id: r.voucherId, vno: r.vno, category: r.category }))} title={/purchase/i.test(r.category) ? 'Open in Purchase Register' : 'Open in Sales Register'}>{r.vno}</span>
-            : r.voucherId && onPickVoucher
-              ? <span className="vlink" {...clickable(() => onPickVoucher({ id: r.voucherId, vno: r.vno }))} title="Open voucher">{r.vno}</span>
-              : r.vno}
+          {isBookingLegRow(r) && r.voucherId && onPickFolder
+            ? <span className="vlink" {...clickable(() => onPickFolder({ id: r.voucherId, vno: r.vno, category: r.category }))} title="Open the whole SO / PO / GP deal">{r.vno}</span>
+            : r.voucherId && onPickInvoice && /sale|purchase/i.test(r.category || '')
+              ? <span className="vlink" {...clickable(() => onPickInvoice({ id: r.voucherId, vno: r.vno, category: r.category }))} title={/purchase/i.test(r.category) ? 'Open in Purchase Register' : 'Open in Sales Register'}>{r.vno}</span>
+              : r.voucherId && onPickVoucher
+                ? <span className="vlink" {...clickable(() => onPickVoucher({ id: r.voucherId, vno: r.vno }))} title="Open voucher">{r.vno}</span>
+                : r.vno}
           {r.tallyRef && <div className="narr" title="Tally Ref">Tally: {r.tallyRef}</div>}
         </td>
         <td className="num drc">{fmt(r.dr)}</td>
@@ -748,7 +765,7 @@ function BillwiseTable({ side, bills: rawBills, name, branch, cur, maxHeight, le
                   <tr className={'bill' + (i === cursor ? ' sel' : '')} data-billrow={i}
                     onClick={() => { setCursor(i); toggle(b.ref); if (wrapRef.current) wrapRef.current.focus(); }}
                     title="Click or Shift+Enter — settlement history">
-                    <td className="l part"><span className="caret">{isOpen ? '▾' : '▸'}</span>{b.ref}</td>
+                    <td className="l part"><span className="caret">{isOpen ? '▾' : '▸'}</span><span className="vlink" {...clickable((e) => { if (e && e.stopPropagation) e.stopPropagation(); openBookingFolder(b.ref, { branch, vno: b.ref }); })} title="Open the whole SO / PO / GP deal">{b.ref}</span></td>
                     <td className="l dt">{b.bdate}</td>
                     <td className="num">{fmt(b.amt)}</td>
                     <td className="num drc">{fmt(b.settled)}</td>

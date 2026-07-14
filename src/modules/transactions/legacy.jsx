@@ -28,6 +28,7 @@ import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { billDuesSummary } from '../../core/voucher/ui';
 import { clickable } from '../../core/ux/clickable';
+import { openBookingFolder } from '../../core/BookingFolderHost';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
 
@@ -222,7 +223,7 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
                     return (
                       <tr key={b.billVno} style={{borderBottom:"1px solid #dfe2e7"}}>
                         <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:10.5,fontWeight:700,color:"#1a1c22"}}>
-                          {b.billVno}
+                          <span {...clickable(()=>openBookingFolder(b.billVno,{vno:b.billVno}))} title="Open the whole SO / PO / GP deal" style={{cursor:"pointer",textDecoration:"underline",textDecorationStyle:"dotted"}}>{b.billVno}</span>
                           {b.refundsBill&&<div style={{fontFamily:"inherit",fontSize:9,fontWeight:700,color:"#C0651A",marginTop:2}} title={`This credit refunds the over-settled bill ${b.refundsBill}`}>↩ {b.kind==="reissue"?"reissue of":"refund of"} {b.refundsBill}</div>}
                         </td>
                         <td style={{padding:"8px 12px",fontSize:10.5,color:"#5b616e"}}>{b.date}</td>

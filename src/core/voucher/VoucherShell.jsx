@@ -6,6 +6,7 @@ import { VOUCHER_REGISTRY } from './registry';
 import { DARK, DIM, BLUE, RED, GREEN, money, brCodeOf, escHtml } from './ui';
 import { JvBlock } from './JvBlock';
 import { useVoucherRevoke, voucherParent, openParentFile } from './useRevokeAction';
+import { openBookingFolder } from '../BookingFolderHost';
 import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
 import { confirmDialog } from '../ux/confirm';
@@ -246,7 +247,13 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
         </div>
         {journalTable}
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-          {parent && parent.navigable && <button onClick={() => { openParentFile(voucher); dismiss(); }} className="max-tablet:min-h-[44px]" title={`Open its ${parent.label} ${parent.ref} — revoke the whole file there`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff' }}>⟲ Open {parent.label} →</button>}
+          {parent && parent.navigable && <button onClick={() => {
+            // A booking leg opens the whole SO/PO/GP Booking Folder (Sale + all Purchases +
+            // GP together); other parents (INB) keep the deep-link to their approvals screen.
+            if (parent.source === 'booking') openBookingFolder(voucher.linkNo || voucher.vno, { branch, voucherId: voucher.id || voucher._id, vno: voucher.vno });
+            else openParentFile(voucher);
+            dismiss();
+          }} className="max-tablet:min-h-[44px]" title={`Open its ${parent.label} ${parent.ref} — the whole deal (revoke/edit it there)`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff' }}>⟲ Open {parent.label} →</button>}
           {canRevoke && !parent && <button onClick={() => doRevoke(editId, dismiss)} disabled={revoking} className="max-tablet:min-h-[44px]" title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
           <button onClick={printEntry} className="max-tablet:min-h-[44px]" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>

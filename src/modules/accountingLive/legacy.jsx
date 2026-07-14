@@ -4,6 +4,8 @@ import { localeOf } from '../../core/format';
 import { bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
 import { openPrintPreview } from '../../core/PrintPreview';
+import { isBookingLegRow } from '../../core/ledgerUI';
+import { openBookingFolder } from '../../core/BookingFolderHost';
 import { clickable } from '../../core/ux/clickable';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
 import { toast } from '../../core/ux/toast';
@@ -440,7 +442,7 @@ function DrillDown({ branch, group, onClose }) {
               </div>
               {(stmt.data.lines || []).length === 0 && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>No entries.</div>}
               {(stmt.data.lines || []).map((ln, i) => (
-                <div key={i} style={tapRow} {...clickable(() => ln.voucherId && setVoucher({ id: ln.voucherId, vno: ln.vno }))}>
+                <div key={i} style={tapRow} {...clickable(() => { if (!ln.voucherId) return; if (isBookingLegRow(ln)) openBookingFolder(ln.vno, { branch, voucherId: ln.voucherId, vno: ln.vno }); else setVoucher({ id: ln.voucherId, vno: ln.vno }); })}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12, color: BLUE, fontWeight: 600 }}>{ln.vno} <span style={{ color: DIM, fontWeight: 400 }}>· {ln.date}</span></div>
                     <div style={{ fontSize: 10.5, color: DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ln.narration || ln.party || ln.category}</div>

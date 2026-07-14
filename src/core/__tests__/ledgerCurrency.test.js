@@ -13,6 +13,7 @@ jest.mock('../useAccounting', () => ({
 }));
 jest.mock('../styleTokens', () => ({ bc: () => ({ cur: '$' }) }));
 jest.mock('../PrintPreview', () => ({ openPrintPreview: jest.fn() }));
+jest.mock('../BookingFolderHost', () => ({ openBookingFolder: jest.fn() }));
 
 import { openPrintPreview } from '../PrintPreview';
 import { printLedgerUI } from '../ledgerUI';
