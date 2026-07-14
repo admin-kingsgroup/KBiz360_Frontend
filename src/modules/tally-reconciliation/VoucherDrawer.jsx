@@ -78,16 +78,29 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
         <div className="flex-1 overflow-y-auto">
           {isLoading && <LoadingState label="Matching vouchers…" />}
           {isError && <ErrorState title="Couldn’t load the vouchers" message="The service didn’t respond." onRetry={() => refetch()} />}
-          {noDayBook && (
-            <div className="m-5 rounded-brand border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink">
-              No Tally <b>Day Book</b> imported for this ledger yet — import it in the{' '}
+          {/* A missing Tally Day Book must NOT hide the ERP vouchers — those are the ERP side you're
+              verifying. Show a SOFT note above the list when there ARE ERP vouchers; the full empty
+              state only when there are none at all. */}
+          {!isLoading && !isError && noDayBook && lines.length > 0 && (
+            <div className="m-5 mb-0 rounded-brand border border-warning/40 bg-warning/10 px-4 py-2.5 text-[13px] text-ink">
+              No Tally <b>Day Book</b> for this ledger this period — showing <b>ERP vouchers only</b> (Tally column blank). Import it in the{' '}
               <button type="button" onClick={() => { onClose(); setRoute && setRoute('/accounts/tally-reco'); }}
                 className="font-semibold text-accent underline underline-offset-2 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent rounded">
                 Ledger Matcher (Day Book)
-              </button>{' '}to drill to the voucher that's off. You can still <b>accept</b> the balance gap below when it's an explained (e.g. inter-branch) difference.
+              </button>{' '}to match voucher-by-voucher.
             </div>
           )}
-          {!isLoading && !noDayBook && lines.length > 0 && (
+          {!isLoading && !isError && lines.length === 0 && (
+            <div className="m-5 rounded-brand border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-ink">
+              {noDayBook ? (<>No Tally <b>Day Book</b> imported and no ERP vouchers for this ledger this period — import it in the{' '}
+                <button type="button" onClick={() => { onClose(); setRoute && setRoute('/accounts/tally-reco'); }}
+                  className="font-semibold text-accent underline underline-offset-2 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-accent rounded">
+                  Ledger Matcher (Day Book)
+                </button>{' '}to drill to the voucher that's off. You can still <b>accept</b> the balance gap below when it's an explained (e.g. inter-branch) difference.</>)
+                : 'No vouchers to show for this ledger this period.'}
+            </div>
+          )}
+          {!isLoading && lines.length > 0 && (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-border text-xs uppercase tracking-wider text-ink-subtle">

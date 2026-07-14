@@ -611,6 +611,22 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText(/10,000 Cr/)).toBeInTheDocument();
   });
 
+  test('voucher drill: an ERP-only ledger with NO Tally Day Book still LISTS its ERP vouchers (not hidden)', async () => {
+    const { getLedgerVouchers } = require('../api');
+    getLedgerVouchers.mockResolvedValueOnce({
+      ledger: 'HR Consultancy Expenses', branch: 'BOM', period: '2026-07', tier: 'month',
+      erpBalance: 45138, tallyImported: 0, summary: { total: 1 },   // NO Day Book, but an ERP voucher exists
+      lines: [{ date: '2025-12-15', ref: 'PXP/BOM/26/0283', desc: 'HR consultancy', party: 'Singh Consultancy', vtype: 'PXP', sourceRef: '', voucherId: 'v9', erp: 45138, tally: null, status: 'only-erp', variance: 0, particulars: [{ ledger: 'GST Input', side: 'Dr', amount: 8100 }] }],
+      defects: [],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByText('HDFC Bank A/c'));   // any off ledger → opens the drawer with this mock
+    // The ERP voucher is listed (used to be hidden behind the "no Day Book" banner), with a soft note.
+    expect(await screen.findByText('Singh Consultancy')).toBeInTheDocument();
+    expect(screen.getByText(/ERP vouchers only/)).toBeInTheDocument();
+    expect(screen.getByText('PXP')).toBeInTheDocument();   // voucher type still shown
+  });
+
   test('certificate panel gates the close — blocked while ledgers are off (Phase 3)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     expect(await screen.findByText('Month-End Tally Certificate')).toBeInTheDocument();
