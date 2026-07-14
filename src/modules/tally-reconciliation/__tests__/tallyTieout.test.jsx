@@ -625,6 +625,10 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(await screen.findByText('Singh Consultancy')).toBeInTheDocument();
     expect(screen.getByText(/ERP vouchers only/)).toBeInTheDocument();
     expect(screen.getByText('PXP')).toBeInTheDocument();   // voucher type still shown
+    // An only-erp row is tinted amber (warning), matching its badge — not alarming danger-red.
+    const row = screen.getByText('Singh Consultancy').closest('tr');
+    expect(row.className).toMatch(/bg-warning/);
+    expect(row.className).not.toMatch(/bg-danger/);
   });
 
   test('certificate panel gates the close — blocked while ledgers are off (Phase 3)', async () => {

@@ -46,6 +46,7 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
   const lines = data?.lines || [];
   const summary = data?.summary || { total: 0 };
   const noDayBook = !isLoading && !isError && (data?.tallyImported === 0);
+  const ready = !isLoading && !isError && !!data;   // header numbers are only meaningful once the drill loaded
 
   return (
     <>
@@ -67,11 +68,11 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
         <div className="flex border-b border-surface-border">
           <div className="flex-1 border-r border-surface-border px-5 py-3 text-center">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">ERP balance</div>
-            <div className="font-mono text-sm font-bold tabular-nums">{fmt(data?.erpBalance ?? null, cur)}</div>
+            <div className="font-mono text-sm font-bold tabular-nums">{ready ? fmt(data?.erpBalance ?? null, cur) : '—'}</div>
           </div>
           <div className="flex-1 px-5 py-3 text-center">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Defects</div>
-            <div className={`text-sm font-bold tabular-nums ${summary.total > 0 ? 'text-danger' : 'text-success'}`}>{summary.total}</div>
+            <div className={`text-sm font-bold tabular-nums ${!ready ? 'text-ink-subtle' : summary.total > 0 ? 'text-danger' : 'text-success'}`}>{ready ? summary.total : '—'}</div>
           </div>
         </div>
 
@@ -100,7 +101,7 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
                 : 'No vouchers to show for this ledger this period.'}
             </div>
           )}
-          {!isLoading && lines.length > 0 && (
+          {!isLoading && !isError && lines.length > 0 && (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-surface-border text-xs uppercase tracking-wider text-ink-subtle">
@@ -120,7 +121,7 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
                   const toggle = () => setExpanded(open ? null : i);
                   return (
                     <React.Fragment key={i}>
-                      <tr className={`border-b border-surface-border ${l.status === 'matched' ? '' : 'bg-danger/5'} ${canExpand ? 'cursor-pointer hover:bg-surface-alt/60 focus:bg-surface-alt/60 focus:outline-none focus:ring-2 focus:ring-accent' : ''}`}
+                      <tr className={`border-b border-surface-border ${meta.tone === 'danger' ? 'bg-danger/5' : meta.tone === 'warning' ? 'bg-warning/5' : ''} ${canExpand ? 'cursor-pointer hover:bg-surface-alt/60 focus:bg-surface-alt/60 focus:outline-none focus:ring-2 focus:ring-accent' : ''}`}
                         onClick={canExpand ? toggle : undefined}
                         role={canExpand ? 'button' : undefined} tabIndex={canExpand ? 0 : undefined}
                         aria-expanded={canExpand ? open : undefined}
@@ -180,7 +181,7 @@ export function VoucherDrawer({ branch, period, tier, row, cur, setRoute, onClos
                 </Select>
                 <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)"
                   className="min-w-0 flex-1 rounded-brand border border-surface-border bg-surface px-3 py-1.5 text-sm text-ink" />
-                <Button variant="secondary" icon={Check} loading={accept.isPending} onClick={() => accept.mutate()}>Accept variance</Button>
+                <Button variant="secondary" icon={Check} loading={accept.isPending} disabled={isError} title={isError ? 'Load the drill before accepting' : undefined} onClick={() => accept.mutate()}>Accept variance</Button>
               </div>
               {accept.isError && <span className="text-xs text-danger">{accept.error?.message}</span>}
               <span className="text-xs text-ink-subtle">Use for permanent explained gaps (inter-branch, timing, FX rounding). The real difference stays visible — it just stops blocking the close.</span>
