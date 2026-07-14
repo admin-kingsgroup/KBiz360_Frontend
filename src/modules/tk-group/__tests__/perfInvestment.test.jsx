@@ -6,9 +6,9 @@ import { investmentRow, fixFirstFlags } from '../utils/investment';
 
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn().mockResolvedValue({}) }));
 // eslint-disable-next-line import/first
-import { PerformanceTargets } from '../PerformanceTargets';
+import { PerformanceTargets } from '../performance-oversight/PerformanceTargets';
 // eslint-disable-next-line import/first
-import { InvestmentDashboard } from '../InvestmentDashboard';
+import { InvestmentDashboard } from '../performance-oversight/InvestmentDashboard';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

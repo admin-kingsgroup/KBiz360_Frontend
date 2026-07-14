@@ -6,9 +6,9 @@ import { calendarKpis, dueTone, filingBranchRows, prevMonth, dueValueParts } fro
 
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn().mockResolvedValue({}) }));
 // eslint-disable-next-line import/first
-import { AssetsCentral } from '../AssetsCentral';
+import { AssetsCentral } from '../performance-oversight/AssetsCentral';
 // eslint-disable-next-line import/first
-import { TaxDesk } from '../TaxDesk';
+import { TaxDesk } from '../performance-oversight/TaxDesk';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

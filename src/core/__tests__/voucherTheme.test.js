@@ -70,7 +70,7 @@ describe('Accounts voucher chrome (VWrap / VoucherShell)', () => {
 });
 
 describe('SO / PO / GP booking voucher (legacy.jsx)', () => {
-  const legacy = read('modules/bookingOrder/legacy.jsx');
+  const legacy = read('modules/accounts/daily-entry/soPoGpVoucherEntry.jsx');
 
   test('palette constants are the template gold + ink (old hexes gone from the declaration)', () => {
     expect(legacy).toContain(`const GOLD = '${GOLD}', DARK = '${INK}'`);
@@ -165,7 +165,7 @@ describe('Voucher module internals + print/display (Tier 1 + 2)', () => {
   });
 
   test('VoucherView journal (pnlTally) Dr/Cr + posted badge are green/red', () => {
-    const pnl = read('modules/reportsFinancial/pnlTally.jsx');
+    const pnl = read('modules/accounts/branch-mis/pnlTally.jsx');
     expect(pnl).toContain("const DR = '#1A7A42', CR = '#C0392B'");
     expect(pnl).toContain("bg: '#E7F3E7', c: '#1A7A42'"); // posted badge
   });

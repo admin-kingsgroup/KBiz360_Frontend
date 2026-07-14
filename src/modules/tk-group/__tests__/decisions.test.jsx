@@ -6,7 +6,7 @@ import { DecisionRequestForm } from '../DecisionRequestForm';
 // api/decisions pulls core/api (import.meta) → mock for the container test.
 jest.mock('../api/decisions', () => ({ submitDecision: jest.fn().mockResolvedValue({}), getMyDecisions: jest.fn() }));
 // eslint-disable-next-line import/first
-import { DecisionsBoard } from '../DecisionsBoard';
+import { DecisionsBoard } from '../approvals/DecisionsBoard';
 // eslint-disable-next-line import/first
 import { submitDecision, getMyDecisions } from '../api/decisions';
 

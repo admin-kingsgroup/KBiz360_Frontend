@@ -6,9 +6,9 @@ import { arapRow } from '../utils/arap';
 
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn().mockResolvedValue({}) }));
 // eslint-disable-next-line import/first
-import { Profitability } from '../Profitability';
+import { Profitability } from '../performance-oversight/Profitability';
 // eslint-disable-next-line import/first
-import { ReceivablesPayables } from '../ReceivablesPayables';
+import { ReceivablesPayables } from '../performance-oversight/ReceivablesPayables';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

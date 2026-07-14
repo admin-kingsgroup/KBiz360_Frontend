@@ -7,7 +7,7 @@ jest.mock('../api/changeRequests', () => ({
 }));
 
 const { getChangeRequests, actOnChangeRequest } = require('../api/changeRequests');
-const { ApprovalsInbox } = require('../ApprovalsInbox');
+const { ApprovalsInbox } = require('../approvals/ApprovalsInbox');
 
 const item = { _id: 'cr1', type: 'period_lock', branch: 'BOM', maker: { name: 'Faiz' }, chain: [{ role: 'Director' }, { role: 'Owner' }], approvals: [{ role: 'Director' }] };
 

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 jest.mock('../api/limits', () => ({ getLimits: jest.fn(), setBranchLimits: jest.fn().mockResolvedValue({}), proposeBranchLimits: jest.fn().mockResolvedValue({}) }));
 // eslint-disable-next-line import/first
-import { LimitsAdmin } from '../LimitsAdmin';
+import { LimitsAdmin } from '../control-configuration/LimitsAdmin';
 // eslint-disable-next-line import/first
 import { getLimits, setBranchLimits, proposeBranchLimits } from '../api/limits';
 

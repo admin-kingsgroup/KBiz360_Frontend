@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 jest.mock('../api/decisions', () => ({ submitDecision: jest.fn().mockResolvedValue({}), getMyDecisions: jest.fn() }));
 // eslint-disable-next-line import/first
-import { Onboarding } from '../Onboarding';
+import { Onboarding } from '../approvals/Onboarding';
 // eslint-disable-next-line import/first
 import { submitDecision, getMyDecisions } from '../api/decisions';
 

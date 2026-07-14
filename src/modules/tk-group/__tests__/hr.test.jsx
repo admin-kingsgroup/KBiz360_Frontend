@@ -4,7 +4,7 @@ import { isHrValid, hrKindLabel, HR_KINDS } from '../utils/hr';
 
 jest.mock('../api/governance', () => ({ proposeGovernance: jest.fn().mockResolvedValue({}), getPendingByType: jest.fn().mockResolvedValue([]) }));
 // eslint-disable-next-line import/first
-import { HRControl } from '../HRControl';
+import { HRControl } from '../hr-control/HRControl';
 // eslint-disable-next-line import/first
 import { proposeGovernance, getPendingByType } from '../api/governance';
 

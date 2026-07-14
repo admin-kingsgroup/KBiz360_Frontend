@@ -6,7 +6,7 @@ import { FlagPanel } from '../FlagPanel';
 // api/flags pulls in core/api (Vite import.meta) → mock it for the container test.
 jest.mock('../api/flags', () => ({ getFlagState: jest.fn(), proposeFlags: jest.fn().mockResolvedValue({}) }));
 // eslint-disable-next-line import/first
-import { FlagAdmin } from '../FlagAdmin';
+import { FlagAdmin } from '../control-configuration/FlagAdmin';
 // eslint-disable-next-line import/first
 import { getFlagState, proposeFlags } from '../api/flags';
 

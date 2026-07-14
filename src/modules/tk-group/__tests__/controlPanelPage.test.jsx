@@ -44,7 +44,7 @@ jest.mock('../api/breakglass', () => ({ getBreakglass: jest.fn().mockResolvedVal
 // test overrides it to assert cancellation blocks the flip.
 jest.mock('../../../core/ux/confirm', () => ({ confirmDialog: jest.fn().mockResolvedValue({ confirmed: true }) }));
 // eslint-disable-next-line import/first
-import { ControlPanel } from '../ControlPanel';
+import { ControlPanel } from '../control-configuration/ControlPanel';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

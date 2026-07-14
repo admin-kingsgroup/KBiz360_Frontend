@@ -11,7 +11,7 @@
 // scan's timestamp and labels these findings "from last build".
 export const DEV_SCAN = {
   "tree": "FE",
-  "filesScanned": 534,
+  "filesScanned": 686,
   "counts": {
     "total": 6,
     "bySeverity": {
@@ -26,54 +26,54 @@ export const DEV_SCAN = {
   },
   "findings": [
     {
-      "id": "FE:modules/reports/legacy.jsx:38:not-implemented",
+      "id": "FE:modules/reports/compliance-tax/varianceAnalysis.jsx:5:not-implemented",
       "tree": "FE",
       "rule": "not-implemented",
       "category": "placeholder",
       "severity": "high",
       "title": "Not-implemented placeholder",
       "remark": "This screen/handler throws or renders a \"not implemented / coming soon\" placeholder — it is a visible dead-end for the user. Build the real behaviour or hide the entry point until it is ready.",
-      "file": "modules/reports/legacy.jsx",
-      "line": 38,
-      "snippet": "return <NotWired title=\"Package P&L\" note=\"File-wise package profitability isn't connected to a live source yet. Once tour packages are linked to their booking files, real P&L per file will appear her",
-      "source": "build"
-    },
-    {
-      "id": "FE:modules/reports/legacy.jsx:146:not-implemented",
-      "tree": "FE",
-      "rule": "not-implemented",
-      "category": "placeholder",
-      "severity": "high",
-      "title": "Not-implemented placeholder",
-      "remark": "This screen/handler throws or renders a \"not implemented / coming soon\" placeholder — it is a visible dead-end for the user. Build the real behaviour or hide the entry point until it is ready.",
-      "file": "modules/reports/legacy.jsx",
-      "line": 146,
+      "file": "modules/reports/compliance-tax/varianceAnalysis.jsx",
+      "line": 5,
       "snippet": "return <NotWired title=\"Variance Analysis\" note=\"Actual-vs-Budget-vs-Forecast variance needs budget and forecast figures that aren't configured yet. Once they're entered, actuals will be compared live",
       "source": "build"
     },
     {
-      "id": "FE:modules/reports/legacy.jsx:238:not-implemented",
+      "id": "FE:modules/reports/financial-statements/reportViewer.jsx:5:not-implemented",
       "tree": "FE",
       "rule": "not-implemented",
       "category": "placeholder",
       "severity": "high",
       "title": "Not-implemented placeholder",
       "remark": "This screen/handler throws or renders a \"not implemented / coming soon\" placeholder — it is a visible dead-end for the user. Build the real behaviour or hide the entry point until it is ready.",
-      "file": "modules/reports/legacy.jsx",
-      "line": 238,
+      "file": "modules/reports/financial-statements/reportViewer.jsx",
+      "line": 5,
       "snippet": "return <NotWired title=\"Report Viewer\" note=\"This tabbed report viewer is a layout preview and isn't connected to live data, filters, scheduling or sharing yet.\"/>;",
       "source": "build"
     },
     {
-      "id": "FE:modules/reports/legacy.jsx:634:not-implemented",
+      "id": "FE:modules/reports/profitability-gp/packagePnL.jsx:5:not-implemented",
       "tree": "FE",
       "rule": "not-implemented",
       "category": "placeholder",
       "severity": "high",
       "title": "Not-implemented placeholder",
       "remark": "This screen/handler throws or renders a \"not implemented / coming soon\" placeholder — it is a visible dead-end for the user. Build the real behaviour or hide the entry point until it is ready.",
-      "file": "modules/reports/legacy.jsx",
-      "line": 634,
+      "file": "modules/reports/profitability-gp/packagePnL.jsx",
+      "line": 5,
+      "snippet": "return <NotWired title=\"Package P&L\" note=\"File-wise package profitability isn't connected to a live source yet. Once tour packages are linked to their booking files, real P&L per file will appear her",
+      "source": "build"
+    },
+    {
+      "id": "FE:modules/reports/report-tools/metaDemo.jsx:5:not-implemented",
+      "tree": "FE",
+      "rule": "not-implemented",
+      "category": "placeholder",
+      "severity": "high",
+      "title": "Not-implemented placeholder",
+      "remark": "This screen/handler throws or renders a \"not implemented / coming soon\" placeholder — it is a visible dead-end for the user. Build the real behaviour or hide the entry point until it is ready.",
+      "file": "modules/reports/report-tools/metaDemo.jsx",
+      "line": 5,
       "snippet": "return <NotWired title=\"Report Meta Features (Demo)\" note=\"Demo screen — it showcases report meta-features (comparatives, sparklines, drill-downs) and is not wired to live data.\"/>;",
       "source": "build"
     },
@@ -91,15 +91,15 @@ export const DEV_SCAN = {
       "source": "build"
     },
     {
-      "id": "FE:modules/taxation/legacy.jsx:55:todo",
+      "id": "FE:modules/taxation/gst-returns/taxGstr1.jsx:37:todo",
       "tree": "FE",
       "rule": "todo",
       "category": "broken-code",
       "severity": "low",
       "title": "Unresolved TODO / FIXME / HACK",
       "remark": "A TODO/FIXME/HACK/XXX marker flags known-incomplete work at this line. Resolve it or track it so it is not forgotten.",
-      "file": "modules/taxation/legacy.jsx",
-      "line": 55,
+      "file": "modules/taxation/gst-returns/taxGstr1.jsx",
+      "line": 37,
       "snippet": "const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag",
       "source": "build"
     }

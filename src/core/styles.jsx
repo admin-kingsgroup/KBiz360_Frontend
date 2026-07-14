@@ -21,7 +21,7 @@ import { buildLeaveUtilization, buildAttrition, lastMonths } from '../modules/hr
 import { fmt, fmtINR, compactAmt } from './format';
 import { todayISO, nowLabel, CUR_FY } from './dates';
 import { openPrintPreview } from './PrintPreview';
-import { FS_NOTES, abcOf, cardStyle } from './helpers';
+import { cardStyle } from './helpers';
 import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear, useFxExposure, useTrialBalance, useAuditTrail } from './useAccounting';
 import { isLiquidRow, liquidityKind } from './ledgerKind';
 import { useTaxFilingBoard, useStatutoryDues } from './useTaxReco';
@@ -34,18 +34,26 @@ const PurchaseLinkField = React.lazy(() =>
 
 import { B, bc, bcfmt, inp, card, btnG, btnGh, Icon, FL, KpiCard, RPT_thStyle, RPT_tdStyle } from './styleTokens';
 export { B, bc, bcfmt, inp, card, btnG, btnGh, Icon, FL, KpiCard, RPT_thStyle, RPT_tdStyle };
-// Branch-aware compact money for the analytics RPT_ reports (each figure is in the
-// branch's OWN currency): ₹ → Cr/L, $ (USD/Africa branches) → K/M/B. Replaces the old
-// hardcoded fmtINR so a USD branch no longer prints ₹ on $ figures.
-const cmoney = (branch, n) => compactAmt(n, { currency: (bc(branch) || {}).cur || '₹' });
-// Row-drill props: make an analytics table row a keyboard-accessible link into the
-// source detail (e.g. a customer/supplier 360° via ?party=). Inert when no route.
-const rrow = (setRoute, route) => (setRoute && route ? {
-  onClick: () => setRoute(route), role: 'button', tabIndex: 0,
-  onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRoute(route); } },
-  style: { cursor: 'pointer' }, title: 'Open details →',
-} : {});
-const partyLink = (base, name) => `${base}?party=${encodeURIComponent(name || '')}`;
+// cmoney/rrow/partyLink moved to modules/reports/profitability-gp/analyticsShared.js
+// (business sub-module reorg) — their only consumers moved there too.
+/* BUSINESS SUB-MODULE REORG (2026-07-13): these 12 report screens moved to their
+   business sub-module folders (matching the nav menu groups); re-exported here
+   under their original names because App.jsx dynamically imports them directly
+   from './core/styles' as one lazy-loaded chunk. RPT_CashPosition and
+   RPT_AuditTrail stay in this file (Accounts-menu items, not Reports/HR/Tax). */
+import { RPT_YieldDestination } from '../modules/reports/profitability-gp/yieldDestination';
+import { RPT_YieldConsultant } from '../modules/reports/profitability-gp/yieldConsultant';
+import { RPT_YieldSupplier } from '../modules/reports/profitability-gp/yieldSupplier';
+import { RPT_YoY } from '../modules/reports/profitability-gp/yoyComparison';
+import { RPT_CustomerLTV } from '../modules/reports/profitability-gp/customerLtv';
+import { RPT_ABCAnalysis } from '../modules/reports/profitability-gp/abcAnalysis';
+import { RPT_CurrencyExposure } from '../modules/reports/compliance-tax/currencyExposure';
+import { RPT_Attrition } from '../modules/hr/hr-reports/attrition';
+import { RPT_LeaveUtilization } from '../modules/hr/hr-reports/leaveUtilization';
+import { RPT_BirthdayCalendar } from '../modules/hr/hr-reports/birthdayCalendar';
+import { RPT_StatutoryDues } from '../modules/taxation/statutoryDues';
+import { RPT_TaxFilingBoard } from '../modules/taxation/taxFilingBoard';
+export { RPT_YieldDestination, RPT_YieldConsultant, RPT_YieldSupplier, RPT_YoY, RPT_CustomerLTV, RPT_ABCAnalysis, RPT_CurrencyExposure, RPT_Attrition, RPT_LeaveUtilization, RPT_BirthdayCalendar, RPT_StatutoryDues, RPT_TaxFilingBoard };
 
 
 export function vDate(){
@@ -624,27 +632,8 @@ export function RPT_CashPosition({branch}){
   );
 }
 
-export function RPT_FSNotes(){
-  return (
-    <RPT_Page title="Notes to Financial Statements" subtitle="Auto-prepared from voucher data · for FY 2025-26 financial statements">
-      <div style={{display:"grid",gridTemplateColumns:"1fr",gap:12}}>
-        {FS_NOTES.map(n=>(
-          <div key={n.note} style={{...cardStyle,borderLeft:"3px solid #d4a437"}}>
-            <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
-              <div style={{minWidth:38,height:38,borderRadius:"50%",background:"#0d1326",color:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700}}>{n.note}</div>
-              <div style={{flex:1}}>
-                <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326"}}>{n.title}</p>
-                {n.autoSource&&<p style={{margin:"2px 0 6px",fontSize:10,color:"#22c55e",fontFamily:"monospace"}}>↻ Auto-sourced from {n.autoSource}</p>}
-                <p style={{margin:n.autoSource?0:"6px 0 0",fontSize:12,color:"#5a6691",lineHeight:1.55}}>{n.body}</p>
-              </div>
-              <button style={{padding:"4px 9px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:4,fontSize:10.5,cursor:"pointer",fontWeight:600}}>Edit</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </RPT_Page>
-  );
-}
+// RPT_FSNotes was dead code (superseded by reportsFinancial/reportsNotes.jsx;
+// not imported by App.jsx) — dropped rather than moved.
 
 /* 4. Audit Trail Report */
 
@@ -688,403 +677,15 @@ export function RPT_AuditTrail({ branch }){
   );
 }
 
-function aggBills(bills, keyOf, fallback = 'Unspecified') {
-  const m = new Map();
-  for (const b of bills || []) {
-    const k = String(keyOf(b) ?? '').trim() || fallback;
-    if (!m.has(k)) m.set(k, { key: k, bookings: 0, revenue: 0, cost: 0, branches: new Set(), firstDate: '', lastDate: '' });
-    const g = m.get(k);
-    g.bookings += 1; g.revenue += b.sell || 0; g.cost += b.cost || 0;
-    if (b.branch) g.branches.add(b.branch);
-    const d = b.date || '';
-    if (d) { if (!g.firstDate || d < g.firstDate) g.firstDate = d; if (!g.lastDate || d > g.lastDate) g.lastDate = d; }
-  }
-  return [...m.values()].map((g) => {
-    const gp = Math.round((g.revenue - g.cost) * 100) / 100;
-    return { ...g, branches: [...g.branches], gp, gpPct: g.revenue > 0 ? +((gp / g.revenue) * 100).toFixed(1) : 0 };
-  });
-}
-
-/* Standard loading / error / empty cards for the live reports (mirrors
-   Supplier 360). Renders `children` only once data is ready & non-empty. */
-function RptState({ q, empty, label = 'data', children }) {
-  if (q.isError) return (
-    <div style={{ ...cardStyle, background: '#FCEBEB', border: '1px solid #E8B4B4' }}>
-      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}>Couldn’t load {label}</p>
-      <p style={{ margin: '3px 0 0', fontSize: 11, color: '#A32D2D' }}>{q.error?.message || 'Request failed.'} — check you’re signed in and the ERP API is reachable.</p>
-    </div>
-  );
-  if (q.isLoading) return <div style={{ ...cardStyle, textAlign: 'center', color: '#5a6691', fontSize: 12 }}>Loading {label}…</div>;
-  if (empty) return (
-    <div style={{ ...cardStyle, background: '#FFF8E8', border: '1px solid #F0D98A' }}>
-      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0d1326' }}>No {label} for the selected period</p>
-      <p style={{ margin: '3px 0 0', fontSize: 11, color: '#5a6691' }}>This report aggregates posted sale/purchase bills. Widen the date range (try “All”) or bill some vouchers and they’ll appear here.</p>
-    </div>
-  );
-  return children;
-}
-
-/* 5. Yield per Destination */
-
-export function RPT_YieldDestination({ branch, setRoute }){
-  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
-  const q=useYieldByDestination(branch,{from:range.from||undefined,to:range.to||undefined});
-  const sorted=q.data?.rows||[];   // server already groups by destination, GP-desc
-  const totalRev=sorted.reduce((s,d)=>s+d.revenue,0);
-  const totalGP=sorted.reduce((s,d)=>s+d.gp,0);
-  const avgGpPct=totalRev>0?(totalGP/totalRev*100).toFixed(1):"0.0";
-  // Destination/sector isn't captured on bookings yet → the server returns a single
-  // "Unspecified" bucket. Flag it honestly rather than showing one bar as real analysis.
-  const uncaptured=sorted.length>0&&sorted.every(d=>!d.destination||/^unspecified$/i.test(d.destination));
-  return (
-    <RPT_Page title="Yield by Destination" subtitle="Margin % by destination — live from posted bills"
-      toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
-      <RptState q={q} empty={sorted.length===0} label="destination bookings">
-      {uncaptured&&<div role="note" style={{margin:"0 0 12px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Destination / sector isn’t captured on bookings yet — all revenue groups under “Unspecified”. Figures are live; the destination split becomes meaningful once bookings carry a destination.</div>}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        <KpiCard label="Total Revenue" value={cmoney(branch, totalRev)} Icon={TrendingUp} accent="info" />
-        <KpiCard label="Total GP" value={cmoney(branch, totalGP)} Icon={PieChartIcon} accent="success" />
-        <KpiCard label="Avg GP %" value={`${avgGpPct}%`} Icon={Percent} accent="neutral" />
-      </div>
-      <div style={cardStyle}>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={sorted}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7"/>
-            <XAxis dataKey="destination" tick={{fontSize:9,fill:"#5a6691"}} angle={-25} textAnchor="end" height={70}/>
-            <YAxis yAxisId="left" tick={{fontSize:10,fill:"#5a6691"}} tickFormatter={v=>(v/100000).toFixed(0)+"L"}/>
-            <YAxis yAxisId="right" orientation="right" tick={{fontSize:10,fill:"#5a6691"}} tickFormatter={v=>v+"%"}/>
-            <Tooltip formatter={(v,n)=>n==="gpPct"?v+"%":cmoney(branch, v)}/>
-            <Legend wrapperStyle={{fontSize:11}}/>
-            <Bar yAxisId="left" dataKey="revenue" fill="#0d1326" name="Revenue"/>
-            <Bar yAxisId="left" dataKey="gp" fill="#d4a437" name="GP"/>
-            <Line yAxisId="right" type="monotone" dataKey="gpPct" stroke="#A32D2D" strokeWidth={2} name="GP %"/>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <div style={{...cardStyle,marginTop:14,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Destination</th><th style={{...RPT_thStyle,textAlign:"right"}}>Bookings</th><th style={{...RPT_thStyle,textAlign:"right"}}>Revenue</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cost</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP %</th></tr></thead>
-          <tbody>{sorted.map(d=>(<tr key={d.destination} {...rrow(setRoute, "/reports/destination")}><td style={{...RPT_tdStyle,fontWeight:600}}>{d.destination}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{d.bookings}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{cmoney(branch, d.revenue)}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{cmoney(branch, d.cost)}</td><td style={{...RPT_tdStyle,textAlign:"right",color:"#22c55e",fontWeight:700}}>{cmoney(branch, d.gp)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:d.gpPct>=25?"#22c55e":d.gpPct>=18?"#d4a437":"#A32D2D"}}>{d.gpPct.toFixed(1)}%</td></tr>))}</tbody>
-        </table>
-      </div>
-      </RptState>
-    </RPT_Page>
-  );
-}
-
-/* 6. Yield per Consultant */
-
-export function RPT_YieldConsultant({ branch, setRoute }){
-  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
-  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
-  const rows=aggBills(q.data,b=>b.consultant,'Unassigned').map(g=>({consultant:g.key,branch:g.branches[0]||'—',bookings:g.bookings,revenue:g.revenue,avgBookingValue:g.bookings>0?Math.round(g.revenue/g.bookings):0,gp:g.gp,gpPct:g.gpPct})).sort((a,b)=>b.revenue-a.revenue);
-  return (
-    <RPT_Page title="Yield by Consultant" subtitle="Margin earned per consultant — live from posted bills"
-      toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
-      <RptState q={q} empty={rows.length===0} label="consultant bookings">
-      <div style={cardStyle}>
-        <ResponsiveContainer width="100%" height={Math.max(240,rows.length*32)}>
-          <BarChart data={rows} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7"/>
-            <XAxis type="number" tick={{fontSize:10,fill:"#5a6691"}} tickFormatter={v=>(v/100000).toFixed(0)+"L"}/>
-            <YAxis dataKey="consultant" type="category" tick={{fontSize:11,fill:"#0d1326"}} width={90}/>
-            <Tooltip formatter={v=>cmoney(branch, v)}/>
-            <Legend wrapperStyle={{fontSize:11}}/>
-            <Bar dataKey="revenue" fill="#0d1326" name="Revenue"/>
-            <Bar dataKey="gp" fill="#d4a437" name="GP"/>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <div style={{...cardStyle,marginTop:14,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Consultant</th><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Bookings</th><th style={{...RPT_thStyle,textAlign:"right"}}>Revenue</th><th style={{...RPT_thStyle,textAlign:"right"}}>Avg Basket</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP %</th></tr></thead>
-          <tbody>{rows.map(c=>(<tr key={c.consultant} {...rrow(setRoute, "/reports/consultant")}><td style={{...RPT_tdStyle,fontWeight:700}}>{c.consultant}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{c.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{c.bookings}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{cmoney(branch, c.revenue)}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{cmoney(branch, c.avgBookingValue)}</td><td style={{...RPT_tdStyle,textAlign:"right",color:"#22c55e",fontWeight:700}}>{cmoney(branch, c.gp)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:c.gpPct>=25?"#22c55e":c.gpPct>=18?"#d4a437":"#A32D2D"}}>{c.gpPct.toFixed(1)}%</td></tr>))}</tbody>
-        </table>
-      </div>
-      </RptState>
-    </RPT_Page>
-  );
-}
-
-/* 7. Yield per Supplier */
-
-export function RPT_YieldSupplier({ branch, setRoute }){
-  // NOTE: the books store ACTUAL supplier cost only (no "expected cost" source),
-  // so this is reframed from expected-vs-actual variance to real spend / margin
-  // contribution per supplier. Wire an expected-cost feed to restore variance.
-  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
-  const q=useGpBills(branch,{from:range.from||undefined,to:range.to||undefined});
-  const rows=aggBills(q.data,b=>b.supplier,'No supplier').map(g=>({supplier:g.key,bookings:g.bookings,cost:g.cost,revenue:g.revenue,gp:g.gp,gpPct:g.gpPct})).sort((a,b)=>b.cost-a.cost);
-  const totalCost=rows.reduce((s,x)=>s+x.cost,0);
-  const totalRev=rows.reduce((s,x)=>s+x.revenue,0);
-  const totalGP=rows.reduce((s,x)=>s+x.gp,0);
-  return (
-    <RPT_Page title="Yield by Supplier" subtitle="Spend, revenue & margin contribution per supplier — live from posted bills"
-      toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
-      <RptState q={q} empty={rows.length===0} label="supplier purchases">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:14}}>
-        <KpiCard label="Total Supplier Cost" value={cmoney(branch, totalCost)} Icon={Truck} accent="warning" />
-        <KpiCard label="Revenue Booked" value={cmoney(branch, totalRev)} Icon={TrendingUp} accent="info" />
-        <KpiCard label="GP Generated" value={cmoney(branch, totalGP)} Icon={PieChartIcon} accent="success" />
-      </div>
-      <div style={{...cardStyle,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Supplier</th><th style={{...RPT_thStyle,textAlign:"right"}}>Bookings</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cost (Spend)</th><th style={{...RPT_thStyle,textAlign:"right"}}>Revenue</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP</th><th style={{...RPT_thStyle,textAlign:"right"}}>GP %</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cost Share</th></tr></thead>
-          <tbody>{rows.map(s=>{const share=totalCost>0?(s.cost/totalCost*100):0;return (<tr key={s.supplier} {...rrow(setRoute, partyLink("/reports/supplier-360", s.supplier))}><td style={{...RPT_tdStyle,fontWeight:600}}>{s.supplier}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{s.bookings}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{cmoney(branch, s.cost)}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{cmoney(branch, s.revenue)}</td><td style={{...RPT_tdStyle,textAlign:"right",color:"#22c55e",fontWeight:700}}>{cmoney(branch, s.gp)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:s.gpPct>=18?"#22c55e":s.gpPct>=10?"#d4a437":"#A32D2D"}}>{s.gpPct.toFixed(1)}%</td><td style={{...RPT_tdStyle,textAlign:"right",color:"#5a6691"}}>{share.toFixed(1)}%</td></tr>);})}</tbody>
-        </table>
-      </div>
-      </RptState>
-    </RPT_Page>
-  );
-}
-
-/* 8. YoY Comparison */
-
-export function RPT_YoY({ branch, setRoute }){
-  // Compares the selected period against the SAME dates one year earlier
-  // (two P&L runs against the live double-entry engine). Default YTD so there's
-  // a bounded period to shift; "All" falls back to current FY vs prior FY.
-  const [range,setRange]=useState(()=>({mode:'ytd',...resolveReportRange('ytd')}));
-  const q=useYearOverYear(branch,{from:range.from||undefined,to:range.to||undefined});
-  const lines=q.data?.rows||[];                      // [{line,group,cy,ly,bold}] from /yoy (two module-PL runs)
-  const curLabel=q.data?.current?.label||'Current', priorLabel=q.data?.prior?.label||'Prior Year';
-  return (
-    <RPT_Page title="Year-over-Year Comparison" subtitle={`${curLabel}  vs  ${priorLabel} · same window, prior year`}
-      toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
-      <RptState q={q} empty={lines.length===0} label="P&L data">
-      <div style={{...cardStyle,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-          <thead><tr><th style={RPT_thStyle}>Particulars</th><th style={{...RPT_thStyle,textAlign:"right"}}>{curLabel}</th><th style={{...RPT_thStyle,textAlign:"right"}}>{priorLabel}</th><th style={{...RPT_thStyle,textAlign:"right"}}>Variance</th><th style={{...RPT_thStyle,textAlign:"right"}}>%Δ</th></tr></thead>
-          <tbody>{lines.map((l,i)=>{const variance=l.cy-l.ly;const pct=l.ly!==0?variance/Math.abs(l.ly)*100:0;const nav=rrow(setRoute,"/reports/pnl");const{style:navStyle,...navRest}=nav;return (<tr key={i} {...navRest} style={{...(l.bold?{background:"#fafbfd",fontWeight:700}:{}),...navStyle}}><td style={{...RPT_tdStyle,fontWeight:l.bold?700:400,fontSize:l.bold?12.5:12}}>{l.line}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:l.bold?700:500}}>{cmoney(branch, l.cy)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:"#5a6691"}}>{cmoney(branch, l.ly)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:variance>=0?(l.group==="Costs"?"#A32D2D":"#22c55e"):(l.group==="Costs"?"#22c55e":"#A32D2D"),fontWeight:700}}>{variance>=0?"+":""}{cmoney(branch, Math.abs(variance))}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:pct>=0?(l.group==="Costs"?"#A32D2D":"#22c55e"):(l.group==="Costs"?"#22c55e":"#A32D2D")}}>{pct>=0?"+":""}{pct.toFixed(1)}%</td></tr>);})}</tbody>
-        </table>
-      </div>
-      </RptState>
-    </RPT_Page>
-  );
-}
-
-/* 9. Customer LTV */
-
-export function RPT_CustomerLTV({ branch, setRoute }){
-  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
-  const q=useCustomerLtv(branch,{from:range.from||undefined,to:range.to||undefined});
-  const sorted=q.data?.rows||[];   // server computes LTV, basket, active span & recency
-  return (
-    <RPT_Page title="Customer Lifetime Value (LTV)" subtitle="Cumulative value per customer — live from posted sales"
-      toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
-      <RptState q={q} empty={sorted.length===0} label="customer sales">
-      <div style={{...cardStyle,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Customer</th><th style={RPT_thStyle}>First Booking</th><th style={RPT_thStyle}>Last Booking</th><th style={{...RPT_thStyle,textAlign:"right"}}>Bookings</th><th style={{...RPT_thStyle,textAlign:"right"}}>LTV</th><th style={{...RPT_thStyle,textAlign:"right"}}>Avg Basket</th><th style={{...RPT_thStyle,textAlign:"center"}}>Active</th><th style={{...RPT_thStyle,textAlign:"center"}}>Recency</th></tr></thead>
-          <tbody>{sorted.map(c=>(<tr key={c.name} {...rrow(setRoute, partyLink("/reports/customer-360", c.name))}><td style={{...RPT_tdStyle,fontWeight:600}}>{c.name}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{c.firstBooking}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{c.lastBooking}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{c.totalBookings}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{cmoney(branch, c.ltv)}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{cmoney(branch, c.avgBasket)}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{c.monthsActive}m</td><td style={{...RPT_tdStyle,textAlign:"center",color:c.recencyDays<=30?"#22c55e":c.recencyDays<=90?"#d4a437":"#A32D2D",fontWeight:700}}>{c.recencyDays}d ago</td></tr>))}</tbody>
-        </table>
-      </div>
-      </RptState>
-    </RPT_Page>
-  );
-}
-
-/* 10. ABC Analysis */
-
-export function RPT_ABCAnalysis({ branch, setRoute }){
-  const [range,setRange]=useState(()=>({mode:'all',...resolveReportRange('all')}));
-  const [dim,setDim]=useState("customers");
-  const by=dim==="customers"?"customer":dim==="suppliers"?"supplier":"destination";
-  const q=useAbcAnalysis(branch,{from:range.from||undefined,to:range.to||undefined,by});
-  const data=q.data?.rows||[];                       // [{name,value,bookings,gp,share,cumPct,class}], ranked
-  const EMPTY_CLS={count:0,value:0,share:0};
-  const classes=q.data?.classes||{A:EMPTY_CLS,B:EMPTY_CLS,C:EMPTY_CLS};
-  const grpStyle=cls=>({background:cls==="A"?"#fae7ad":cls==="B"?"#cfe2ff":"#e2e3e5",color:cls==="A"?"#664700":cls==="B"?"#004085":"#383d41"});
-  return (
-    <RPT_Page title="ABC Analysis (Pareto)"
-      subtitle="80/15/5 split based on contribution to value — live from posted bills"
-      toolbar={<div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><ReportDateBar value={range} onChange={setRange}/><select value={dim} onChange={e=>setDim(e.target.value)} style={{padding:"7px 11px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:11.5,background:"#fff"}}><option value="customers">By Customer (LTV)</option><option value="suppliers">By Supplier (Spend)</option><option value="destinations">By Destination (Revenue)</option></select></div>}>
-      <RptState q={q} empty={data.length===0} label="contribution data">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        {["A","B","C"].map(c=>{const cl=classes[c]||{count:0,value:0,share:0};return (<div key={c} style={{...cardStyle,borderTop:"4px solid "+(c==="A"?"#d4a437":c==="B"?"#3b82f6":"#5a6691")}}><div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}><span style={{padding:"4px 10px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:"0.5px",...grpStyle(c)}}>CLASS {c}</span><span style={{fontSize:11,color:"#5a6691"}}>{cl.count} items · {cl.share}% of total</span></div><p style={{margin:0,fontSize:22,fontWeight:700,color:"#0d1326"}}>{cmoney(branch, cl.value)}</p><p style={{margin:"3px 0 0",fontSize:10.5,color:"#5a6691"}}>{c==="A"?"Top contributors — focus & nurture":c==="B"?"Mid-tier — opportunity to grow":"Long tail — automate / rationalise"}</p></div>);})}
-      </div>
-      <div style={{...cardStyle,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Rank</th><th style={RPT_thStyle}>Name</th><th style={{...RPT_thStyle,textAlign:"right"}}>Value</th><th style={{...RPT_thStyle,textAlign:"right"}}>Share</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cumulative</th><th style={{...RPT_thStyle,textAlign:"center"}}>Class</th></tr></thead>
-          <tbody>{data.map((d,i)=>{const val=d.value;return (<tr key={(d.name||d.destination)+i} {...rrow(setRoute, by==="customer"?partyLink("/reports/customer-360",d.name||d.destination):by==="supplier"?partyLink("/reports/supplier-360",d.name||d.destination):"/reports/destination")}><td style={{...RPT_tdStyle,color:"#5a6691"}}>{i+1}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{d.name||d.destination}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{cmoney(branch, val)}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{d.share}%</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{d.cumPct}%</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 9px",borderRadius:3,fontSize:10.5,fontWeight:700,letterSpacing:"0.3px",...grpStyle(d.class)}}>{d.class}</span></td></tr>);})}</tbody>
-        </table>
-      </div>
-      </RptState>
-    </RPT_Page>
-  );
-}
-
-
-export function RPT_Attrition(){
-
-  const emps=((useMasterList('employees').data)||[]).map(fromEmpDTO);
-  const months=lastMonths(todayISO().slice(0,7),12);
-  const {rows:ATTRITION_DATA,ttlJoiners,ttlLeavers,annualAttrition:annualAttritionN}=buildAttrition(emps,months);
-  const annualAttrition=(annualAttritionN||0).toFixed(1);
-  return (
-    <RPT_Page title="Attrition Rate Report" subtitle="Monthly joiners vs leavers · FY 2025-26">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Joiners YTD</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#22c55e"}}>{ttlJoiners}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Leavers YTD</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{ttlLeavers}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Net Add</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>+{ttlJoiners-ttlLeavers}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Annual Attrition</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:Number(annualAttrition)>20?"#A32D2D":"#0d1326"}}>{annualAttrition}%</p></div>
-      </div>
-      <div style={cardStyle}>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={ATTRITION_DATA}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f2f7"/>
-            <XAxis dataKey="month" tick={{fontSize:10,fill:"#5a6691"}}/>
-            <YAxis tick={{fontSize:10,fill:"#5a6691"}}/>
-            <Tooltip/>
-            <Legend wrapperStyle={{fontSize:11}}/>
-            <Bar dataKey="joiners" fill="#22c55e" name="Joiners"/>
-            <Bar dataKey="leavers" fill="#A32D2D" name="Leavers"/>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <div style={{...cardStyle,marginTop:14,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Month</th><th style={{...RPT_thStyle,textAlign:"right"}}>Opening HC</th><th style={{...RPT_thStyle,textAlign:"right"}}>Joiners</th><th style={{...RPT_thStyle,textAlign:"right"}}>Leavers</th><th style={{...RPT_thStyle,textAlign:"right"}}>Closing HC</th><th style={{...RPT_thStyle,textAlign:"right"}}>Attrition %</th></tr></thead>
-          <tbody>{ATTRITION_DATA.map(m=>(<tr key={m.month}><td style={{...RPT_tdStyle,fontWeight:600}}>{m.month}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{m.openingHc}</td><td style={{...RPT_tdStyle,textAlign:"right",color:m.joiners>0?"#22c55e":"#5a6691",fontWeight:m.joiners>0?700:400}}>{m.joiners||"—"}</td><td style={{...RPT_tdStyle,textAlign:"right",color:m.leavers>0?"#A32D2D":"#5a6691",fontWeight:m.leavers>0?700:400}}>{m.leavers||"—"}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{m.closingHc}</td><td style={{...RPT_tdStyle,textAlign:"right",color:m.attritionRate>0?"#A32D2D":"#5a6691"}}>{m.attritionRate>0?m.attritionRate.toFixed(1)+"%":"—"}</td></tr>))}</tbody>
-        </table>
-      </div>
-    </RPT_Page>
-  );
-}
-
-/* 12. Leave Utilization */
-
-export function RPT_LeaveUtilization(){
-
-  const emps=((useMasterList('employees').data)||[]).map(fromEmpDTO);
-  const leaves=((useMasterList('leave-requests').data)||[]).map(fromLeaveDTO);
-  const LEAVE_UTILIZATION=buildLeaveUtilization(emps,leaves);
-  return (
-    <RPT_Page title="Leave Utilization Report" subtitle="% of entitlement used per employee · current FY">
-      <div style={{...cardStyle,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Employee</th><th style={RPT_thStyle}>Branch</th><th style={{...RPT_thStyle,textAlign:"right"}}>Entitled</th><th style={{...RPT_thStyle,textAlign:"right"}}>Used</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th><th style={{...RPT_thStyle,textAlign:"right"}}>CL</th><th style={{...RPT_thStyle,textAlign:"right"}}>SL</th><th style={{...RPT_thStyle,textAlign:"right"}}>EL</th><th style={{...RPT_thStyle,textAlign:"center"}}>Utilization</th></tr></thead>
-          <tbody>{LEAVE_UTILIZATION.length===0&&(<tr><td colSpan={9} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3"}}>No employees yet.</td></tr>)}{LEAVE_UTILIZATION.map(l=>(<tr key={l.empId}><td style={{...RPT_tdStyle,fontWeight:600}}>{l.name}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{l.branch}</span></td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.entitled}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{l.used}</td><td style={{...RPT_tdStyle,textAlign:"right",color:l.balance<5?"#A32D2D":"#0d1326"}}>{l.balance}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.casual}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.sick}</td><td style={{...RPT_tdStyle,textAlign:"right"}}>{l.earned}</td><td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><div style={{display:"flex",alignItems:"center",gap:6}}><div style={{flex:1,height:6,background:"#f0f2f7",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:l.utilPct+"%",background:l.utilPct>75?"#A32D2D":l.utilPct>50?"#d4a437":"#22c55e",borderRadius:3}}/></div><span style={{fontSize:10.5,fontWeight:700,color:l.utilPct>75?"#A32D2D":"#0d1326",minWidth:36,textAlign:"right"}}>{l.utilPct.toFixed(0)}%</span></div></td></tr>))}</tbody>
-        </table>
-      </div>
-    </RPT_Page>
-  );
-}
-
-/* 13. Birthday & Anniversary Calendar */
-
-export function RPT_BirthdayCalendar(){
-
-  const statsQ=useQuery({queryKey:['employees','stats'],queryFn:()=>apiGet('/api/employees/stats'),enabled:!!getAuthToken(),staleTime:60_000});
-  const stats=statsQ.data||{birthdays:[],anniversaries:[]};
-  return (
-    <RPT_Page title="Birthday &amp; Anniversary Calendar" subtitle="Engagement events for HR &amp; team celebrations">
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-        <div style={cardStyle}>
-          <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎂 Upcoming Birthdays</p>
-          {(stats.birthdays||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming birthdays"}</p>}
-          {(stats.birthdays||[]).map(b=>(<div key={b.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#d4a437",display:"flex",alignItems:"center",justifyContent:"center",color:"#0d1326",fontSize:14,fontWeight:700}}>{b.name.substring(0,2).toUpperCase()}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{b.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{b.branch} · {b.date}</p></div></div>))}
-        </div>
-        <div style={cardStyle}>
-          <p style={{margin:0,fontSize:14,fontWeight:700,color:"#0d1326",marginBottom:12}}>🎉 Work Anniversaries</p>
-          {(stats.anniversaries||[]).length===0&&<p style={{color:"#5a6691",fontSize:12}}>{statsQ.isLoading?"Loading…":"No upcoming anniversaries"}</p>}
-          {(stats.anniversaries||[]).map(a=>(<div key={a.name} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid #dfe2e7"}}><div style={{width:44,height:44,borderRadius:"50%",background:"#6B4C8B",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}}>{a.years}</div><div style={{flex:1}}><p style={{margin:0,fontSize:13,color:"#0d1326",fontWeight:700}}>{a.name}</p><p style={{margin:0,fontSize:11,color:"#5a6691"}}>{a.branch} · {a.years} year{a.years!==1?"s":""} on {a.date}</p></div></div>))}
-        </div>
-      </div>
-    </RPT_Page>
-  );
-}
-
-
-
-export function RPT_StatutoryDues(){
-  
-  const q=useStatutoryDues();
-  const rows=q.data?.rows||[];
-  const t=q.data?.totals||{overdue:0,pending:0,upcoming:0,dueValue:0};
-  // Money is per currency — ₹ India (GST/TDS) vs $ Africa (VAT/WHT), never blended.
-  const sym=(c)=>(!c||c==="INR")?"₹":"$";
-  const dueParts=t.dueByCurrency&&Object.keys(t.dueByCurrency).length
-    ? Object.entries(t.dueByCurrency).filter(([,v])=>Number(v)).map(([c,v])=>compactAmt(v,{currency:sym(c)}))
-    : (Number(t.dueValue)?[fmtINR(t.dueValue)]:[]);
-  const dueLabel=dueParts.length?dueParts.join(" · "):"—";
-  return (
-    <RPT_Page title="Statutory Dues Calendar" subtitle="All compliance dates · filing status &amp; reminders">
-      <RptState q={q} empty={rows.length===0} label="statutory dues">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Overdue</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{t.overdue}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#f97316"}}>{t.pending}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Upcoming</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#d4a437"}}>{t.upcoming}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Total Due Value</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{dueLabel}</p></div>
-      </div>
-      <div style={{...cardStyle,overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Due Date</th><th style={RPT_thStyle}>Authority</th><th style={RPT_thStyle}>Filing</th><th style={RPT_thStyle}>Entity</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={{...RPT_thStyle,textAlign:"center"}}>Days Left</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-          <tbody>{rows.map((d,i)=>(<tr key={d.id||i}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:600}}>{d.due}</td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700,color:"#0d1326"}}>{d.authority}</span></td><td style={{...RPT_tdStyle,fontWeight:600}}>{d.filing}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{d.entity}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700}}>{d.amount>0?compactAmt(d.amount,{currency:sym(d.currency)}):"—"}</td><td style={{...RPT_tdStyle,textAlign:"center",fontWeight:700,color:d.daysLeft<=0?"#A32D2D":d.daysLeft<=7?"#f97316":d.daysLeft<=30?"#d4a437":"#5a6691"}}>{d.status==="Filed"?"—":d.daysLeft<=0?"DUE NOW":d.daysLeft+"d"}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:d.status==="Filed"?"#d4edda":d.status==="Pending"?"#f8d7da":d.status==="Upcoming"?"#fff3cd":"#f8d7da",color:d.status==="Filed"?"#155724":d.status==="Pending"?"#721c24":d.status==="Upcoming"?"#856404":"#721c24"}}>{d.status}</span></td></tr>))}</tbody>
-        </table>
-      </div>
-      </RptState>
-    </RPT_Page>
-  );
-}
-
-/* 15. Tax Filing Status Board */
-
-export function RPT_TaxFilingBoard({ branch }){
-  // Filed/Pending is derived live from entered return figures (no static data).
-  const [period,setPeriod]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);});
-  const q=useTaxFilingBoard(branch,period);
-  const entities=q.data?.entities||[];
-  const allTaxes=[...new Set(entities.flatMap(e=>Object.keys(e.taxes)))];
-  const t=q.data?.totals||{filed:0,pending:0,returns:0};
-  return (
-    <RPT_Page title="Tax Filing Status Board" subtitle="GSTR / TDS / VAT — filed vs pending per branch, derived live from entered return figures"
-      toolbar={<label style={{display:"flex",alignItems:"center",gap:6,fontSize:11.5,color:"#5a6691",fontWeight:600}}>Period
-        <input type="month" value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"4px 8px",border:"1px solid #cdd1d8",borderRadius:4,fontSize:12}}/></label>}>
-      <RptState q={q} empty={entities.length===0} label="branches">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Returns Tracked</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{t.returns}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Filed</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#155724"}}>{t.filed}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Pending</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#A32D2D"}}>{t.pending}</p></div>
-      </div>
-      <div style={cardStyle}>
-        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={{...RPT_thStyle,minWidth:180}}>Entity</th>{allTaxes.map(t=><th key={t} style={{...RPT_thStyle,textAlign:"center",minWidth:100}}>{t}</th>)}</tr></thead>
-          <tbody>{entities.map(e=>(<tr key={e.entity}><td style={{...RPT_tdStyle,fontWeight:700}}>{e.entity}</td>{allTaxes.map(t=>{const tax=e.taxes[t];if(!tax) return <td key={t} style={{...RPT_tdStyle,textAlign:"center",color:"#cbd0dc"}}>—</td>;return (<td key={t} style={{padding:"8px 6px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}><span style={{display:"inline-block",padding:"3px 10px",borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px",background:tax.status==="Filed"?"#d4edda":"#f8d7da",color:tax.status==="Filed"?"#155724":"#721c24"}}>{tax.status==="Filed"?"✓ Filed":"○ Pending"}</span>{tax.date!=="—"&&<p style={{margin:"3px 0 0",fontSize:9,color:"#5a6691",fontFamily:"monospace"}}>{tax.date}</p>}</td>);})}</tr>))}</tbody>
-        </table></div>
-      </div>
-      </RptState>
-    </RPT_Page>
-  );
-}
-
-/* 16. Currency Exposure */
-
-export function RPT_CurrencyExposure({ branch }){
-
-  const q=useFxExposure(branch);
-  const rows=q.data?.rows||[];
-  const t=q.data?.totals||{currencies:0,inrEquivalent:0,missingRates:0};
-  const n=(v)=>Number(v||0).toLocaleString("en-IN");
-  return (
-    <RPT_Page title="Currency Exposure Report" subtitle="Open foreign-currency positions per currency · net exposure & INR equivalent (live from posted books)">
-      <RptState q={q} empty={rows.length===0} label="foreign-currency exposure">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Currencies in Use</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{t.currencies}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Net INR Equivalent</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:"#0d1326"}}>{fmtINR(t.inrEquivalent)}</p></div>
-        <div style={cardStyle}><p style={{margin:0,fontSize:10.5,color:"#5a6691",fontWeight:700,textTransform:"uppercase"}}>Currencies w/o Rate</p><p style={{margin:"4px 0 0",fontSize:22,fontWeight:700,color:t.missingRates>0?"#A32D2D":"#155724"}}>{t.missingRates}</p></div>
-      </div>
-      <div style={cardStyle}>
-        <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
-          <thead><tr><th style={RPT_thStyle}>Currency</th><th style={RPT_thStyle}>Branches</th><th style={{...RPT_thStyle,textAlign:"right"}}>Receivables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Payables</th><th style={{...RPT_thStyle,textAlign:"right"}}>Cash Held</th><th style={{...RPT_thStyle,textAlign:"right"}}>Net Exposure</th><th style={{...RPT_thStyle,textAlign:"right"}}>Rate → INR</th><th style={{...RPT_thStyle,textAlign:"right"}}>INR Equivalent</th></tr></thead>
-          <tbody>{rows.map(c=>(<tr key={c.currency}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:700}}>{c.currency}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{(c.branches||[]).join(", ")}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.receivables)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.payables)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace"}}>{n(c.cashHeld)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:700}}>{n(c.netExposure)}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",color:c.rateStale?"#A32D2D":"#5a6691"}}>{c.rateStale?"no rate":c.rate}</td><td style={{...RPT_tdStyle,textAlign:"right",fontWeight:700,color:c.inrEquivalent==null?"#A32D2D":"#0d1326"}}>{c.inrEquivalent==null?"rate missing":fmtINR(c.inrEquivalent)}</td></tr>))}</tbody>
-        </table></div>
-      </div>
-      <p style={{margin:"10px 2px 0",fontSize:10.5,color:"#5a6691",fontStyle:"italic"}}>Amounts shown in each foreign currency; INR equivalent uses the latest forex rate on file. Hedged/unhedged positions are not shown — the system does not yet track FX hedges or forward contracts, so this reflects open exposure only.</p>
-      </RptState>
-    </RPT_Page>
-  );
-}
+// aggBills/RptState/RPT_YieldDestination/RPT_YieldConsultant/RPT_YieldSupplier/
+// RPT_YoY/RPT_CustomerLTV/RPT_ABCAnalysis moved to modules/reports/profitability-gp/
+// (aggBills/cmoney/rrow/partyLink -> analyticsShared.js); RPT_Attrition/
+// RPT_LeaveUtilization/RPT_BirthdayCalendar moved to modules/hr/hr-reports/;
+// RPT_StatutoryDues/RPT_TaxFilingBoard moved to modules/taxation/;
+// RPT_CurrencyExposure moved to modules/reports/compliance-tax/ — all business
+// sub-module reorg. RptState + RPT_Page moved together to core/reportPage.jsx
+// since they're shared across the reports/hr/taxation destinations. Re-exported
+// below for App.jsx's direct chunk import.
 
 export const tabBtnStyle = (active) => ({
   padding:"10px 16px",border:"none",
