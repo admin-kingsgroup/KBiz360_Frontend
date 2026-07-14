@@ -56,7 +56,12 @@ export function LedgerModalHost({ branch: shellBranch }) {
   useEffect(() => {
     const onNav = () => { setVoucher(null); setJob(null); };
     window.addEventListener('kb:open-register', onNav);
-    return () => window.removeEventListener('kb:open-register', onNav);
+    // Opening the Booking Folder from a surface INSIDE this modal (e.g. the bill-wise tab,
+    // which fires openBookingFolder directly) must close this ledger too — else the folder
+    // (z 8950) stacks over a still-dimmed ledger (8800). Mirrors the ledger vno path, which
+    // already calls close() before openBookingFolder.
+    window.addEventListener('kb:booking-folder', onNav);
+    return () => { window.removeEventListener('kb:open-register', onNav); window.removeEventListener('kb:booking-folder', onNav); };
   }, []);
 
   useEffect(() => {

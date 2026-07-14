@@ -18,10 +18,11 @@ import { openBookingFolder } from '../core/BookingFolderHost';
 
 export function GlobalSearch(){
   const [q,setQ]=useState("");
-  // A search hit is a booking file → open the WHOLE SO/PO/GP deal (folder) rather than
-  // navigating to the generic module page (which lost the specific deal). Resolves by
-  // Link No / sale invoice no; the folder falls back gracefully for a non-booking ref.
-  const openDeal=(r)=>openBookingFolder(r.linkNo||r.saleVno||r.id,{branch:r.branch?{code:r.branch}:undefined,vno:r.saleVno||r.id});
+  // A search hit is a GP-bill file → open the WHOLE SO/PO/GP deal (folder) rather than
+  // navigating to the generic module page (which lost the specific deal). gp-bills rows
+  // carry only `id` (the booking's Link/sale voucher no) + `branch`; the folder resolves
+  // it by that number, and shows a neutral "not a booking" note if it's an unlinked voucher.
+  const openDeal=(r)=>openBookingFolder(r.id,{branch:r.branch?{code:r.branch}:undefined,vno:r.id});
 
   // Live GP bills across every branch, inception → today (so prior-FY data is
   // searchable too). Cached; one fetch backs every keystroke.

@@ -18,6 +18,8 @@ import { CONSOLIDATED_LABEL } from '../../core/data';
 import { PeriodBar } from '../../core/period';
 import { PLSide, GroupSummary, LedgerVouchers, VoucherView } from './pnlTally.jsx';
 import { openLedgerModal } from '../../core/LedgerModalHost';
+import { openBookingFolder } from '../../core/BookingFolderHost';
+import { isBookingLegRow } from '../../core/ledgerUI';
 import { PageLayout } from '../../shell/PageLayout';
 import { SkeletonTable } from '../../shell/primitives';
 import { toastInfo } from '../../core/ux/toast';
@@ -63,7 +65,11 @@ export function BalanceSheetTallyLive({ branch }) {
     if (line.ledger || (!line.isGroup && !line.items?.length)) openLedgerModal(line.ledger || line.name);
     else if (line.isGroup) setStack((s) => [...s, { kind: 'group', title: line.name, items: line.items || [] }]);
   };
-  const pickFrame = (f) => setStack((s) => (f && f.kind ? [...s, f] : s));
+  const pickFrame = (f) => {
+    // Forward booking leg → open the whole SO/PO/GP deal (folder); else keep the frame.
+    if (f && f.kind === 'voucher' && isBookingLegRow(f)) { openBookingFolder(f.vno, { branch, voucherId: f.id, vno: f.vno }); return; }
+    setStack((s) => (f && f.kind ? [...s, f] : s));
+  };
   const goto = (i) => setStack((s) => s.slice(0, i + 1));
 
   const crumb = (label, i) => (

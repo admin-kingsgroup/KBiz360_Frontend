@@ -625,7 +625,12 @@ export function PnLTallyLive({ branch }) {
     if (line.ledger || (!line.isGroup && !line.items?.length)) openLedgerModal(line.ledger || line.name);
     else if (line.isGroup) setStack((s) => [...s, { kind: 'group', title: line.name, items: line.items || [] }]);
   };
-  const pickFrame = (f) => setStack((s) => [...s, f.kind ? f : null].filter(Boolean));
+  const pickFrame = (f) => {
+    // A forward SO/PO/GP booking leg opens the whole deal (folder) rather than pushing a
+    // single-voucher frame; refund/reissue + non-booking legs keep the VoucherView frame.
+    if (f && f.kind === 'voucher' && isBookingLegRow(f)) { openBookingFolder(f.vno, { branch, voucherId: f.id, vno: f.vno }); return; }
+    setStack((s) => [...s, f.kind ? f : null].filter(Boolean));
+  };
   const goto = (i) => setStack((s) => s.slice(0, i + 1));
 
   const crumb = (label, i) => (

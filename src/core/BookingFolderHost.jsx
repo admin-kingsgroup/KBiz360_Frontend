@@ -175,7 +175,12 @@ export function BookingFolderHost({ branch: shellBranch }) {
           )}
 
           {!state.loading && !state.fallback && state.err && (
-            <div style={{ padding: 20, color: '#8A2C1C', fontSize: 13, textAlign: 'center' }}>Couldn’t open the deal — {state.err}</div>
+            // A ref that resolves to no booking (a migrated/opening/manual bill, a debit note,
+            // an unlinked voucher) is NOT an error — many drill surfaces can't know in advance.
+            // Degrade to a neutral note instead of a red failure; only a real fault shows red.
+            /no .*(booking|inb).*found/i.test(state.err)
+              ? <div style={{ padding: 26, color: DIM, fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>🗂 This isn’t part of an SO/PO/GP booking — there’s no consolidated deal to open.<div style={{ fontSize: 11, marginTop: 6, color: '#9aa4b3', fontFamily: 'monospace' }}>{job.vno || job.ref}</div></div>
+              : <div style={{ padding: 20, color: '#8A2C1C', fontSize: 13, textAlign: 'center' }}>Couldn’t open the deal — {state.err}</div>
           )}
 
           {/* INB deal (inter-branch) — no BookingOrder; show its two legs' identity. */}

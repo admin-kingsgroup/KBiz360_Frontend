@@ -33,7 +33,12 @@ const FORWARD_GP_TYPES = ['SF', 'PF', 'SH', 'PH', 'SHT', 'PHT', 'SV', 'PV', 'SC'
 // Exported so the Sales/Purchase Register reuses the SAME guard — it must exclude a
 // refund/reissue row (whose linkNo points at the ORIGINAL sale) and INB rows, routing
 // only genuine forward booking legs to the folder.
-export const isBookingLegRow = (r) => !!r && /sale|purchase/i.test(r.category || '') && FORWARD_GP_TYPES.includes(r.type);
+// Function DECLARATION (hoisted) not a const arrow — this is imported across the
+// ledgerUI ↔ BookingFolderHost ↔ pnlTally region, so hoisting keeps it init-safe even
+// if a future edit ever references it during module load.
+export function isBookingLegRow(r) {
+  return !!r && /sale|purchase/i.test(r.category || '') && FORWARD_GP_TYPES.includes(r.type);
+}
 
 export { billwiseSide, isBillwiseLedger } from './ledgerMath';
 
