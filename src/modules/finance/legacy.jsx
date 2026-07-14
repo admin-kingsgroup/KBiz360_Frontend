@@ -28,7 +28,6 @@ import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp } from '../
 import { Dashboard } from '../dashboard';
 import { PfEsiChallan } from '../hr';
 import { ForexReport } from '../reports';
-import { EWayBill, Form26AS } from '../taxation';
 import { RecurringVouchers } from '../transactions';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../core/PrintPreview';
@@ -767,10 +766,6 @@ export function CashFlowForecast({branch}){
 
 
 /* ── RECURRING VOUCHER TEMPLATES ─────────────────────────────── */
-
-// Single source of truth lives in core/taxSections; re-exported here for the
-// existing importers of this module.
-export { TDS_SECTIONS } from '../../core/taxSections';
 
 export function LoanEmiRegister({branch}){
   const cur=bc(branch).cur;

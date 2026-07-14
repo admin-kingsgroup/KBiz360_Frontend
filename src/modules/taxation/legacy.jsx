@@ -21,7 +21,7 @@ import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, tabBtnStyle } from '../../core/styles';
 import { MiniBar, share, pctText } from '../../core/insightsUI';
-import { TDS_SECTIONS } from '../finance';
+import { TDS_SECTIONS } from '../../core/taxSections';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../core/PrintPreview';
 import { SampleBanner } from '../../core/ux/SampleBanner';
