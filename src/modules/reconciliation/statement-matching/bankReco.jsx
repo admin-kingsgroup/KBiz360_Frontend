@@ -19,6 +19,7 @@ import { PeriodBar } from '../../../core/period';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
 import { bc, btnG, btnGh, card, inp } from '../../../core/styles';
+import { useMobile } from '../../../core/hooks';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
 const RECON_CLR = {

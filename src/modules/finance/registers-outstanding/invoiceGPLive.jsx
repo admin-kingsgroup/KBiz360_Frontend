@@ -20,7 +20,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { exportToExcel, vouchersToSheet } from '../../../core/exportExcel';
 import { useSalesRegister, usePurchaseRegister, useInvoiceGP } from '../../../core/useAccounting';
-import { inp } from '../../../core/styles';
+import { card, inp } from '../../../core/styles';
+import { clickable } from '../../../core/ux/clickable';
 import { VoucherLines } from '../../accountingLive/legacy.jsx';
 import {
   DARK, GOLD, DIM, BLUE, RED, GREEN, curOf, money, branchLabel, Page, Banner, State, ExportBtn,

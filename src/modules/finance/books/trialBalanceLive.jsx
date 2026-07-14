@@ -17,6 +17,7 @@ import { exportToExcel } from '../../../core/exportExcel';
 import { useReportExport } from '../../../core/reportExportContext';
 import { pushModal } from '../../../core/ux/modalStore';
 import { clickable } from '../../../core/ux/clickable';
+import { card } from '../../../core/styles';
 import { useTrialBalance } from '../../../core/useAccounting';
 import { LedgerVouchers } from '../../reportsFinancial/pnlTally.jsx';
 import { VoucherEditor } from '../../accountingLive/legacy.jsx';

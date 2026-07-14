@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { todayISO } from '../../../core/dates';
-import { TAB_Page, tabPanel } from '../../../core/helpers';
+import { TAB_Page, tabPanel, cardStyle } from '../../../core/helpers';
 import { FL, inpStd, tabBtnStyle } from '../../../core/styles';
 
 export function VoucherEntryTabbed(){

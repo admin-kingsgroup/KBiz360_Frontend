@@ -8,6 +8,7 @@
 
 import { useMobile } from '../../../core/hooks';
 import { bc } from '../../../core/styles';
+import { fmt } from '../../../core/format';
 
 export function WorkingCapitalDashboard({branch,setRoute}){
   const mob=useMobile();
