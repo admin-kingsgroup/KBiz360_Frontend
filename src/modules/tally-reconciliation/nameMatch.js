@@ -88,10 +88,12 @@ const SUGGEST_MIN = 0.6;  // fuzzy-name floor for an advisory "possible rename"
  *  greedy fuzzy guess can't steal a Tally head a certain match needs. */
 export function buildNameMatcher(rows = [], opts = {}) {
   const tol = opts.amtTol != null ? Number(opts.amtTol) : 1;
-  const erp = (rows || []).filter((r) => r && r.status === 'only-erp').map((r) => ({
+  // Exclude synthetic reconciling rows (e.g. the P&L brought-forward the tie-out
+  // injects) — they're balancing artefacts, never a real ledger to rename in Tally.
+  const erp = (rows || []).filter((r) => r && r.status === 'only-erp' && !r.synthetic).map((r) => ({
     name: r.erpLedger || r.ledger || '', code: r.code || '', amount: round2(r.erp), group: r.group || r.parentGroup || '',
   }));
-  const tally = (rows || []).filter((r) => r && r.status === 'only-tally').map((r) => ({
+  const tally = (rows || []).filter((r) => r && r.status === 'only-tally' && !r.synthetic).map((r) => ({
     name: r.tallyLedger || r.ledger || '', amount: round2(r.tally), group: r.tallyGroup || r.group || '',
   }));
   const claimed = new Set();

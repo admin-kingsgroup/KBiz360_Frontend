@@ -107,6 +107,14 @@ describe('buildNameMatcher — BOM Dec-25', () => {
     expect(claimed.length).toBe(new Set(claimed).size);
   });
 
+  test('synthetic reconciling rows are excluded (never treated as a ledger to rename)', () => {
+    const withSynth = buildNameMatcher([
+      { status: 'only-erp', erpLedger: 'Profit & Loss A/c', erp: -5000, synthetic: true },
+      { status: 'only-erp', erpLedger: 'Real Head', code: '', erp: -100 },
+    ]);
+    expect(withSynth.erp.map((e) => e.name)).toEqual(['Real Head']);
+  });
+
   test('summary tallies the two sides', () => {
     expect(m.summary.erpOrphans).toBe(9);
     expect(m.summary.tallyOrphans).toBe(12);

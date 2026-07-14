@@ -772,7 +772,9 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                so a Defect-Register drill matches a board-row drill. Falls back to the passed object. */
             onDrill={(x) => setDrill(rows.find((r) => nkFE(r.ledger) === nkFE(x.ledger)) || x)} />
         ) : tab === 'names' ? (
-          <NameMatcherPane rows={rows} cur={cur} />
+          isLoading ? <LoadingState label="Computing the tie-out…" />
+            : isError ? <ErrorState title="Couldn’t load the tie-out" message="The service didn’t respond. Check the connection and retry." onRetry={() => refetch()} />
+              : <NameMatcherPane rows={rows} cur={cur} />
         ) : (<>
         {isLoading && <LoadingState label="Computing the tie-out…" />}
         {isError && <ErrorState title="Couldn’t load the tie-out" message="The service didn’t respond. Check the connection and retry." onRetry={() => refetch()} />}
