@@ -54,7 +54,7 @@ const { BankingApiSettings, DelegationsManager, GroupDashboard, StatutoryFilingR
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, GratuityEstimateView, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyForm16, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
 const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, CustomerMasterDetail, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/masters/mastersParties'));
-const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
+const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, ForexReport, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, ReportsMetaDemo, RPT_TaxSummary, RPT_TaxRateSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
 const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
 const { PageAccessControl } = lazyModule(() => import('./modules/settings/pageAccess'));
 const { EWayBill, Form16AGenerator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
@@ -487,6 +487,7 @@ export default function KB360App(){
     if(route==="/hr/calendar")            return <RPT_BirthdayCalendar/>;
     /* New Compliance Reports */
     if(route==="/reports/tax-summary")    return <RPT_TaxSummary branch={branch}/>;
+    if(route==="/reports/tax-rate-summary") return <RPT_TaxRateSummary branch={branch}/>;
     if(route==="/reports/statutory-dues") return <RPT_StatutoryDues/>;
     if(route==="/reports/tax-board")      return <RPT_TaxFilingBoard branch={branch}/>;
     if(route==="/reports/fx-exposure")    return <RPT_CurrencyExposure branch={branch}/>;

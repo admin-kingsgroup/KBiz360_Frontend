@@ -134,6 +134,19 @@ export function useTaxSummary(branch, { from, to } = {}) {
   });
 }
 
+// GST rate-wise view — Output/Input CGST/SGST/IGST split BY RATE (5/12/18…) for a
+// branch + period, so each rate row lines up 1:1 with Tally's per-rate GST ledgers.
+// Sourced from the posted journal + tied out against the tax-ledger balances.
+export function useTaxRateSummary(branch, { from, to } = {}) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'tax-rate-summary', code || 'all', from || '', to || ''],
+    queryFn: () => apiGet('/api/accounting/tax-rate-summary', { branch: code, from, to }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Reverse-charge (RCM) liability on foreign-supplier purchases for the period —
 // IGST self-assessed @ 18%, payable in cash AND claimable as ITC the same month.
 export function useRcmLiability(branch, { from, to } = {}) {

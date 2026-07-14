@@ -32,6 +32,7 @@ export { RatioAnalysis } from './pages/ratio-analysis';
 export { ReportCF } from './pages/cash-flow-statement';
 export { ClientStatement } from './pages/client-statement';
 export { RPT_TaxSummary } from './pages/tax-summary';
+export { RPT_TaxRateSummary } from './pages/tax-rate-summary';
 export { ConsolidatedBS } from './pages/consolidated-bs';
 export { ScheduleIIIBS } from './pages/schedule-iii-bs';
 export { ReportExpenseBgt } from './pages/expense-budget';

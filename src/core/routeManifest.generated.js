@@ -258,6 +258,7 @@ export const APP_ROUTES = [
   "/reports/supplier-360",
   "/reports/tally-export",
   "/reports/tax-board",
+  "/reports/tax-rate-summary",
   "/reports/tax-summary",
   "/reports/variance",
   "/reports/viewer",
