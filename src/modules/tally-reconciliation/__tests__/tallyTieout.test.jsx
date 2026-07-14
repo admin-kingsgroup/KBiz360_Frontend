@@ -237,6 +237,9 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText(/ERP only/)).not.toBeInTheDocument();     // Tally is shown now, not suppressed
     expect(screen.getAllByText('Tied').length).toBeGreaterThan(0);      // slice/module tie-out status
     expect(screen.getByText('Air Ticket Purchase')).toBeInTheDocument();
+    // On the TB tab the module now splits into Sales / Purchase sub-headers (with subtotals) too.
+    expect(screen.getByText('Sales')).toBeInTheDocument();
+    expect(screen.getByText('Purchase')).toBeInTheDocument();
     expect(screen.getByText(/no cost centre/i)).toBeInTheDocument();
     expect(screen.getByText('HDFC Bank A/c')).toBeInTheDocument();        // BS ledger in the trailing bucket
     expect(screen.getByText('Ferry Sales')).toBeInTheDocument();          // Tally-only trading ledger must NOT vanish
@@ -247,6 +250,36 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByLabelText(/By Module/)).not.toBeChecked();
     expect(window.localStorage.getItem('tally.moduleView')).toBe('0');
     window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+  });
+
+  test('By Module bucket groups the no-cost-centre ledgers as the Chart of Accounts (group header + subtotal, ledgers nested)', async () => {
+    window.localStorage.removeItem('tally.coaView');
+    window.localStorage.removeItem('tally.moduleView');
+    const { getTieOut } = require('../api');
+    const adCap = { ledger: 'AD Capital', code: 'L1044', group: 'Capital Account', parentGroup: 'Capital Account', statement: 'BS', nature: 'liability', erp: -50000, tally: -50000, diff: 0, status: 'tied' };
+    const ndCap = { ledger: 'ND Capital', code: 'L1045', group: 'Capital Account', parentGroup: 'Capital Account', statement: 'BS', nature: 'liability', erp: -100000, tally: -100000, diff: 0, status: 'tied' };
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month',
+      counts: { total: 2, tied: 2, off: 0, offTotal: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [adCap, ndCap], tree: [],
+      moduleTree: {
+        modules: [],
+        totals: { erp: 0, sales: 0, cogs: 0, gp: 0 },
+        // The BE ships the bucket pre-grouped as the CoA (group node with a subtotal + its ledgers).
+        bucketTree: [
+          { id: 'capital', name: 'Capital Account', level: 0, statement: 'BS', erp: -150000, tally: -150000, diff: 0, status: 'tied', rows: [adCap, ndCap], children: [] },
+        ],
+        bucketTreePL: [],
+      },
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByLabelText(/By Module/));
+    // The bucket now nests its ledgers under their CoA group (with a per-group subtotal row).
+    expect(await screen.findByText('Capital Account')).toBeInTheDocument();
+    expect(screen.getByText('AD Capital')).toBeInTheDocument();
+    expect(screen.getByText('ND Capital')).toBeInTheDocument();
     window.localStorage.removeItem('tally.moduleView');
   });
 

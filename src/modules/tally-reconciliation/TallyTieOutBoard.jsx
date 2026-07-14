@@ -434,9 +434,10 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // with its trading-ledger slices beneath. A single-module ledger carries its Tally straight
   // across (real diff); a ledger split across ≥2 cost centres can't attribute its one Tally figure
   // to a module, so it shows "— at ledger" (reconcile By CoA); an ERP posting with no Tally match
-  // shows "— not in Tally". On the P&L tab a module is a mini-P&L — Sales / COGS subtotals + a
-  // per-module GP tie-out in the header. The trailing bucket holds every ledger with no cost centre
-  // (BS + non-trading on TB; indirect income/expense on P&L). ──
+  // shows "— not in Tally". Each module splits into a Sales side then a Purchase/COGS side, each
+  // with its own subtotal ("Sales / Purchase" on TB, "Sales (income) / Less: COGS" on P&L); the P&L
+  // header also carries a per-module GP tie-out. The trailing bucket holds every ledger with no cost
+  // centre (BS + non-trading on TB; indirect income/expense on P&L). ──
   const gpText = (n) => (n === 0 || n == null ? '0' : `${n > 0 ? '' : '−'}${Math.abs(n).toLocaleString(localeOf(cur))}`);
   const diffCell = (n) => (n == null ? '—' : n === 0 ? '0' : `${n > 0 ? '+' : '−'}${Math.abs(n).toLocaleString(localeOf(cur))}`);
   const modBadge = (st) => st === 'tied' ? { tone: 'success', label: 'Tied' }
@@ -480,6 +481,15 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     // check a Sales/Purchase ledger in Tally but not ERP would vanish, though it's a real gap).
     const nonModule = rows.filter((r) => !(MODULE_HEADS.has(r.parentGroup) && r.erp != null) && (!pl || r.statement === 'PL'));
     const bucketLabel = pl ? 'Other P&L · no cost centre (indirect income & expense)' : 'Balance Sheet & non-trading · no cost centre';
+    // The bucket, grouped as the ERP Chart of Accounts (group ▸ sub-group ▸ ledger with per-group
+    // subtotals) — built by the BE from the SAME non-module rows. Falls back to the flat list if an
+    // older BE hasn't shipped the tree yet (deploy skew).
+    const bucket = pl ? mt.bucketTreePL : mt.bucketTree;
+    const groupedBucket = Array.isArray(bucket) && bucket.length > 0;
+    // Each module splits into Sales then Purchase (cost), each carrying its own Σ ERP·Tally·Δ
+    // subtotal. TB uses plain "Sales / Purchase"; the P&L tab keeps its income-statement wording.
+    const salesLabel = pl ? 'Sales (income)' : 'Sales';
+    const cogsLabel = pl ? 'Less: COGS (cost)' : 'Purchase';
     const modHead = (m) => {
       const meta = modBadge(m.status || 'unmatched');
       const gpTie = pl && m.gpTally != null;
@@ -519,21 +529,20 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           return (
             <React.Fragment key={kp}>
               {modHead(m)}
-              {pl ? (
-                <>
-                  {subTotal('Sales (income)', m.sales, m.salesTally)}
-                  {inc.map((r) => renderModuleSlice(r, kp + '|s|' + (r.code || r.ledger)))}
-                  {subTotal('Less: COGS (cost)', m.cogs, m.cogsTally)}
-                  {cost.map((r) => renderModuleSlice(r, kp + '|c|' + (r.code || r.ledger)))}
-                </>
-              ) : m.rows.map((r) => renderModuleSlice(r, kp + '|' + (r.code || r.ledger)))}
+              {/* Sales side, then Purchase side — each with a subtotal; a side with no ledgers is skipped. */}
+              {inc.length > 0 && subTotal(salesLabel, m.sales, m.salesTally)}
+              {inc.map((r) => renderModuleSlice(r, kp + '|s|' + (r.code || r.ledger)))}
+              {cost.length > 0 && subTotal(cogsLabel, m.cogs, m.cogsTally)}
+              {cost.map((r) => renderModuleSlice(r, kp + '|c|' + (r.code || r.ledger)))}
             </React.Fragment>
           );
         })}
-        {nonModule.length > 0 && (
+        {(groupedBucket || nonModule.length > 0) && (
           <>
             <tr><td colSpan={5} className="bg-surface-alt px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">{bucketLabel}</td></tr>
-            {nonModule.map((r) => renderLedgerRow(r, `mod-nc|${r.code || r.ledger}`))}
+            {groupedBucket
+              ? renderTreeNodes(bucket, 0)                                        /* group ▸ sub-group ▸ ledger, per-group Σ ERP·Tally·Δ·tie */
+              : nonModule.map((r) => renderLedgerRow(r, `mod-nc|${r.code || r.ledger}`))}
           </>
         )}
       </>
