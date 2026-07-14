@@ -145,6 +145,9 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // visibleEntries, so this filters all of them (and select-all) at once.
   const flaggedCount = status === 'pending' ? searchedEntries.filter((e) => !e.postable).length : 0;
   const visibleEntries = useMemo(() => (status === 'pending' && onlyFlagged ? searchedEntries.filter((e) => !e.postable) : searchedEntries), [searchedEntries, onlyFlagged, status]);
+  // Auto-clear the filter once nothing is flagged, so clearing the list to zero never leaves
+  // the filter stuck ON (hiding the remaining pending vouchers behind a vanished chip).
+  React.useEffect(() => { if (flaggedCount === 0 && onlyFlagged) setOnlyFlagged(false); }, [flaggedCount, onlyFlagged]);
   // Newest first: date desc, then Vch No desc (numeric-aware) as a stable tiebreak.
   const cmpLatest = (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.vno || '').localeCompare(String(a.vno || ''), undefined, { numeric: true });
   // Edited tab: same search, ordered most-recently-edited first.

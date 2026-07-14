@@ -1929,6 +1929,9 @@ export function PendingBookings({ branch, setRoute }) {
   const flaggedCount = rows.filter((b) => b.validation?.hasErrors).length;
   const visibleRows = onlyFlagged ? rows.filter((b) => b.validation?.hasErrors) : rows;
   const allIds = visibleRows.map((b) => b.id);
+  // Auto-clear the filter once nothing is flagged, so "work the list to zero" never leaves
+  // the filter stuck ON hiding the remaining (non-flagged) pending rows behind a vanished chip.
+  React.useEffect(() => { if (flaggedCount === 0 && onlyFlagged) setOnlyFlagged(false); }, [flaggedCount, onlyFlagged]);
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
 
@@ -2418,6 +2421,9 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const toggleSel = (id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAllSel = () => setSel((s) => (s.size === allIds.length ? new Set() : new Set(allIds)));
   React.useEffect(() => { setSel(new Set()); setOnlyFlagged(false); }, [status, brCode]);
+  // Auto-clear the filter once nothing is flagged, so clearing the list to zero never leaves
+  // the filter stuck ON (hiding the remaining pending rows behind a chip that has vanished).
+  React.useEffect(() => { if (flaggedCount === 0 && onlyFlagged) setOnlyFlagged(false); }, [flaggedCount, onlyFlagged]);
 
   const onApprove = async (b) => {
     setBusyId(b.id); setMsg('');
