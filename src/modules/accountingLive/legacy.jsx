@@ -1,12 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { card, inp } from '../../core/styles';
 import { localeOf } from '../../core/format';
-import { exportToExcel, vouchersToSheet } from '../../core/exportExcel';
 import { bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
 import { openPrintPreview } from '../../core/PrintPreview';
-import { useReportExport } from '../../core/reportExportContext';
-import { pushModal } from '../../core/ux/modalStore';
 import { clickable } from '../../core/ux/clickable';
 import { SmartDateInput } from '../../core/ux/SmartDateInput';
 import { toast } from '../../core/ux/toast';
@@ -14,19 +11,16 @@ import { PeriodBar } from '../../core/period';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet,
   useLedgerStatement, useChartOfAccounts,
-  useSalesRegister, usePurchaseRegister, useInvoiceGP,
   useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
 } from '../../core/useAccounting';
-import { LedgerVouchers } from '../reportsFinancial/pnlTally.jsx';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { editorVoucherTotal } from '../../core/voucher/ui';
 import { hasRegistry } from '../../core/voucher/registry';
 import { useVoucherRevoke, voucherParent, openParentFile } from '../../core/voucher/useRevokeAction';
 import {
-  DARK, GOLD, DIM, BLUE, RED, GREEN, curOf, money, branchLabel, Page, Banner, State, ExportBtn,
-  Table, Th, headRow, rowBg, num, productOf, DetailedTable, ModeToggle, RangeBar, SearchInput,
-  Pagination, nfmt, openReportPrint, PrintBtn, Crumb, dateInRange, todayISO, monthStartISO,
+  DARK, GOLD, DIM, BLUE, RED, GREEN, curOf, money, branchLabel, Page, Banner, State,
+  Th, headRow, rowBg, num, productOf, Crumb, todayISO,
 } from './shared';
 
 const DateInput = (props) => <input type="date" {...props} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 140, minHeight: 32, fontSize: 11 }} />;
@@ -121,184 +115,9 @@ const intDomOf = (v, booking) => {
 
 
 
-// Small Summary/Detailed view switch.
-function ViewToggle({ view, setView }) {
-  const B = ({ id, label }) => (
-    <button onClick={() => setView(id)} className="max-tablet:min-h-[44px]" style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11, cursor: 'pointer', fontWeight: 700, background: view === id ? DARK : '#fff', color: view === id ? GOLD : DIM, borderColor: view === id ? DARK : '#cdd1d8' }}>{label}</button>
-  );
-  return <><B id="summary" label="Summary" /><B id="detailed" label="Detailed" /></>;
-}
 
 
 
-
-function LedgerDrill({ branch, ledger, from, to, onClose }) {
-  const cur = curOf(branch);
-  const [voucher, setVoucher] = useState(null);
-  useEffect(() => pushModal(onClose), []); // Esc closes (topmost-first)
-  const crumbs = [
-    { label: ledger, onClick: voucher ? () => setVoucher(null) : null },
-    ...(voucher ? [{ label: voucher.vno }] : []),
-  ];
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(16,18,22,0.5)', zIndex: 800, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(960px, 96vw)', maxHeight: '92vh', overflowY: 'auto', padding: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
-          <Crumb items={crumbs} />
-          <button onClick={onClose} className="inline-flex items-center justify-center max-tablet:min-h-[44px] max-tablet:min-w-[44px]" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, flexShrink: 0 }}>✕</button>
-        </div>
-        {voucher
-          ? <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} />
-          : <LedgerVouchers name={ledger} branch={branch} from={from} to={to} onPick={(f) => f?.kind === 'voucher' && setVoucher({ id: f.id, vno: f.vno })} />}
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════ TRIAL BALANCE ════════════════════════════════ */
-export function TrialBalanceLive({ branch }) {
-  const cur = curOf(branch);
-  const [from, setFrom] = useState(todayISO);
-  const [to, setTo] = useState(todayISO);
-  const [view, setView] = useState('detailed'); // detailed (4-col) | summary (closing only)
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(1000); // show the whole ledger by default; pager still kicks in past 1000
-  const [drill, setDrill] = useState(null); // ledger name
-  const q = useTrialBalance(branch, { from, to });
-
-  // Normalise: a not-yet-redeployed backend returns only debit/credit (= closing
-  // on side). Map that onto the new columns so the screen still works.
-  const rows = useMemo(() => (q.data?.rows || []).map((r) => (
-    r.closingDebit != null || r.closingCredit != null
-      ? r
-      : { ...r, openingDebit: 0, openingCredit: 0, closingDebit: r.debit || 0, closingCredit: r.credit || 0, debit: 0, credit: 0 }
-  )), [q.data]);
-
-  const term = search.trim().toLowerCase();
-  const filtered = useMemo(() => (term
-    ? rows.filter((r) => `${r.ledger} ${r.group} ${r.code || ''}`.toLowerCase().includes(term))
-    : rows), [rows, term]);
-
-  const T = useMemo(() => {
-    const s = (k) => Math.round(filtered.reduce((a, r) => a + (r[k] || 0), 0));
-    return { openDr: s('openingDebit'), openCr: s('openingCredit'), dr: s('debit'), cr: s('credit'), clDr: s('closingDebit'), clCr: s('closingCredit') };
-  }, [filtered]);
-  const groupTotals = useMemo(() => {
-    const m = new Map();
-    for (const r of filtered) {
-      if (!m.has(r.group)) m.set(r.group, { clDr: 0, clCr: 0, n: 0 });
-      const g = m.get(r.group); g.clDr += r.closingDebit || 0; g.clCr += r.closingCredit || 0; g.n += 1;
-    }
-    return m;
-  }, [filtered]);
-
-  // Balanced banner reflects the FULL trial balance, not the searched subset —
-  // otherwise a search that hides one side would falsely read "out of balance".
-  const fullClDr = q.data?.totalClosingDebit != null ? q.data.totalClosingDebit : (q.data?.totalDebit || 0);
-  const fullClCr = q.data?.totalClosingCredit != null ? q.data.totalClosingCredit : (q.data?.totalCredit || 0);
-  const balanced = q.data ? Math.abs(fullClDr - fullClCr) < 1 : true;
-  const pageRows = useMemo(() => filtered.slice(page * pageSize, page * pageSize + pageSize), [filtered, page, pageSize]);
-
-  // Export / print share one column+row set (raw numbers, group on each row).
-  const expColumns = view === 'summary'
-    ? [{ key: 'group', label: 'Group' }, { key: 'ledger', label: 'Ledger' }, { key: 'closingDebit', label: `Closing Dr (${cur})`, num: true }, { key: 'closingCredit', label: `Closing Cr (${cur})`, num: true }]
-    : [{ key: 'group', label: 'Group' }, { key: 'code', label: 'Code' }, { key: 'ledger', label: 'Ledger' },
-       { key: 'openingDebit', label: `Opening Dr`, num: true }, { key: 'openingCredit', label: `Opening Cr`, num: true },
-       { key: 'debit', label: `Debit`, num: true }, { key: 'credit', label: `Credit`, num: true },
-       { key: 'closingDebit', label: `Closing Dr`, num: true }, { key: 'closingCredit', label: `Closing Cr`, num: true }];
-  const expRows = filtered.map((r) => ({ ...r, code: r.code || '' }));
-  const printRows = filtered.map((r) => { const o = { group: r.group, code: r.code || '', ledger: r.ledger }; for (const c of expColumns) if (c.num) o[c.key] = nfmt(r[c.key], localeOf(cur)); return o; });
-  const totalRow = view === 'summary'
-    ? { group: 'TOTAL', ledger: '', closingDebit: nfmt(T.clDr, localeOf(cur)), closingCredit: nfmt(T.clCr, localeOf(cur)) }
-    : { group: 'TOTAL', code: '', ledger: '', openingDebit: nfmt(T.openDr, localeOf(cur)), openingCredit: nfmt(T.openCr, localeOf(cur)), debit: nfmt(T.dr, localeOf(cur)), credit: nfmt(T.cr, localeOf(cur)), closingDebit: nfmt(T.clDr, localeOf(cur)), closingCredit: nfmt(T.clCr, localeOf(cur)) };
-  const sub = `${branchLabel(branch)} · ${filtered.length} ledgers · Closing Dr ${money(cur, T.clDr)} / Cr ${money(cur, T.clCr)}`;
-  const exportNow = () => filtered.length && exportToExcel(`trial-balance-${branchLabel(branch)}`, expColumns, expRows);
-  const printNow = () => filtered.length && openReportPrint('Trial Balance', sub, expColumns, printRows, totalRow);
-  // Feed the global Tally Export bar each ledger's closing balance (Dr/Cr → sign).
-  const tallyLedgers = useMemo(() => filtered.map((r) => {
-    const dr = Math.round(r.closingDebit || 0), crv = Math.round(r.closingCredit || 0);
-    return { name: r.ledger, parent: r.group, amount: dr >= crv ? dr : crv, drCr: dr >= crv ? 'Dr' : 'Cr' };
-  }), [filtered]);
-  useReportExport({ title: 'Trial Balance', kind: 'ledgers', rows: tallyLedgers, recommend: 'portrait' }, [tallyLedgers]);
-
-  // group-header bookkeeping while rendering the page slice
-  let lastGroup = null;
-
-  return (
-    <Page
-      wide={view === 'detailed'}
-      title="Trial Balance"
-      sub={sub}
-      right={<>
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(0); }} placeholder="Ledger / group…" />
-        <ModeToggle view={view} setView={setView} modes={[{ id: 'detailed', label: 'Detailed' }, { id: 'summary', label: 'Summary' }]} />
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} branch={branch} />
-        <ExportBtn onClick={exportNow} disabled={!filtered.length} />
-        <PrintBtn onClick={printNow} disabled={!filtered.length} />
-      </>}
-    >
-      {q.data && (balanced
-        ? <Banner tone="ok">✔ Trial Balance tallied — Closing Dr {money(cur, fullClDr)} = Cr {money(cur, fullClCr)}{term ? ' (full set)' : ''}</Banner>
-        : <Banner tone="err">⚠ Out of balance — Closing Dr {money(cur, fullClDr)} ≠ Cr {money(cur, fullClCr)}</Banner>)}
-      <State q={q} empty={filtered.length === 0}>
-        <Table>
-          <thead><tr style={headRow}>
-            <Th>Ledger Account</Th>
-            {view === 'detailed' && <><Th right>Opening Dr</Th><Th right>Opening Cr</Th><Th right>Debit</Th><Th right>Credit</Th></>}
-            <Th right>Closing Dr ({cur})</Th><Th right>Closing Cr ({cur})</Th>
-          </tr></thead>
-          <tbody>
-            {pageRows.map((l, i) => {
-              const showGroup = l.group !== lastGroup;
-              lastGroup = l.group;
-              const gt = groupTotals.get(l.group);
-              return (
-                <React.Fragment key={(l.code || '') + l.ledger + i}>
-                  {showGroup && (
-                    <tr style={{ background: '#eef1f7' }}>
-                      <td style={{ padding: '7px 14px', fontWeight: 800, color: DARK, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{l.group} <span style={{ color: DIM, fontWeight: 600 }}>· {gt?.n} ledger(s)</span></td>
-                      {view === 'detailed' && <td colSpan={4} />}
-                      <td style={{ padding: '7px 14px', ...num, fontWeight: 700, color: DIM, fontSize: 10.5 }}>{money(cur, gt?.clDr)}</td>
-                      <td style={{ padding: '7px 14px', ...num, fontWeight: 700, color: DIM, fontSize: 10.5 }}>{money(cur, gt?.clCr)}</td>
-                    </tr>
-                  )}
-                  <tr style={{ ...rowBg(i), cursor: 'pointer' }}
-                    {...clickable(() => setDrill(l.ledger))}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
-                    <td style={{ padding: '8px 14px 8px 26px', color: BLUE, fontWeight: 600 }}>{l.ledger}{l.code ? <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{l.code}</span> : null} <span style={{ color: '#9197a3', fontSize: 10 }}>›</span></td>
-                    {view === 'detailed' && <>
-                      <td style={{ padding: '8px 14px', ...num, color: l.openingDebit > 0 ? DARK : '#9197a3' }}>{money(cur, l.openingDebit)}</td>
-                      <td style={{ padding: '8px 14px', ...num, color: l.openingCredit > 0 ? DARK : '#9197a3' }}>{money(cur, l.openingCredit)}</td>
-                      <td style={{ padding: '8px 14px', ...num, color: l.debit > 0 ? BLUE : '#9197a3' }}>{money(cur, l.debit)}</td>
-                      <td style={{ padding: '8px 14px', ...num, color: l.credit > 0 ? RED : '#9197a3' }}>{money(cur, l.credit)}</td>
-                    </>}
-                    <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingDebit > 0 ? DARK : '#9197a3' }}>{money(cur, l.closingDebit)}</td>
-                    <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingCredit > 0 ? DARK : '#9197a3' }}>{money(cur, l.closingCredit)}</td>
-                  </tr>
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-          <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
-            <td style={{ padding: '10px 14px', fontWeight: 700, color: GOLD, fontSize: 12 }}>TOTAL — {filtered.length} ledgers</td>
-            {view === 'detailed' && <>
-              <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.openDr)}</td>
-              <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.openCr)}</td>
-              <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.dr)}</td>
-              <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.cr)}</td>
-            </>}
-            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff', fontSize: 13 }}>{money(cur, T.clDr)}</td>
-            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: GOLD, fontSize: 13 }}>{money(cur, T.clCr)}</td>
-          </tr></tfoot>
-        </Table>
-        <Pagination total={filtered.length} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} unit="ledgers" />
-      </State>
-      {drill && <LedgerDrill branch={branch} ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
-    </Page>
-  );
-}
 
 /* ════════════════════ DRILL-DOWN: group → ledger → voucher (editable) ═══ */
 const tapRow = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', minHeight: 44, cursor: 'pointer', borderBottom: '1px solid #dfe2e7', WebkitTapHighlightColor: 'transparent' };
@@ -904,208 +723,6 @@ export function buildCaptureSheet(vouchers, { tab, tag, linkIndex, bookingByLink
 }
 
 
-/* ════════════════════ INVOICE-WISE GP (by Link No) ═════════════════ */
-export function InvoiceGPLive({ branch }) {
-  const cur = curOf(branch);
-  const [from, setFrom] = useState(monthStartISO);
-  const [to, setTo] = useState(todayISO);
-  const [open, setOpen] = useState(null);     // expanded row index
-  const [view, setView] = useState('summary'); // summary | detailed
-  // The expanded row is tracked by array index, but `rows` is re-derived when the
-  // date range changes — so a stale index would expand the wrong (or a missing)
-  // file. Collapse on any filter change to keep the open row honest.
-  useEffect(() => { setOpen(null); }, [from, to]);
-  // Fetch all; date filtering is client-side (Tally dates are mixed-format strings).
-  const q = useInvoiceGP(branch);
-  // Underlying vouchers (with full Tally bifurcation in line.meta) → drill + export.
-  const salesQ = useSalesRegister(branch);
-  const purchQ = usePurchaseRegister(branch);
-  const salesRows = salesQ.data || [];
-  const purchRows = purchQ.data || [];
-  const d = q.data;
-  const allGpRows = d?.rows || [];
-  const STATUS = {
-    matched: { c: GREEN, t: 'matched' }, 'no-cost': { c: '#d97706', t: 'no cost' }, 'no-sale': { c: RED, t: 'no sale' },
-    'sale (no link)': { c: BLUE, t: 'sale · no link' }, 'purchase (no link)': { c: '#d97706', t: 'purchase · no link' },
-  };
-
-  // Index underlying vouchers by Link No and by voucher no.
-  const byLink = useMemo(() => {
-    const m = new Map();
-    const add = (v, side) => {
-      const k = (v.linkNo || '').trim(); if (!k) return;
-      if (!m.has(k)) m.set(k, { sales: [], purchases: [] });
-      m.get(k)[side].push(v);
-    };
-    salesRows.forEach((v) => add(v, 'sales'));
-    purchRows.forEach((v) => add(v, 'purchases'));
-    return m;
-  }, [salesRows, purchRows]);
-  const byVno = useMemo(() => {
-    const m = new Map();
-    [...salesRows, ...purchRows].forEach((v) => m.set(v.vno, v));
-    return m;
-  }, [salesRows, purchRows]);
-  const underlyingFor = (r) => {
-    if (r.linked && r.linkNo) return byLink.get(r.linkNo) || { sales: [], purchases: [] };
-    const v = byVno.get(r.ref);
-    if (!v) return { sales: [], purchases: [] };
-    return v.category === 'sale' ? { sales: [v], purchases: [] } : { sales: [], purchases: [v] };
-  };
-  // Fall back to underlying voucher fields so the table is fully populated even
-  // against an older backend that didn't return date on the GP rows.
-  const fields = (r) => {
-    const u = underlyingFor(r);
-    return {
-      u,
-      ref: r.ref || r.linkNo || (Array.isArray(r.vnos) ? r.vnos.join(' · ') : '') || '—',
-      date: r.date || u.sales[0]?.date || u.purchases[0]?.date || '—',
-      customer: r.customer || u.sales[0]?.party || '—',
-      supplier: r.supplier || u.purchases[0]?.party || '—',
-    };
-  };
-
-  // Date-filter the GP rows client-side (resolve the file's date from the row or
-  // its underlying voucher), then recompute the totals for the filtered set.
-  const gpDate = (r) => { const u = underlyingFor(r); return r.date || u.sales[0]?.date || u.purchases[0]?.date || ''; };
-  const rows = useMemo(() => allGpRows.filter((r) => dateInRange(gpDate(r), from, to)), [allGpRows, from, to, byLink, byVno]);
-  const linkedCount = rows.filter((r) => r.linked).length;
-  const unlinked = { sales: rows.filter((r) => r.status === 'sale (no link)').length, purchases: rows.filter((r) => r.status === 'purchase (no link)').length };
-  const totals = useMemo(() => {
-    const sale = Math.round(rows.reduce((s, r) => s + (r.sale || 0), 0) * 100) / 100;
-    const cost = Math.round(rows.reduce((s, r) => s + (r.cost || 0), 0) * 100) / 100;
-    const gp = Math.round((sale - cost) * 100) / 100;
-    return { sale, cost, gp, gpPct: sale > 0 ? Math.round((gp / sale) * 10000) / 100 : 0 };
-  }, [rows]);
-
-  const exportSummary = () => {
-    if (!rows.length) return;
-    const columns = [
-      { key: 'ref', label: 'Link No / Voucher' }, { key: 'date', label: 'Date' },
-      { key: 'customer', label: 'Customer' }, { key: 'supplier', label: 'Supplier' },
-      { key: 'sale', label: 'Sale' }, { key: 'cost', label: 'Cost' },
-      { key: 'gp', label: 'Gross Profit' }, { key: 'gpPct', label: 'GP %' },
-      { key: 'status', label: 'Status' }, { key: 'vouchers', label: 'Vouchers' },
-    ];
-    const sheet = rows.map((r) => {
-      const f = fields(r);
-      return {
-        ref: f.ref, date: f.date, customer: f.customer === '—' ? '' : f.customer, supplier: f.supplier === '—' ? '' : f.supplier,
-        sale: r.sale, cost: r.cost, gp: r.gp, gpPct: r.gpPct, status: r.status,
-        vouchers: Array.isArray(r.vnos) ? r.vnos.join(' · ') : '',
-      };
-    });
-    exportToExcel(`gross-profit-${branchLabel(branch)}`, columns, sheet);
-  };
-  // Flatten every GP file into its underlying sale & purchase vouchers, tagged
-  // with the file's GP — drives both the inline Detailed table and the export.
-  const detailSheet = useMemo(() => {
-    const list = [];
-    rows.forEach((r) => {
-      const u = r.linked && r.linkNo ? (byLink.get(r.linkNo) || { sales: [], purchases: [] })
-        : (() => { const v = byVno.get(r.ref); return v ? (v.category === 'sale' ? { sales: [v], purchases: [] } : { sales: [], purchases: [v] }) : { sales: [], purchases: [] }; })();
-      u.sales.forEach((v) => list.push({ ...v, __lead: { gpFile: r.ref || r.linkNo, side: 'Sale', fileGP: r.gp, fileGPpct: r.gpPct } }));
-      u.purchases.forEach((v) => list.push({ ...v, __lead: { gpFile: r.ref || r.linkNo, side: 'Cost', fileGP: r.gp, fileGPpct: r.gpPct } }));
-    });
-    const lead = [
-      { key: 'gpFile', label: 'GP File / Link No' }, { key: 'side', label: 'Side' },
-      { key: 'fileGP', label: 'File GP' }, { key: 'fileGPpct', label: 'File GP %' },
-    ];
-    return vouchersToSheet(list, lead);
-  }, [rows, byLink, byVno]);
-  const exportDetailed = () => {
-    if (!detailSheet.rows.length) return;
-    exportToExcel(`gross-profit-detailed-${branchLabel(branch)}`, detailSheet.columns, detailSheet.rows);
-  };
-
-  const detailReady = !salesQ.isLoading && !purchQ.isLoading;
-  const SideTag = ({ tone, children }) => (
-    <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.5px', padding: '2px 8px', borderRadius: 4, marginBottom: 8, display: 'inline-block',
-      background: (tone === 'sale' ? BLUE : '#d97706') + '18', color: tone === 'sale' ? BLUE : '#d97706' }}>{children}</span>
-  );
-
-  return (
-    <Page
-      wide={view === 'detailed'}
-      title="Invoice-wise Gross Profit"
-      sub={`${branchLabel(branch)} · ${rows.length} rows (${linkedCount} linked files) · ${view === 'detailed' ? 'every sale & purchase with full base-fare / tax bifurcation — scroll right' : 'click a row for the full base-fare / tax bifurcation'}`}
-      right={<>
-        <ViewToggle view={view} setView={setView} />
-        <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} branch={branch} />
-        <ExportBtn onClick={exportSummary} disabled={!rows.length} label="Export GP" />
-        <ExportBtn onClick={exportDetailed} disabled={!detailSheet.rows.length || !detailReady} label="Export Full Detail" />
-      </>}
-    >
-      {(unlinked.sales > 0 || unlinked.purchases > 0) && (
-        <Banner tone="info">{unlinked.sales} sale(s) and {unlinked.purchases} purchase(s) have no Link No — shown individually below. Give a sale and its purchase the same Link No to pair them into one file.</Banner>
-      )}
-      <State q={q} empty={rows.length === 0}>
-        {view === 'detailed' ? (
-          !detailReady ? <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading full detail…</div>
-            : <DetailedTable columns={detailSheet.columns} rows={detailSheet.rows} />
-        ) : (
-        <Table>
-          <thead><tr style={headRow}>
-            <Th>Link No / Voucher</Th><Th>Date</Th><Th>Customer</Th><Th>Supplier</Th><Th right>Sale</Th><Th right>Cost</Th><Th right>GP</Th><Th right>GP %</Th><Th>Status</Th>
-          </tr></thead>
-          <tbody>
-            {rows.map((r, i) => {
-              const s = STATUS[r.status] || { c: DIM, t: r.status };
-              const f = fields(r);
-              const isOpen = open === i;
-              return (
-                <React.Fragment key={r.ref + '-' + i}>
-                  <tr style={{ ...rowBg(i), cursor: 'pointer', background: isOpen ? '#eef4ff' : rowBg(i).background }} {...clickable(() => setOpen(isOpen ? null : i))}>
-                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontSize: 10.5, color: r.linked ? '#6b21a8' : '#64748b', fontWeight: 700 }}>
-                      <span style={{ color: DIM, marginRight: 5 }}>{isOpen ? '▾' : '▸'}</span>{f.ref}
-                    </td>
-                    <td style={{ padding: '8px 12px', color: DIM, whiteSpace: 'nowrap' }}>{f.date}</td>
-                    <td style={{ padding: '8px 12px', color: DARK }}>{f.customer}</td>
-                    <td style={{ padding: '8px 12px', color: DARK }}>{f.supplier}</td>
-                    <td style={{ padding: '8px 12px', ...num }}>{money(cur, r.sale)}</td>
-                    <td style={{ padding: '8px 12px', ...num, color: '#d97706' }}>{money(cur, r.cost)}</td>
-                    <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: r.gp >= 0 ? GREEN : RED }}>{money(cur, r.gp)}</td>
-                    <td style={{ padding: '8px 12px', ...num, fontWeight: 700, color: r.gp >= 0 ? GREEN : RED }}>{r.gpPct}%</td>
-                    <td style={{ padding: '8px 12px' }}><span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 700, background: s.c + '22', color: s.c }}>{s.t}</span></td>
-                  </tr>
-                  {isOpen && (
-                    <tr>
-                      <td colSpan={9} style={{ padding: 0, background: '#f7f9fc', borderBottom: '2px solid #cdd1d8' }}>
-                        <div style={{ padding: 16 }}>
-                          <div style={{ fontSize: 11.5, fontWeight: 700, color: DARK, marginBottom: 12 }}>
-                            File {f.ref} — Sale {money(cur, r.sale)} − Cost {money(cur, r.cost)} = GP <span style={{ color: r.gp >= 0 ? GREEN : RED }}>{money(cur, r.gp)}</span> ({r.gpPct}%)
-                          </div>
-                          {f.u.sales.length === 0 && f.u.purchases.length === 0 && (
-                            <div style={{ fontSize: 11, color: DIM }}>{detailReady ? 'No underlying voucher detail found.' : 'Loading detail…'}</div>
-                          )}
-                          {f.u.sales.map((v) => (
-                            <div key={v.id || v.vno} style={{ marginBottom: 14 }}><SideTag tone="sale">SALE</SideTag><VoucherLines voucher={v} cur={cur} /></div>
-                          ))}
-                          {f.u.purchases.map((v) => (
-                            <div key={v.id || v.vno} style={{ marginBottom: 14 }}><SideTag tone="cost">PURCHASE / COST</SideTag><VoucherLines voucher={v} cur={cur} /></div>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </tbody>
-          <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
-            <td colSpan={4} style={{ padding: '9px 12px', fontWeight: 700, color: GOLD }}>TOTAL — {rows.length} rows</td>
-            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, totals.sale)}</td>
-            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, totals.cost)}</td>
-            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{money(cur, totals.gp)}</td>
-            <td style={{ padding: '9px 12px', ...num, fontWeight: 800, color: GOLD }}>{totals.gpPct}%</td>
-            <td />
-          </tr></tfoot>
-        </Table>
-        )}
-      </State>
-    </Page>
-  );
-}
 
 /* ════════════════════ CASH BOOK (live) ═════════════════════════════
    A true Tally Cash Book: the ledger account of a Cash-in-Hand ledger.
