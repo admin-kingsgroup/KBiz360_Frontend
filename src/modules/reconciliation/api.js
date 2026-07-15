@@ -67,9 +67,17 @@ export function unfreezeLedger({ branch, code, name, period, tier = 'month' }) {
   return apiPost('/api/reconciliation/ledger-unfreeze', { branch, code, name, period, tier });
 }
 // Inter-Branch pair freeze (no per-ledger cert — a branch-pair balance agreement).
+// One call → every pair's month-scoped agreement + freeze/signing state (avoids N× reconcile).
+export async function getIbFreezeAll({ period } = {}) {
+  try { return (await apiGet('/api/interbranch-reconciliation/freeze/status-all', { period }))?.data || []; }
+  catch { return []; }
+}
 export async function getIbFreeze({ branchA, branchB, period } = {}) {
   try { return (await apiGet('/api/interbranch-reconciliation/freeze', { branchA, branchB, period }))?.data || null; }
   catch { return null; }
+}
+export function ibUnfreeze({ branchA, branchB, period }) {
+  return apiPost('/api/interbranch-reconciliation/freeze/unfreeze', { branchA, branchB, period });
 }
 export function ibFreeze({ branchA, branchB, period }) {
   return apiPost('/api/interbranch-reconciliation/freeze', { branchA, branchB, period });

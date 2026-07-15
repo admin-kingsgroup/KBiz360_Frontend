@@ -26,7 +26,7 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
   const brCode = branch && (branch.code || branch);
 
   const refresh = useCallback(async () => {
-    if (!brCode || (!code && !name) || !period) { setSt(null); return; }
+    if (!brCode || brCode === 'ALL' || (!code && !name) || !period) { setSt(null); return; }
     setLoading(true);
     try { setSt(await getLedgerFreeze({ branch: brCode, code, name, period })); }
     finally { setLoading(false); }
@@ -34,7 +34,8 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  if (!brCode || (!code && !name) || !period) return null;
+  // Freeze is per single branch — hide on the consolidated ALL view (freeze would 400).
+  if (!brCode || brCode === 'ALL' || (!code && !name) || !period) return null;
 
   const un = st?.unreconciled || {};
   const label = ledgerLabel || name || code;

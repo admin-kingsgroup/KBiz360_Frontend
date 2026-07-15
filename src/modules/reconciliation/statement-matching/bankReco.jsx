@@ -368,7 +368,7 @@ export function BankReco({branch}){
           </div>
 
           {/* Freeze & Certify this bank ledger for the month (blocks revoke/edit once frozen) */}
-          <ReconFreezePanel branch={branch} code={(bankLedgers.find(b=>b.name===ledger)||{}).code} ledgerLabel={ledger}
+          <ReconFreezePanel branch={branch} code={(bankLedgers.find(b=>b.name===ledger)||{}).code} name={ledger} ledgerLabel={ledger}
             defaultPeriod={to ? to.slice(0,7) : undefined} currency={bankCcy} statementBalance={summary?.bankBalance} />
 
           {/* Manual-match action bar */}

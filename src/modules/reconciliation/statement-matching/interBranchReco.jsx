@@ -9,21 +9,27 @@
    accountantWorkspace/accountantWorkspace.jsx (MENU_RECONCILIATION ▸
    Statement Matching ▸ "Inter-Branch Reconciliation").
    ════════════════════════════════════════════════════════════════════ */
-import { useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Coins, Scale, Snowflake, Lock } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { AlertTriangle, CheckCircle2, Coins, Scale, Snowflake, Lock, PenLine } from 'lucide-react';
 import { bc } from '../../../core/styles';
 import { toast } from '../../../core/ux/toast';
 import { confirmDialog } from '../../../core/ux/confirm';
 import { useInterBranchReco, useInterBranchLinks } from '../../../core/useInterBranchReco';
 import { C, card, money, Shell, th, td, rnum, Table, Tile, Row, aBtn } from '../../accountantWorkspace/shared';
 import { wbBadge } from './shared';
-import { getIbFreeze, ibFreeze, ibFreezeSign, ibFreezeReopen } from '../api';
+import { getIbFreezeAll, ibFreeze, ibFreezeSign, ibUnfreeze, ibFreezeReopen } from '../api';
 
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const pairKey = (a, b) => [a, b].sort().join('::');
 
 export function InterBranchReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const [period, setPeriod] = useState(thisMonth());
+  // Freeze state for EVERY pair this month in ONE reconcile (not N× per cell).
+  const [freezeAll, setFreezeAll] = useState([]);
+  const loadFreeze = useCallback(async () => { setFreezeAll(await getIbFreezeAll({ period })); }, [period]);
+  useEffect(() => { loadFreeze(); }, [loadFreeze]);
+  const freezeMap = useMemo(() => { const m = {}; for (const s of freezeAll) m[s.pairId] = s; return m; }, [freezeAll]);
   const q = useInterBranchReco();
   const raw = q.data || { pairs: [], totals: {} };
   // A specific top-bar branch scopes the reco to pairs INVOLVING that branch;
@@ -70,7 +76,7 @@ export function InterBranchReco({ branch }) {
               <td style={{ ...td, ...rnum }}>{money(cur, p.bReceivableFromA)}</td>
               <td style={{ ...td, ...rnum, fontWeight: 700, color: p.matched ? C.dim : C.red }}>{money(cur, Math.abs(p.difference))}</td>
               <td style={td}><span style={wbBadge(p.matched ? 'reconciled' : 'differences')}>{p.matched ? 'reconciled' : 'mismatch'}</span></td>
-              <td style={td}><IbFreezeCell branchA={p.branchA} branchB={p.branchB} period={period} agrees={p.matched} /></td>
+              <td style={td}><IbFreezeCell branchA={p.branchA} branchB={p.branchB} period={period} st={freezeMap[pairKey(p.branchA, p.branchB)]} onChanged={loadFreeze} /></td>
             </tr>
           ))}
         </tbody>
@@ -84,48 +90,45 @@ export function InterBranchReco({ branch }) {
   );
 }
 
-// Per-pair FREEZE control — freeze the branch-pair for the chosen month (refused
-// unless the two agree), sign the certify chain, or un-freeze/re-open. Once frozen,
-// the pair's INB vouchers for that month can no longer be revoked/edited.
-function IbFreezeCell({ branchA, branchB, period, agrees }) {
-  const [st, setSt] = useState(null);
+// Per-pair FREEZE control — renders from the parent's ONE month reconcile (`st`) and
+// mutates via the parent's `onChanged` refresh. Freeze is gated on the MONTH-scoped
+// agreement (`st.agrees`), not the all-time pair status. Frozen (not certified) →
+// soft Un-freeze (whoever froze); Certified → Director/Owner Re-open (reason).
+function IbFreezeCell({ branchA, branchB, period, st, onChanged }) {
   const [busy, setBusy] = useState(false);
-
-  const refresh = useCallback(async () => {
-    setSt(await getIbFreeze({ branchA, branchB, period }));
-  }, [branchA, branchB, period]);
-  useEffect(() => { refresh(); }, [refresh]);
 
   const run = async (fn, okMsg) => {
     setBusy(true);
-    try { await fn(); toast(okMsg, 'success'); await refresh(); }
+    try { await fn(); toast(okMsg, 'success'); await onChanged(); }
     catch (e) { toast(e?.message || 'Action failed', 'error'); }
     finally { setBusy(false); }
   };
   const doFreeze = () => run(() => ibFreeze({ branchA, branchB, period }), `Frozen ${branchA}↔${branchB} · ${period}`);
   const doSign = () => run(() => ibFreezeSign({ branchA, branchB, period }), `Signed ${branchA}↔${branchB}`);
+  const doUnfreeze = () => run(() => ibUnfreeze({ branchA, branchB, period }), `Un-frozen ${branchA}↔${branchB}`);
   const doReopen = async () => {
-    const { confirmed, reason } = await confirmDialog({ title: `Re-open ${branchA}↔${branchB}?`, message: 'Releases the freeze so this month can change again.', reasonRequired: true, reasonLabel: 'Reason', confirmLabel: 'Re-open' });
+    const { confirmed, reason } = await confirmDialog({ title: `Re-open ${branchA}↔${branchB}?`, message: 'Releases the certified freeze so this month can change again.', reasonRequired: true, reasonLabel: 'Reason', confirmLabel: 'Re-open' });
     if (!confirmed) return;
     run(() => ibFreezeReopen({ branchA, branchB, period, reason }), `Re-opened ${branchA}↔${branchB}`);
   };
 
-  if (!st) return <span style={{ fontSize: 10, color: C.dim }}>…</span>;
-  const frozen = !!st.frozen; const certified = !!st.certified;
+  // No month-scoped state for this pair (no activity + no freeze record) → nothing to freeze.
+  if (!st) return <span style={{ fontSize: 10, color: C.dim }} title="no inter-branch activity this month">—</span>;
+  const { frozen, certified, agrees, signatures, nextSigner } = st;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
       {certified
         ? <span style={{ fontSize: 10, fontWeight: 800, color: '#0f2f5c' }}><Lock size={10} style={{ verticalAlign: -1 }} /> Certified</span>
         : frozen
-          ? <span style={{ fontSize: 10, fontWeight: 800, color: '#185FA5' }}><Snowflake size={10} style={{ verticalAlign: -1 }} /> Frozen</span>
+          ? <span style={{ fontSize: 10, fontWeight: 800, color: '#185FA5' }}><Snowflake size={10} style={{ verticalAlign: -1 }} /> Frozen{signatures ? ` · ${signatures} signed` : ''}</span>
           : <span style={{ fontSize: 10, color: C.dim }}>Open</span>}
       {!frozen && !certified && (
-        <button onClick={doFreeze} disabled={!agrees || busy} title={agrees ? '' : 'the two branches must agree first'}
+        <button onClick={doFreeze} disabled={!agrees || busy} title={agrees ? '' : 'the two branches must agree this month first'}
           style={{ ...aBtn(C.blue), opacity: (agrees && !busy) ? 1 : 0.5 }}>Freeze</button>
       )}
       {frozen && !certified && (<>
-        <button onClick={doSign} disabled={busy} style={{ ...aBtn(C.green), opacity: busy ? 0.6 : 1 }}>Sign</button>
-        <button onClick={doReopen} disabled={busy} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Un-freeze</button>
+        {nextSigner && <button onClick={doSign} disabled={busy} style={{ ...aBtn(C.green), opacity: busy ? 0.6 : 1 }}><PenLine size={11} style={{ verticalAlign: -2 }} /> Sign as {nextSigner}</button>}
+        <button onClick={doUnfreeze} disabled={busy} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Un-freeze</button>
       </>)}
       {certified && <button onClick={doReopen} disabled={busy} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Re-open</button>}
     </div>
