@@ -46,28 +46,26 @@ export function TargetsBudgets({ branches = DEFAULT_BRANCHES }) {
     <div className="grid gap-4">
       <PageSection title="Propose a target or budget">
         {msg ? <div role="status" className="mb-2.5 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
-        <form onSubmit={submit} aria-label="Propose a target or budget" className="grid max-w-[460px] gap-2.5">
-          <div className="flex gap-2.5">
-            <FormField label="Branch" className="flex-1">
+        <form onSubmit={submit} aria-label="Propose a target or budget" className="grid gap-3">
+          <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4">
+            <FormField label="Branch">
               <Select aria-label="Branch" value={branch} onChange={(e) => setBranch(e.target.value)}>
                 {branches.map((b) => <option key={b} value={b}>{b === 'ALL' ? 'ALL (group)' : b}</option>)}
               </Select>
             </FormField>
-            <FormField label="Period" className="w-[110px]">
+            <FormField label="Period">
               <Input aria-label="Period (YYYY-MM)" placeholder="YYYY-MM" value={period} onChange={(e) => setPeriod(e.target.value)} />
             </FormField>
-          </div>
-          <div className="flex gap-2.5">
-            <FormField label="Metric" className="flex-1">
+            <FormField label="Metric">
               <Select aria-label="Metric" value={metric} onChange={(e) => setMetric(e.target.value)}>
                 {TARGET_METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
               </Select>
             </FormField>
-            <FormField label="Amount" className="flex-1">
+            <FormField label="Amount">
               <Input aria-label="Amount" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="tabular-nums" />
             </FormField>
           </div>
-          <FormField label="Note (optional)">
+          <FormField label="Note (optional)" className="max-w-md">
             <Input aria-label="Note" value={note} onChange={(e) => setNote(e.target.value)} />
           </FormField>
           <Button type="submit" variant="primary" size="sm" disabled={!valid} className="justify-self-start">
