@@ -20,7 +20,7 @@ describe('<NameMatcherPane>', () => {
     render(<NameMatcherPane rows={rows} cur="₹" />);
 
     // summary line
-    expect(screen.getByText(/in ERP with no Tally name/i)).toBeInTheDocument();
+    expect(screen.getByText(/in ERP with no Tally balance this period/i)).toBeInTheDocument();
 
     // TDS split → both section ledgers shown
     expect(screen.getByText('194J-TDS on Professional Fees')).toBeInTheDocument();
