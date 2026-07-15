@@ -2,7 +2,7 @@
 // carries the two tier tie-outs, its routes resolve, and the board renders the
 // three side-by-side views from mocked tie-out data (incl. an only-in-Tally row).
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 jest.mock('../api', () => ({
@@ -612,6 +612,42 @@ describe('Tally Reconciliation · tie-out board render', () => {
     // By ledger → the three legs render as three separate rows again.
     fireEvent.click(screen.getByRole('button', { name: /^By ledger$/ }));
     expect(screen.getByText('SVC2 CGST Output [BOM]')).toBeInTheDocument();
+  });
+
+  test('tab badges — Unmatched Entries badges amount-off ledgers (counts.off); one-sided ledgers badge Ledger Matcher, no phantom Unmatched-Entries count', async () => {
+    const { getTieOut, getDefects } = require('../api');
+    // 0 amount-off, but 3 one-sided ledgers (2 ERP-only + 1 Tally-only) — all whole-ledger gaps.
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', periodEnd: '2026-07-31',
+      counts: { total: 5, tied: 2, off: 0, onlyErp: 2, onlyTally: 1, absDiff: 0, netProfitErp: 0, netProfitTally: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 5 },
+      rows: [
+        { ledger: 'ERP Only A', code: 'E1', group: 'Sundry Debtors', parentGroup: 'Sundry Debtors', statement: 'BS', nature: 'asset', erp: 5000, tally: null, diff: 5000, status: 'only-erp', erpLedger: 'ERP Only A' },
+        { ledger: 'ERP Only B', code: 'E2', group: 'Sundry Debtors', parentGroup: 'Sundry Debtors', statement: 'BS', nature: 'asset', erp: 3000, tally: null, diff: 3000, status: 'only-erp', erpLedger: 'ERP Only B' },
+        { ledger: 'Tally Only C', code: 'T1', group: 'Sundry Creditors', parentGroup: 'Sundry Creditors', statement: 'BS', nature: 'liability', erp: null, tally: -2000, diff: 2000, status: 'only-tally', tallyLedger: 'Tally Only C' },
+      ],
+    });
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 3,
+      summary: { total: 3, byType: { 'ledger-missing-tally': 2, 'ledger-missing-erp': 1 } },
+      defects: [
+        { ledger: 'ERP Only A', date: '', ref: '', desc: 'no daybook', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 5000, variance: 5000, side: 'balance' },
+        { ledger: 'ERP Only B', date: '', ref: '', desc: 'no daybook', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 3000, variance: 3000, side: 'balance' },
+        { ledger: 'Tally Only C', date: '', ref: '', desc: 'no erp side', type: 'ledger-missing-erp', label: 'Ledger absent in ERP', amount: -2000, variance: -2000, side: 'balance' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('ERP Only A'); // getTieOut resolved (TB tab renders the rows) → badges computed
+    // Ledger Matcher tab badges the 3 one-sided ledgers.
+    const ledgerTab = screen.getByRole('button', { name: /Ledger Matcher/ });
+    expect(within(ledgerTab).getByText('3')).toBeInTheDocument();
+    // Unmatched Entries tab shows NO numeric badge (counts.off === 0) — no phantom count.
+    const entriesTab = screen.getByRole('button', { name: /Unmatched Entries/ });
+    expect(within(entriesTab).queryByText('3')).not.toBeInTheDocument();
+    // Clicking it → the empty state redirects to Ledger Matcher (never "N" over an empty panel).
+    fireEvent.click(entriesTab);
+    expect(await screen.findByText('No unmatched entries')).toBeInTheDocument();
+    expect(screen.getByText(/whole-ledger gaps/i)).toBeInTheDocument();
   });
 
   test('Unmatched Entries — a side with no rows shows the clean ✓ state; ledger-level rename/stranded cues do NOT appear here', async () => {

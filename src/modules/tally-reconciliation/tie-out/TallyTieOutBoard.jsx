@@ -244,10 +244,16 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // A certified (signed/locked) period is frozen — re-upload/Clear are blocked by the
   // BE until re-opened; gate the upload controls proactively (not just via the 409).
   const periodCertified = data?.certStatus === 'signed' || data?.certStatus === 'locked';
-  // One authoritative "off" count (every non-tied ledger), used by the KPI, the
-  // Defects tab badge AND the certificate gate — never diverge.
+  // One authoritative "off" count (every non-tied ledger), used by the KPI row and the
+  // certificate gate — never diverge. The two tab badges SPLIT it by where the fix lives:
+  // Unmatched Entries badges the amount-off ledgers (counts.off — voucher-level, drillable),
+  // Ledger Matcher badges the one-sided ledgers (nameOrphans); together they sum to offTotal.
+  // (A one-sided ledger with no Day Book only yields a whole-ledger gap, which lives in the
+  // Ledger Matcher tab — so badging Unmatched Entries with offTotal would show a count for a
+  // tab that renders empty.)
   const offTotal = counts.offTotal ?? ((counts.off || 0) + (counts.onlyErp || 0) + (counts.onlyTally || 0));
-  // Unmatched ledger NAMES (present on one side only) — the Name Matcher tab's badge.
+  const offAmount = counts.off || 0;                                  // amount-off ledgers → Unmatched Entries badge
+  // Unmatched ledger NAMES (present on one side only) — the Ledger Matcher tab's badge.
   const nameOrphans = (counts.onlyErp || 0) + (counts.onlyTally || 0);
   // Name/group corrections owed in Tally (the ledger's amount may already tie, but by
   // policy its Tally name/group must match ERP before certifying). `blocking` = the
@@ -758,7 +764,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           <button key={k} type="button" onClick={() => setTab(k)}
             className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-semibold ${tab === k ? 'border-accent text-accent' : 'border-transparent text-ink-muted hover:text-ink'}`}>
             {k === 'defects' && <AlertTriangle size={14} aria-hidden="true" />}{lbl}
-            {k === 'defects' && offTotal > 0 ? <span className="rounded-full bg-danger/15 px-1.5 text-xs font-bold text-danger">{offTotal}</span> : null}
+            {k === 'defects' && offAmount > 0 ? <span className="rounded-full bg-danger/15 px-1.5 text-xs font-bold text-danger">{offAmount}</span> : null}
             {k === 'names' && nameOrphans > 0 ? <span className="rounded-full bg-warning/15 px-1.5 text-xs font-bold text-warning">{nameOrphans}</span> : null}
           </button>
         ))}
@@ -919,8 +925,14 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
   if (loading) return <LoadingState label="Scanning off ledgers for unmatched entries…" />;
   if (error) return <ErrorState title="Couldn’t load Unmatched Entries" message="The service didn’t respond." onRetry={onRetry} />;
   if (!entries.length) {
+    // offLedgers > 0 with no voucher-tier entries ⇒ every off ledger is a whole-ledger gap
+    // (a ledger absent on one side) — its home is the Ledger Matcher tab, not here. Say so
+    // rather than implying nothing is off (which would contradict the KPI / gate).
+    const hasLedgerGaps = (data?.offLedgers || 0) > 0;
     return <EmptyState title="No unmatched entries"
-      hint="Every voucher reconciles ERP ↔ Tally — or there are no off ledgers this period. Whole-ledger name gaps (if any) are in the Ledger Matcher tab." />;
+      hint={hasLedgerGaps
+        ? 'No voucher is on only one side. The off ledgers this period are whole-ledger gaps (a ledger absent on one side) — fix those in the Ledger Matcher tab.'
+        : 'Every voucher reconciles ERP ↔ Tally. Whole-ledger name gaps (if any) are in the Ledger Matcher tab.'} />;
   }
   const notInErp = byType['missing-in-erp'];
   const notInTally = byType['missing-in-tally'];
