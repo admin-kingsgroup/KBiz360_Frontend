@@ -3,18 +3,24 @@
 // (→ Inter-Branch Sales), a transparent Service Fee (→ Service Fee Income, the
 // margin), IGST on the fee. Posts via the standard sale pipeline and registers an
 // open INB Link No the buying branch fetches into its SO/PO/GP purchase side.
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
-import { useCreateInb, useOpenInb } from '../../core/useInterBranchVoucher';
+import { useCreateInb, useOpenInb, usePairRate } from '../../core/useInterBranchVoucher';
 import { toast } from '../../core/ux/toast';
 
-const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
+const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8', amber: '#8a6d00', amberBg: '#fff7e0' };
 const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
 // Tax jurisdiction per branch (mirror of the backend). Same country (India) = IGST
 // taxable; different country = cross-border export (zero-rated) — EXCEPT BOM, which
 // bills IGST on its service fee even to an African branch (seller-side only).
 const COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+// Book currency per branch (mirror of backend taxRegime.BOOK_CCY): India → INR, Africa → USD.
+// When the two ends of an INB deal differ, the deal is CROSS-CURRENCY and needs a frozen FX
+// rate so the receiving branch books in its own currency.
+const BOOK_CCY = { BOM: 'INR', AMD: 'INR', BOMMB: 'INR', NBO: 'USD', DAR: 'USD', FBM: 'USD' };
+const bookCcyOf = (b) => BOOK_CCY[b] || 'INR';
+const CCY_SYM = { INR: '₹', USD: '$' };
 const inbTreatment = (from, to) => {
   const cf = COUNTRY[from] || 'IN'; const ct = COUNTRY[to] || 'IN';
   const crossBorder = cf !== ct;
@@ -36,7 +42,7 @@ export function InterBranchVoucher({ branch }) {
   const [form, setForm] = useState({
     toBranch: '', date: todayISO(), packageType: 'International',
     passenger: '', reference: '',
-    base: '', k3: '', taxes: '', serviceFee: '',
+    base: '', k3: '', taxes: '', serviceFee: '', fxRate: '',
   });
   const set = (k, v) => setForm((s) => ({ ...s, [k]: v }));
 
@@ -55,6 +61,33 @@ export function InterBranchVoucher({ branch }) {
   const igst = treatment.zeroRated ? 0 : r2(svc * taxRate / 100); // export → zero-rated; BOM cross-border → IGST
   const total = r2(fares + svc + igst);
 
+  // ── Cross-currency FX (INR-branch ↔ USD-branch) ─────────────────────────────
+  // The seller posts in ITS currency; when the buyer books in a different one the deal
+  // needs a frozen USD→INR rate so the buyer captures its own currency. Same-currency
+  // deals never see any of this.
+  const sellerCcy = bookCcyOf(fromBranch);
+  const buyerCcy = form.toBranch ? bookCcyOf(form.toBranch) : sellerCcy;
+  const crossCcy = !!form.toBranch && sellerCcy !== buyerCcy;
+  const rateQ = usePairRate(crossCcy ? 'USD' : null, crossCcy ? 'INR' : null, form.date);
+  const dailyRate = rateQ.data && rateQ.data.set ? Number(rateQ.data.rate) : null;
+  // Prefill the field from the daily rate once it loads (user can override); clear when the
+  // deal turns same-currency.
+  useEffect(() => {
+    if (!crossCcy) { if (form.fxRate !== '') set('fxRate', ''); return; }
+    if (form.fxRate === '' && dailyRate) set('fxRate', String(dailyRate));
+  }, [crossCcy, dailyRate]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fxRate = num(form.fxRate);
+  const convert = (amt, fromC, toC, rate) => {
+    if (fromC === toC) return r2(amt);
+    if (!(rate > 0)) return null;
+    if (fromC === 'USD' && toC === 'INR') return r2(amt * rate);
+    if (fromC === 'INR' && toC === 'USD') return r2(amt / rate);
+    return null;
+  };
+  const buyerTotal = crossCcy ? convert(total, sellerCcy, buyerCcy, fxRate) : null;
+  const buyerSym = CCY_SYM[buyerCcy] || '';
+  const fxMissing = crossCcy && !(fxRate > 0);
+
   const create = useCreateInb();
   const openQ = useOpenInb(branch); // INB legs others sent TO this branch (info)
   const incoming = openQ.data || [];
@@ -62,7 +95,7 @@ export function InterBranchVoucher({ branch }) {
   const inp = { padding: '6px 9px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12.5 };
   const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 9, padding: 14, marginBottom: 12 };
   const lbl = { fontSize: 11, color: C.dim, fontWeight: 700, display: 'block', marginBottom: 3 };
-  const valid = fromBranch && form.toBranch && form.date && total > 0;
+  const valid = fromBranch && form.toBranch && form.date && total > 0 && !fxMissing;
 
   const submit = () => {
     if (!valid) return;
@@ -75,6 +108,9 @@ export function InterBranchVoucher({ branch }) {
         { ledger: 'Inter-Branch Sales', amt: num(form.taxes), desc: 'Taxes', meta: { Taxes: num(form.taxes) } },
       ].filter((l) => l.amt),
       serviceFee: svc, taxRate, gstMode: 'inter',
+      // Freeze the FX quote on a cross-currency deal so the buyer branch books in its own
+      // currency (base=USD, quote=INR); omitted for same-currency deals.
+      ...(crossCcy ? { fx: { base: 'USD', quote: 'INR', rate: fxRate, date: form.date, fromCcy: sellerCcy, toCcy: buyerCcy, source: 'manual' } } : {}),
     }, {
       onSuccess: (res) => {
         toast(`Inter-branch sale posted · ${res?.inbLinkNo || ''}`, 'success');
@@ -125,6 +161,30 @@ export function InterBranchVoucher({ branch }) {
           <span style={{ marginLeft: 'auto', fontWeight: 800 }}>Total: {cur}{total.toLocaleString(loc)}</span>
         </div>
       </div>
+
+      {crossCcy && (
+        <div style={{ ...card, background: fxMissing ? C.amberBg : '#f4f8ff', border: `1px solid ${fxMissing ? C.amber : C.blue}` }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', marginBottom: 8 }}>
+            Inter-Branch FX · {sellerCcy} → {buyerCcy} ({form.toBranch} books in {buyerCcy})
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div><label style={lbl}>Rate — 1 USD = ₹</label>
+              <input type="number" min="0" step="0.0001" value={form.fxRate} onChange={(e) => set('fxRate', e.target.value)}
+                placeholder={dailyRate ? String(dailyRate) : '0'} style={{ ...inp, width: 130, textAlign: 'right' }} /></div>
+            <div style={{ fontSize: 11.5, color: C.dim }}>
+              {rateQ.isLoading ? 'Loading daily rate…'
+                : dailyRate ? <>Daily rate {form.date}: <b>1 USD = ₹{dailyRate.toLocaleString(localeOf('₹'))}</b></>
+                : <span style={{ color: C.amber }}>No daily USD→INR rate set for {form.date} — enter one to post.</span>}
+            </div>
+            <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: fxMissing ? C.amber : C.blue }}>
+              {fxMissing ? 'Set the FX rate' : <>Buyer books ≈ {buyerSym}{(buyerTotal || 0).toLocaleString(localeOf(buyerSym), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>}
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
+            Your legs post in {sellerCcy}; the frozen rate translates the deal so {form.toBranch}’s pending PO lands in {buyerCcy}. Books stay single-currency.
+          </div>
+        </div>
+      )}
 
       <div style={{ ...card, background: '#f7f9fc' }}>
         <div style={{ fontSize: 11, color: C.dim }}>Posts in {fromBranch || 'your branch'}:</div>

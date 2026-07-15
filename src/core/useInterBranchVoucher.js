@@ -22,6 +22,17 @@ export function useOpenInb(toBranch) {
   });
 }
 
+// FX rate for a currency pair on a date — used by the INB form to translate a
+// cross-currency deal (INR-branch ↔ USD-branch). Only fetches when both codes are set.
+export function usePairRate(from, to, date) {
+  return useQuery({
+    queryKey: ['forex', 'pair', from || '', to || '', date || ''],
+    queryFn: () => apiGet('/api/forex-rates/pair', { from, to, date }),
+    enabled: enabled() && !!from && !!to && from !== to,
+    staleTime: 60_000,
+  });
+}
+
 export function useInbReconcile(branch) {
   const code = branchCode(branch);
   return useQuery({

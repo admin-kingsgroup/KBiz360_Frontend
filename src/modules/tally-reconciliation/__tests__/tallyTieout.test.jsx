@@ -614,6 +614,29 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('SVC2 CGST Output [BOM]')).toBeInTheDocument();
   });
 
+  test('Unmatched Entries — blank-Vch-No Tally-only vouchers do NOT collapse; presence sections show Value, amount-differs shows Net Δ', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 3,
+      summary: { total: 3, byType: { 'missing-in-erp': 2, 'amount-mismatch': 1 } },
+      defects: [
+        // Two DISTINCT Tally-only vouchers, same date, NO voucherId, NO ref — must stay separate rows.
+        { ledger: 'Bank Charges', date: '2026-07-05', ref: '', desc: 'charge one', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: -300, side: 'tally' },
+        { ledger: 'Interest Paid', date: '2026-07-05', ref: '', desc: 'charge two', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: -700, side: 'tally' },
+        { ledger: 'Sales A/c', date: '2026-07-06', ref: 'SA/12', desc: 'amount off', type: 'amount-mismatch', label: 'Amount differs', amount: 250, variance: 250, side: 'both', voucherId: 'vv' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
+    await screen.findByText('Not in ERP');
+    // Two SEPARATE voucher rows (each a "(no voucher no)" placeholder) — never merged into one.
+    expect(screen.getAllByText('(no voucher no)').length).toBe(2);
+    // Presence section shows a "Value" column; the amount-differs section shows the signed "Net Δ".
+    expect(screen.getByText('Value')).toBeInTheDocument();
+    expect(screen.getByText('Net Δ')).toBeInTheDocument();
+  });
+
   test('tab badges — Unmatched Entries badges amount-off ledgers (counts.off); one-sided ledgers badge Ledger Matcher, no phantom Unmatched-Entries count', async () => {
     const { getTieOut, getDefects } = require('../api');
     // 0 amount-off, but 3 one-sided ledgers (2 ERP-only + 1 Tally-only) — all whole-ledger gaps.

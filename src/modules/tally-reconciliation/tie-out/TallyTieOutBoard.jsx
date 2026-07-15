@@ -914,17 +914,23 @@ const ENTRY_SECTIONS = [
 ];
 function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
   const defects = data?.defects || [];
-  // Voucher-level only — whole-ledger (master) gaps now live in the Ledger Matcher tab.
-  const entries = useMemo(() => defects.filter((d) => defectMeta(d.type).tier === 'voucher'), [defects]);
+  // Split the voucher-level defects by side. Whole-ledger (master) gaps live in the Ledger
+  // Matcher tab, so ONLY these three types render here — bucket directly by exact type so the
+  // header count and the rendered sections can never disagree (an unknown/master type is not
+  // an "unmatched entry" and is simply not shown, rather than counted-but-invisible).
   const byType = useMemo(() => {
     const m = { 'missing-in-erp': [], 'missing-in-tally': [], 'amount-mismatch': [] };
-    for (const d of entries) (m[d.type] || (m[d.type] = [])).push(d);
+    for (const d of defects) if (m[d.type]) m[d.type].push(d);
     return m;
-  }, [entries]);
+  }, [defects]);
+  const notInErp = byType['missing-in-erp'];
+  const notInTally = byType['missing-in-tally'];
+  const amountDiff = byType['amount-mismatch'];
+  const total = notInErp.length + notInTally.length + amountDiff.length;
 
   if (loading) return <LoadingState label="Scanning off ledgers for unmatched entries…" />;
   if (error) return <ErrorState title="Couldn’t load Unmatched Entries" message="The service didn’t respond." onRetry={onRetry} />;
-  if (!entries.length) {
+  if (!total) {
     // offLedgers > 0 with no voucher-tier entries ⇒ every off ledger is a whole-ledger gap
     // (a ledger absent on one side) — its home is the Ledger Matcher tab, not here. Say so
     // rather than implying nothing is off (which would contradict the KPI / gate).
@@ -934,9 +940,6 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
         ? 'No voucher is on only one side. The off ledgers this period are whole-ledger gaps (a ledger absent on one side) — fix those in the Ledger Matcher tab.'
         : 'Every voucher reconciles ERP ↔ Tally. Whole-ledger name gaps (if any) are in the Ledger Matcher tab.'} />;
   }
-  const notInErp = byType['missing-in-erp'];
-  const notInTally = byType['missing-in-tally'];
-  const amountDiff = byType['amount-mismatch'];
   return (
     <div className="grid gap-4">
       {/* summary + scope badge */}
@@ -946,7 +949,7 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
           <span className="rounded-full bg-warning/15 px-3 py-1 text-warning">Not in Tally: {notInTally.length}</span>
           {amountDiff.length > 0 && <span className="rounded-full bg-danger/10 px-3 py-1 text-danger">Amount differs: {amountDiff.length}</span>}
         </div>
-        <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data.offLedgers} off ledgers</span>
+        <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data?.offLedgers || 0} off ledgers</span>
       </div>
       {/* Two sides always shown (so a clean side reads as clean); the amount band only when present. */}
       <div className="grid gap-4">
@@ -961,31 +964,37 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
 // One voucher = many ledger legs, so the flat register lists the SAME voucher once per
 // off ledger — inflating the count and hiding that ONE fix clears MANY rows. Regroup the
 // voucher-tier legs by voucher: key on the ERP voucherId (reliable identity), else the
-// date+ref pair. Meta (type / link / party) is filled from whichever leg carries it — a
-// Tally-only leg has no ERP detail. Sorted MOST off-legs first, so the highest-leverage
-// fixes surface at the top.
+// date+voucher-no pair. When BOTH are absent (a Tally-only leg whose export carried no Vch
+// No) fall back to a per-leg key so genuinely distinct vouchers don't collapse into one row
+// (which would misreport the leg count / value / drill focus). Meta (type / link / party)
+// is filled from whichever leg carries it. `net` = signed balance impact of the captured
+// legs; `gross` = the voucher's value (the larger of the Dr / Cr side) — for a wholly-
+// missing (balanced) voucher `net` is ~0, so `gross` is what tells the reviewer its size.
+// Sorted MOST off-legs first, so the highest-leverage fixes surface at the top.
 function groupDefectsByVoucher(rows) {
   const map = new Map();
-  for (const d of rows) {
-    const key = d.voucherId || `${d.date || ''}|${d.ref || ''}`;
+  rows.forEach((d, i) => {
+    const key = d.voucherId || (d.ref ? `${d.date || ''}|${d.ref}` : `noref:${i}:${d.ledger || ''}`);
     let g = map.get(key);
     if (!g) {
       g = { key, ref: d.ref || '', date: d.date || '', vtype: '', sourceRef: '', party: '',
-        voucherId: d.voucherId || null, primaryLedger: d.ledger, legs: [], types: new Set(), net: 0, absMax: 0 };
+        voucherId: d.voucherId || null, primaryLedger: d.ledger, legs: [], types: new Set(), net: 0, sumPos: 0, sumNeg: 0, absMax: 0 };
       map.set(key, g);
     }
     g.legs.push(d);
     g.types.add(d.type);
-    g.net += Number(d.amount) || 0;
-    const a = Math.abs(Number(d.amount) || 0);
+    const amt = Number(d.amount) || 0;
+    g.net += amt;
+    if (amt > 0) g.sumPos += amt; else g.sumNeg += -amt;   // Dr vs Cr side totals → value = the larger
+    const a = Math.abs(amt);
     if (a > g.absMax) { g.absMax = a; g.primaryLedger = d.ledger; } // biggest leg = best drawer context
     if (!g.vtype && d.vtype) g.vtype = d.vtype;
     if (!g.sourceRef && d.sourceRef) g.sourceRef = d.sourceRef;
     if (!g.party && d.party) g.party = d.party;
     if (!g.voucherId && d.voucherId) g.voucherId = d.voucherId;
-  }
+  });
   return [...map.values()]
-    .map((g) => ({ ...g, net: Math.round(g.net * 100) / 100 }))
+    .map((g) => ({ ...g, net: Math.round(g.net * 100) / 100, gross: Math.round(Math.max(g.sumPos, g.sumNeg) * 100) / 100 }))
     .sort((a, b) => b.legs.length - a.legs.length || b.absMax - a.absMax);
 }
 
@@ -1003,12 +1012,16 @@ function EntrySection({ section, rows, cur, onDrill }) {
   return (
     <section className="overflow-hidden rounded-brand border border-surface-border bg-surface shadow-card">
       <header className="border-b border-surface-border bg-surface-alt/60 px-4 py-3">
-        <h4 className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
-          <span className={`inline-block h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
-          {section.title}
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">· {grouped ? 'by voucher' : 'by ledger leg'}</span>
-          <span className="rounded-full bg-surface-alt px-2 text-xs font-bold tabular-nums text-ink-muted">{count}</span>
-          {grouped && groups.length > 0 && rows.length !== groups.length && <span className="text-[11px] font-semibold text-ink-subtle">{rows.length} legs</span>}
+        {/* Toggle is a SIBLING of the heading (not nested inside it) — a heading's content
+            model is phrasing content, so interactive controls don't belong within it. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <h4 className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
+            <span className={`inline-block h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
+            {section.title}
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">· {grouped ? 'by voucher' : 'by ledger leg'}</span>
+            <span className="rounded-full bg-surface-alt px-2 text-xs font-bold tabular-nums text-ink-muted">{count}</span>
+            {grouped && groups.length > 0 && rows.length !== groups.length && <span className="text-[11px] font-semibold text-ink-subtle">{rows.length} legs</span>}
+          </h4>
           {rows.length > 0 && (
             <div className="ml-auto inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-[11px] font-semibold" role="group" aria-label={`Group ${section.title} by`}>
               {[{ k: 'voucher', l: 'By voucher' }, { k: 'ledger', l: 'By ledger' }].map((o) => (
@@ -1019,14 +1032,14 @@ function EntrySection({ section, rows, cur, onDrill }) {
               ))}
             </div>
           )}
-        </h4>
+        </div>
         <p className="mt-0.5 text-xs text-ink-muted">{section.blurb}</p>
       </header>
       <div className="overflow-x-auto">
         {rows.length === 0
           ? <div className="px-4 py-6 text-center text-sm text-ink-subtle">✓ Nothing here — every entry on this side has a match.</div>
           : grouped
-            ? <VoucherGroupedTable groups={groups} cur={cur} onDrill={onDrill} />
+            ? <VoucherGroupedTable groups={groups} cur={cur} onDrill={onDrill} valueMode={section.key === 'amount-differs' ? 'net' : 'gross'} />
             : <LedgerLegTable rows={rows} cur={cur} onDrill={onDrill} />}
       </div>
     </section>
@@ -1067,26 +1080,30 @@ function LedgerLegTable({ rows, cur, onDrill }) {
 }
 
 // The BY-VOUCHER table: one row per voucher number, expandable to its ledger legs. A row
-// click opens the voucher (drill focus); the ▸ chip toggles the leg preview inline.
-function VoucherGroupedTable({ groups, cur, onDrill }) {
+// click opens the voucher (drill focus); the ▸ chip toggles the leg preview inline. The
+// value column adapts: presence sections (Not in ERP / Not in Tally) show the voucher's
+// Value (a wholly-missing voucher nets to ~0, which reads as "no difference"); the amount-
+// differs section shows the signed Net Δ, where the difference is the whole point.
+function VoucherGroupedTable({ groups, cur, onDrill, valueMode = 'gross' }) {
+  const valueLabel = valueMode === 'net' ? 'Net Δ' : 'Value';
   return (
     <table className="w-full text-sm" style={{ minWidth: 640 }}>
       <thead>
         <tr className="border-b border-surface-border text-xs uppercase tracking-wider text-ink-subtle">
           <th className="px-4 py-2 text-left font-bold">Voucher</th>
           <th className="px-4 py-2 text-center font-bold">Legs</th>
-          <th className="px-4 py-2 text-right font-bold">Net Δ</th>
+          <th className="px-4 py-2 text-right font-bold">{valueLabel}</th>
           <th className="px-4 py-2 text-right font-bold">Defect</th>
         </tr>
       </thead>
       <tbody>
-        {groups.map((g) => <VoucherGroupRow key={g.key} g={g} cur={cur} onDrill={onDrill} />)}
+        {groups.map((g) => <VoucherGroupRow key={g.key} g={g} cur={cur} onDrill={onDrill} valueMode={valueMode} />)}
       </tbody>
     </table>
   );
 }
 
-function VoucherGroupRow({ g, cur, onDrill }) {
+function VoucherGroupRow({ g, cur, onDrill, valueMode = 'gross' }) {
   const [open, setOpen] = useState(false);
   const types = [...g.types];
   const drill = () => onDrill({ ledger: g.primaryLedger, focusVoucherId: g.voucherId, focusRef: g.ref });
@@ -1111,7 +1128,7 @@ function VoucherGroupRow({ g, cur, onDrill }) {
           </button>
         </td>
         <td className="px-4 py-2 text-center align-top font-semibold tabular-nums text-ink">{g.legs.length}</td>
-        <td className="px-4 py-2 text-right align-top font-mono tabular-nums">{fmt(g.net, cur)}</td>
+        <td className="px-4 py-2 text-right align-top font-mono tabular-nums">{fmt(valueMode === 'net' ? g.net : g.gross, cur)}</td>
         <td className="px-4 py-2 text-right align-top">
           <span className="inline-flex flex-wrap justify-end gap-1">
             {types.map((t) => { const m = defectMeta(t); return <Badge key={t} tone={m.tone} size="sm" dot>{m.label}</Badge>; })}

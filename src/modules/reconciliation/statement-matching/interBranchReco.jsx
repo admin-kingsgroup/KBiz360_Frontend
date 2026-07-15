@@ -21,6 +21,10 @@ import { getIbFreezeAll, ibFreeze, ibFreezeSign, ibUnfreeze, ibFreezeReopen } fr
 
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const pairKey = (a, b) => [a, b].sort().join('::');
+// Currency symbol per book currency — a cross-currency pair (INR-branch ↔ USD-branch)
+// shows each side in its OWN currency, so a single top-bar symbol isn't enough.
+const CCY_SYM = { INR: '₹', USD: '$' };
+const symOf = (ccy, fallback) => CCY_SYM[ccy] || fallback;
 
 export function InterBranchReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
@@ -41,8 +45,9 @@ export function InterBranchReco({ branch }) {
       pairs,
       totals: {
         pairs: pairs.length,
-        matched: pairs.filter((p) => p.matched).length,
-        mismatched: pairs.filter((p) => !p.matched).length,
+        matched: pairs.filter((p) => p.matched === true).length,
+        mismatched: pairs.filter((p) => p.matched === false).length,
+        unrated: pairs.filter((p) => p.matched === null).length, // cross-currency, rate not set
         totalDifference: pairs.reduce((s, p) => s + Math.abs(Number(p.difference) || 0), 0),
       },
     }
@@ -68,17 +73,28 @@ export function InterBranchReco({ branch }) {
         <tbody>
           {q.isLoading && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
           {!q.isLoading && data.pairs.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ No inter-branch balances to reconcile.</td></tr>}
-          {data.pairs.map((p, i) => (
-            <tr key={i} style={{ background: p.matched ? '#f4fbf4' : '#fdf6f4' }}>
+          {data.pairs.map((p, i) => {
+            // Cross-currency pair → each side in its own currency; the difference (and the
+            // reference rate used to translate) sit in branch A's currency.
+            const symA = p.crossCurrency ? symOf(p.currencyA, cur) : cur;
+            const symB = p.crossCurrency ? symOf(p.currencyB, cur) : cur;
+            const unrated = p.matched === null;
+            const bg = p.matched === true ? '#f4fbf4' : unrated ? '#fff7e0' : '#fdf6f4';
+            return (
+            <tr key={i} style={{ background: bg }}>
               <td style={{ ...td, fontWeight: 700, color: C.dark }}>{p.branchA}</td>
               <td style={{ ...td, fontWeight: 700, color: C.dark }}>{p.branchB}</td>
-              <td style={{ ...td, ...rnum }}>{money(cur, p.aReceivableFromB)}</td>
-              <td style={{ ...td, ...rnum }}>{money(cur, p.bReceivableFromA)}</td>
-              <td style={{ ...td, ...rnum, fontWeight: 700, color: p.matched ? C.dim : C.red }}>{money(cur, Math.abs(p.difference))}</td>
-              <td style={td}><span style={wbBadge(p.matched ? 'reconciled' : 'differences')}>{p.matched ? 'reconciled' : 'mismatch'}</span></td>
+              <td style={{ ...td, ...rnum }}>{money(symA, p.aReceivableFromB)}</td>
+              <td style={{ ...td, ...rnum }}>{money(symB, p.bReceivableFromA)}</td>
+              <td style={{ ...td, ...rnum, fontWeight: 700, color: p.matched === true ? C.dim : unrated ? '#8a6d00' : C.red }}>
+                {unrated ? '—' : money(symA, Math.abs(p.difference))}
+                {p.crossCurrency && p.fxRate ? <div style={{ fontSize: 10, color: C.dim, fontWeight: 400 }}>@ 1 USD = ₹{Number(p.fxRate).toLocaleString()}</div> : null}
+              </td>
+              <td style={td}><span style={wbBadge(p.matched === true ? 'reconciled' : unrated ? 'open' : 'differences')}>{p.matched === true ? 'reconciled' : unrated ? 'set FX rate' : 'mismatch'}</span></td>
               <td style={td}><IbFreezeCell branchA={p.branchA} branchB={p.branchB} period={period} st={freezeMap[pairKey(p.branchA, p.branchB)]} onChanged={loadFreeze} /></td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </Table>
       {/* Line level — the exact deal behind a pair mismatch, by INB Link No. */}
