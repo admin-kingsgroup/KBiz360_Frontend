@@ -29,3 +29,9 @@ export async function setFlag(key, enabled, branch) {
 export async function setManyFlags(changes) {
   return apiPost('/api/tk/flags/set-many', { changes });
 }
+
+// Read-only IMPACT PREVIEW — "what would this rule have caught?" over the last `days` of
+// vouchers for a branch scope. Returns { impact: { count, amount, examples, note, ... } }.
+export async function flagImpact(key, branch, days = 90) {
+  return apiPost('/api/tk/flags/impact', { key, branch: branch || 'default', days });
+}

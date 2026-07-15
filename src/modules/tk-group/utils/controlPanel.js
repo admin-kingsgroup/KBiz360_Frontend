@@ -172,6 +172,7 @@ export const POWER_SCREENS = [
   { group: 'Rules', items: [
     { key: 'defaults',     label: 'Default Rules' },
     { key: 'configurable', label: 'Configurable Rules' },
+    { key: 'grid',         label: 'All-Branches Grid' },
   ] },
   { group: 'Enforcement tools', items: [
     { key: 'matrix',   label: 'Enforcement Matrix' },
@@ -274,6 +275,69 @@ export const CONFIGURABLE_GROUPS = [
 /** Flat list of every configurable flag key — the set the bulk "Enable all / Disable all"
  *  acts on, and the FE mirror of the backend CONTROLLABLE_KEYS. */
 export const CONFIGURABLE_FLAGS = CONFIGURABLE_GROUPS.flatMap((g) => g.items.map((i) => i.flag));
+
+/** Build the ALL-BRANCHES POSTURE GRID model from the raw flag state — the bird's-eye view.
+ *  Rows = the configurable flags (kept grouped); columns = each branch `code`. Each cell is
+ *  { on, override }: `on` is the flag's EFFECTIVE state for that branch (branch override →
+ *  global), `override` is true when the branch carries an explicit value (vs inheriting the
+ *  Group default). The 'default'/'ALL' column is the global value (never an "override"). Pure
+ *  & testable — mirrors isFlagOn so the grid shows exactly what enforces per branch. */
+export function postureGrid(flagState, branchCodes = []) {
+  const flags = (flagState && flagState.flags) || {};
+  const isDefaultCol = (c) => !c || c === 'default' || c === 'ALL';
+  return CONFIGURABLE_GROUPS.map((g) => ({
+    group: g.group,
+    rows: g.items.map((it) => {
+      const f = flags[it.flag] || {};
+      const cells = {};
+      branchCodes.forEach((code) => {
+        const hasOverride = !isDefaultCol(code) && f.branches && Object.prototype.hasOwnProperty.call(f.branches, code);
+        cells[code] = { on: isFlagOn(flagState, it.flag, code), override: !!hasOverride };
+      });
+      return { key: it.flag, nm: it.nm, crit: !!it.crit, cells };
+    }),
+  }));
+}
+
+// ── Posture presets — named go-live bundles (pure data) ──────────────────────
+// Each preset is the set of configurable flags it turns ON; applying it turns every OTHER
+// configurable flag OFF for the scope. Applied via the bulk set-many endpoint. Order = the
+// escalation from lightest to full control.
+export const POSTURE_PRESETS = [
+  { key: 'conservative', label: 'Conservative', desc: 'Approval basics: branch-accountant routing + Owner co-sign on refunds / reissues.',
+    flags: ['control.role.branch_accountant', 'approval.owner_cosign_sensitive'] },
+  { key: 'standard', label: 'Standard', desc: 'Conservative + verifier≠approver, large-voucher escalation, mandatory documents, export logging and the period lock.',
+    flags: ['control.role.branch_accountant', 'approval.owner_cosign_sensitive', 'sod.verifier_ne_approver', 'approval.escalation_signoffs', 'entry.mandatory_docs', 'reports.log_exports', 'masters.period_lock'] },
+  { key: 'strict', label: 'Strict', desc: 'Every configurable rule on — the full control layer.',
+    flags: CONFIGURABLE_FLAGS },
+];
+
+/** Bulk changes to apply a preset for a scope: every configurable flag set to whether the
+ *  preset includes it, for `branch` ('default'/'ALL'/'' = Group global). Pure & testable. */
+export function presetChanges(preset, branch) {
+  const on = new Set((preset && preset.flags) || []);
+  return CONFIGURABLE_FLAGS.map((key) => ({ key, enabled: on.has(key), branch }));
+}
+
+/** Bulk changes to COPY the effective configurable posture of `sourceBranch` onto each of
+ *  `targetBranches` — for every configurable flag, set the target's value to the source's
+ *  EFFECTIVE value (a target equal to the source is skipped). Pure (reads the flag state). */
+export function copyBranchChanges(flagState, sourceBranch, targetBranches = []) {
+  const out = [];
+  targetBranches.forEach((t) => {
+    if (t === sourceBranch) return;
+    CONFIGURABLE_FLAGS.forEach((key) => out.push({ key, enabled: isFlagOn(flagState, key, sourceBranch), branch: t }));
+  });
+  return out;
+}
+
+/** Bulk changes to RESET a branch to the Group default — clears every configurable flag's
+ *  branch override (enabled:null) so the branch inherits the global value again. This is the
+ *  path back from override → inherit. No-op on the 'default' scope. Pure. */
+export function resetBranchChanges(branch) {
+  if (!branch || branch === 'default' || branch === 'ALL') return [];
+  return CONFIGURABLE_FLAGS.map((key) => ({ key, enabled: null, branch }));
+}
 
 // Rules the Owner has decided AGAINST — shown as a muted footnote on the Configurable
 // screen so the decision is visible without cluttering the switch list.

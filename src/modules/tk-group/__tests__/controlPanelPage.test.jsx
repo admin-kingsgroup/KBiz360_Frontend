@@ -8,6 +8,7 @@ jest.mock('../api/flags', () => ({
   proposeFlags: jest.fn().mockResolvedValue({ ok: true }),
   setFlag: jest.fn().mockResolvedValue({ flags: { 'branch.central_relocated': { enabled: true, label: 'Relocate' } }, enabled: ['branch.central_relocated'] }),
   setManyFlags: jest.fn().mockResolvedValue({ flags: {}, enabled: [] }),
+  flagImpact: jest.fn().mockResolvedValue({ impact: { days: 90, branch: null, measurable: true, count: 12, amount: 340000, examples: ['V1', 'V2'], note: '' } }),
 }));
 jest.mock('../../../core/useAccounting', () => ({ useConfigValue: () => ({ data: {} }) }));
 jest.mock('../api/limits', () => ({
@@ -148,6 +149,85 @@ describe('Control Panel · two-screen model', () => {
     fireEvent.click(screen.getByText('Configurable Rules'));
     await screen.findByText('Approval & Verification');
     expect(screen.queryByRole('button', { name: 'Enable all' })).not.toBeInTheDocument();
+  });
+
+  test('Preview impact: fetches and shows the "would have caught" summary per rule', async () => {
+    const { flagImpact } = require('../api/flags');
+    flagImpact.mockClear();
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    const buttons = await screen.findAllByRole('button', { name: /Preview impact/ });
+    expect(buttons.length).toBe(21);   // one per configurable rule
+    fireEvent.click(buttons[0]);
+    await waitFor(() => expect(flagImpact).toHaveBeenCalled());
+    expect(await screen.findByText(/12 vouchers/)).toBeInTheDocument();
+  });
+
+  test('Preview impact shows the reason note on a measurable-but-zero result (no ceiling set)', async () => {
+    const { flagImpact } = require('../api/flags');
+    flagImpact.mockClear().mockResolvedValue({ impact: { days: 90, branch: 'BOM', measurable: true, count: 0, amount: 0, examples: [], note: 'No escalate ceiling is configured (Limits & Thresholds) — engaging this would escalate nothing yet.' } });
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    const buttons = await screen.findAllByRole('button', { name: /Preview impact/ });
+    fireEvent.click(buttons[0]);
+    await waitFor(() => expect(flagImpact).toHaveBeenCalled());
+    expect(await screen.findByText(/No escalate ceiling is configured/)).toBeInTheDocument();
+  });
+
+  test('Owner: Reset to inherit clears a branch’s overrides (enabled:null)', async () => {
+    const { setManyFlags } = require('../api/flags');
+    const { confirmDialog } = require('../../../core/ux/confirm');
+    setManyFlags.mockClear(); confirmDialog.mockClear().mockResolvedValue({ confirmed: true });
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    fireEvent.click(await screen.findByRole('button', { name: /^BOM\b/ }));                 // scope to BOM → reset button appears
+    fireEvent.click(await screen.findByRole('button', { name: /Reset to inherit/ }));
+    await waitFor(() => expect(setManyFlags).toHaveBeenCalledTimes(1));
+    const changes = setManyFlags.mock.calls[0][0];
+    expect(changes).toHaveLength(21);
+    expect(changes.every((c) => c.enabled === null && c.branch === 'BOM')).toBe(true);
+  });
+
+  test('Owner: applying a preset bulk-sets all configurable rules (preset ON, rest OFF)', async () => {
+    const { setManyFlags } = require('../api/flags');
+    const { confirmDialog } = require('../../../core/ux/confirm');
+    setManyFlags.mockClear(); confirmDialog.mockClear().mockResolvedValue({ confirmed: true });
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Standard' }));
+    await waitFor(() => expect(setManyFlags).toHaveBeenCalledTimes(1));
+    const changes = setManyFlags.mock.calls[0][0];
+    expect(changes).toHaveLength(21);
+    expect(changes.find((c) => c.key === 'entry.mandatory_docs').enabled).toBe(true);   // Standard includes docs
+  });
+
+  test('Owner: copy-to-all-branches copies the source (a real branch) to the other 5 branches', async () => {
+    const { setManyFlags } = require('../api/flags');
+    const { confirmDialog } = require('../../../core/ux/confirm');
+    setManyFlags.mockClear(); confirmDialog.mockClear().mockResolvedValue({ confirmed: true });
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'super_admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    fireEvent.click(await screen.findByRole('button', { name: /Copy to all other branches/ }));
+    await waitFor(() => expect(setManyFlags).toHaveBeenCalledTimes(1));
+    const changes = setManyFlags.mock.calls[0][0];
+    expect(changes.length).toBe(5 * 21);   // source is a real branch (default excluded) → 5 target branches × 21
+    expect(changes.every((c) => c.branch !== 'default' && typeof c.enabled === 'boolean')).toBe(true);
+  });
+
+  test('All-Branches Grid: renders a cell per rule × branch; an Owner cell-flip targets that scope', async () => {
+    const { setFlag } = require('../api/flags');
+    setFlag.mockClear();
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(await screen.findByText('All-Branches Grid'));
+    expect(await screen.findByText('Group default')).toBeInTheDocument();   // branch column header
+    const cells = await screen.findAllByRole('button', { name: /Relocate central screens/ });
+    expect(cells.length).toBe(7);                                           // Group default + 6 branches
+    fireEvent.click(cells[0]);                                              // the Group-default column cell
+    await waitFor(() => expect(setFlag).toHaveBeenCalledWith('branch.central_relocated', true, 'default'));
   });
 
   test('Policy Tester tool renders a live verdict', async () => {

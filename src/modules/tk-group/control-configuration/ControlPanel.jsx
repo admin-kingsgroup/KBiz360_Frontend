@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getFlagState, proposeFlags, setFlag, setManyFlags } from '../api/flags';
+import { getFlagState, proposeFlags, setFlag, setManyFlags, flagImpact } from '../api/flags';
 import { withBranchToggled, isFlagOn } from '../utils/flags';
 import { useConfigValue } from '../../../core/useAccounting';
 import { isOwner } from '../utils/owner';
@@ -16,7 +16,7 @@ import { ChangeLog } from '../ChangeLog';
 import { Delegation } from '../Delegation';
 import { BreakGlass } from '../BreakGlass';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
-import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES } from '../utils/controlPanel';
+import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges } from '../utils/controlPanel';
 import { Badge } from '../../../shell/primitives';
 
 // ─── TK GROUP CENTRAL · Control Panel ────────────────────────────────────────
@@ -81,6 +81,23 @@ function ChainCard({ k, r, w, n }) {
   );
 }
 
+// One cell of the All-Branches Grid: ✓ on / · off, with a SOLID fill when the branch carries
+// an explicit override and a soft/faded fill when it inherits the Group default — so drift is
+// obvious at a glance. crit (money control) turns an ON override red. Click to flip that
+// branch's value (Owner live-flips; others propose).
+function GridCell({ cell, crit, onClick, label }) {
+  const { on, override } = cell || {};
+  const cls = on
+    ? (override ? (crit ? 'bg-danger text-white' : 'bg-success text-white') : (crit ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'))
+    : (override ? 'bg-surface-alt text-ink-muted ring-1 ring-inset ring-surface-border' : 'bg-surface text-ink-subtle');
+  return (
+    <button type="button" onClick={onClick} aria-label={label} title={label}
+      className={`flex h-7 w-7 items-center justify-center rounded-md text-[12px] font-bold transition-colors hover:opacity-80 ${cls}`}>
+      {on ? '✓' : '·'}
+    </button>
+  );
+}
+
 // The role flags map back to a ROLE_SWITCHES key so the Approval group can show the
 // deadlock guardrail under the right rows.
 const ROLE_FLAG_KEY = Object.fromEntries(ROLE_SWITCHES.map((rs) => [rs.flag, rs.key]));
@@ -101,6 +118,11 @@ export function ControlPanel({ setRoute }) {
   const go = (route) => setRoute && setRoute(route);
   const qc = useQueryClient();
   const [msg, setMsg] = useState('');
+  // Copy source = a REAL branch (not Group default — pushing the global as explicit overrides
+  // is a footgun; use Reset-to-inherit for that). Defaults to the first real branch.
+  const [copySource, setCopySource] = useState(() => (LIMIT_BRANCHES.find((b) => b.code !== 'default') || {}).code || 'default');
+  const [impacts, setImpacts] = useState({});                // { flagKey: impact result } — the preview cache
+  const [previewing, setPreviewing] = useState('');          // flagKey currently being previewed
   const flags = flagsQ.data?.flags || {};
   // Branch-aware: reflects the selected branch's override, falling back to the global value.
   const isOn = (key) => isFlagOn(flagsQ.data, key, branch);
@@ -108,29 +130,53 @@ export function ControlPanel({ setRoute }) {
   const scoped = branch !== 'default';
   const owner = isOwner();
 
-  // Flipping a control: the OWNER has full override, so their click applies the flag LIVE
-  // (self-approved) and the toggle moves at once. Everyone else PROPOSES the change through
-  // the Owner-approved change-request flow. Either way it is written to the audit trail.
-  // There is no master switch, so no rule needs a special confirm — every flip is one click.
-  const onPropose = async (key) => {
-    const turningOn = !isOn(key);
-    const where = scoped ? ` for ${branchLabel}` : '';
+  // Flip a single control for a SPECIFIC scope (`targetBranch`: a branch code, or
+  // 'default'/'ALL'/'' for the Group global). The OWNER applies it LIVE (self-approved) and
+  // the toggle moves at once; everyone else PROPOSES it through the Owner-approved
+  // change-request flow. Either way it is audited. No master switch, so no rule needs a
+  // special confirm — every flip is one click. Shared by the Configurable screen (panel
+  // branch) and the All-Branches Grid (per-cell branch).
+  const flipFor = async (key, targetBranch) => {
+    const turningOn = !isFlagOn(flagsQ.data, key, targetBranch);
+    const isDef = !targetBranch || targetBranch === 'default' || targetBranch === 'ALL';
+    const bLabel = (LIMIT_BRANCHES.find((b) => b.code === targetBranch) || {}).label || targetBranch;
+    const where = isDef ? '' : ` for ${bLabel}`;
     setMsg('');
     try {
       if (owner) {
-        const next = await setFlag(key, turningOn, branch);         // live flip (branch-scoped)
+        const next = await setFlag(key, turningOn, targetBranch);   // live flip (scoped)
         qc.setQueryData(['tk', 'flags'], next);
         const lab = (next && next.flags && next.flags[key] && next.flags[key].label) || key;
         toastSuccess(`${lab}${where} — ${turningOn ? 'ON' : 'OFF'}`);
         setMsg(`“${key}”${where} is now ${turningOn ? 'ON' : 'OFF'}.`);
       } else {
-        await proposeFlags(withBranchToggled(flagsQ.data || { flags: {} }, key, branch));
+        await proposeFlags(withBranchToggled(flagsQ.data || { flags: {} }, key, targetBranch));
         toastInfo('Submitted for the Owner’s approval.');
         setMsg(`Change to “${key}”${where} submitted for the Owner’s approval — it applies only once approved.`);
       }
       qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
     } catch (e) {
       const m = (e && e.message) || (owner ? 'Could not apply the change.' : 'Could not submit the change.');
+      toastError(m);
+      setMsg(m);
+    }
+  };
+  // Configurable screen flips against the panel-selected branch scope.
+  const onPropose = (key) => flipFor(key, branch);
+
+  // Apply a batch of {key,enabled,branch} changes via the bulk endpoint (OWNER-only) and
+  // refresh the cache. Shared by Enable-all/Disable-all, presets, and copy-across-branches.
+  const applyBulk = async (changes, label) => {
+    setMsg('');
+    if (!changes.length) { setMsg('Nothing to change.'); return; }
+    try {
+      const next = await setManyFlags(changes);
+      if (next && next.flags) qc.setQueryData(['tk', 'flags'], next);
+      toastSuccess(`${label} — applied (${changes.length} settings)`);
+      setMsg(`${label} — applied (${changes.length} settings).`);
+      qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
+    } catch (e) {
+      const m = (e && e.message) || 'Could not apply the bulk change.';
       toastError(m);
       setMsg(m);
     }
@@ -150,19 +196,77 @@ export function ControlPanel({ setRoute }) {
       confirmLabel: label,
     });
     if (!confirmed) return;
-    setMsg('');
+    await applyBulk(CONFIGURABLE_FLAGS.map((key) => ({ key, enabled: enable, branch })), `${label}${where}`);
+  };
+
+  // Apply a named posture preset (Conservative / Standard / Strict) to the current scope —
+  // sets the preset's flags ON and every other configurable rule OFF, in one action.
+  const onApplyPreset = async (preset) => {
+    const where = scoped ? ` for ${branchLabel}` : ' (Group default)';
+    const { confirmed } = await confirmDialog({
+      title: `Apply the “${preset.label}” preset${scoped ? ` to ${branchLabel}` : ''}?`,
+      message: `${preset.desc} This sets those ${preset.flags.length} rule${preset.flags.length > 1 ? 's' : ''} ON and every other configurable rule OFF${where}. Reversible — adjust any rule after.`,
+      danger: false,
+      confirmLabel: `Apply ${preset.label}`,
+    });
+    if (!confirmed) return;
+    await applyBulk(presetChanges(preset, branch), `“${preset.label}” preset${where}`);
+  };
+
+  // Copy the source branch's configurable posture onto every OTHER real branch.
+  const onCopyConfig = async () => {
+    const targets = LIMIT_BRANCHES.filter((b) => b.code !== 'default' && b.code !== copySource).map((b) => b.code);
+    const srcLabel = (LIMIT_BRANCHES.find((b) => b.code === copySource) || {}).label || copySource;
+    const changes = copyBranchChanges(flagsQ.data, copySource, targets);
+    const { confirmed } = await confirmDialog({
+      title: `Copy ${srcLabel}’s rules to the other ${targets.length} branches?`,
+      message: `Every configurable rule’s effective value from ${srcLabel} is applied to ${targets.join(', ')}. Reversible per branch.`,
+      danger: false,
+      confirmLabel: 'Copy config',
+    });
+    if (!confirmed) return;
+    await applyBulk(changes, `${srcLabel}’s config → ${targets.length} branches`);
+  };
+
+  // Reset a branch to the Group default — clear every configurable override so it inherits
+  // the global value again (the path back from override → inherit). OWNER only.
+  const onResetBranch = async (targetBranch) => {
+    if (!targetBranch || targetBranch === 'default') return;
+    const bLabel = (LIMIT_BRANCHES.find((b) => b.code === targetBranch) || {}).label || targetBranch;
+    const { confirmed } = await confirmDialog({
+      title: `Reset ${bLabel} to the Group default?`,
+      message: `This clears ${bLabel}’s configurable-rule overrides so it inherits the Group default for every rule again. Reversible — set overrides again any time.`,
+      danger: false,
+      confirmLabel: 'Reset to inherit',
+    });
+    if (!confirmed) return;
+    await applyBulk(resetBranchChanges(targetBranch), `${bLabel} → Group default (inherit)`);
+  };
+
+  // Impact preview — read-only "what would this rule have caught?" against the last 90 days
+  // of vouchers for the current branch scope. Caches per flag; re-runs on click.
+  const onPreview = async (key) => {
+    setPreviewing(key);
     try {
-      const changes = CONFIGURABLE_FLAGS.map((key) => ({ key, enabled: enable, branch }));
-      const next = await setManyFlags(changes);
-      if (next && next.flags) qc.setQueryData(['tk', 'flags'], next);
-      toastSuccess(`${label}${where} — ${CONFIGURABLE_FLAGS.length} rules ${enable ? 'ON' : 'OFF'}`);
-      setMsg(`${label}: ${CONFIGURABLE_FLAGS.length} configurable rules ${enable ? 'ON' : 'OFF'}${where}.`);
-      qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
+      const r = await flagImpact(key, branch, 90);
+      setImpacts((m) => ({ ...m, [key]: (r && r.impact) || r || {} }));
     } catch (e) {
-      const m = (e && e.message) || 'Could not apply the bulk change.';
-      toastError(m);
-      setMsg(m);
+      setImpacts((m) => ({ ...m, [key]: { error: (e && e.message) || 'Preview failed' } }));
+    } finally {
+      setPreviewing('');
     }
+  };
+  // One-line summary of a preview result for inline display. A measurable-but-zero result
+  // carrying a note (no ceiling / no locks configured) shows the note, not a bare "0".
+  const impactText = (imp) => {
+    if (!imp) return '';
+    if (imp.error) return imp.error;
+    if (imp.measurable === false) return imp.note;
+    if (imp.count === 0 && imp.note) return imp.note;
+    const amt = Number(imp.amount || 0).toLocaleString('en-IN');
+    const scopeLabel = imp.branch ? ` · ${(LIMIT_BRANCHES.find((b) => b.code === imp.branch) || {}).label || imp.branch}` : '';
+    const eg = imp.examples && imp.examples.length ? ` (e.g. ${imp.examples.slice(0, 3).join(', ')})` : '';
+    return `Last ${imp.days}d${scopeLabel}: ${imp.count} voucher${imp.count === 1 ? '' : 's'} · ₹${amt}${eg}`;
   };
 
   const renderConfigGroup = (grp) => {
@@ -181,10 +285,18 @@ export function ControlPanel({ setRoute }) {
           {grp.items.map((c) => {
             const roleKey = ROLE_FLAG_KEY[c.flag];
             const warn = roleKey ? roleControlWarning(roleKey, v) : null;
+            const imp = impacts[c.flag];
             return (
               <div key={c.flag}>
                 <SwitchRow {...c} on={isOn(c.flag)} onPropose={onPropose} />
                 {warn && isOn(c.flag) && <div className="mt-1 flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning-soft px-2.5 py-1.5 text-[11px] text-warning"><span>⚠</span><span>{warn}</span></div>}
+                <div className="mt-1 flex flex-wrap items-center gap-2 pl-0.5">
+                  <button type="button" onClick={() => onPreview(c.flag)} disabled={previewing === c.flag}
+                    className="text-[10.5px] font-medium text-navy/70 hover:text-navy hover:underline disabled:opacity-60">
+                    {previewing === c.flag ? 'Checking…' : '🔍 Preview impact'}
+                  </button>
+                  {imp && <span className={`text-[10.5px] ${imp.error ? 'text-danger' : 'text-ink-muted'}`}>{impactText(imp)}</span>}
+                </div>
               </div>
             );
           })}
@@ -207,11 +319,35 @@ export function ControlPanel({ setRoute }) {
           <>
             <p className="mb-4 mt-1 max-w-[80ch] text-[13.5px] text-ink-muted">The rules you switch on one-by-one{scoped ? <> for <b>{branchLabel}</b></> : ''}. Each is independent — there is no master switch. {owner ? 'Flip any switch to apply it live.' : 'Changes are submitted for the Owner’s approval.'}</p>
             {owner && (
-              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-brand border border-surface-border bg-surface-alt px-3 py-2">
-                <span className="mr-1 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">Bulk{scoped ? ` · ${branchLabel}` : ''}</span>
-                <button type="button" onClick={() => onBulk(true)} className="rounded-full border border-success/50 bg-success-soft px-3 py-1 text-[11.5px] font-semibold text-success hover:bg-success/10">Enable all</button>
-                <button type="button" onClick={() => onBulk(false)} className="rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-danger-soft hover:text-danger">Disable all</button>
-                <span className="ml-1 text-[11px] text-ink-muted">applies to all {CONFIGURABLE_FLAGS.length} configurable rules — your go-live / rollback in one action.</span>
+              <div className="mb-4 grid gap-2 rounded-brand border border-surface-border bg-surface-alt px-3 py-2.5">
+                {/* Bulk — go-live / rollback in one action */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="mr-1 w-[52px] shrink-0 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">Bulk</span>
+                  <button type="button" onClick={() => onBulk(true)} className="rounded-full border border-success/50 bg-success-soft px-3 py-1 text-[11.5px] font-semibold text-success hover:bg-success/10">Enable all</button>
+                  <button type="button" onClick={() => onBulk(false)} className="rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-danger-soft hover:text-danger">Disable all</button>
+                  {scoped && <button type="button" onClick={() => onResetBranch(branch)} className="rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">↺ Reset to inherit</button>}
+                  <span className="ml-1 text-[11px] text-ink-muted">all {CONFIGURABLE_FLAGS.length} rules{scoped ? ` · ${branchLabel}` : ' · Group default'}</span>
+                </div>
+                {/* Presets — named posture bundles */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-surface-border/60 pt-2">
+                  <span className="mr-1 w-[52px] shrink-0 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">Presets</span>
+                  {POSTURE_PRESETS.map((p) => (
+                    <button key={p.key} type="button" onClick={() => onApplyPreset(p)} title={p.desc}
+                      className="rounded-full border border-navy/30 bg-navy/5 px-3 py-1 text-[11.5px] font-semibold text-navy hover:bg-navy/10">{p.label}</button>
+                  ))}
+                  <span className="ml-1 text-[11px] text-ink-muted">a known-good bundle (sets the rest off).</span>
+                </div>
+                {/* Copy across branches */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-surface-border/60 pt-2">
+                  <span className="mr-1 w-[52px] shrink-0 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">Copy</span>
+                  <select value={copySource} onChange={(e) => setCopySource(e.target.value)} aria-label="Copy source branch"
+                    className="rounded-md border border-surface-border bg-surface px-2 py-1 text-[11.5px] text-ink">
+                    {LIMIT_BRANCHES.filter((b) => b.code !== 'default').map((b) => <option key={b.code} value={b.code}>{b.label}</option>)}
+                  </select>
+                  <button type="button" onClick={onCopyConfig}
+                    className="rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">Copy to all other branches</button>
+                  <span className="ml-1 text-[11px] text-ink-muted">apply this branch’s setup everywhere else.</span>
+                </div>
               </div>
             )}
             {CONFIGURABLE_GROUPS.map(renderConfigGroup)}
@@ -223,6 +359,65 @@ export function ControlPanel({ setRoute }) {
             </div>
           </>
         );
+      case 'grid': {
+        const codes = LIMIT_BRANCHES.map((b) => b.code);
+        const grid = postureGrid(flagsQ.data, codes);
+        const branchOf = (code) => (LIMIT_BRANCHES.find((b) => b.code === code) || {}).label || code;
+        return (
+          <>
+            <p className="mb-3 mt-1 max-w-[84ch] text-[13.5px] text-ink-muted">Every configurable rule across all branches at a glance. <b>✓</b> on · <b>·</b> off; a <b>solid</b> cell is an explicit branch override, a <b>faded</b> cell inherits the Group default. Click any cell to flip it{owner ? ' live.' : ' — it is submitted for the Owner’s approval.'}</p>
+            <div className="overflow-x-auto rounded-brand border border-surface-border bg-surface">
+              <table className="w-full min-w-[760px] text-[12px]">
+                <thead>
+                  <tr className="bg-surface-alt text-ink-muted">
+                    <th className="sticky left-0 z-10 bg-surface-alt p-2.5 text-left font-mono text-[9px] font-semibold uppercase tracking-wide">Rule</th>
+                    {LIMIT_BRANCHES.map((b) => (
+                      <th key={b.code} className="p-2 text-center font-mono text-[9px] font-semibold uppercase tracking-wide">
+                        <div>{b.label}</div>
+                        {owner && b.code !== 'default' && (
+                          <button type="button" onClick={() => onResetBranch(b.code)} title={`Reset ${b.label} to the Group default`}
+                            className="mt-0.5 font-sans text-[9px] font-normal normal-case text-ink-subtle hover:text-navy hover:underline">↺ inherit</button>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {grid.map((g) => (
+                    <React.Fragment key={g.group}>
+                      <tr><td colSpan={LIMIT_BRANCHES.length + 1} className="border-t border-surface-border/60 bg-surface-alt/50 px-2.5 py-1 font-mono text-[9px] uppercase tracking-widest text-ink-subtle">{g.group}</td></tr>
+                      {g.rows.map((row) => (
+                        <tr key={row.key} className="border-t border-surface-border/60 hover:bg-navy/[0.03]">
+                          <td className="sticky left-0 z-10 bg-surface p-2.5 font-semibold text-ink">{row.nm}</td>
+                          {codes.map((code) => {
+                            const c = row.cells[code] || { on: false, override: false };
+                            return (
+                              <td key={code} className="p-1.5 text-center">
+                                <div className="flex justify-center">
+                                  <GridCell cell={c} crit={row.crit} onClick={() => flipFor(row.key, code)}
+                                    label={`${row.nm} · ${branchOf(code)} · ${c.on ? 'on' : 'off'}${code === 'default' ? ' (group default)' : (c.override ? ' (override)' : ' (inherits)')}`} />
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-ink-muted">
+              <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded bg-success text-[11px] font-bold text-white">✓</span> on · override</span>
+              <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded bg-success-soft text-[11px] font-bold text-success">✓</span> on · inherits default</span>
+              <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded bg-danger text-[11px] font-bold text-white">✓</span> on · money control</span>
+              <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded bg-surface-alt text-[11px] font-bold text-ink-muted ring-1 ring-inset ring-surface-border">·</span> off · override</span>
+              <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded bg-surface text-[11px] font-bold text-ink-subtle">·</span> off · inherits default</span>
+              <span className="text-ink-subtle">↺ inherit = clear a branch’s overrides</span>
+            </div>
+          </>
+        );
+      }
       case 'matrix': return <EnforcementMatrix go={go} branch={branch} />;
       case 'tester': return <PolicyTester branch={branch} />;
       case 'active': return <ActiveControls />;
@@ -304,7 +499,7 @@ export function ControlPanel({ setRoute }) {
           {LIMIT_BRANCHES.map((b) => {
             const active = branch === b.code;
             return (
-              <button key={b.code} type="button" onClick={() => setBranch(b.code)}
+              <button key={b.code} type="button" onClick={() => { setBranch(b.code); setImpacts({}); }}
                 className={`rounded-full border px-3 py-1 text-[11.5px] transition-colors ${active ? 'border-navy bg-navy text-white font-semibold' : 'border-surface-border text-ink-muted hover:bg-navy/5'}`}>
                 {b.label}{b.code !== 'default' && <span className={`ml-1 font-mono text-[9px] ${active ? 'text-white/70' : 'text-ink-subtle'}`}>{b.ccy}</span>}
               </button>

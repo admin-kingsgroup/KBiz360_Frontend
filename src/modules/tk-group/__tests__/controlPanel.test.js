@@ -1,11 +1,64 @@
-import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary } from '../utils/controlPanel';
+import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges } from '../utils/controlPanel';
+
+describe('posture presets + copy-across-branches (pure)', () => {
+  test('presetChanges: covers every configurable flag; preset flags ON, the rest OFF, for the scope', () => {
+    const p = POSTURE_PRESETS.find((x) => x.key === 'conservative');
+    const ch = presetChanges(p, 'BOM');
+    expect(ch).toHaveLength(CONFIGURABLE_FLAGS.length);
+    expect(ch.every((c) => c.branch === 'BOM')).toBe(true);
+    p.flags.forEach((f) => expect(ch.find((c) => c.key === f).enabled).toBe(true));
+    const offKey = CONFIGURABLE_FLAGS.find((f) => !p.flags.includes(f));
+    expect(ch.find((c) => c.key === offKey).enabled).toBe(false);
+  });
+  test('presets nest: conservative ⊂ standard ⊂ strict; strict = all flags', () => {
+    const s = Object.fromEntries(POSTURE_PRESETS.map((p) => [p.key, new Set(p.flags)]));
+    expect(s.strict.size).toBe(CONFIGURABLE_FLAGS.length);
+    [...s.conservative].forEach((f) => expect(s.standard.has(f)).toBe(true));
+    [...s.standard].forEach((f) => expect(s.strict.has(f)).toBe(true));
+  });
+  test('copyBranchChanges: source effective value → each target; source skipped', () => {
+    const state = { flags: { 'entry.mandatory_docs': { enabled: false, branches: { BOM: true } } } };
+    const ch = copyBranchChanges(state, 'BOM', ['BOM', 'AMD', 'NBO']);
+    expect(ch.some((c) => c.branch === 'BOM')).toBe(false);                    // source excluded
+    expect(ch.filter((c) => c.branch === 'AMD')).toHaveLength(CONFIGURABLE_FLAGS.length);
+    expect(ch.find((c) => c.branch === 'AMD' && c.key === 'entry.mandatory_docs').enabled).toBe(true);  // BOM ON → AMD ON
+  });
+  test('resetBranchChanges: clears every configurable flag for a branch (enabled:null); no-op on default', () => {
+    const ch = resetBranchChanges('BOM');
+    expect(ch).toHaveLength(CONFIGURABLE_FLAGS.length);
+    expect(ch.every((c) => c.enabled === null && c.branch === 'BOM')).toBe(true);
+    expect(resetBranchChanges('default')).toEqual([]);
+    expect(resetBranchChanges()).toEqual([]);
+  });
+});
+
+describe('postureGrid — all-branches bird\'s-eye', () => {
+  const codes = ['default', 'BOM', 'AMD'];
+  test('grid groups match CONFIGURABLE_GROUPS; every configurable flag has exactly one row', () => {
+    const g = postureGrid({ flags: {} }, codes);
+    expect(g.map((x) => x.group)).toEqual(CONFIGURABLE_GROUPS.map((x) => x.group));
+    expect(g.flatMap((x) => x.rows.map((r) => r.key)).sort()).toEqual([...CONFIGURABLE_FLAGS].sort());
+  });
+  test('cell.on = effective state; cell.override only for an explicit branch value; default col never override', () => {
+    const state = { flags: { 'entry.mandatory_docs': { enabled: true, branches: { AMD: false } } } };
+    const row = postureGrid(state, codes).flatMap((x) => x.rows).find((r) => r.key === 'entry.mandatory_docs');
+    expect(row.cells.default).toEqual({ on: true, override: false });   // global ON; the default column is never an "override"
+    expect(row.cells.BOM).toEqual({ on: true, override: false });        // inherits the global ON
+    expect(row.cells.AMD).toEqual({ on: false, override: true });        // explicit branch override → OFF
+  });
+  test('empty / missing state → every cell off, no overrides', () => {
+    const cells = postureGrid(undefined, codes).flatMap((x) => x.rows).flatMap((r) => Object.values(r.cells));
+    expect(cells.length).toBeGreaterThan(0);
+    expect(cells.every((c) => c.on === false && c.override === false)).toBe(true);
+  });
+});
 
 describe('Control Panel structure', () => {
   test('two rule screens + tools, no master screen', () => {
     expect(POWER_SCREENS.map((g) => g.group)).toEqual(['Rules', 'Enforcement tools', 'Reference & oversight']);
-    expect(POWER_SCREEN_KEYS.slice(0, 2)).toEqual(['defaults', 'configurable']);
+    expect(POWER_SCREEN_KEYS.slice(0, 3)).toEqual(['defaults', 'configurable', 'grid']);
     expect(POWER_SCREEN_KEYS).not.toContain('master');
-    expect(POWER_SCREEN_KEYS).toHaveLength(13);
+    expect(POWER_SCREEN_KEYS).toHaveLength(14);
   });
   test('screen keys are unique and include the tools', () => {
     expect(new Set(POWER_SCREEN_KEYS).size).toBe(POWER_SCREEN_KEYS.length);
