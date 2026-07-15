@@ -506,7 +506,7 @@ export default function KB360App(){
     // Director → Owner). Operates on the focused branch (opBranch); Focus = ALL pools
     // every branch's pending into one central queue.
     if(route==="/tk/voucher-approvals")  return (
-      <div className="grid gap-4">
+      <div className="grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
         <StagePipeline/>
         <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>
       </div>
