@@ -274,7 +274,7 @@ export const RULE_BOOK = [
     { t: 'Director sign-off requires Verify done and only the configured Director (default farhan@travkings.com) may sign.', r: 'approvalChain.js:137' },
     { t: 'Owner sign-off requires Verify done and only the configured Owner (default afshin.dhanani@kingsgroupco.com) may sign.', r: 'approvalChain.js:143' },
     { t: 'Check/Verify actions are only allowed on a Pending entry.', r: 'approvalChain.js:124' },
-    { t: 'A branch-accountant ERP entry is routed into the chain (pre-stamped checkedBy so it starts at Verify) when approval.chain_branch_entries is engaged.', r: 'vouchers.service.js:228' },
+    { t: 'A branch-accountant ERP entry is routed into the chain (pre-stamped checkedBy so it starts at Verify) when the Branch Accountant is switched under control (control.role.branch_accountant).', r: 'vouchers.service.js' },
     { t: 'Default configurable voucher chain is Verify (AccountsExecutive) → Approve (FinanceManager); role ranks BranchAccountant 1 < AE 2 < FM 3 < Director 4 < Owner 5.', r: 'approvalEngine.js:10,12' },
     { t: 'Chain levels at or below the maker\'s own rank are dropped (a senior maker needs fewer approvals).', r: 'approvalEngine.js:84' },
   ]},

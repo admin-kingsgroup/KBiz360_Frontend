@@ -39,7 +39,7 @@ export function asEmailList(v, fallback = []) {
 
 /** Build the Control Panel view model from the raw config.
  *  @param {{verifyEmails?:any, approveEmails?:any, flags?:object}} cfg
- *  @returns {{levels:Array, verify:string[], approve:string[], aeCanApprove:boolean, masterOn:boolean}} */
+ *  @returns {{levels:Array, verify:string[], approve:string[], aeCanApprove:boolean, people:Array}} */
 export function approvalChainView(cfg = {}) {
   const verify = asEmailList(cfg.verifyEmails, DEFAULT_VERIFY);
   const approve = asEmailList(cfg.approveEmails, DEFAULT_APPROVE);
@@ -103,7 +103,7 @@ export function roleControlWarning(roleKey, view = {}) {
  *  ROUTE to Check → Verify → Approve, and WHY. Mirrors the BE create() guard (Enforcement
  *  Matrix + per-role switches + owner-cosign + branch-entry chain). `store` = voucher-policy
  *  store; `flags` = flag-state payload; `rowKey` = a Matrix row (booking/inb/receipt/…);
- *  `role` = a ROLE_SWITCHES key. Returns { routed, reasons:[{rule,detail}], masterOn }. Pure. */
+ *  `role` = a ROLE_SWITCHES key. Returns { routed, reasons:[{rule,detail}] }. Pure. */
 export function policyTest({ store, flags, branch, rowKey, amount, role } = {}) {
   const reasons = [];
   const amt = Math.abs(Number(amount) || 0);

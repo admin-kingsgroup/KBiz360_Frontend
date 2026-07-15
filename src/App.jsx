@@ -10,7 +10,7 @@ import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
 import { ErrorBoundary } from './shell/ErrorBoundary';
-import { pickBranchForUser, withCanonicalRole } from './core/branchScope';
+import { pickBranchForUser, withCanonicalRole, applyRenewedAccess } from './core/branchScope';
 import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
@@ -278,14 +278,15 @@ export default function KB360App(){
         // Visibility Control) without forcing a re-login. Only re-render when the
         // hidden set actually changed, so this renew loop never re-triggers itself.
         if(r.user){
+          // Apply the server's re-read access (role / branch scope / view-only / page-
+          // visibility) so an admin's change in Settings → Users & Roles takes effect within
+          // the 10-min renew cycle WITHOUT a full re-login. Previously only `hidden` was
+          // picked up, so a promoted role (e.g. AE → Sr. Accounts Executive) kept the old,
+          // non-central menu until re-login. applyRenewedAccess returns the SAME reference
+          // when nothing changed, so this renew loop never re-triggers itself.
           setCurrentUser(prev=>{
-            if(!prev) return prev;
-            const next=Array.isArray(r.user.hidden)?r.user.hidden:[];
-            const prevH=Array.isArray(prev.hidden)?prev.hidden:[];
-            const same=prevH.length===next.length && prevH.every(k=>next.includes(k));
-            if(same) return prev;
-            const merged={...prev, hidden:next};
-            try{ localStorage.setItem("kb360-user", JSON.stringify(merged)); }catch{ /* ignore */ }
+            const merged=applyRenewedAccess(prev, r.user);
+            if(merged!==prev){ try{ localStorage.setItem("kb360-user", JSON.stringify(merged)); }catch{ /* ignore */ } }
             return merged;
           });
         }

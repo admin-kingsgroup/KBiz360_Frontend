@@ -28,6 +28,35 @@ export function isFullScope(user) {
   return !user || FULL_SCOPE_ROLES.includes(user?.role);
 }
 
+// Merge the server's RE-READ access (returned by /auth/refresh) into the cached user so an
+// admin's change in Settings → Users & Roles (role / branch scope / view-only / page-
+// visibility) takes effect within the renew cycle WITHOUT a full re-login. Returns the SAME
+// reference when nothing the UI depends on changed (so the renew loop never re-renders
+// itself), else a new object. Role is canonicalised (super_admin ⇒ Super Admin) like login.
+// Only `hidden` used to be applied, so a promoted role (e.g. AE → Sr. Accounts Executive)
+// kept the old menu — no TK Group Central / Tally Reconciliation — until the user re-logged.
+export function applyRenewedAccess(prev, fresh) {
+  if (!prev || !fresh) return prev;
+  const u = withCanonicalRole(fresh);
+  const arrEq = (a, b) => { const x = Array.isArray(a) ? a : []; const y = Array.isArray(b) ? b : []; return x.length === y.length && x.every((k) => y.includes(k)); };
+  const merged = {
+    ...prev,
+    role: u.role || prev.role,
+    branches: u.branches !== undefined ? u.branches : prev.branches,
+    allBranches: u.allBranches !== undefined ? u.allBranches : prev.allBranches,
+    viewOnly: u.viewOnly !== undefined ? u.viewOnly : prev.viewOnly,
+    hidden: Array.isArray(u.hidden) ? u.hidden : (prev.hidden || []),
+    granted: Array.isArray(u.granted) ? u.granted : (prev.granted || []),
+  };
+  const same = merged.role === prev.role
+    && merged.allBranches === prev.allBranches
+    && merged.viewOnly === prev.viewOnly
+    && arrEq(merged.branches, prev.branches)
+    && arrEq(merged.hidden, prev.hidden)
+    && arrEq(merged.granted, prev.granted);
+  return same ? prev : merged;
+}
+
 // A NON-full-scope user (GM / BM / Branch Accountant) with NO branch assigned has no
 // access to anything — they must NOT fall back to seeing all branches. An admin has to
 // assign them a branch first.

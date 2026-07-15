@@ -65,7 +65,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
       <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
         <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Report</h1>
         <EmptyState title="Central closing tier"
-          hint="The Branch Accountant works the WEEKLY cycle only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
+          hint="The Branch Accountant works the Daily & Weekly freeze only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
           action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/reports/weekly')}>Open Weekly Report</Button>} />
       </div>
     );
