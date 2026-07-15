@@ -1363,7 +1363,7 @@ export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain 
   // 'vouchers' keeps the combined queue for alert deep-links.
   const catDomain = VOUCHER_KEYS.has(domain) ? domain : '';
   return (
-    <div style={{ margin: 12 }}>
+    <div style={{ margin: '12px 0' }}>
       <FocusBanner />
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
         {seg('sopogp', 'SO / PO / GP')}{seg('inbspg', 'INB')}
