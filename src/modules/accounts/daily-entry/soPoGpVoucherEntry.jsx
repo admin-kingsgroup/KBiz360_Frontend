@@ -432,6 +432,23 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // BOM bills IGST on its service fee even to an African branch, so a BOM sale is never
   // a zero-rated export — only other branches' cross-border legs are (seller-side only).
   const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch) && brCode !== 'BOM';
+  // ── Inter-branch cross-currency FX (manual, per deal — no daily rate) ─────────
+  // India branches book ₹, Africa branches book $. When the two ends differ the deal is
+  // CROSS-CURRENCY: the seller keys ONE frozen rate (1 USD = ₹x) on this INSO voucher; the
+  // buyer branch's converted INPO is derived from it on push. Same-currency deals never
+  // see the field. The rate is frozen onto the deal on save (fx on the INB payload).
+  const [fxRate, setFxRate] = useState(editing ? (editBooking.fx && editBooking.fx.rate ? String(editBooking.fx.rate) : '') : '');
+  const inbCcyOf = (code) => (((bc({ code }) || {}).cur) === '$' ? 'USD' : 'INR');
+  const sellerCcy = inbCcyOf(brCode);
+  const buyerCcy = interBranch && toBranch ? inbCcyOf(toBranch) : sellerCcy;
+  const crossCcy = interBranch && !!toBranch && sellerCcy !== buyerCcy;
+  const fxRateNum = num(fxRate);
+  // Manual IGST tick — bill tax on the Service Fee even cross-border. A same-country inter-state
+  // deal is always taxable (tick locked ON); a cross-border deal defaults OFF (zero-rated export)
+  // and the seller ticks it to bill IGST (added to what the buyer branch pays).
+  const crossBorderInb = interBranch && !!toBranch && inbCrossBorder(brCode, toBranch);
+  const [billIgstCB, setBillIgstCB] = useState(editing ? !!(editBooking.billIgst) : false);
+  const billIgst = interBranch ? (crossBorderInb ? billIgstCB : true) : undefined;
 
   // Switching module reloads the seed grid for that module — never while editing
   // (the module is locked to the existing voucher so its lines aren't wiped).
@@ -577,7 +594,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const needsScope = hasPackage && !packageType;
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = interBranch
-    ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope)  // INB: counterparty branch + sale value + Int'l/Domestic for Flights/Holiday
+    ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope && (!crossCcy || fxRateNum > 0))  // INB: counterparty + sale value + Int'l/Domestic for Flights/Holiday + FX rate on a cross-currency deal
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
       && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)));
 
@@ -604,10 +621,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       const inbBody = {
         fromBranch: brCode, toBranch, date, module: moduleCode,
         packageType: hasPackage ? packageType : '', passenger: pax, reference: saleTallyRef || headerRef,
-        fareLines, serviceFee,
+        fareLines, serviceFee, billIgst,
         noSupplier: isNoSupp,
         supplier: hasPurchase ? { name: supplier.name, ledgerName: supplier.ledgerName || supplier.name, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name), foreign: suppForeign } : null,
         purchase: hasPurchase ? { heads: totals.po.heads || [], gst: totals.po.gst || 0, incentiveAmt: totals.po.incentiveAmt || 0, incentiveTds: totals.po.incentiveTds || 0, gstMode: purGstMode } : null,
+        // Freeze the manual FX quote onto a cross-currency deal (base USD, quote INR) so the
+        // buyer branch's converted INPO is derived from it; omitted for same-currency deals.
+        ...(crossCcy ? { fx: { base: 'USD', quote: 'INR', rate: fxRateNum, date, fromCcy: sellerCcy, toCcy: buyerCcy, source: 'manual' } } : {}),
       };
       // Editing an existing INB deal → rebuild BOTH pending legs as a unit (reason to the
       // audit trail); a fresh voucher raises a new deal. Same body either way.
@@ -825,7 +845,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
   // The Purchase Order section — step ② of the full entry form.
   const poSection = !isNoSupp && (
-    <Section n="2" badge="PO" name="Purchase Order" sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
+    <Section n="2" badge={interBranch ? 'INPO' : 'PO'} name={interBranch ? 'Inter-Branch Purchase Order' : 'Purchase Order'} sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
       {!editing && (openInbQ.data || []).length > 0 && (
         <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
@@ -909,7 +929,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       <div style={{ ...card, border: '1px solid #dfe2e7', borderLeft: '4px solid ' + GOLD, borderRadius: 4, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
         <div style={{ padding: '14px 18px', background: DARK, borderBottom: '3px solid ' + GOLD, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (interBranch ? 'INTER-BRANCH (INB) VOUCHER' : 'SO / PO / GP VOUCHER')}</p>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>{editing ? `EDIT — ${editBooking.bookingNo}` : (interBranch ? 'INSO / INPO / INGP VOUCHER' : 'SO / PO / GP VOUCHER')}</p>
             <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#8A8A84' }}>
               {editing
                 ? <>Fix any data-entry mistake — or switch the <b style={{ color: GOLD }}>module</b> if it was booked wrong — then <b style={{ color: GOLD }}>Save changes</b> · {brCode} · returns to Pending; approve it from the Pending queue</>
@@ -935,7 +955,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <span style={{ padding: '5px 12px', borderRadius: 4, background: GOLD_SOFT, color: GOLD_DEEP, fontWeight: 800, letterSpacing: '.5px', fontFamily: 'monospace', fontSize: 13 }}>{editing ? (editBooking.linkNo || '—') : (interBranch ? 'INB Link · on save' : `${nextLinkNo} · on save`)}</span>
           <span style={{ fontSize: 10.5, color: '#9197a3', fontStyle: 'italic' }}>{interBranch ? 'links the Inter-Branch Sale & Supplier Purchase of this voucher' : 'links the Sales Order, Purchase Order & Gross Profit of this invoice'}</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            {(interBranch ? ['INB', 'SO', 'PO', 'GP'] : ['SO', 'PO', 'GP']).map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: c === 'INB' ? GOLD : GOLD_SOFT, color: c === 'INB' ? '#fff' : GOLD_DEEP }}>{c}</span>)}
+            {(interBranch ? ['INSO', 'INPO', 'INGP'] : ['SO', 'PO', 'GP']).map((c) => <span key={c} style={{ fontSize: 9, fontWeight: 800, padding: '3px 9px', borderRadius: 20, background: interBranch ? GOLD : GOLD_SOFT, color: interBranch ? '#fff' : GOLD_DEEP }}>{c}</span>)}
           </span>
         </div>
       </div>
@@ -1037,6 +1057,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
           )}
           {interBranch ? (
+            <>
             <FL label={<>To Branch (counterparty) <span style={{ color: '#dc2626' }}>*</span></>}>
               <DropdownMenu
                 ariaLabel="To Branch"
@@ -1052,6 +1073,26 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 )}
               />
             </FL>
+            {crossCcy && (
+              <FL label={<>Deal FX Rate — 1 USD = ₹ <span style={{ color: '#dc2626' }}>*</span></>}>
+                <input type="number" min="0" step="0.0001" value={fxRate} onChange={(e) => setFxRate(e.target.value)} placeholder="e.g. 95" style={inp} />
+                <p style={fxRateNum > 0 ? hintOk : hintWarn}>
+                  {fxRateNum > 0
+                    ? <>✓ {toBranch} books in {buyerCcy}: {(bc({ code: toBranch }) || {}).cur}{round2(sellerCcy === 'INR' ? num(totals.so.total) / fxRateNum : num(totals.so.total) * fxRateNum).toLocaleString()}</>
+                    : <>⚠ {sellerCcy} → {buyerCcy} deal — enter the frozen rate so {toBranch} books in {buyerCcy}</>}
+                </p>
+              </FL>
+            )}
+            {crossBorderInb && (
+              <FL label="IGST on Service Fee">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer', fontSize: 12.5, color: '#1F2328' }}>
+                  <input type="checkbox" checked={billIgst} onChange={(e) => setBillIgstCB(e.target.checked)} />
+                  <span>Bill IGST 18% even cross-border</span>
+                </label>
+                <p style={billIgst ? hintOk : hintMuted}>{billIgst ? `✓ Billed — added to what ${toBranch} pays` : 'Zero-rated export — no IGST on the Service Fee'}</p>
+              </FL>
+            )}
+            </>
           ) : (
           <FL label="Client Ledger *">
             <PartyPicker branch={branch} kind="customer" value={{ name: customer.ledgerName, group: customer.ledgerGroup }} subGroupFilter={clientType}
@@ -1169,7 +1210,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       </div>
 
       {/* ① Sales Order */}
-      <Section n="1" badge="SO" name="Sales Order" sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={SO_BAR}>
+      <Section n="1" badge={interBranch ? 'INSO' : 'SO'} name={interBranch ? 'Inter-Branch Sales Order' : 'Sales Order'} sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={SO_BAR}>
         <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #d8e0ea' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
             <thead><tr style={{ borderBottom: '2px solid ' + SO_BAR }}>
@@ -1250,7 +1291,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       )}
 
       {/* ③ Gross Profit */}
-      <Section n="3" badge="GP" name="Gross Profit" sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
+      <Section n="3" badge={interBranch ? 'INGP' : 'GP'} name={interBranch ? 'Inter-Branch Gross Profit' : 'Gross Profit'} sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
           <GpCard k={'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
           <GpCard k={'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
