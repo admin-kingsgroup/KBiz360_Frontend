@@ -47,7 +47,7 @@ export function Gstr2bPage() {
   ];
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
       <p className="max-w-3xl text-sm text-ink-muted">
         Import the month's <b>GSTR-2B</b> from the GST portal and match each invoice to the purchase it belongs to.
         The <b>Control Tower</b> gates the close on unmatched input credit, so what you claim ties out to what suppliers filed.
