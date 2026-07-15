@@ -236,6 +236,10 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
     enabled: central,
   });
   const rows = data?.rows || [];
+  // ERP chart names for the current view — passed to the TB parser so a real ERP ledger the
+  // upload lists is never silently dropped over a blank/zero balance cell (mirrors the
+  // backend importTB guard); it surfaces as an 'off' gap instead of "in ERP, not in Tally".
+  const erpLedgerNames = useMemo(() => new Set(rows.map((r) => r.erpLedger).filter(Boolean).map((n) => String(n).trim().toLowerCase())), [rows]);
   const counts = data?.counts || {};
   const imported = data?.imported || {};
   // Group subtotal rows a grouped upload carried that DIDN'T reconcile to their ledgers —
@@ -319,7 +323,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const pickFile = async (file, kind) => {
     if (!file) return;
     setParsing(kind);
-    try { const r = await (kind === 'db' ? parseDayBookFile(file) : parseTBFile(file)); (kind === 'db' ? setDbFile : setTbFile)({ rows: r.rows || [], error: r.error || '', note: r.note || '', name: file.name }); }
+    try { const r = await (kind === 'db' ? parseDayBookFile(file) : parseTBFile(file, { erpLedgers: erpLedgerNames })); (kind === 'db' ? setDbFile : setTbFile)({ rows: r.rows || [], error: r.error || '', note: r.note || '', name: file.name }); }
     catch (e) { (kind === 'db' ? setDbFile : setTbFile)({ rows: [], error: e.message, name: file.name }); }
     finally { setParsing(''); }
   };
