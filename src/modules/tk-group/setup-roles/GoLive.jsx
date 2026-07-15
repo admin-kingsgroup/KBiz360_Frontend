@@ -2,20 +2,20 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getFlagState } from '../api/flags';
 import { getPendingByType } from '../api/governance';
-import { goLiveSteps, masterIsOn } from '../utils/goLive';
+import { goLiveSteps, enforcementEngaged } from '../utils/goLive';
 import { Button, Card } from '../../../shell/primitives';
 
 // ─── TK GROUP · FE · Go-Live checklist (container) ───────────────────────────
-// A guided view of exactly where go-live stands: is the control catalogue ready, has
-// the master switch been proposed, approved, and engaged. Read-only status; the actual
-// flip happens on Control Flags → Approvals (dual-approved, reversible).
+// A guided view of exactly where go-live stands: is the control catalogue ready, are the
+// foundation rules enforcing, and have the configurable rules been engaged. There is no
+// master switch — enforcement goes live rule-by-rule in the Control Panel (reversible).
 
 export function GoLive({ setRoute }) {
   const fq = useQuery({ queryKey: ['tk', 'flags'], queryFn: getFlagState, staleTime: 15_000 });
   const pq = useQuery({ queryKey: ['tk', 'pending', 'flag'], queryFn: () => getPendingByType('flag'), staleTime: 15_000 });
   const flagState = fq.data || { flags: {} };
   const pendingFlagCount = (pq.data || []).length;
-  const on = masterIsOn(flagState);
+  const on = enforcementEngaged(flagState);
   const steps = goLiveSteps(flagState, pendingFlagCount);
 
   return (
@@ -26,8 +26,8 @@ export function GoLive({ setRoute }) {
         </div>
         <div className="mt-0.5 text-xs text-ink-muted">
           {on
-            ? 'Enforcement is active. Toggle the master control off (dual-approved) to roll back.'
-            : 'Nothing is enforced yet. Follow the steps below to go live — it stays fully reversible.'}
+            ? 'Enforcement is active. Switch the rules off in the Control Panel to roll back — the always-on defaults still apply.'
+            : 'Only the always-on default rules apply. Follow the steps below to go live — it stays fully reversible.'}
         </div>
       </div>
 

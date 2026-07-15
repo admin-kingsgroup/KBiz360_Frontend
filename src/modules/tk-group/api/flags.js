@@ -22,3 +22,10 @@ export async function proposeFlags(flags) {
 export async function setFlag(key, enabled, branch) {
   return apiPost('/api/tk/flags/set', { key, enabled, branch: branch || 'default' });
 }
+
+// Owner-only BULK flip — Enable all / Disable all for a branch scope in one request.
+// `changes` = [{ key, enabled, branch }]. Returns the new flag state ({ flags, enabled }),
+// same shape as getFlagState so it drops straight into the query cache.
+export async function setManyFlags(changes) {
+  return apiPost('/api/tk/flags/set-many', { changes });
+}

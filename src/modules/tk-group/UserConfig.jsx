@@ -62,7 +62,7 @@ export function UserConfig({ go, branch = 'default' }) {
   return (
     <div data-testid="user-config">
       <p className="mb-3 mt-1 max-w-[84ch] text-[13.5px] text-ink-muted">
-        Every user, with role · branches · app access, and their <b>approval ceiling</b> for <b>{meta.label}</b>. Above the ceiling an approver is blocked — a higher approver must sign (enforced when that branch’s guard is on). {owner ? 'Saves apply live.' : 'Changes are submitted for the Owner’s approval.'} Full per-user rules (branch/module/2FA/view-only) live in the <button className="underline" onClick={() => go && go('/tk/user-rules')}>User Control Center</button>.
+        Every user, with role · branches · app access, and their <b>approval ceiling</b> for <b>{meta.label}</b>. Above the ceiling an approver is blocked — a higher approver must sign (enforced when the branch’s approval controls are engaged). {owner ? 'Saves apply live.' : 'Changes are submitted for the Owner’s approval.'} Full per-user rules (branch/module/2FA/view-only) live in the <button className="underline" onClick={() => go && go('/tk/user-rules')}>User Control Center</button>.
       </p>
 
       {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}

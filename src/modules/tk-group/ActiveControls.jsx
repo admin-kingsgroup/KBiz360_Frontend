@@ -17,7 +17,8 @@ export function ActiveControls() {
   const labelOf = (c) => (realBranches.find((x) => x.code === c) || {}).label || c;
 
   const active = activeControls(flags, codes);
-  const guardOn = active.some((a) => a.key === 'core.policy_guard' && a.globalOn);
+  // Enforcement is engaged for the group once ANY control is on (there is no master switch).
+  const anyOn = active.length > 0;
 
   // Where a control is on: "All branches" when global (unless a branch turned it off), else
   // the specific branches it's overridden ON for.
@@ -35,9 +36,9 @@ export function ActiveControls() {
         Everything that is <b>engaged right now</b>, and where — pulled live from the control flags. Use it as the go-live board: nothing enforces until it appears here.
       </p>
 
-      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${guardOn ? 'border-danger/40 bg-danger-soft' : 'border-warning/40 bg-warning-soft'}`}>
-        <Badge tone={guardOn ? 'danger' : 'warning'}>{guardOn ? 'Master guard engaged' : 'Master guard dormant'}</Badge>
-        <span className={`text-[12px] ${guardOn ? 'text-danger' : 'text-warning'}`}>
+      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${anyOn ? 'border-success/40 bg-success-soft' : 'border-warning/40 bg-warning-soft'}`}>
+        <Badge tone={anyOn ? 'success' : 'warning'}>{anyOn ? 'Enforcement engaged' : 'All dormant'}</Badge>
+        <span className={`text-[12px] ${anyOn ? 'text-success' : 'text-warning'}`}>
           {active.length === 0 ? 'Nothing is engaged — every control is off.' : `${active.length} control${active.length > 1 ? 's' : ''} engaged.`}
         </span>
       </div>

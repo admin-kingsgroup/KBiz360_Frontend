@@ -75,16 +75,13 @@ export function PolicyTester({ branch = 'default' }) {
             ))}
           </ul>
         ) : (
-          <div className="mt-2 text-[12px] text-ink-muted">No control routes this voucher — it posts on approval the single-step way (the maker can clear it, unless SoD applies).</div>
-        )}
-        {result.masterOn && (
-          <div className="mt-2 rounded-md bg-warning-soft px-2.5 py-1.5 text-[11px] text-warning">🛡️ The master guard is engaged for this branch — segregation-of-duties, cash caps and back-date limits also apply on top of the above.</div>
+          <div className="mt-2 text-[12px] text-ink-muted">No control routes this voucher — it posts on approval the single-step way (the maker can clear it, unless it is under control).</div>
         )}
       </div>
 
       <div className="mt-[16px] flex items-start gap-2.5 rounded-[9px] border border-surface-border bg-surface-alt px-[15px] py-3 text-[12px] text-ink-muted">
         <span>ℹ️</span>
-        <span>This mirrors the live entry guard: the <b>Enforcement Matrix</b> row for the type, the per-<b>role</b> switch, <b>Owner co-sign</b> on refund/reissue, and the branch-entry chain. A booking-folder or INB deal keeps its own approval flow regardless.</span>
+        <span>This mirrors the live entry guard: the <b>Enforcement Matrix</b> row for the type, the per-<b>role</b> control switch, and <b>Owner co-sign</b> on refund/reissue. A booking-folder or INB deal keeps its own approval flow regardless.</span>
       </div>
     </div>
   );

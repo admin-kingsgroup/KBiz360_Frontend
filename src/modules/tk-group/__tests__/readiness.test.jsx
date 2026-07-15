@@ -18,7 +18,7 @@ describe('readinessFromFlags', () => {
     expect(r.total).toBe(4);
     expect(r.engaged).toBe(2);                 // hide_statements (enabled) + pending_by_default (foundation)
     expect(r.pct).toBe(50);
-    expect(r.masterOn).toBe(false);            // core.policy_guard off
+    expect(r.anyOn).toBe(true);                // a non-foundation control (hide_statements) is on
   });
   test('foundation flags count as engaged', () => {
     const r = readinessFromFlags(FLAG_STATE);
@@ -26,13 +26,18 @@ describe('readinessFromFlags', () => {
     expect(found.on).toBe(true);
     expect(found.foundation).toBe(true);
   });
-  test('masterOn true when core.policy_guard is enabled', () => {
-    const r = readinessFromFlags({ flags: { 'core.policy_guard': { enabled: true } } });
-    expect(r.masterOn).toBe(true);
+  test('anyOn false when only foundation flags are on (defaults-only)', () => {
+    const r = readinessFromFlags({ flags: { 'core.audit_log': { foundation: true } } });
+    expect(r.anyOn).toBe(false);               // foundation does not count as "engaged"
+    expect(r.pct).toBe(100);
+  });
+  test('anyOn true when a configurable control is enabled', () => {
+    const r = readinessFromFlags({ flags: { 'entry.mandatory_docs': { enabled: true } } });
+    expect(r.anyOn).toBe(true);
     expect(r.pct).toBe(100);
   });
   test('empty / missing state is safe', () => {
-    expect(readinessFromFlags(undefined)).toEqual({ total: 0, engaged: 0, pct: 0, masterOn: false, items: [] });
+    expect(readinessFromFlags(undefined)).toEqual({ total: 0, engaged: 0, pct: 0, anyOn: false, items: [] });
   });
 });
 
@@ -53,6 +58,6 @@ describe('ConfigReadiness', () => {
     // wait for the query to resolve (a control row appears)
     expect(await screen.findByText('Master control')).toBeInTheDocument();
     expect(await screen.findByText('50%')).toBeInTheDocument();          // 1 of 2 engaged
-    expect(screen.getByText(/Dormant · migration-safe/)).toBeInTheDocument(); // master off
+    expect(screen.getByText(/Engaged · enforcing/)).toBeInTheDocument(); // a configurable control is on
   });
 });

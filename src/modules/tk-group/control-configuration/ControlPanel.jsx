@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getFlagState, proposeFlags, setFlag } from '../api/flags';
+import { getFlagState, proposeFlags, setFlag, setManyFlags } from '../api/flags';
 import { withBranchToggled, isFlagOn } from '../utils/flags';
 import { useConfigValue } from '../../../core/useAccounting';
 import { isOwner } from '../utils/owner';
@@ -16,24 +16,21 @@ import { ChangeLog } from '../ChangeLog';
 import { Delegation } from '../Delegation';
 import { BreakGlass } from '../BreakGlass';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
-import { approvalChainView, POWER_SCREENS, CONTROL_LISTS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning } from '../utils/controlPanel';
-import { readinessFromFlags } from '../utils/readiness';
+import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES } from '../utils/controlPanel';
 import { Badge } from '../../../shell/primitives';
 
-// ─── TK GROUP CENTRAL · Control Panel → Power Console ─────────────────────────
-// The Owner's power console: 17 screens across Enforcement / Access & Rights /
-// Governance / Oversight that decide WHO MAY DO WHAT. Everything ships OFF (dormant)
-// and is switched on one-by-one and user-by-user. This view is READ-ONLY — it shows
-// the true state (real flags + approval config) and routes to Control Flags / Limits,
-// where changes are proposed and Owner-approved. Nothing here enforces or disrupts
-// current work.
+// ─── TK GROUP CENTRAL · Control Panel ────────────────────────────────────────
+// Two rule screens — DEFAULT RULES (always-on foundation locks, read-only) and
+// CONFIGURABLE RULES (the Owner's ON/OFF switches, grouped) — plus the enforcement
+// tools and reference/oversight screens. There is NO master switch: enforcement
+// engages rule-by-rule (with an Enable-all / Disable-all bulk action). Everything ships
+// OFF (dormant) and the always-on foundation rules apply on day one.
 const CAP_GLYPH = { full: '●', cond: '◐', none: '○' };
 const CAP_COLOR = { full: 'text-success', cond: 'text-warning', none: 'text-ink-subtle' };
 
-const Off = () => <Badge tone="neutral" size="sm">Off</Badge>;
 const H3 = ({ children }) => <h3 className="mb-2 mt-5 text-[15px] font-semibold text-ink">{children}</h3>;
-// Interactive switch — flipping it PROPOSES the change (Owner-approved), it does not
-// flip live. Off = grey, On = teal (crit = red for money controls).
+// Interactive switch — the Owner flips it live; everyone else proposes the change.
+// Off = grey, On = teal (crit = red for money controls).
 function Toggle({ on, crit, onClick, label }) {
   return (
     <button type="button" role="switch" aria-checked={!!on} aria-label={label} onClick={onClick}
@@ -42,115 +39,90 @@ function Toggle({ on, crit, onClick, label }) {
     </button>
   );
 }
-function Row({ nm, ds, st, flag, on, crit, onPropose, right, applied, guarded, planned, declined }) {
-  const control = right !== undefined ? right
-    : flag ? <Toggle on={on} crit={crit} label={nm} onClick={() => onPropose && onPropose(flag)} />
-    : applied ? <Badge tone="success" size="sm">Active</Badge>
-    : guarded ? <Badge tone="info" size="sm">Via master guard</Badge>
-    : declined ? <Badge tone="neutral" size="sm">Not required</Badge>
-    : planned ? <Badge tone="neutral" size="sm">Planned</Badge>
-    : <Off />;
-  const state = flag ? (on ? 'On' : 'Off') : applied ? 'Active now' : guarded ? 'Engages with the master guard' : declined ? 'Owner decided — not adopted' : planned ? 'Not built yet' : 'Off';
-  const engaged = flag ? on : applied;
-  const accentColor = engaged ? (crit ? '#dc2626' : '#16a34a') : '#cdd1d8';
+// A configurable rule row — the toggle proposes (or, for the Owner, flips live).
+function SwitchRow({ nm, ds, flag, on, crit, onPropose }) {
+  const accentColor = on ? (crit ? '#dc2626' : '#16a34a') : '#cdd1d8';
   return (
     <div className="flex items-start gap-3 rounded-brand border border-l-4 border-surface-border bg-surface p-3.5 shadow-sm transition-colors" style={{ borderLeftColor: accentColor }}>
       <div className="min-w-0 flex-1">
         <div className="text-[13.5px] font-semibold text-ink">{nm}</div>
         {ds && <div className="mt-0.5 text-[11.5px] text-ink-muted">{ds}</div>}
-        <div className={`mt-2 inline-block rounded-full px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-wide ${engaged ? (crit ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success') : 'bg-surface-alt text-ink-subtle'}`}>
-          {state}{st ? ' · ' + st : ''}{flag ? ' · proposes to Owner' : ''}
+        <div className={`mt-2 inline-block rounded-full px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-wide ${on ? (crit ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success') : 'bg-surface-alt text-ink-subtle'}`}>
+          {on ? 'On' : 'Off'} · {flag}
         </div>
       </div>
-      {control}
+      <Toggle on={on} crit={crit} label={nm} onClick={() => onPropose && onPropose(flag)} />
     </div>
   );
 }
-const ControlList = ({ items, isOn = () => false, onPropose = () => {} }) => (
-  <div className="grid gap-2.5 tablet:grid-cols-2">{items.map((c, i) => <Row key={i} {...c} on={c.flag ? isOn(c.flag) : false} onPropose={onPropose} />)}</div>
-);
-// Check → Verify → Approve reads as a pipeline, so each level gets its own accent
-// (blue → amber → green) rather than three identical white boxes.
+// A default (always-on) rule — read-only, never a toggle.
+function DefaultRow({ nm, ds }) {
+  return (
+    <div className="flex items-start gap-3 rounded-brand border border-l-4 border-surface-border bg-surface p-3.5 shadow-sm" style={{ borderLeftColor: '#16a34a' }}>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13.5px] font-semibold text-ink">{nm}</div>
+        {ds && <div className="mt-0.5 text-[11.5px] text-ink-muted">{ds}</div>}
+      </div>
+      <Badge tone="success" size="sm">🔒 Always on</Badge>
+    </div>
+  );
+}
+// Check → Verify → Approve reads as a pipeline, so each level gets its own accent.
 const CHAIN_COLORS = ['#2563eb', '#d97706', '#16a34a'];
 function ChainCard({ k, r, w, n }) {
-  const color = CHAIN_COLORS[(n - 1) % CHAIN_COLORS.length] || '#5b616e';
+  const color = CHAIN_COLORS[((n || 1) - 1) % CHAIN_COLORS.length] || '#5b616e';
   return (
     <div className="min-w-[170px] flex-1 rounded-brand border border-t-4 border-surface-border bg-surface p-3.5 shadow-sm" style={{ borderTopColor: color }}>
-      <div className="flex items-center gap-1.5">
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: color }}>{n}</span>
-        <div className="font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">{k}</div>
-      </div>
+      {n != null && <div className="flex items-center gap-1.5"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: color }}>{n}</span><div className="font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">{k}</div></div>}
+      {n == null && <div className="font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">{k}</div>}
       <div className="mt-1.5 text-[15px] font-semibold text-ink">{r}</div>
       <div className="truncate text-[11px] text-ink-muted">{w}</div>
     </div>
   );
 }
 
-// Screens whose controls are branch-scoped — the panel branch selector shows on these.
-const BRANCH_SCOPED = new Set(['master', 'approval', 'matrix', 'rights', 'sod', 'entry', 'reports', 'limits', 'users']);
+// The role flags map back to a ROLE_SWITCHES key so the Approval group can show the
+// deadlock guardrail under the right rows.
+const ROLE_FLAG_KEY = Object.fromEntries(ROLE_SWITCHES.map((rs) => [rs.flag, rs.key]));
 
-// The control flags each nav screen directly toggles — so its pill can show a REAL "N on"
-// count for the selected branch instead of a blanket hard-coded "off". Screens not listed
-// have no directly-toggled flags (they use other stores or are display-only), so they show
-// no pill rather than a misleading state.
-const SCREEN_FLAGS = {
-  master: ['core.policy_guard'],
-  approval: ['approval.ae_can_approve', 'approval.owner_cosign_sensitive', 'control.role.branch_accountant', 'control.role.ae', 'control.role.fm', 'control.role.director', 'control.role.owner'],
-  rights: ['branch.central_relocated', 'branch.hide_statements'],
-  sod: ['approval.chain_branch_entries', 'approval.escalation_signoffs'],
-  entry: ['entry.mandatory_docs', 'close.require_recon', 'close.require_integrity'],
-  reports: ['reports.restrict_export', 'reports.log_exports', 'reports.block_branch_group_export'],
-};
+// Screens whose controls are branch-scoped — the panel branch selector shows on these.
+// (roles + masters render static content that ignores branch, so no selector there.)
+const BRANCH_SCOPED = new Set(['configurable', 'matrix', 'limits', 'users']);
+// Nav pill: the Configurable screen shows a real "N on" count of its flags for the branch.
+const SCREEN_FLAGS = { configurable: CONFIGURABLE_FLAGS };
 
 export function ControlPanel({ setRoute }) {
-  const [screen, setScreen] = useState('master');
+  const [screen, setScreen] = useState('defaults');
   const [branch, setBranch] = useState('default');   // panel-wide branch scope for the controls
   const flagsQ = useQuery({ queryKey: ['tk', 'flags'], queryFn: getFlagState, staleTime: 30_000 });
   const verify = useConfigValue('approval.verifyEmails').data;
   const approve = useConfigValue('approval.approveEmails').data;
   const v = approvalChainView({ verifyEmails: verify, approveEmails: approve, flags: flagsQ.data });
-  const r = readinessFromFlags(flagsQ.data);
   const go = (route) => setRoute && setRoute(route);
   const qc = useQueryClient();
   const [msg, setMsg] = useState('');
   const flags = flagsQ.data?.flags || {};
-  // Branch-aware: reflects the selected branch's override, falling back to the global
-  // value (and the whole panel scopes to `branch`).
+  // Branch-aware: reflects the selected branch's override, falling back to the global value.
   const isOn = (key) => isFlagOn(flagsQ.data, key, branch);
   const branchLabel = (LIMIT_BRANCHES.find((b) => b.code === branch) || {}).label || branch;
   const scoped = branch !== 'default';
   const owner = isOwner();
-  // Flipping a control: the OWNER has full override, so their click applies the flag
-  // LIVE (self-approved) and the toggle moves at once — the server returns the new flag
-  // state, which we drop straight into the query cache. Everyone else PROPOSES the
-  // change through the Owner-approved change-request flow (it never flips live for them).
-  // Either way it is written to the audit trail. Dormant-safe: even an engaged flag stays
-  // guarded by core.policy_guard until that master switch is itself on.
+
+  // Flipping a control: the OWNER has full override, so their click applies the flag LIVE
+  // (self-approved) and the toggle moves at once. Everyone else PROPOSES the change through
+  // the Owner-approved change-request flow. Either way it is written to the audit trail.
+  // There is no master switch, so no rule needs a special confirm — every flip is one click.
   const onPropose = async (key) => {
     const turningOn = !isOn(key);
     const where = scoped ? ` for ${branchLabel}` : '';
-    // The MASTER switch engages/disengages enforcement — too consequential for a bare
-    // click, so the Owner's live flip is confirmed first. Every other control stays a
-    // one-click instant flip. (Non-Owners only propose.)
-    if (owner && key === 'core.policy_guard') {
-      const { confirmed } = await confirmDialog({
-        title: turningOn ? `Engage the TK Group guard${where}?` : `Disengage the TK Group guard${where}?`,
-        message: turningOn
-          ? `This turns ON enforcement ${scoped ? `for ${branchLabel}` : 'across all branches'} immediately — approval chains, segregation-of-duties, cash caps, back-date limits and master-write staging all begin applying to everyone except you. You can switch it back off here at any time.`
-          : `This turns OFF the control layer ${scoped ? `for ${branchLabel}` : '(all branches)'} immediately — nothing is enforced there and nobody is blocked. Individual controls keep their settings but stop applying until you re-engage the guard.`,
-        danger: true,
-        confirmLabel: turningOn ? 'Engage guard' : 'Disengage guard',
-      });
-      if (!confirmed) return;                                        // cancelled — no change, no toast
-    }
     setMsg('');
     try {
       if (owner) {
-        const next = await setFlag(key, turningOn, branch);         // live flip (branch-scoped) → { flags, enabled }
-        qc.setQueryData(['tk', 'flags'], next);                     // toggle reflects immediately
+        const next = await setFlag(key, turningOn, branch);         // live flip (branch-scoped)
+        qc.setQueryData(['tk', 'flags'], next);
         const lab = (next && next.flags && next.flags[key] && next.flags[key].label) || key;
         toastSuccess(`${lab}${where} — ${turningOn ? 'ON' : 'OFF'}`);
-        setMsg(`“${key}”${where} is now ${turningOn ? 'ON' : 'OFF'}${turningOn && key === 'core.policy_guard' ? ` — the guard is engaged${where} and controls now enforce.` : '.'}`);
+        setMsg(`“${key}”${where} is now ${turningOn ? 'ON' : 'OFF'}.`);
       } else {
         await proposeFlags(withBranchToggled(flagsQ.data || { flags: {} }, key, branch));
         toastInfo('Submitted for the Owner’s approval.');
@@ -164,102 +136,106 @@ export function ControlPanel({ setRoute }) {
     }
   };
 
+  // Enable-all / Disable-all — OWNER only, one request over every configurable flag for the
+  // current branch scope. This is the go-live / rollback that used to be the master switch.
+  const onBulk = async (enable) => {
+    const label = enable ? 'Enable all' : 'Disable all';
+    const where = scoped ? ` for ${branchLabel}` : '';
+    const { confirmed } = await confirmDialog({
+      title: `${label} configurable rules${where}?`,
+      message: enable
+        ? `This switches ON all ${CONFIGURABLE_FLAGS.length} configurable rules ${scoped ? `for ${branchLabel}` : 'across the Group default'} in one action. Each still applies only to the entries it governs, and the always-on foundation rules are unaffected. You can switch any back off individually.`
+        : `This switches OFF all ${CONFIGURABLE_FLAGS.length} configurable rules ${scoped ? `for ${branchLabel}` : '(Group default)'} — enforcement returns to the always-on foundation rules only. Reversible any time.`,
+      danger: !enable,
+      confirmLabel: label,
+    });
+    if (!confirmed) return;
+    setMsg('');
+    try {
+      const changes = CONFIGURABLE_FLAGS.map((key) => ({ key, enabled: enable, branch }));
+      const next = await setManyFlags(changes);
+      if (next && next.flags) qc.setQueryData(['tk', 'flags'], next);
+      toastSuccess(`${label}${where} — ${CONFIGURABLE_FLAGS.length} rules ${enable ? 'ON' : 'OFF'}`);
+      setMsg(`${label}: ${CONFIGURABLE_FLAGS.length} configurable rules ${enable ? 'ON' : 'OFF'}${where}.`);
+      qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
+    } catch (e) {
+      const m = (e && e.message) || 'Could not apply the bulk change.';
+      toastError(m);
+      setMsg(m);
+    }
+  };
+
+  const renderConfigGroup = (grp) => {
+    const isApproval = grp.group === 'Approval & Verification';
+    const overlap = isApproval ? verifyApproveOverlap(v) : [];
+    return (
+      <div key={grp.group}>
+        <H3>{grp.group}</H3>
+        {isApproval && overlap.length > 0 && (
+          <div className="mb-2 flex items-start gap-2 rounded-brand border border-danger/40 bg-danger-soft px-3 py-2 text-[12px] text-danger">
+            <span>⚠</span>
+            <span><b>Segregation-of-duties conflict:</b> {overlap.join(', ')} {overlap.length > 1 ? 'are' : 'is'} in <b>both</b> the Verify and Approve lists — the same person could verify AND give final approval on their own voucher.</span>
+          </div>
+        )}
+        <div className="grid gap-2.5 tablet:grid-cols-2">
+          {grp.items.map((c) => {
+            const roleKey = ROLE_FLAG_KEY[c.flag];
+            const warn = roleKey ? roleControlWarning(roleKey, v) : null;
+            return (
+              <div key={c.flag}>
+                <SwitchRow {...c} on={isOn(c.flag)} onPropose={onPropose} />
+                {warn && isOn(c.flag) && <div className="mt-1 flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning-soft px-2.5 py-1.5 text-[11px] text-warning"><span>⚠</span><span>{warn}</span></div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const screenBody = () => {
     switch (screen) {
-      case 'master':
+      case 'defaults':
         return (
           <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The one switch that makes every other setting live. While off, this console is advisory — nobody is blocked, nothing needs approval, your migration continues untouched.</p>
-            <Row nm="Engage the TK Group guard (go-live switch)"
-              ds="ON = enforcement engages for this scope — approval chains, segregation-of-duties, cash caps, back-date limits and master-write staging all begin applying to everyone except you. OFF = advisory only; nobody is blocked and your migration continues untouched. Flip this LAST, once the other screens are set."
-              st="core.policy_guard" flag="core.policy_guard" on={isOn('core.policy_guard')} onPropose={onPropose} />
-            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🛡️</span><span><b>Nothing is engaged.</b> This console decides who may do what; it takes no action itself. Changes are proposed on Control Flags and Owner-approved. Hand power over slowly — one control, one voucher type, one user at a time.</span></div>
+            <p className="mb-4 mt-1 max-w-[80ch] text-[13.5px] text-ink-muted">The foundation locks that are <b>always enforced</b> and can’t be switched off — they apply on day one, before you engage anything else. Read-only.</p>
+            <div className="grid gap-2.5 tablet:grid-cols-2">{DEFAULT_RULES.map((r, i) => <DefaultRow key={i} {...r} />)}</div>
           </>
         );
-      case 'approval':
+      case 'configurable':
         return (
           <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">The three-level chain and the rights on it. Switch each <b>role</b> under control one at a time below — a role with its switch off acts independently (no approval required).</p>
-            <div className="flex flex-wrap items-stretch gap-2">
-              {v.levels.map((l, i) => (
-                <React.Fragment key={l.n}>
-                  <ChainCard k={`Level ${l.n} · ${l.name}`} r={l.role} w={l.who} n={l.n} />
-                  {i < v.levels.length - 1 && (
-                    <div className="flex items-center text-ink-subtle" aria-hidden>
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-alt text-[13px]">→</span>
-                    </div>
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-            {/* SoD conflict — the same person in both Verify and Approve can clear their own voucher */}
-            {(() => {
-              const overlap = verifyApproveOverlap(v);
-              return overlap.length > 0 ? (
-                <div className="mt-3 flex items-start gap-2 rounded-brand border border-danger/40 bg-danger-soft px-3 py-2 text-[12px] text-danger">
-                  <span>⚠</span>
-                  <span><b>Segregation-of-duties conflict:</b> {overlap.join(', ')} {overlap.length > 1 ? 'are' : 'is'} in <b>both</b> the Verify and Approve lists — the same person could verify AND give final approval on their own voucher. Remove them from one level on <button className="underline" onClick={() => go('/tk/control-panel')}>Approval config</button>.</span>
-                </div>
-              ) : null;
-            })()}
-            <div className="mt-3 grid gap-2.5">
-              <Row nm="Require approval before posting" ds="Already active: every voucher starts Pending — nothing hits the books until it's approved; the maker can clear their own until a review chain is engaged. Enforced on all non-booking entries. Nothing to switch." applied />
-              <Row nm="Let Sughra also Approve (AE-approve)" ds="ON = the Accounts Executive (Sughra) may give final approval on a branch-accountant voucher, not just verify. OFF = Sughra verifies only; Faiz (FM) gives final approval."
-                st="Sughra verifies only" flag="approval.ae_can_approve" on={isOn('approval.ae_can_approve')} onPropose={onPropose} />
-              <Row nm="Owner co-sign on sensitive types" ds="ON = a refund / reissue additionally needs the Owner (Afshin) to sign before final approval — routed through the chain, no self-clear. OFF = they approve like any other voucher."
-                st="refund · reissue" flag="approval.owner_cosign_sensitive" on={isOn('approval.owner_cosign_sensitive')} onPropose={onPropose} />
-            </div>
-            <H3>Roles under control</H3>
-            <p className="mb-2 max-w-[82ch] text-[12.5px] text-ink-muted">Switch a role ON to route <b>its</b> entries through Check → Verify → Approve — <b>independently of the Master Switch</b> (like the Enforcement Matrix). OFF = that role acts on its own, no approval required.</p>
-            <div className="grid gap-2.5 tablet:grid-cols-2">
-              {ROLE_SWITCHES.map((rs) => {
-                // Deadlock guardrail: routing a sole verifier/approver through the chain
-                // leaves their own entries clearable only by the Owner (maker ≠ verifier/approver).
-                const warn = roleControlWarning(rs.key, v);
-                return (
-                  <div key={rs.flag}>
-                    <Row nm={rs.name === rs.role ? rs.role : `${rs.role} · ${rs.name}`}
-                      ds={`ON = ${rs.name}'s entries walk the approval chain (${rs.duty}). OFF = acts independently — no approval required.${rs.key === 'owner' ? ' Note: a Super Admin can still override the chain.' : ''}`}
-                      st={rs.duty} flag={rs.flag} on={isOn(rs.flag)} onPropose={onPropose} />
-                    {warn && <div className="mt-1 flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning-soft px-2.5 py-1.5 text-[11px] text-warning"><span>⚠</span><span>{warn}</span></div>}
-                  </div>
-                );
-              })}
-            </div>
-            <H3>Who is under control</H3>
-            <div className="grid gap-3 tablet:grid-cols-2">
-              {ROLE_SWITCHES.map((rs) => {
-                // Branch-aware (matches the toggles above): a role is under control when its
-                // own switch is on for the selected branch OR the master guard is engaged.
-                const under = isOn(rs.flag) || isOn('core.policy_guard');
-                const extra = rs.key === 'ae' && v.aeCanApprove ? 'can also Approve' : '';
-                return (
-                  <div key={rs.key} className={`rounded-brand border border-l-4 p-4 shadow-sm ${under ? 'border-success/40 bg-success-soft/40' : 'border-warning/40 bg-warning-soft/40'}`} style={{ borderLeftColor: under ? '#16a34a' : '#d97706' }}>
-                    <div className="flex items-center justify-between gap-2">
-                      <div><div className="text-[16px] font-semibold text-ink">{rs.name}</div><div className="text-[11px] text-ink-muted">{rs.role} · {rs.duty}</div></div>
-                      {under ? <Badge tone="success" size="sm">Under control</Badge> : <Badge tone="warning" size="sm">Independent · no approval</Badge>}
-                    </div>
-                    <p className="mt-2 text-[11px] text-ink-muted">{under ? `Operates within the approval chain${extra ? ` (${extra})` : ''}.` : 'Switched off — reacts independently, no approval required.'}</p>
-                  </div>
-                );
-              })}
+            <p className="mb-4 mt-1 max-w-[80ch] text-[13.5px] text-ink-muted">The rules you switch on one-by-one{scoped ? <> for <b>{branchLabel}</b></> : ''}. Each is independent — there is no master switch. {owner ? 'Flip any switch to apply it live.' : 'Changes are submitted for the Owner’s approval.'}</p>
+            {owner && (
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-brand border border-surface-border bg-surface-alt px-3 py-2">
+                <span className="mr-1 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">Bulk{scoped ? ` · ${branchLabel}` : ''}</span>
+                <button type="button" onClick={() => onBulk(true)} className="rounded-full border border-success/50 bg-success-soft px-3 py-1 text-[11.5px] font-semibold text-success hover:bg-success/10">Enable all</button>
+                <button type="button" onClick={() => onBulk(false)} className="rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-danger-soft hover:text-danger">Disable all</button>
+                <span className="ml-1 text-[11px] text-ink-muted">applies to all {CONFIGURABLE_FLAGS.length} configurable rules — your go-live / rollback in one action.</span>
+              </div>
+            )}
+            {CONFIGURABLE_GROUPS.map(renderConfigGroup)}
+            <div className="mt-6 rounded-brand border border-surface-border bg-surface-alt/60 p-3.5">
+              <div className="font-mono text-[9.5px] uppercase tracking-wide text-ink-subtle">Considered &amp; declined (Owner’s decision — not adopted)</div>
+              <div className="mt-1.5 grid gap-1.5 tablet:grid-cols-2">
+                {DECLINED_RULES.map((d, i) => <div key={i} className="text-[11.5px] text-ink-subtle"><b className="text-ink-muted">{d.nm}</b> — {d.ds}</div>)}
+              </div>
             </div>
           </>
         );
-      case 'matrix':
-        return <EnforcementMatrix go={go} branch={branch} />;
-      case 'tester':
-        return <PolicyTester branch={branch} />;
-      case 'active':
-        return <ActiveControls />;
-      case 'digest':
-        return <DailyDigest go={go} />;
-      case 'limits':
-        return <BranchLimitsEditor go={go} branch={branch} onBranchChange={setBranch} />;
+      case 'matrix': return <EnforcementMatrix go={go} branch={branch} />;
+      case 'tester': return <PolicyTester branch={branch} />;
+      case 'active': return <ActiveControls />;
+      case 'digest': return <DailyDigest go={go} />;
+      case 'limits': return <BranchLimitsEditor go={go} branch={branch} onBranchChange={setBranch} />;
+      case 'users': return <UserConfig go={go} branch={branch} />;
+      case 'delegation': return <Delegation />;
+      case 'breakglass': return <BreakGlass />;
+      case 'log': return <ChangeLog go={go} />;
       case 'roles':
         return (
           <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who can do what, by role — the intended posture. Nothing enforces until the Master Switch is on. ● full · ◐ conditional · ○ none.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who can do what, by role — the intended posture. ● full · ◐ conditional · ○ none.</p>
             <div className="overflow-x-auto rounded-brand border border-surface-border bg-surface">
               <table className="w-full min-w-[760px] text-[12px]">
                 <thead><tr className="bg-surface-alt text-ink-muted">{['Role', ...CAP_COLS].map((h, i) => <th key={h} className={`p-2.5 font-mono text-[9px] font-semibold uppercase tracking-wide ${i ? 'text-center' : 'text-left'}`}>{h}</th>)}</tr></thead>
@@ -275,18 +251,10 @@ export function ControlPanel({ setRoute }) {
             </div>
           </>
         );
-      case 'users':
-        return <UserConfig go={go} branch={branch} />;
-      case 'rights': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Two flags you set independently here (Relocate, Hide-statements). The rest engage automatically with the master guard — <b>Via master guard</b> means a branch write already stages for Owner approval once the guard is on, so you don't wire them separately.</p><ControlList items={CONTROL_LISTS.rights} isOn={isOn} onPropose={onPropose} /></>;
-      case 'sod': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Conflict rules — the same person can never both create and clear their own work. Most engage with the master guard; the branch-entry chain is its own live switch.</p><ControlList items={CONTROL_LISTS.sod} isOn={isOn} onPropose={onPropose} /></>;
-      case 'security': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Session-level protection at login. Single-device sessions and password strength are <b>already enforced</b>; the Owner has decided not to adopt 2FA, login-hours or IP restrictions.</p><ControlList items={CONTROL_LISTS.security} /></>;
-      case 'entry': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Guards at the point of entry and on statutory work. Mandatory-documents and reconciliation-before-close are live switches (dormant until engaged); future-date and tax-filing locks are already enforced.</p><ControlList items={CONTROL_LISTS.entry} isOn={isOn} onPropose={onPropose} /></>;
-      case 'notifications': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who is told what, and when a stale item escalates — so nothing waits unseen.</p><ControlList items={CONTROL_LISTS.notifications} /></>;
-      case 'reports': return <><p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who may export sensitive data, and the trail it leaves. These are live switches — the shared export helpers enforce them the moment you engage each flag; dormant until then.</p><ControlList items={CONTROL_LISTS.reports} isOn={isOn} onPropose={onPropose} /></>;
       case 'masters':
         return (
           <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who owns the chart of accounts and how a new party is brought on. These chains are the Owner's — locked, not freely editable.</p>
+            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">Who owns the chart of accounts and how a new party is brought on. These chains are the Owner’s — locked, not freely editable. Engage the branch-write staging on the <button className="underline" onClick={() => setScreen('configurable')}>Configurable Rules</button> screen (Masters &amp; Locks).</p>
             <H3>Masters &amp; chart of accounts</H3>
             <div className="flex flex-wrap items-center gap-2"><ChainCard k="Maker" r="Faiz" w="creates / alters heads" /><span className="text-ink-subtle">→</span><ChainCard k="Approver" r="Afshin (Owner)" w="sole approval · all 6 branches" /><Badge tone="danger" size="sm">🔒 Locked</Badge></div>
             <H3>New party onboarding</H3>
@@ -296,62 +264,32 @@ export function ControlPanel({ setRoute }) {
               <ChainCard k="③ Verify" r="Farhan" w="Director" /><span className="text-ink-subtle">→</span>
               <ChainCard k="④ Approve" r="Afshin" w="Owner · party goes active" />
             </div>
-            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🔒</span><span>Branch accountants never create parties or ledgers — they only raise a request; a party appears in branch pickers only after Afshin approves.</span></div>
-            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🛡️</span><span><b>Wired &amp; dormant:</b> customer &amp; supplier onboarding already routes through the master guard — a branch create / edit / delete stages for the Owner the moment the guard is engaged; today it applies inline, unchanged. Ledger heads stay locked to Faiz → Owner.</span></div>
+            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>🔒</span><span>Branch accountants never create parties or ledgers — they only raise a request; a party appears in branch pickers only after Afshin approves. Turn on <b>Master-creation lock</b> (Configurable Rules) to stage branch master writes for the Owner.</span></div>
           </>
         );
-      case 'delegation':
-        return <Delegation />;
-      case 'breakglass':
-        return <BreakGlass />;
-      case 'erp':
-        return (
-          <>
-            <p className="mb-4 mt-1 max-w-[78ch] text-[13.5px] text-ink-muted">How much of the ERP is configured, and how much of the money flow is secured under verification — both climb as you engage controls.</p>
-            <div className="flex flex-wrap gap-3">
-              <div className="min-w-[220px] flex-1 rounded-brand border border-surface-border bg-surface p-4">
-                <div className="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Controls engaged</div>
-                <div className="mt-1 text-4xl font-black tabular-nums text-warning">{r.pct}%</div>
-                <div className="mt-1 text-[11px] text-ink-muted">{r.engaged} of {r.total} control flags on</div>
-              </div>
-              <div className="min-w-[220px] flex-1 rounded-brand border border-surface-border bg-surface p-4">
-                <div className="font-mono text-[10px] uppercase tracking-wide text-ink-subtle">Secure &amp; under verification</div>
-                <div className="mt-1 text-4xl font-black tabular-nums text-danger">{r.masterOn ? '100' : '6'}%</div>
-                <div className="mt-1 text-[11px] text-ink-muted">{r.masterOn ? 'Guard engaged — enforcing' : 'Foundation locks only · master guard dormant'}</div>
-              </div>
-            </div>
-            <div className="mt-[18px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold"><span>📈</span><span>Each control you engage lifts these — the goal is <b>100% implemented · fully secured</b>, reached when the Master Switch is on and every voucher type is enforced. Detail on <button className="underline" onClick={() => go('/tk/readiness')}>Configuration Readiness</button>.</span></div>
-          </>
-        );
-      case 'log':
-        return <ChangeLog go={go} />;
       default: return null;
     }
   };
 
   const activeLabel = POWER_SCREENS.flatMap((g) => g.items).find((i) => i.key === screen)?.label || '';
   const showBranchBar = BRANCH_SCOPED.has(screen);
-  // The status strip reflects the selected branch ONLY on branch-scoped screens; on the
-  // display-only screens it shows the global state (so it never claims "BOM scope" on a
-  // screen that ignores the branch selector).
+  // The status strip reflects the selected branch only on branch-scoped screens.
   const stripBranch = showBranchBar ? branch : 'default';
   const stripScoped = showBranchBar && scoped;
-  const masterOn = isFlagOn(flagsQ.data, 'core.policy_guard', stripBranch);
-  const engaged = Object.keys(flags).filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length;
+  const engaged = CONFIGURABLE_FLAGS.filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length;
 
   return (
     <div data-testid="tk-control-panel">
-      {/* status strip — reflects the REAL flag state for the selected branch scope */}
-      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${masterOn ? 'border-danger/40 bg-danger-soft' : 'border-warning/40 bg-warning-soft'}`}>
-        <span className={`text-[11px] font-bold uppercase tracking-wide ${masterOn ? 'text-danger' : 'text-warning'}`}>Power Console</span>
-        <Badge tone={masterOn ? 'danger' : 'warning'}>
-          {masterOn ? 'Guard engaged · enforcing' : engaged > 0 ? `${engaged} control${engaged > 1 ? 's' : ''} on · guard dormant` : 'Everything OFF · dormant'}
+      {/* status strip — reflects the REAL configurable-flag state for the selected scope */}
+      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${engaged > 0 ? 'border-success/40 bg-success-soft' : 'border-warning/40 bg-warning-soft'}`}>
+        <span className={`text-[11px] font-bold uppercase tracking-wide ${engaged > 0 ? 'text-success' : 'text-warning'}`}>Control Panel</span>
+        <Badge tone={engaged > 0 ? 'success' : 'warning'}>
+          {engaged > 0 ? `${engaged} control${engaged > 1 ? 's' : ''} on` : 'Everything OFF · dormant'}
         </Badge>
-        <span className={`text-[12px] ${masterOn ? 'text-danger' : 'text-warning'}`}>
+        <span className={`text-[12px] ${engaged > 0 ? 'text-success' : 'text-warning'}`}>
           {stripScoped ? <><b>{branchLabel}</b> scope · </> : null}
-          {masterOn ? `The TK Group guard is on${stripScoped ? ` for ${branchLabel}` : ''} — these controls now enforce.`
-            : owner ? 'Flip any switch to engage it live — your change applies immediately and is logged.'
-            : 'Nothing enforces — switch controls on one-by-one and user-by-user, at your pace.'}
+          {owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
+            : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
         </span>
         <button type="button" onClick={() => go('/tk/rules')}
           className="ml-auto shrink-0 rounded-full border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">
@@ -379,13 +317,11 @@ export function ControlPanel({ setRoute }) {
       {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}
       <div className="grid gap-4 desktop:grid-cols-[230px_1fr]">
         {/* nav */}
-        <nav className="rounded-brand border border-surface-border bg-surface p-2" aria-label="Power Console screens">
+        <nav className="rounded-brand border border-surface-border bg-surface p-2" aria-label="Control Panel screens">
           {POWER_SCREENS.map((grp) => (
             <div key={grp.group} className="mb-2">
               <div className="px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-ink-subtle">{grp.group}</div>
               {grp.items.map((it) => {
-                // Real per-screen state: how many of THIS screen's flags are on for the
-                // selected branch. `null` = we don't track this screen via flags (show no pill).
                 const keys = SCREEN_FLAGS[it.key];
                 const onN = keys ? keys.filter((k) => isOn(k)).length : null;
                 return (

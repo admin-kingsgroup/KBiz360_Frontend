@@ -37,11 +37,6 @@ export function asEmailList(v, fallback = []) {
   return clean.length ? clean : fallback;
 }
 
-function masterOn(flags) {
-  const f = ((flags && flags.flags) || {})['core.policy_guard'] || {};
-  return f.foundation === true || f.enabled === true;
-}
-
 /** Build the Control Panel view model from the raw config.
  *  @param {{verifyEmails?:any, approveEmails?:any, flags?:object}} cfg
  *  @returns {{levels:Array, verify:string[], approve:string[], aeCanApprove:boolean, masterOn:boolean}} */
@@ -54,14 +49,12 @@ export function approvalChainView(cfg = {}) {
   const aeFlag = flagsMap['approval.ae_can_approve'];
   const aeFlagOn = !!aeFlag && (aeFlag.foundation === true || aeFlag.enabled === true);
   const aeCanApprove = aeFlagOn || verify.some((e) => approve.includes(e));
-  const mOn = masterOn(cfg.flags);
 
-  // Per-role control state across all FIVE roles. A role is "under control" (walks the
-  // approval chain) when EITHER the master guard is on OR its own control.role.* switch is
-  // on (the switches enforce independently of the master guard, like the Enforcement
-  // Matrix). Otherwise the role is INDEPENDENT — no approval required, acts on its own.
+  // Per-role control state across all FIVE roles. With no master switch, a role is "under
+  // control" (walks the approval chain) ONLY when its own control.role.* switch is on;
+  // otherwise it is INDEPENDENT — no approval required, acts on its own.
   const people = ROLE_SWITCHES.map((rs) => {
-    const under = mOn || flagOnGlobal(cfg.flags, rs.flag);
+    const under = flagOnGlobal(cfg.flags, rs.flag);
     return {
       key: rs.key, name: rs.name, role: rs.role, duty: rs.duty, flag: rs.flag,
       extra: rs.key === 'ae' && aeCanApprove ? 'can also Approve' : '',
@@ -79,7 +72,6 @@ export function approvalChainView(cfg = {}) {
     verify,
     approve,
     aeCanApprove,
-    masterOn: mOn,
     people,
   };
 }
@@ -126,10 +118,9 @@ export function policyTest({ store, flags, branch, rowKey, amount, role } = {}) 
   if ((rowKey === 'refund' || rowKey === 'reissue') && isFlagOn(flags, 'approval.owner_cosign_sensitive', branch)) {
     reasons.push({ rule: 'Owner co-sign', detail: 'a refund / reissue additionally needs the Owner to sign.' });
   }
-  if (role === 'branch_accountant' && isFlagOn(flags, 'approval.chain_branch_entries', branch)) {
-    reasons.push({ rule: 'Branch-entry chain', detail: 'branch-accountant entries walk Check → Verify → Approve.' });
-  }
-  return { routed: reasons.length > 0, reasons, masterOn: isFlagOn(flags, 'core.policy_guard', branch) };
+  // Branch-accountant routing is covered by the Role control check above
+  // (control.role.branch_accountant); the old approval.chain_branch_entries flag is retired.
+  return { routed: reasons.length > 0, reasons };
 }
 
 /** Active Controls digest — every flag currently ON (globally, or overridden ON for some
@@ -173,92 +164,108 @@ export function digestSummary({ overview = {}, integrity = {}, inbox = {} } = {}
 }
 
 // ─── Power Console structure (pure data) ─────────────────────────────────────
-// The screens, grouped. `key` matches the component's screen router; every screen ships
-// dormant. Order is the recommended engage-order within each group.
+// Two RULE screens — Default Rules (always-on, read-only) and Configurable Rules (the
+// Owner's ON/OFF switches) — plus the enforcement tools and reference/oversight screens.
+// There is NO master switch: enforcement engages rule-by-rule. `key` matches the
+// component's screen router.
 export const POWER_SCREENS = [
-  { group: 'Enforcement', items: [
-    { key: 'master',   label: 'Master Switch' },
-    { key: 'approval', label: 'Approval & Verification' },
+  { group: 'Rules', items: [
+    { key: 'defaults',     label: 'Default Rules' },
+    { key: 'configurable', label: 'Configurable Rules' },
+  ] },
+  { group: 'Enforcement tools', items: [
     { key: 'matrix',   label: 'Enforcement Matrix' },
     { key: 'limits',   label: 'Limits & Thresholds' },
     { key: 'tester',   label: 'Policy Tester' },
   ] },
-  { group: 'Access & Rights', items: [
-    { key: 'rights',   label: 'Rights & Locks' },
-    { key: 'roles',    label: 'Role Capabilities' },
-    { key: 'users',    label: 'User Configuration' },
-    { key: 'sod',      label: 'Segregation of Duties' },
-    { key: 'security', label: 'Access & Security' },
-    { key: 'reports',  label: 'Report & Export Controls' },
-  ] },
-  { group: 'Governance', items: [
+  { group: 'Reference & oversight', items: [
+    { key: 'roles',      label: 'Role Capabilities' },
+    { key: 'users',      label: 'User Configuration' },
     { key: 'masters',    label: 'Master & Onboarding' },
     { key: 'delegation', label: 'Delegation' },
-    { key: 'entry',      label: 'Data-Entry & Compliance' },
     { key: 'breakglass', label: 'Break-Glass Access' },
-  ] },
-  { group: 'Oversight', items: [
-    { key: 'digest',        label: 'Daily Digest' },
-    { key: 'active',        label: 'Active Controls' },
-    { key: 'notifications', label: 'Notifications & SLA' },
-    { key: 'erp',           label: 'ERP Config & Security' },
-    { key: 'log',           label: 'Change Log / Audit' },
+    { key: 'active',     label: 'Active Controls' },
+    { key: 'digest',     label: 'Daily Digest' },
+    { key: 'log',        label: 'Change Log / Audit' },
   ] },
 ];
 
 /** Flat list of all screen keys (for the router / tests). */
 export const POWER_SCREEN_KEYS = POWER_SCREENS.flatMap((g) => g.items.map((i) => i.key));
 
-// Data-driven control lists — each screen that is just a stack of switches. Every one
-// ships OFF (dormant). `crit` = a money/critical switch (red accent). Kept as data so
-// the component renders them generically and they are testable.
-export const CONTROL_LISTS = {
-  rights: [
+// ── Screen 1 · DEFAULT RULES — always enforced, not switchable (read-only) ────
+// The foundation locks that apply on day one, guard or no guard. maker≠approver and
+// payment-prepared≠released are the two SoD rules promoted to always-on when the master
+// switch was removed (they only bite on an under-control / money-out voucher).
+export const DEFAULT_RULES = [
+  { nm: 'Require approval before posting', ds: 'Every voucher starts Pending — nothing hits the books until it is approved.' },
+  { nm: 'Maker cannot approve their own routed voucher', ds: 'Once a voucher is under control (routed / reviewChain), its maker can never give the approval — a different person must. An un-routed voucher can still be self-cleared during the migration.' },
+  { nm: 'Payment prepared ≠ Payment released', ds: 'Money-out starts Pending and the maker is barred from releasing it, so a different person must.' },
+  { nm: 'Master create ≠ Master approve', ds: 'Faiz creates heads, the Owner approves — never the same hand (locked meta-rule).' },
+  { nm: 'Numbering lock (auto only)', ds: 'Voucher numbers are always system-generated — no manual resets.' },
+  { nm: 'Wired-ledger lock', ds: 'Module / tax / inter-branch heads are locked for everyone.' },
+  { nm: 'Master & onboarding chains locked', ds: 'Ledger heads route Faiz → Owner; a new party routes Branch → Faiz (KYC) → Farhan → Owner. Not freely editable.' },
+  { nm: 'Block future-dated entries', ds: 'No posting beyond today (two-layer guard; travel dates excepted).' },
+  { nm: 'Duplicate-bill detection', ds: 'A supplier expense bill with the same supplier + Bill/Invoice no. as an existing entry is blocked on save (overridable with a reason).' },
+  { nm: 'Negative-GP block', ds: 'A loss-making SO/PO/GP booking or INB deal (gross profit below 0) is hard-blocked on save for EVERY branch — no exemptions. Zero GP (at-cost) is allowed.' },
+  { nm: 'Single active session per user', ds: 'A new Books login invalidates every earlier session, so other devices are signed out on their next request.' },
+  { nm: 'Password strength (minimum length)', ds: 'A minimum length is enforced on every new / changed password, and a change signs the account out on every device.' },
+  { nm: 'Approval-request alerts', ds: 'Pending work surfaces on the Alerts feed and the Inbox badge for the next approver.' },
+  { nm: 'Stale-approval SLA + escalation', ds: 'Change-requests are aged against the clearance SLA — on-time / at-risk / breached — on the governance queue.' },
+  { nm: 'Exception & risk alerts', ds: 'GP≤0 · negative cash · over-limit surface on the Alerts feed.' },
+  { nm: 'Daily digest to Owner / Director', ds: 'An in-app Daily Digest summarises pending approvals, exceptions and close readiness at a glance.' },
+];
+
+// ── Screen 2 · CONFIGURABLE RULES — the Owner's ON/OFF switches, by group ──────
+// Every one ships OFF (dormant) and is its own independent switch — no master gate.
+// `crit` = a money/critical switch (red accent). Kept as data so the component renders
+// them generically and they are testable.
+export const CONFIGURABLE_GROUPS = [
+  { group: 'Approval & Verification', items: [
+    { nm: 'Let Sughra also Approve (AE-approve)', ds: 'ON = the Accounts Executive (Sughra) may give final approval on a branch-accountant voucher, not just verify. OFF = Sughra verifies only; Faiz (FM) gives final approval.', flag: 'approval.ae_can_approve' },
+    { nm: 'Owner co-sign on sensitive types', ds: 'ON = a refund / reissue additionally needs the Owner (Afshin) to sign before final approval — routed through the chain, no self-clear. OFF = they approve like any other voucher.', flag: 'approval.owner_cosign_sensitive', crit: true },
+    { nm: 'Branch Accountant under control', ds: "ON = a Branch Accountant's entries walk Check → Verify → Approve. OFF = acts independently, no approval required.", flag: 'control.role.branch_accountant' },
+    { nm: 'Accounts Executive (Sughra) under control', ds: "ON = Sughra's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.ae' },
+    { nm: 'Finance Manager (Faiz) under control', ds: "ON = Faiz's entries walk the approval chain — FM can no longer single-step approve their own. OFF = acts independently.", flag: 'control.role.fm' },
+    { nm: 'Director (Farhan) under control', ds: "ON = Farhan's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.director' },
+    { nm: 'Owner (Afshin) under control', ds: "ON = Afshin's entries walk the approval chain. OFF = acts independently. Note: a Super Admin can still override the chain.", flag: 'control.role.owner' },
+  ] },
+  { group: 'Segregation of Duties', items: [
+    { nm: 'Verifier ≠ Approver on the same voucher', ds: 'ON = Check → Verify → Approve pass through different hands on the same voucher (relaxable via AE-approve). OFF = not separately enforced.', flag: 'sod.verifier_ne_approver' },
+    { nm: 'Large-voucher escalation sign-offs', ds: 'ON = over the escalate ceiling a voucher also needs a Director (Farhan) sign-off, and over the dual ceiling an Owner (Afshin) sign-off, before Faiz’s final approval posts. OFF = FM-approve alone is enough.', flag: 'approval.escalation_signoffs' },
+  ] },
+  { group: 'Access & Export', items: [
     { nm: 'Relocate central screens off branch', ds: 'ON = masters · approvals · money-out · period-close live in TK Group Central only (removed from the Branch surface). OFF = branches keep those screens inline.', flag: 'branch.central_relocated' },
     { nm: 'Hide branch statements (P&L / Balance Sheet)', ds: 'ON = P&L / GP / MIS hidden from Branch Accountants (central always sees). OFF = branches see their own statements.', flag: 'branch.hide_statements' },
-    { nm: 'Master-creation lock', ds: 'Not a switch — engages automatically with the master guard: once ON, a branch ledger / party write stages for Owner approval (masterGuard).', guarded: true },
-    { nm: 'Field locks (PAN · bank · credit-limit)', ds: 'Not a switch — engages with the master guard: a branch PAN / bank / credit-limit change stages for Owner approval.', guarded: true },
-    { nm: 'Period lock', ds: 'Not a switch — engages with the master guard: no posting into a closed / filed period. Set specific periods on Period Locks.', guarded: true },
-    { nm: 'Numbering lock (auto only)', ds: 'Already active: voucher numbers are always system-generated — no manual resets. Nothing to switch.', applied: true },
-    { nm: 'Wired-ledger lock', ds: 'Already active: module / tax / inter-branch heads are locked for everyone. Nothing to switch.', applied: true },
-  ],
-  sod: [
-    { nm: 'A maker cannot approve their own voucher', ds: 'Not a switch — engages with the master guard: the maker is barred from its own approval (isMaker check).', guarded: true },
-    { nm: 'Verifier ≠ Approver on the same voucher', ds: 'Not a switch — engages with the master guard: Check → Verify → Approve pass through different hands (relaxable via AE-approve).', guarded: true },
-    { nm: 'Master create ≠ Master approve', ds: 'Already active: Faiz creates, the Owner approves — never the same hand (locked meta-rule). Nothing to switch.', applied: true },
-    { nm: 'Payment prepared ≠ Payment released', ds: 'Not a switch — engages with the master guard: money-out starts Pending and the maker is barred from releasing it, so a different person must.', guarded: true, crit: true },
-    { nm: 'Branch entries walk Check → Verify → Approve', ds: 'ON = a branch-accountant ERP voucher goes Check (entry) → Verify (Sughra) → Approve (Faiz), not the maker single-step approving their own. OFF = maker single-step approve (today). NOTE: the newer Branch Accountant switch on Approval & Verification does the same thing per-role — use one or the other, not both.', flag: 'approval.chain_branch_entries' },
-    { nm: 'Large-voucher escalation sign-offs', ds: 'ON = over the escalate ceiling a voucher also needs a Director (Farhan) sign-off, and over the dual ceiling an Owner (Afshin) sign-off, before Faiz’s final approval posts. OFF = FM-approve alone is enough.', flag: 'approval.escalation_signoffs' },
-  ],
-  security: [
-    { nm: 'Single active session per user', ds: 'Already active: a new Books login invalidates every earlier session, so other devices are signed out on their next request. Nothing to switch.', applied: true },
-    { nm: 'Password strength (minimum length)', ds: 'Already active: a minimum length is enforced on every new / changed password, and a change signs the account out on every device. Nothing to switch.', applied: true },
-    { nm: 'Password rotation (force periodic reset)', ds: 'Not adopted (Owner’s decision): scheduled password resets are not required.', declined: true },
-    { nm: 'Require 2-factor authentication', ds: 'Not adopted (Owner’s decision): no second login factor.', declined: true },
-    { nm: 'Login working-hours window', ds: 'Not adopted (Owner’s decision): logins are not restricted by time of day (branches span four timezones).', declined: true },
-    { nm: 'IP / location allow-list', ds: 'Not adopted (Owner’s decision): logins are not restricted to office IPs.', declined: true },
-  ],
-  entry: [
-    { nm: 'Block future-dated entries', ds: 'Already active: no posting beyond today (two-layer guard; travel dates excepted). Nothing to switch.', applied: true },
-    { nm: 'Duplicate-bill detection', ds: 'Already active: a supplier expense bill with the same supplier + Bill/Invoice no. as an existing entry is blocked on save (overridable with a reason). Nothing to switch.', applied: true },
-    { nm: 'Negative-GP block', ds: 'Already active: a loss-making SO/PO/GP booking or INB deal (gross profit below 0) is hard-blocked on save for EVERY branch — no exemptions. Zero GP (at-cost) is allowed. Nothing to switch.', applied: true },
-    { nm: 'Mandatory documents', ds: "ON = a money-out / expense / ADM-ACM voucher can't be created without a supporting attachment. OFF = attachment optional.", flag: 'entry.mandatory_docs' },
-    { nm: 'Tax filing lock', ds: 'Not a switch — engages with the master guard: a filed period locks (no edits after filing, via period lock).', guarded: true },
-    { nm: 'Reconciliation before close', ds: "ON = a period can't hard-close until bank / client / supplier reconciliation is signed off (no open lines through period end). OFF = close not gated on recon.", flag: 'close.require_recon' },
-    { nm: 'Integrity before close', ds: "ON = a period can't hard-close while any Control-Tower integrity gate is failing (journal drift, suspense, self-approvals, sub-ledger ↔ GL, …). OFF = close not gated on integrity.", flag: 'close.require_integrity' },
-  ],
-  notifications: [
-    { nm: 'Approval-request alerts', ds: 'Already active: pending work surfaces on the Alerts feed and the Inbox badge for the next approver. Nothing to switch.', applied: true },
-    { nm: 'Stale-approval SLA + escalation', ds: 'Already active: change-requests are aged against the clearance SLA — on-time / at-risk / breached — on the governance queue.', applied: true },
-    { nm: 'Exception & risk alerts', ds: 'Already active: GP≤0 · negative cash · over-limit surface on the Alerts feed. Nothing to switch.', applied: true },
-    { nm: 'Daily digest to Owner / Director', ds: 'Already active: an in-app Daily Digest (Oversight → Daily Digest) summarises pending approvals, exceptions and close readiness at a glance. Nothing to switch.', applied: true },
-  ],
-  reports: [
     { nm: 'Restrict export of sensitive data', ds: 'ON = only permitted roles may export ledgers / registers / P&L (a view-only user is blocked at the shared export helper). OFF = export open to anyone with view access.', flag: 'reports.restrict_export' },
     { nm: 'Log every export', ds: 'ON = every export (allowed or blocked) is recorded to the central export trail — who exported what, when. OFF = exports are not logged.', flag: 'reports.log_exports' },
     { nm: 'Block branch export of group reports', ds: 'ON = a branch-scoped user cannot export a consolidated (group) report. OFF = branch users may export group reports.', flag: 'reports.block_branch_group_export' },
-  ],
-};
+  ] },
+  { group: 'Masters & Locks', items: [
+    { nm: 'Master-creation lock', ds: 'ON = a branch ledger / party create · delete stages for Owner approval (masterGuard). OFF = branch master writes apply inline.', flag: 'masters.creation_lock' },
+    { nm: 'Field locks (PAN · bank · credit-limit)', ds: 'ON = a branch PAN / bank / credit-limit change stages for Owner approval. OFF = applied inline.', flag: 'masters.field_locks' },
+    { nm: 'Period lock', ds: 'ON = no posting or editing into a closed / filed period. Set specific periods on Period Locks. OFF = not enforced.', flag: 'masters.period_lock' },
+    { nm: 'Tax filing lock', ds: 'ON = a filed period locks (no edits after filing). OFF = not enforced.', flag: 'masters.tax_filing_lock' },
+  ] },
+  { group: 'Data-Entry & Close', items: [
+    { nm: 'Mandatory documents', ds: "ON = a money-out / expense / ADM-ACM voucher can't be created without a supporting attachment. OFF = attachment optional.", flag: 'entry.mandatory_docs' },
+    { nm: 'Reconciliation before close', ds: "ON = a period can't hard-close until bank / client / supplier reconciliation is signed off (no open lines through period end). OFF = close not gated on recon.", flag: 'close.require_recon' },
+    { nm: 'Integrity before close', ds: "ON = a period can't hard-close while any Control-Tower integrity gate is failing (journal drift, suspense, self-approvals, sub-ledger ↔ GL, …). OFF = close not gated on integrity.", flag: 'close.require_integrity' },
+  ] },
+];
+
+/** Flat list of every configurable flag key — the set the bulk "Enable all / Disable all"
+ *  acts on, and the FE mirror of the backend CONTROLLABLE_KEYS. */
+export const CONFIGURABLE_FLAGS = CONFIGURABLE_GROUPS.flatMap((g) => g.items.map((i) => i.flag));
+
+// Rules the Owner has decided AGAINST — shown as a muted footnote on the Configurable
+// screen so the decision is visible without cluttering the switch list.
+export const DECLINED_RULES = [
+  { nm: 'Password rotation (force periodic reset)', ds: 'Scheduled password resets are not required.' },
+  { nm: 'Require 2-factor authentication', ds: 'No second login factor.' },
+  { nm: 'Login working-hours window', ds: 'Logins are not restricted by time of day (branches span four timezones).' },
+  { nm: 'IP / location allow-list', ds: 'Logins are not restricted to office IPs.' },
+];
 
 // Role capability posture (● full · ◐ conditional · ○ none), across the same columns
 // as the Role Capabilities screen. Pure data for the matrix.

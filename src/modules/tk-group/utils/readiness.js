@@ -1,8 +1,8 @@
 // ─── TK GROUP · FE · configuration readiness (pure) ──────────────────────────
 // The "how much of the control layer is engaged" scoreboard Faiz & the Owner watch
-// toward go-live — distinct from the Go-Live checklist (the 4-step master-guard flip).
-// Computes a green % + per-control status from the REAL flag state (/api/tk/flags).
-// Read-only; pure & testable.
+// toward go-live. Computes a green % + per-control status from the REAL flag state
+// (/api/tk/flags). With no master switch, enforcement is "engaged" once ANY control is on
+// (`anyOn`). Read-only; pure & testable.
 
 /** @param {{flags?:Object<string,{enabled?:boolean,foundation?:boolean,label?:string}>}} flagState */
 export function readinessFromFlags(flagState) {
@@ -15,6 +15,7 @@ export function readinessFromFlags(flagState) {
   const total = items.length;
   const engaged = items.filter((i) => i.on).length;
   const pct = total ? Math.round((engaged / total) * 100) : 0;
-  const masterOn = items.some((i) => i.key === 'core.policy_guard' && i.on);
-  return { total, engaged, pct, masterOn, items };
+  // Enforcement is engaged once ANY control is on (replaces the retired master-guard signal).
+  const anyOn = items.some((i) => i.on && !i.foundation);
+  return { total, engaged, pct, anyOn, items };
 }

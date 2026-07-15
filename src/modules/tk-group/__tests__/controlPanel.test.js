@@ -1,21 +1,34 @@
-import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, CONTROL_LISTS, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary } from '../utils/controlPanel';
+import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary } from '../utils/controlPanel';
 
-describe('Power Console structure', () => {
-  test('20 screens across 4 groups', () => {
-    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['Enforcement', 'Access & Rights', 'Governance', 'Oversight']);
-    expect(POWER_SCREEN_KEYS).toHaveLength(20);
+describe('Control Panel structure', () => {
+  test('two rule screens + tools, no master screen', () => {
+    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['Rules', 'Enforcement tools', 'Reference & oversight']);
+    expect(POWER_SCREEN_KEYS.slice(0, 2)).toEqual(['defaults', 'configurable']);
+    expect(POWER_SCREEN_KEYS).not.toContain('master');
+    expect(POWER_SCREEN_KEYS).toHaveLength(13);
   });
-  test('includes the added screens (Policy Tester + Active Controls + Daily Digest)', () => {
-    for (const k of ['notifications', 'breakglass', 'reports', 'tester', 'active', 'digest']) expect(POWER_SCREEN_KEYS).toContain(k);
-  });
-  test('screen keys are unique', () => {
+  test('screen keys are unique and include the tools', () => {
     expect(new Set(POWER_SCREEN_KEYS).size).toBe(POWER_SCREEN_KEYS.length);
+    for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log']) expect(POWER_SCREEN_KEYS).toContain(k);
   });
-  test('control lists exist for every list-screen and carry name + description', () => {
-    for (const k of ['rights', 'sod', 'security', 'entry', 'notifications', 'reports']) {
-      expect(Array.isArray(CONTROL_LISTS[k])).toBe(true);
-      expect(CONTROL_LISTS[k].every((c) => c.nm && c.ds)).toBe(true);
-    }
+  test('DEFAULT_RULES (always-on) carry name + description; include the promoted SoD rules', () => {
+    expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(14);
+    expect(DEFAULT_RULES.every((r) => r.nm && r.ds)).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Maker cannot approve their own routed/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Payment prepared/.test(r.nm))).toBe(true);
+  });
+  test('CONFIGURABLE_GROUPS: every item is a real flag switch; 21 flags across 5 groups', () => {
+    expect(CONFIGURABLE_GROUPS.map((g) => g.group)).toEqual(['Approval & Verification', 'Segregation of Duties', 'Access & Export', 'Masters & Locks', 'Data-Entry & Close']);
+    CONFIGURABLE_GROUPS.forEach((g) => g.items.forEach((c) => { expect(c.nm && c.ds && c.flag).toBeTruthy(); }));
+    expect(CONFIGURABLE_FLAGS).toHaveLength(21);
+    expect(new Set(CONFIGURABLE_FLAGS).size).toBe(21);           // no duplicates
+    // retired keys are gone; the new masters/sod switches are present
+    expect(CONFIGURABLE_FLAGS).not.toContain('core.policy_guard');
+    expect(CONFIGURABLE_FLAGS).not.toContain('approval.chain_branch_entries');
+    expect(CONFIGURABLE_FLAGS).toEqual(expect.arrayContaining(['masters.creation_lock', 'masters.period_lock', 'sod.verifier_ne_approver']));
+  });
+  test('DECLINED_RULES lists the four not-adopted controls', () => {
+    expect(DECLINED_RULES.map((d) => d.nm)).toEqual(expect.arrayContaining([expect.stringMatching(/2-factor/), expect.stringMatching(/IP \/ location/)]));
   });
   test('role capability matrix aligns to the columns', () => {
     expect(ROLE_CAPS.every((r) => r.caps.length === CAP_COLS.length)).toBe(true);
@@ -46,9 +59,8 @@ describe('approvalChainView', () => {
     expect(v.aeCanApprove).toBe(true);
   });
 
-  test('master guard OFF => all five roles INDEPENDENT, no approval required', () => {
-    const v = approvalChainView({ flags: { flags: { 'core.policy_guard': { enabled: false } } } });
-    expect(v.masterOn).toBe(false);
+  test('no role switches => all five roles INDEPENDENT, no approval required', () => {
+    const v = approvalChainView({ flags: { flags: {} } });
     expect(v.people).toHaveLength(5);
     expect(v.people.map((p) => p.key)).toEqual(['branch_accountant', 'ae', 'fm', 'director', 'owner']);
     expect(v.people.every((p) => p.independent)).toBe(true);
@@ -56,18 +68,19 @@ describe('approvalChainView', () => {
     expect(v.people.find((p) => p.key === 'fm').status).toMatch(/Independent/);
   });
 
-  test('master guard ON => all five under control', () => {
-    const v = approvalChainView({ flags: { flags: { 'core.policy_guard': { enabled: true } } } });
-    expect(v.masterOn).toBe(true);
+  test('every role switched on => all five under control', () => {
+    const flags = { flags: {} };
+    ['branch_accountant', 'ae', 'fm', 'director', 'owner'].forEach((k) => { flags.flags[`control.role.${k}`] = { enabled: true }; });
+    const v = approvalChainView({ flags });
     expect(v.people.every((p) => !p.independent)).toBe(true);
     expect(v.people.find((p) => p.key === 'fm').status).toBe('Under control');
   });
 
-  test('a per-role switch brings ONLY that role under control (master guard off)', () => {
+  test('a per-role switch brings ONLY that role under control (no master switch anymore)', () => {
     const v = approvalChainView({ flags: { flags: { 'control.role.fm': { enabled: true } } } });
-    expect(v.masterOn).toBe(false);
     expect(v.people.find((p) => p.key === 'fm').independent).toBe(false);   // FM switched under control
     expect(v.people.find((p) => p.key === 'ae').independent).toBe(true);    // others still independent
+    expect(v.masterOn).toBeUndefined();                                     // master concept removed
   });
 });
 
