@@ -16,9 +16,41 @@ import { getLedgerFreeze, freezeLedger, unfreezeLedger, signCertificate } from '
 const pill = (bg, color) => ({ padding: '2px 9px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, background: bg, color, whiteSpace: 'nowrap' });
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
+// The "touch tab" — a two-segment toggle (Un-Frozen ⇄ Frozen) that reads as one flip.
+// Un-Frozen is active while open; Frozen is active while frozen. The Frozen segment is
+// DISABLED (and reasons out) until every entry is reconciled — clicking it freezes;
+// clicking Un-Frozen while frozen releases the soft lock. Certified locks the whole tab.
+function FreezeTab({ frozen, canFreeze, busy, onFreeze, onUnfreeze }) {
+  const seg = (active, label, blocked, onClick, activeBg, blockedTitle) => (
+    <button type="button" role="tab" aria-selected={active} disabled={busy || active || blocked}
+      title={blocked && !active ? blockedTitle : ''}
+      onClick={active || blocked ? undefined : onClick}
+      style={{
+        padding: '5px 13px', minHeight: 28, minWidth: 82, fontSize: 11, fontWeight: 800,
+        border: 'none', borderRadius: 7, transition: 'background .15s,color .15s',
+        cursor: (active || blocked || busy) ? 'default' : 'pointer',
+        background: active ? activeBg : 'transparent',
+        color: active ? '#fff' : (blocked ? '#aeb3bd' : C.dim),
+        boxShadow: active ? '0 1px 2px rgba(16,18,22,0.18)' : 'none',
+      }}>
+      {label}
+    </button>
+  );
+  return (
+    <div role="tablist" aria-label="Freeze state"
+      style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 9, background: '#eef1f5', border: `1px solid ${C.border}`, opacity: busy ? 0.6 : 1 }}>
+      {seg(!frozen, 'Un-Frozen', false, onUnfreeze, C.dim, '')}
+      {seg(frozen, 'Frozen', !canFreeze, onFreeze, C.blue, 'reconcile every entry first')}
+    </div>
+  );
+}
+
 // Pass a bank ledger CODE, or a client/supplier ledger NAME. The month being frozen
 // is chosen in the panel (seeded from `defaultPeriod` or the current month).
-export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defaultPeriod, currency = 'INR', statementBalance }) {
+// `onShowUnreconciled(bool)` — optional; when given, a chip lets the user jump the
+// matching tables to just the still-open lines (and back). `showingUnreconciled`
+// reflects that filter so the chip can toggle it off.
+export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defaultPeriod, currency = 'INR', statementBalance, onShowUnreconciled, showingUnreconciled = false }) {
   const [st, setSt] = useState(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -101,35 +133,37 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
         {loading ? <span style={{ fontSize: 11, color: C.dim }}>…</span> : statusPill}
       </div>
 
-      {/* Reconciled-gate message when open and not yet freezable */}
+      {/* Reconciled-gate message when open and not yet freezable + jump-to-blockers chip */}
       {st && !st.frozen && !st.certified && (un.total == null
         ? <span style={{ fontSize: 11, color: C.dim }}>{un.error ? `Can't check: ${un.error}` : ''}</span>
         : un.total > 0
-          ? <span style={{ fontSize: 11.5, color: '#8a5a00', fontWeight: 700 }}>{un.total} entr{un.total === 1 ? 'y' : 'ies'} still unreconciled — reconcile all before freezing</span>
-          : <span style={{ fontSize: 11.5, color: C.green, fontWeight: 700 }}><CheckCircle2 size={11} style={{ verticalAlign: -1 }} /> all entries reconciled</span>
+          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#8a5a00', fontWeight: 700 }}>
+              {un.total} entr{un.total === 1 ? 'y' : 'ies'} still unreconciled — reconcile all before freezing
+              {onShowUnreconciled && (
+                <button type="button"
+                  onClick={() => onShowUnreconciled(!showingUnreconciled)}
+                  style={{ padding: '2px 9px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, cursor: 'pointer',
+                    border: `1px solid ${showingUnreconciled ? C.blue : '#f0d98a'}`,
+                    background: showingUnreconciled ? '#e6f1fb' : '#fff', color: showingUnreconciled ? C.blue : '#8a5a00' }}>
+                  {showingUnreconciled ? '✓ filtered — show all' : `Show the ${un.total} →`}
+                </button>
+              )}
+            </span>
+          : <span style={{ fontSize: 11.5, color: C.green, fontWeight: 700 }}><CheckCircle2 size={11} style={{ verticalAlign: -1 }} /> all entries reconciled — ready to freeze</span>
       )}
 
-      <div style={{ display: 'flex', gap: 6 }}>
-        {st && !st.frozen && !st.certified && (
-          <button onClick={doFreeze} disabled={!st.canFreeze || busy}
-            title={st.canFreeze ? '' : 'reconcile every entry first'}
-            style={{ ...aBtn(C.blue), opacity: (st.canFreeze && !busy) ? 1 : 0.5 }}>
-            <Snowflake size={12} style={{ verticalAlign: -2 }} /> Freeze
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {st && !st.certified && (
+          <FreezeTab frozen={!!st.frozen} canFreeze={!!st.canFreeze} busy={busy}
+            onFreeze={doFreeze} onUnfreeze={doUnfreeze} />
+        )}
+        {st && st.frozen && !st.certified && st.nextSigner && (
+          <button onClick={doSign} disabled={busy} style={{ ...aBtn(C.green), opacity: busy ? 0.6 : 1 }}>
+            <PenLine size={12} style={{ verticalAlign: -2 }} /> Sign as {st.nextSigner}
           </button>
         )}
-        {st && st.frozen && !st.certified && (<>
-          {st.nextSigner && (
-            <button onClick={doSign} disabled={busy} style={{ ...aBtn(C.green), opacity: busy ? 0.6 : 1 }}>
-              <PenLine size={12} style={{ verticalAlign: -2 }} /> Sign as {st.nextSigner}
-            </button>
-          )}
-          <button onClick={doUnfreeze} disabled={busy}
-            style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, opacity: busy ? 0.6 : 1 }}>
-            Un-freeze
-          </button>
-        </>)}
         {st && st.certified && (
-          <span style={{ fontSize: 11, color: C.dim }}>Re-open in the Certification register to change.</span>
+          <span style={{ fontSize: 11, color: C.dim }}><Lock size={11} style={{ verticalAlign: -1 }} /> Re-open in the Certification register to change.</span>
         )}
       </div>
     </div>

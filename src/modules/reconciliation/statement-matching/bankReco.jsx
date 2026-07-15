@@ -214,6 +214,7 @@ export function BankReco({branch}){
   const {data:brs}=useBankBRS(ledger,branch,range);
   const [view,setView]=useState("detailed");  // detailed | minimal
   const [search,setSearch]=useState("");
+  const [onlyOpen,setOnlyOpen]=useState(false); // filter both tables to just the still-open lines (driven by the Freeze tab's jump chip)
   const [selBooks,setSelBooks]=useState([]);   // { bookKey, vno, debit, credit }[] — N book legs → one line (split)
   const [selStmt,setSelStmt]=useState(null);   // statement line
   const [showImport,setShowImport]=useState(false);
@@ -238,8 +239,8 @@ export function BankReco({branch}){
 
   const bookLines=book?.lines||[];
   const q=search.trim().toLowerCase();
-  const bookFiltered=bookLines.filter(l=>!q||`${l.date} ${l.vno} ${l.narration} ${l.party}`.toLowerCase().includes(q));
-  const stmtFiltered=stmt.filter(l=>!q||`${l.date} ${l.reference} ${l.chequeNo} ${l.utr} ${l.description}`.toLowerCase().includes(q));
+  const bookFiltered=bookLines.filter(l=>(!q||`${l.date} ${l.vno} ${l.narration} ${l.party}`.toLowerCase().includes(q))&&(!onlyOpen||!l.reconciled));
+  const stmtFiltered=stmt.filter(l=>(!q||`${l.date} ${l.reference} ${l.chequeNo} ${l.utr} ${l.description}`.toLowerCase().includes(q))&&(!onlyOpen||l.status==="unreconciled"||l.status==="exception"));
 
   /* ── Manual match: pair one or more book lines with one statement line (N:1 split) ── */
   const toggleBook=(b)=>setSelBooks(p=>p.some(x=>x.bookKey===b.bookKey)?p.filter(x=>x.bookKey!==b.bookKey):[...p,b]);
@@ -361,6 +362,7 @@ export function BankReco({branch}){
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search date / ref / narration…" style={{border:"none",background:"transparent",outline:"none",fontSize:11,minWidth:200}}/>
             </div>
             <div style={{display:"flex",gap:4}}>
+              <button onClick={()=>setOnlyOpen(o=>!o)} title="Show only the still-open (unreconciled / exception) lines" style={{...((onlyOpen)?btnG:btnGh),fontSize:10,padding:"4px 10px"}}>{onlyOpen?"● ":""}Unreconciled only</button>
               {["detailed","minimal"].map(v=>(
                 <button key={v} onClick={()=>setView(v)} style={{...((view===v)?btnG:btnGh),fontSize:10,padding:"4px 10px",textTransform:"capitalize"}}>{v}</button>
               ))}
@@ -369,7 +371,8 @@ export function BankReco({branch}){
 
           {/* Freeze & Certify this bank ledger for the month (blocks revoke/edit once frozen) */}
           <ReconFreezePanel branch={branch} code={(bankLedgers.find(b=>b.name===ledger)||{}).code} name={ledger} ledgerLabel={ledger}
-            defaultPeriod={to ? to.slice(0,7) : undefined} currency={bankCcy} statementBalance={summary?.bankBalance} />
+            defaultPeriod={to ? to.slice(0,7) : undefined} currency={bankCcy} statementBalance={summary?.bankBalance}
+            onShowUnreconciled={setOnlyOpen} showingUnreconciled={onlyOpen} />
 
           {/* Manual-match action bar */}
           {(selBooks.length>0||selStmt)&&(
