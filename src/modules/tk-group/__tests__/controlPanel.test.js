@@ -65,7 +65,7 @@ describe('Control Panel structure', () => {
     for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log']) expect(POWER_SCREEN_KEYS).toContain(k);
   });
   test('DEFAULT_RULES (always-on) carry name + description; include SoD + the DB-enforced invariants', () => {
-    expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(25);   // 16 base + 13 audited invariants
+    expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(30);   // 16 base + 13 audited + 4 lifecycle invariants
     expect(DEFAULT_RULES.every((r) => r.nm && r.ds)).toBe(true);
     expect(DEFAULT_RULES.some((r) => /Maker cannot approve their own routed/.test(r.nm))).toBe(true);
     expect(DEFAULT_RULES.some((r) => /Payment prepared/.test(r.nm))).toBe(true);
@@ -74,6 +74,11 @@ describe('Control Panel structure', () => {
     expect(DEFAULT_RULES.some((r) => /immutable/.test(r.nm))).toBe(true);                      // VOU-03
     expect(DEFAULT_RULES.some((r) => /refund.s original must resolve/i.test(r.nm))).toBe(true); // RF-01
     expect(DEFAULT_RULES.some((r) => /Branch isolation/.test(r.nm))).toBe(true);
+    // the 4 lifecycle/access invariants just added
+    expect(DEFAULT_RULES.some((r) => /Master-locked voucher legs/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /INB deal is controlled end-to-end/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Linked SO\/PO\/GP pair/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Login & password-change integrity/.test(r.nm))).toBe(true);
   });
   test('CONFIGURABLE_GROUPS: every item is a real flag switch; 21 flags across 5 groups', () => {
     expect(CONFIGURABLE_GROUPS.map((g) => g.group)).toEqual(['Approval & Verification', 'Segregation of Duties', 'Access & Export', 'Masters & Locks', 'Data-Entry & Close']);

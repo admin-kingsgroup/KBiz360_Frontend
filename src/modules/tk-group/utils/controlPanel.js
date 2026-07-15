@@ -224,14 +224,18 @@ export const DEFAULT_RULES = [
   { nm: 'Approved / posted voucher is immutable', ds: 'A voucher that has posted to the books can’t be edited — it must be revoked back to Pending first. Protects the audit trail.' },
   { nm: 'Deleted voucher is view-only', ds: 'A deleted voucher can never be edited, re-posted or re-approved, and its number stays retired.' },
   { nm: 'Every edit needs a reason and re-enters approval', ds: 'Editing a voucher requires an edit reason, forces it back to Pending, and clears the prior approval / review chain — changed figures must be re-checked.' },
+  { nm: 'Master-locked voucher legs change only via their master', ds: 'A voucher that is a leg of a booking (SO/PO/GP), an INB deal, an expense order, or an ADM / ACM register can’t be edited, revoked or deleted directly — every change, including reversing it out of the books, goes through its master (a still-pending INB leg is the one edit exception, for in-place correction).' },
+  { nm: 'INB deal is controlled end-to-end', ds: 'An inter-branch deal is gated across its whole lifecycle: approved together as a group its legs post as one unit — if one refuses, the legs that call posted roll back to Pending; a push then needs both legs approved; and once pushed a leg is locked — it can no longer be revoked, so a half-approved deal can never reach the buyer branch.' },
   { nm: 'Full audit trail on every voucher action', ds: 'Approve, edit, revoke, delete, push and un-allocate are all recorded to the audit trail (best-effort — logging never blocks the action).' },
   // ── Revoke & refund integrity ──
   { nm: 'A refund’s original must resolve', ds: 'A refund / reissue that names an original sale/purchase must find it, otherwise it stays Pending — this prevents over-refunding a client.' },
   { nm: 'Revoke needs a reason and fully un-posts', ds: 'A revoke requires a reason and must completely reverse the journal, verified — never a half-revoke. It is hard-blocked when it would break a bank-reconciled or frozen-reconciliation record, a pushed INB deal, a master-locked booking/order leg, or an original that a live refund/reissue reverses. (A settled bill or an aged / closed-period revoke proceeds with a warning, not a block.)' },
+  { nm: 'Linked SO/PO/GP pair moves as one', ds: 'A sale and its purchase under one Link No are revoked together — you can’t unwind one side of a booking and leave the other posted.' },
   // ── Masters & access ──
   { nm: 'Ledger integrity', ds: 'Ledger codes are system-generated, ledger names are unique per scope, and a ledger that already has postings can’t be deleted (deactivate it instead).' },
   { nm: 'Branch isolation', ds: 'A branch-scoped user can only view or act on the branches they are assigned; another branch’s record simply returns “not found”.' },
   { nm: 'View-only users can’t write', ds: 'A view-only user is blocked from ERP data writes — they may still renew their own token, change their own password, and use support tickets. (Session sign-out on new login / password change is covered by Single active session and Password strength above.)' },
+  { nm: 'Login & password-change integrity', ds: 'A user whose Books access is switched off can’t log in and any live session is evicted on its next request; a password change requires the correct current password and a genuinely different new one.' },
 ];
 
 // ── Screen 2 · CONFIGURABLE RULES — the Owner's ON/OFF switches, by group ──────

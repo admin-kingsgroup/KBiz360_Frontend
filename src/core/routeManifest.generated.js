@@ -17,6 +17,7 @@ export const APP_ROUTES = [
   "/accounts/collections",
   "/accounts/dashboard",
   "/accounts/inb-counterparty",
+  "/accounts/inb-inbound",
   "/accounts/inb-matrix",
   "/accounts/inb-register",
   "/accounts/interbranch-reco",

@@ -171,6 +171,16 @@ export const LedgersMaster = ({ branch }) => {
   const groupsQ = useMasterList('groups');
   const groups = groupsQ.data || [];
   const groupOptions = groups.map((g) => g.name);
+  // Group NAMES that ARE — or nest under — a party group (Sundry Creditors/Debtors).
+  // Hidden from the ledger "Group" picker so a NEW party ledger can't be filed here
+  // (parties belong to the Supplier/Customer master, which auto-creates the ledger —
+  // the backend also rejects it with 422). Uses each group's resolved rootGroup, so
+  // custom sub-groups like "Supplier B2B" / "B2C Reference" are caught too — not just
+  // the two literal names. The current value is still kept when EDITING a party ledger.
+  const partyGroupNames = new Set([
+    ...PARTY_GROUPS,
+    ...groups.filter((g) => PARTY_GROUPS.includes(g.name) || PARTY_GROUPS.includes(g.rootGroup)).map((g) => g.name),
+  ]);
   // Custom sub-groups whose parent chain reaches `groupName` — used to offer a
   // Sub-Group dropdown scoped to the chosen Group (e.g. picking "Sundry Debtors"
   // lists only the sub-groups created under it). Keep Group = the parent Tally
@@ -272,12 +282,12 @@ export const LedgersMaster = ({ branch }) => {
           { key: 'name', label: 'Ledger Name', type: 'text', required: true },
           // Changing the Group resets Sub-Group (its old value belongs to a different
           // group and would no longer be valid) — see EditModal's `clears` support.
-          // Sundry Creditors/Debtors are hidden here — a party ledger is created from
-          // the Supplier / Customer (Client) master, which auto-provisions it. The
-          // current value is kept when editing a ledger that's already a party one.
+          // Sundry Creditors/Debtors (and any sub-group under them) are hidden here — a
+          // party ledger is created from the Supplier / Customer (Client) master, which
+          // auto-provisions it. The current value is kept when editing an existing party ledger.
           { key: 'group', label: 'Group', type: 'select', required: true, clears: ['subGroup'],
             options: (form) => (groupOptions.length ? groupOptions : TALLY_GROUP_NAMES)
-              .filter((g) => !PARTY_GROUPS.includes(g) || g === form?.group) },
+              .filter((g) => !partyGroupNames.has(g) || g === form?.group) },
           { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
             options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
           // Changing Branch re-defaults Currency to that branch's main currency
