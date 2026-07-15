@@ -21,6 +21,7 @@ import {
 import { parseClientStatement } from '../../../core/clientStatementParse';
 import { C, card, money, brLabel, Shell, th, td, rnum, Table, aBtn, Tile, SecTitle, Row } from '../../accountantWorkspace/shared';
 import { ReconMatcher, wbBadge, downloadCSV } from './shared';
+import ReconFreezePanel from './ReconFreezePanel';
 
 export function ClientReco({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
@@ -140,6 +141,9 @@ export function ClientReco({ branch, setRoute }) {
         <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : (diff > 0 ? 'books higher than statement' : 'books lower than statement')} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} loading={sumQ.isLoading} />
         <Tile icon={<Coins size={13} />} label="Open / Unapplied" value={`${alloc.totals?.openInvoiceCount || 0} / ${alloc.totals?.unappliedReceiptCount || 0}`} sub="open invoices · unapplied receipts" tone={C.gold} loading={allocQ.isLoading} />
       </Row>
+
+      {/* Freeze & Certify this client ledger for the month (blocks revoke/edit once frozen) */}
+      <ReconFreezePanel branch={branch} name={client} ledgerLabel={client} currency={cur} statementBalance={sum.statementOwed} />
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 6, margin: '0 2px 12px' }}>

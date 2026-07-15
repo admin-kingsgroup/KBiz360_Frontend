@@ -21,6 +21,7 @@ import { CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
 import { bc, btnG, btnGh, card, inp } from '../../../core/styles';
 import { useMobile } from '../../../core/hooks';
 import { openPrintPreview } from '../../../core/PrintPreview';
+import ReconFreezePanel from './ReconFreezePanel';
 
 const RECON_CLR = {
   reconciled:   { c:"#27500A", bg:"#EAF3DE", label:"Reconciled" },
@@ -365,6 +366,10 @@ export function BankReco({branch}){
               ))}
             </div>
           </div>
+
+          {/* Freeze & Certify this bank ledger for the month (blocks revoke/edit once frozen) */}
+          <ReconFreezePanel branch={branch} code={(bankLedgers.find(b=>b.name===ledger)||{}).code} ledgerLabel={ledger}
+            defaultPeriod={to ? to.slice(0,7) : undefined} currency={bankCcy} statementBalance={summary?.bankBalance} />
 
           {/* Manual-match action bar */}
           {(selBooks.length>0||selStmt)&&(

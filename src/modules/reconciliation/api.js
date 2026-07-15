@@ -51,6 +51,36 @@ export function generateCertificates({ branch, tier, period, codes }) {
 export function freezeSnapshot(id, { statementBalance, adjustments }) {
   return apiPost(`/api/reconciliation/${id}/snapshot`, { statementBalance, adjustments });
 }
+// ── Freeze-from-screen (Statement Matching "Freeze" tab) ─────────────────────
+// Per-ledger freeze straight off a matching screen: read the freeze state (status +
+// unreconciled-entry count so the button can disable with a reason), freeze one
+// ledger for a month (BE refuses unless every entry is reconciled), or un-freeze
+// (SOFT-lock release while unsigned). Ledger keyed by CODE or NAME.
+export async function getLedgerFreeze({ branch, code, name, period, tier = 'month' } = {}) {
+  try { return (await apiGet('/api/reconciliation/ledger-freeze', { branch, code, name, period, tier }))?.data || null; }
+  catch { return null; }
+}
+export function freezeLedger({ branch, code, name, period, tier = 'month', statementBalance, adjustments }) {
+  return apiPost('/api/reconciliation/ledger-freeze', { branch, code, name, period, tier, statementBalance, adjustments });
+}
+export function unfreezeLedger({ branch, code, name, period, tier = 'month' }) {
+  return apiPost('/api/reconciliation/ledger-unfreeze', { branch, code, name, period, tier });
+}
+// Inter-Branch pair freeze (no per-ledger cert — a branch-pair balance agreement).
+export async function getIbFreeze({ branchA, branchB, period } = {}) {
+  try { return (await apiGet('/api/interbranch-reconciliation/freeze', { branchA, branchB, period }))?.data || null; }
+  catch { return null; }
+}
+export function ibFreeze({ branchA, branchB, period }) {
+  return apiPost('/api/interbranch-reconciliation/freeze', { branchA, branchB, period });
+}
+export function ibFreezeSign({ branchA, branchB, period }) {
+  return apiPost('/api/interbranch-reconciliation/freeze/sign', { branchA, branchB, period });
+}
+export function ibFreezeReopen({ branchA, branchB, period, reason }) {
+  return apiPost('/api/interbranch-reconciliation/freeze/reopen', { branchA, branchB, period, reason });
+}
+
 // Statement attach: multipart when a file (PDF/CSV/image/XML) is chosen —
 // stored in the private S3 bucket, tamper-tied to its content sha256.
 export function addAttachment(id, { label, source, file }) {

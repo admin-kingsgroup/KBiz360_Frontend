@@ -23,6 +23,7 @@ import {
 import { parseSupplierStatement } from '../../../core/supplierStatementParse';
 import { C, card, money, brLabel, Shell, aBtn, Tile, SecTitle, Row } from '../../accountantWorkspace/shared';
 import { ReconMatcher } from './shared';
+import ReconFreezePanel from './ReconFreezePanel';
 
 export function SupplierReco({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
@@ -84,6 +85,9 @@ export function SupplierReco({ branch, setRoute }) {
             <Tile icon={<AlertTriangle size={13} />} label="Difference" value={money(cur, Math.abs(diff))} sub={Math.abs(diff) <= 0.01 ? '✓ reconciled' : (diff < 0 ? 'books lower than statement' : 'books higher than statement')} tone={Math.abs(diff) <= 0.01 ? C.green : C.red} loading={sumQ.isLoading} />
             <Tile icon={<CheckSquare size={13} />} label="Matched / Open" value={`${sum.counts?.statementReconciled || 0} / ${sum.counts?.statementUnreconciled || 0}`} sub={`${sum.counts?.statementException || 0} disputed · ${sum.counts?.statementPartial || 0} partial`} tone={C.gold} loading={sumQ.isLoading} />
           </Row>
+
+          {/* Freeze & Certify this supplier ledger for the month (blocks revoke/edit once frozen) */}
+          <ReconFreezePanel branch={branch} name={sel} ledgerLabel={sel} currency={cur} statementBalance={sum.statementOwed} />
 
           {/* Import box */}
           <div style={{ ...card, padding: 12, marginBottom: 12 }}>

@@ -9,14 +9,21 @@
    accountantWorkspace/accountantWorkspace.jsx (MENU_RECONCILIATION ▸
    Statement Matching ▸ "Inter-Branch Reconciliation").
    ════════════════════════════════════════════════════════════════════ */
-import { AlertTriangle, CheckCircle2, Coins, Scale } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { AlertTriangle, CheckCircle2, Coins, Scale, Snowflake, Lock } from 'lucide-react';
 import { bc } from '../../../core/styles';
+import { toast } from '../../../core/ux/toast';
+import { confirmDialog } from '../../../core/ux/confirm';
 import { useInterBranchReco, useInterBranchLinks } from '../../../core/useInterBranchReco';
-import { C, card, money, Shell, th, td, rnum, Table, Tile, Row } from '../../accountantWorkspace/shared';
+import { C, card, money, Shell, th, td, rnum, Table, Tile, Row, aBtn } from '../../accountantWorkspace/shared';
 import { wbBadge } from './shared';
+import { getIbFreeze, ibFreeze, ibFreezeSign, ibFreezeReopen } from '../api';
+
+const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
 export function InterBranchReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
+  const [period, setPeriod] = useState(thisMonth());
   const q = useInterBranchReco();
   const raw = q.data || { pairs: [], totals: {} };
   // A specific top-bar branch scopes the reco to pairs INVOLVING that branch;
@@ -36,7 +43,11 @@ export function InterBranchReco({ branch }) {
     : raw;
   return (
     <Shell title="Inter-branch Reconciliation" sub="every branch pair's two directional current accounts — they should net to zero"
-      right={<div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: data.totals?.mismatched ? C.red : C.green }}>{data.totals?.mismatched || 0} mismatched · {data.totals?.matched || 0} matched</div>}>
+      right={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 11, color: C.dim }}>Freeze month</span>
+        <input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} style={{ border: `1px solid ${C.border}`, borderRadius: 5, padding: '3px 7px', fontSize: 12 }} />
+        <div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: data.totals?.mismatched ? C.red : C.green }}>{data.totals?.mismatched || 0} mismatched · {data.totals?.matched || 0} matched</div>
+      </div>}>
       <Row>
         <Tile icon={<Scale size={13} />} label="Branch Pairs" value={data.totals?.pairs || 0} sub="with activity" tone={C.dark} loading={q.isLoading} />
         <Tile icon={<CheckCircle2 size={13} />} label="Reconciled" value={data.totals?.matched || 0} sub="net to zero" tone={C.green} loading={q.isLoading} />
@@ -45,12 +56,12 @@ export function InterBranchReco({ branch }) {
       </Row>
       <Table>
         <thead><tr>
-          {['Branch A', 'Branch B', 'A receivable from B', 'B receivable from A', 'Difference', 'Status'].map((h, i) =>
+          {['Branch A', 'Branch B', 'A receivable from B', 'B receivable from A', 'Difference', 'Status', `Freeze · ${period}`].map((h, i) =>
             <th key={h} style={{ ...th, ...(i >= 2 && i <= 4 ? rnum : {}) }}>{h}</th>)}
         </tr></thead>
         <tbody>
-          {q.isLoading && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
-          {!q.isLoading && data.pairs.length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ No inter-branch balances to reconcile.</td></tr>}
+          {q.isLoading && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
+          {!q.isLoading && data.pairs.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ No inter-branch balances to reconcile.</td></tr>}
           {data.pairs.map((p, i) => (
             <tr key={i} style={{ background: p.matched ? '#f4fbf4' : '#fdf6f4' }}>
               <td style={{ ...td, fontWeight: 700, color: C.dark }}>{p.branchA}</td>
@@ -59,6 +70,7 @@ export function InterBranchReco({ branch }) {
               <td style={{ ...td, ...rnum }}>{money(cur, p.bReceivableFromA)}</td>
               <td style={{ ...td, ...rnum, fontWeight: 700, color: p.matched ? C.dim : C.red }}>{money(cur, Math.abs(p.difference))}</td>
               <td style={td}><span style={wbBadge(p.matched ? 'reconciled' : 'differences')}>{p.matched ? 'reconciled' : 'mismatch'}</span></td>
+              <td style={td}><IbFreezeCell branchA={p.branchA} branchB={p.branchB} period={period} agrees={p.matched} /></td>
             </tr>
           ))}
         </tbody>
@@ -69,6 +81,54 @@ export function InterBranchReco({ branch }) {
         Each pair compares branch A's "Travkings Tours and Travels B" ledger against branch B's "Travkings Tours and Travels A" ledger (sub-group <b>Inter Branch</b>). The selling branch books a debtor and the buying branch a creditor, so the two should be equal and opposite (net zero). A non-zero difference means one branch booked the deal and the other hasn't, or the amounts disagree — an agreement check, not an elimination.
       </div>
     </Shell>
+  );
+}
+
+// Per-pair FREEZE control — freeze the branch-pair for the chosen month (refused
+// unless the two agree), sign the certify chain, or un-freeze/re-open. Once frozen,
+// the pair's INB vouchers for that month can no longer be revoked/edited.
+function IbFreezeCell({ branchA, branchB, period, agrees }) {
+  const [st, setSt] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setSt(await getIbFreeze({ branchA, branchB, period }));
+  }, [branchA, branchB, period]);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const run = async (fn, okMsg) => {
+    setBusy(true);
+    try { await fn(); toast(okMsg, 'success'); await refresh(); }
+    catch (e) { toast(e?.message || 'Action failed', 'error'); }
+    finally { setBusy(false); }
+  };
+  const doFreeze = () => run(() => ibFreeze({ branchA, branchB, period }), `Frozen ${branchA}↔${branchB} · ${period}`);
+  const doSign = () => run(() => ibFreezeSign({ branchA, branchB, period }), `Signed ${branchA}↔${branchB}`);
+  const doReopen = async () => {
+    const { confirmed, reason } = await confirmDialog({ title: `Re-open ${branchA}↔${branchB}?`, message: 'Releases the freeze so this month can change again.', reasonRequired: true, reasonLabel: 'Reason', confirmLabel: 'Re-open' });
+    if (!confirmed) return;
+    run(() => ibFreezeReopen({ branchA, branchB, period, reason }), `Re-opened ${branchA}↔${branchB}`);
+  };
+
+  if (!st) return <span style={{ fontSize: 10, color: C.dim }}>…</span>;
+  const frozen = !!st.frozen; const certified = !!st.certified;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+      {certified
+        ? <span style={{ fontSize: 10, fontWeight: 800, color: '#0f2f5c' }}><Lock size={10} style={{ verticalAlign: -1 }} /> Certified</span>
+        : frozen
+          ? <span style={{ fontSize: 10, fontWeight: 800, color: '#185FA5' }}><Snowflake size={10} style={{ verticalAlign: -1 }} /> Frozen</span>
+          : <span style={{ fontSize: 10, color: C.dim }}>Open</span>}
+      {!frozen && !certified && (
+        <button onClick={doFreeze} disabled={!agrees || busy} title={agrees ? '' : 'the two branches must agree first'}
+          style={{ ...aBtn(C.blue), opacity: (agrees && !busy) ? 1 : 0.5 }}>Freeze</button>
+      )}
+      {frozen && !certified && (<>
+        <button onClick={doSign} disabled={busy} style={{ ...aBtn(C.green), opacity: busy ? 0.6 : 1 }}>Sign</button>
+        <button onClick={doReopen} disabled={busy} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Un-freeze</button>
+      </>)}
+      {certified && <button onClick={doReopen} disabled={busy} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Re-open</button>}
+    </div>
   );
 }
 
