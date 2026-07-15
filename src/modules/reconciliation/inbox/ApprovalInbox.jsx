@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Inbox, ChevronRight, Snowflake } from 'lucide-react';
 import { getInbox } from '../api';
-import { branchCodeOf, tierMenuName, certPathFor, fmtAmt } from '../utils';
+import { BRANCHES, branchCodeOf, tierMenuName, certPathFor, fmtAmt } from '../utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../../shell/primitives';
+import { FULL_SCOPE_ROLES } from '../../../core/branchScope';
+import { useCockpitFocusStore } from '../../../store/cockpitFocus';
 
 // ─── TK Group Central · Approval Inbox ───────────────────────────────────────
 // Every FROZEN certificate across all branches still awaiting a signature, routed
@@ -33,15 +35,30 @@ export function roleActs(me, signer) {
 export function ApprovalInbox({ branch: appBranch, setRoute, currentUser }) {
   const code = branchCodeOf(appBranch); // '' in group mode (ALL) → every branch
   const [mineOnly, setMineOnly] = useState(true);
+  const setFocus = useCockpitFocusStore((s) => s.setFocus);
+  // The inbox is a TK Group Central surface (approvals happen at Group). A branch-
+  // scoped user reaching it by direct URL gets the rule, not the board.
+  const central = FULL_SCOPE_ROLES.includes(currentUser?.role) || currentUser?.role === 'super_admin';
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['recon-certs', 'inbox', code || 'ALL'],
     queryFn: () => getInbox({ branch: code || 'ALL' }),
+    enabled: central,
   });
   const me = data?.me || currentUser?.role || '';
   const all = data?.items || [];
   const mine = all.filter((i) => roleActs(me, i.waitingOn));
   const shown = mineOnly ? mine : all;
   const branches = [...new Set(shown.map((i) => i.branch))].sort();
+
+  if (!central) {
+    return (
+      <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
+        <h1 className="kbiz-page-title">Approval Inbox</h1>
+        <EmptyState title="TK Group Central only"
+          hint="The Approval Inbox is worked from TK Group Central by AE / FM / Director / Owner. At a branch, use the Daily & Weekly Freeze pages." />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
@@ -87,7 +104,7 @@ export function ApprovalInbox({ branch: appBranch, setRoute, currentUser }) {
                         <Badge tone={roleActs(me, i.waitingOn) ? 'success' : 'neutral'} size="sm">{i.waitingOn}</Badge>
                         <span className="ml-1 text-xs text-ink-subtle">{i.action}</span>
                       </td>
-                      <td className={cellCls}><Button variant="ghost" size="sm" icon={ChevronRight} onClick={() => setRoute && setRoute(certPathFor(i.tier))}>Open</Button></td>
+                      <td className={cellCls}><Button variant="ghost" size="sm" icon={ChevronRight} onClick={() => { if (i.branch) setFocus(i.branch, BRANCHES); if (setRoute) setRoute(certPathFor(i.tier)); }}>Open</Button></td>
                     </tr>
                   ))}
                 </tbody>
