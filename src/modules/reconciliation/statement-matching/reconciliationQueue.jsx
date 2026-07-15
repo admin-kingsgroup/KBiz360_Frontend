@@ -11,8 +11,10 @@ import { useBankLedgers } from '../../../core/useBankReco';
 import { fmtINR } from '../../../core/format';
 import { btnGh } from '../../../core/styles';
 
-// The four tiers, in ladder order, for the pending strip.
+// The five tiers, in ladder order, for the pending strip (Daily/Weekly are the
+// branch freeze tiers; Month/Quarter/Year certify at TK Group).
 const RECO_QUEUE_TIERS = [
+  { key:'daily',   label:'Daily' },
   { key:'weekly',  label:'Weekly' },
   { key:'month',   label:'Month-End' },
   { key:'quarter', label:'Quarterly' },

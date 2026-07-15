@@ -168,7 +168,7 @@ function InterBranchLinkLevel({ branch, cur }) {
   // legs mix. Re-total on the FE grouped by the SELLER's currency so each figure is honest.
   const openByCcy = {};
   for (const l of (data.unbooked || [])) { const c = bookCcyOf(l.fromBranch); openByCcy[c] = (openByCcy[c] || 0) + (Number(l.total) || 0); }
-  const openAmtStr = Object.entries(openByCcy).map(([c, v]) => `${CCY_SYM[c] || ''}${(Math.round(v * 100) / 100).toLocaleString(c === 'USD' ? undefined : undefined)}`).join(' + ');
+  const openAmtStr = Object.entries(openByCcy).map(([c, v]) => `${CCY_SYM[c] || ''}${(Math.round(v * 100) / 100).toLocaleString()}`).join(' + ') || money(cur, 0);
   return (
     <div style={{ marginTop: 18 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 6 }}>
@@ -188,7 +188,7 @@ function InterBranchLinkLevel({ branch, cur }) {
               <td style={td}>{l.date}</td>
               <td style={td}>{l.fromBranch} → {l.toBranch}</td>
               <td style={td}>{l.module || '—'}</td>
-              <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(cur, l.total)}</td>
+              <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(symOf(bookCcyOf(l.fromBranch), cur), l.total)}</td>
               <td style={td}><span style={wbBadge('differences')}>open — one side unbooked</span></td>
             </tr>
           ))}
