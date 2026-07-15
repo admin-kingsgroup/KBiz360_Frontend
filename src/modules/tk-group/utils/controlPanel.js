@@ -204,7 +204,7 @@ export const DEFAULT_RULES = [
   { nm: 'Master create ≠ Master approve', ds: 'Faiz creates heads, the Owner approves — never the same hand (locked meta-rule).' },
   { nm: 'Numbering lock (auto only)', ds: 'Voucher numbers are always system-generated — no manual resets.' },
   { nm: 'Wired-ledger lock', ds: 'Module / tax / inter-branch heads are locked for everyone.' },
-  { nm: 'Master & onboarding chains locked', ds: 'Ledger heads route Faiz → Owner; a new party routes Branch → Faiz (KYC) → Farhan → Owner. Not freely editable.' },
+  { nm: 'Master & onboarding chains are the Owner’s', ds: 'Chart-of-accounts and new-party onboarding follow a maker → Owner chain — ledger heads: Faiz → Owner; a new party: Branch → Faiz (KYC) → Director → Owner. The Owner-approval staging of a branch master write engages with the Master-creation lock (applies inline until it is on).' },
   { nm: 'Block future-dated entries', ds: 'No posting beyond today (two-layer guard; travel dates excepted).' },
   { nm: 'Duplicate-bill detection', ds: 'A supplier expense bill with the same supplier + Bill/Invoice no. as an existing entry is blocked on save (overridable with a reason).' },
   { nm: 'Negative-GP block', ds: 'A loss-making SO/PO/GP booking or INB deal (gross profit below 0) is hard-blocked on save for EVERY branch — no exemptions. Zero GP (at-cost) is allowed.' },
@@ -218,19 +218,19 @@ export const DEFAULT_RULES = [
   { nm: 'Voucher must be balanced (Dr = Cr)', ds: 'Every voucher’s total debit must equal its total credit or it can never post; the same ledger can’t sit on both the debit and credit side (a self-cancelling wash). Foundational.' },
   { nm: 'Approval validation gate', ds: 'Before a sale / purchase / booking posts it must pass: GST-rate sanity, total = net + GST + Service Charge-2 GST + TCS + round-off, a Flight/Holiday cost-centre tag (International/Domestic), valid multi-PO leg types, chosen customer & supplier ledgers, and positive totals.' },
   { nm: 'Inter-branch deals must use the INB Voucher', ds: 'A Travkings inter-branch sale can’t be entered as an SO/PO/GP booking — it is blocked and belongs in the INB pipeline.' },
-  { nm: 'Post only to existing ledgers', ds: 'A standalone / imported voucher can’t silently create a ledger; tax and control heads are seeded in the database only. A line carrying an amount but no ledger is refused.' },
+  { nm: 'Post only to existing ledgers', ds: 'A direct GL voucher (payment · receipt · contra · journal · debit-note · expense) can’t silently create a ledger — a line carrying an amount but no ledger is refused; tax & control heads are seeded in the database only.' },
   // ── Lifecycle & audit ──
   { nm: 'Approved / posted voucher is immutable', ds: 'A voucher that has posted to the books can’t be edited — it must be revoked back to Pending first. Protects the audit trail.' },
   { nm: 'Deleted voucher is view-only', ds: 'A deleted voucher can never be edited, re-posted or re-approved, and its number stays retired.' },
   { nm: 'Every edit needs a reason and re-enters approval', ds: 'Editing a voucher requires an edit reason, forces it back to Pending, and clears the prior approval / review chain — changed figures must be re-checked.' },
-  { nm: 'Full audit trail on every voucher action', ds: 'Approve, edit, revoke, delete, push and un-allocate are all recorded to the audit trail.' },
+  { nm: 'Full audit trail on every voucher action', ds: 'Approve, edit, revoke, delete, push and un-allocate are all recorded to the audit trail (best-effort — logging never blocks the action).' },
   // ── Revoke & refund integrity ──
   { nm: 'A refund’s original must resolve', ds: 'A refund / reissue that names an original sale/purchase must find it, otherwise it stays Pending — this prevents over-refunding a client.' },
-  { nm: 'Revoke needs a reason and fully un-posts', ds: 'A revoke requires a reason and must completely reverse the journal (verified) — never a half-revoke; it is blocked when it would break a reconciled, pushed-INB, settled, or closed-period record.' },
+  { nm: 'Revoke needs a reason and fully un-posts', ds: 'A revoke requires a reason and must completely reverse the journal, verified — never a half-revoke. It is hard-blocked when it would break a bank-reconciled or frozen-reconciliation record, a pushed INB deal, a master-locked booking/order leg, or an original that a live refund/reissue reverses. (A settled bill or an aged / closed-period revoke proceeds with a warning, not a block.)' },
   // ── Masters & access ──
   { nm: 'Ledger integrity', ds: 'Ledger codes are system-generated, ledger names are unique per scope, and a ledger that already has postings can’t be deleted (deactivate it instead).' },
   { nm: 'Branch isolation', ds: 'A branch-scoped user can only view or act on the branches they are assigned; another branch’s record simply returns “not found”.' },
-  { nm: 'Session security', ds: 'View-only users are blocked from every write; a new login or a password change signs out all earlier sessions on their next request.' },
+  { nm: 'View-only users can’t write', ds: 'A view-only user is blocked from ERP data writes — they may still renew their own token, change their own password, and use support tickets. (Session sign-out on new login / password change is covered by Single active session and Password strength above.)' },
 ];
 
 // ── Screen 2 · CONFIGURABLE RULES — the Owner's ON/OFF switches, by group ──────
