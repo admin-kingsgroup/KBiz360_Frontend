@@ -61,7 +61,7 @@ const wrap = (ui) => {
 describe('CertificationRegister · render (tier-locked sign-off pages — the menu is the tier switch)', () => {
   test('weekly page: this tier\'s card ONLY + the grouped ledger register', async () => {
     wrap(<CertificationRegister branch="BOM" tier="weekly" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
-    expect(await screen.findByText('Weekly Certification')).toBeInTheDocument(); // page title
+    expect(await screen.findByText('Weekly Freeze')).toBeInTheDocument();     // page title (soft tier = Freeze, not Certification)
     expect(screen.getByText('Weekly')).toBeInTheDocument();                   // the tier progress card
     expect(screen.queryByText('Month-End')).not.toBeInTheDocument();          // other tiers live on their own pages
     expect(screen.queryByText('Quarterly')).not.toBeInTheDocument();
@@ -96,7 +96,7 @@ describe('CertificationRegister · render (tier-locked sign-off pages — the me
   test('Branch Accountant on a central tier URL: guarded, not broken', async () => {
     wrap(<CertificationRegister branch="BOM" tier="quarter" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
     expect(await screen.findByText('Central closing tier')).toBeInTheDocument();
-    expect(screen.getByText(/WEEKLY cycle only/i)).toBeInTheDocument();
+    expect(screen.getByText(/Daily & Weekly freeze only/i)).toBeInTheDocument();
     expect(screen.queryByText('ICICI Bank A/c')).not.toBeInTheDocument();     // no register leaks
   });
 });
@@ -160,7 +160,7 @@ describe('RuleBookPage · render', () => {
   test('renders tiers, roles, steps and the eight golden rules with branch-aware periods (object branch prop)', async () => {
     wrap(<RuleBookPage branch={{ code: 'NBO', city: 'Nairobi' }} setRoute={() => {}} />);
     expect(await screen.findByText('Reconciliation Rule Book')).toBeInTheDocument();
-    expect(screen.getByText('1 · The four tiers')).toBeInTheDocument();
+    expect(screen.getByText('1 · The five tiers')).toBeInTheDocument();
     expect(screen.getByText('2 · Roles — who does what')).toBeInTheDocument();
     expect(screen.getByText('4 · The eight golden rules')).toBeInTheDocument();
     expect(await screen.findByText('CY2026-Q3')).toBeInTheDocument();        // Africa regime period from API

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2, LayoutDashboard } from 'lucide-react';
 import { getTree, getSummary, getPending, generateCertificates } from '../api';
 import { useCockpitFocus } from '../../../store/cockpitFocus';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, certPathFor, hubPathFor, reportPathFor, tierMenuName } from '../utils';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, certPathFor, hubPathFor, reportPathFor, tierMenuName, isSoftTier } from '../utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../../shell/primitives';
 import { CertificateDrawer } from '../shared/CertificateDrawer';
 import { CycleLedgerDrawer } from './CycleLedgerDrawer';
@@ -54,6 +54,10 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
   const [periodSel, setPeriodSel] = useState({});
   const qc = useQueryClient();
   const tier = tierOf(tierKey);
+  // Daily & Weekly are FREEZE-ONLY (branch); Month/Quarter/Year are CERTIFIED (TK
+  // Group). The workbench is the same page — only the wording differs by family.
+  const soft = isSoftTier(tierKey);
+  const registerNoun = soft ? 'Freeze' : 'Certification';
 
   // Follow the app-wide branch selector — the module must never show a
   // different branch than the rest of the ERP (branch-isolation convention).
@@ -97,8 +101,8 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
       <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
         <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Certification</h1>
         <EmptyState title="Central closing tier"
-          hint="The Branch Accountant works the WEEKLY cycle only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
-          action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Open Weekly Certification</Button>} />
+          hint="The Branch Accountant works the Daily & Weekly freeze only — Month-End, Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner."
+          action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Open Weekly Freeze</Button>} />
       </div>
     );
   }
@@ -108,8 +112,8 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Certification</h1>
-          <p className="text-sm text-ink-muted">One certificate per ledger · {tier.mode === 'digital' ? 'digital sign chain' : 'physical certificate + scan-back'} · branch-wise, never mixed.</p>
+          <h1 className="kbiz-page-title">{tierMenuName(tierKey)} {registerNoun}</h1>
+          <p className="text-sm text-ink-muted">One {soft ? 'freeze' : 'certificate'} per ledger · {soft ? 'freeze + approve chain' : (tier.mode === 'digital' ? 'digital sign chain' : 'physical certificate + scan-back')} · branch-wise, never mixed.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" icon={LayoutDashboard} onClick={() => setRoute && setRoute(hubPathFor(tierKey))}>{tierMenuName(tierKey)} Hub</Button>
@@ -138,8 +142,8 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
       <div className="grid grid-cols-1 gap-3 tablet:max-w-sm">
         <TierCard tier={tier} counts={summary?.tiers?.[tierKey]} period={summary?.periods?.[tierKey]} />
       </div>
-      {tiers.length === 1 && (
-        <p className="text-xs text-ink-subtle">Month-End, Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner.</p>
+      {tiers.length < TIERS.length && (
+        <p className="text-xs text-ink-subtle">Daily &amp; Weekly are freeze-only — Month-End, Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner.</p>
       )}
 
       {/* register */}

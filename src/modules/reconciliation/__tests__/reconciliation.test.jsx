@@ -8,24 +8,27 @@ import {
 } from '../utils';
 
 describe('reconciliation · tiers', () => {
-  test('four tiers in ladder order with the designed chains', () => {
-    expect(TIERS.map((t) => t.key)).toEqual(['weekly', 'month', 'quarter', 'year']);
-    expect(tierOf('weekly').chain.map((s) => s.role)).toEqual(['Branch Accountant', 'AE', 'FM', 'Director']);
-    expect(tierOf('month').chain.map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner']);
-    expect(tierOf('quarter').chain.map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner', 'Statutory']);
-    expect(tierOf('year').chain.map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner', 'Auditor', 'Owner']);
+  test('five tiers in ladder order with the designed chains', () => {
+    expect(TIERS.map((t) => t.key)).toEqual(['daily', 'weekly', 'month', 'quarter', 'year']);
+    // Soft (branch, freeze-only): Daily = BA→AE, Weekly = BA→AE→FM.
+    expect(tierOf('daily').chain.map((s) => s.role)).toEqual(['Branch Accountant', 'AE']);
+    expect(tierOf('weekly').chain.map((s) => s.role)).toEqual(['Branch Accountant', 'AE', 'FM']);
+    // Hard (TK Group, certification): AE freeze → FM verify → Director certify → Owner lock.
+    ['month', 'quarter', 'year'].forEach((k) => {
+      expect(tierOf(k).chain.map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner']);
+    });
   });
-  test('weekly is digital; the three closing tiers are physical', () => {
-    expect(tierOf('weekly').mode).toBe('digital');
+  test('Daily & Weekly are digital; the three closing tiers are physical', () => {
+    ['daily', 'weekly'].forEach((k) => expect(tierOf(k).mode).toBe('digital'));
     ['month', 'quarter', 'year'].forEach((k) => expect(tierOf(k).mode).toBe('physical'));
   });
-  test('unknown tier falls back to weekly (never crashes a row)', () => {
-    expect(tierOf('nope').key).toBe('weekly');
+  test('unknown tier falls back to the first tier (never crashes a row)', () => {
+    expect(tierOf('nope').key).toBe('daily');
   });
-  test('Branch Accountant sees the weekly tier ONLY; central roles see all four', () => {
-    expect(visibleTiers('Branch Accountant').map((t) => t.key)).toEqual(['weekly']);
+  test('Branch Accountant sees the DAILY & WEEKLY freeze tiers ONLY; central roles see all five', () => {
+    expect(visibleTiers('Branch Accountant').map((t) => t.key)).toEqual(['daily', 'weekly']);
     ['Sr. Accounts Executive', 'Senior Finance Manager', 'Director', 'Super Admin', undefined].forEach((r) => {
-      expect(visibleTiers(r)).toHaveLength(4);
+      expect(visibleTiers(r)).toHaveLength(5);
     });
   });
   test('cycle CONFIG is FM/Director/Owner only — AE and Branch Accountant cannot reshape the scope', () => {
@@ -138,11 +141,13 @@ describe('reconciliation · rule book content', () => {
     expect(GOLDEN_RULES).toHaveLength(8);
     expect(GOLDEN_RULES.map((r) => r.n)).toEqual(['01', '02', '03', '04', '05', '06', '07', '08']);
   });
-  test('role matrix: Branch Accountant is weekly-only; Owner locks the month', () => {
+  test('role matrix: Branch Accountant freezes daily & weekly only; Owner locks the month', () => {
     const ba = ROLE_MATRIX.find((r) => r.role === 'Branch Accountant');
-    expect(ba.weekly).toBe('Prepare');
+    expect([ba.daily, ba.weekly]).toEqual(['Freeze', 'Freeze']);
     expect([ba.month, ba.quarter, ba.year]).toEqual(['—', '—', '—']);
     expect(ROLE_MATRIX.find((r) => r.role === 'Owner').month).toBe('Lock');
-    expect(ROLE_MATRIX.find((r) => r.role === 'Auditor').year).toBe('Attest');
+    // AE is the month-end maker (freeze); external Statutory/Auditor rows are removed.
+    expect(ROLE_MATRIX.find((r) => r.role === 'AE').month).toBe('Freeze');
+    expect(ROLE_MATRIX.find((r) => r.role === 'Auditor')).toBeUndefined();
   });
 });

@@ -21,7 +21,7 @@ jest.mock('../api', () => ({
 }));
 
 import { reconciliationRoutes } from '../routes';
-import { TIERS, TIER_PATHS, hubPathFor, certPathFor, reportPathFor, tierMenuName } from '../utils';
+import { TIERS, TIER_PATHS, hubPathFor, certPathFor, reportPathFor, tierMenuName, isSoftTier } from '../utils';
 import { MENU_RECONCILIATION } from '../../../core/menus';
 
 const routePaths = reconciliationRoutes.map((r) => r.path);
@@ -38,8 +38,8 @@ describe('reconciliation · route table ↔ tier pairing', () => {
     expect(Object.keys(TIER_PATHS).sort()).toEqual(TIERS.map((t) => t.key).sort());
   });
 
-  test('every menu href under Reconciliation Hub + Certification + Reports resolves to a route', () => {
-    const menuHrefs = [...group('Reconciliation Hub').children, ...group('Certification').children, ...group('Reports').children]
+  test('every menu href under Freeze + Reconciliation Hub + Reports resolves to a route', () => {
+    const menuHrefs = [...group('Freeze').children, ...group('Reconciliation Hub').children, ...group('Reports').children]
       .map((c) => c.href);
     menuHrefs.forEach((h) => expect(routePaths).toContain(h));
   });
@@ -75,11 +75,11 @@ describe('reconciliation · route table ↔ tier pairing', () => {
     expect(await screen.findByText(h1)).toBeInTheDocument();
   });
 
-  test('route titles match the menu wording (tierMenuName)', () => {
+  test('route titles match the family wording (freeze tiers say Freeze; cert tiers say Certification)', () => {
     TIERS.forEach(({ key }) => {
       expect(routeByPath(hubPathFor(key)).title).toBe(`${tierMenuName(key)} Reconciliation`);
-      expect(routeByPath(certPathFor(key)).title).toBe(`${tierMenuName(key)} Certification`);
       expect(routeByPath(reportPathFor(key)).title).toBe(`${tierMenuName(key)} Report`);
+      expect(routeByPath(certPathFor(key)).title).toBe(`${tierMenuName(key)} ${isSoftTier(key) ? 'Freeze' : 'Certification'}`);
     });
   });
 });

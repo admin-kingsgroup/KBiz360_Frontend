@@ -648,42 +648,27 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"Audit Trail", href:"/tk/audit"},
 ]};
 
-// Reconciliation — its own top-level module (the most important control in the
-// business): 4-tier per-ledger certificates (Weekly digital · Month/Quarter/Year
-// physical) + the staff Rule Book. Branch-wise throughout; existing statement-
-// matching screens stay under Accounts ▸ Reconciliation — this module is the
-// certificate/sign-off layer above them.
+// Reconciliation — the BRANCH surface is FREEZE-ONLY: Daily & Weekly freeze (no
+// certification — that is done at TK Group Central) plus the statement-matching
+// screens. Month/Quarter/Year certification and Tally Reconciliation are NOT on the
+// branch surface; they live in the TK Group Central cockpit (modules/tk-group/cockpit.js).
+// Branch-wise throughout.
 export const MENU_RECONCILIATION = {label:"Statement Reconciliation", icon:ArrowLeftRight, children:[
-  // Reconciliation Hub — the read-only FULL VIEW / dashboard of a tier: every
-  // ledger in scope + its live status, branch-wise readiness and the attention
-  // list. One entry per tier (the menu is the tier switch). This is where you
-  // WATCH; Certification below is where you sign off.
+  // Freeze — the per-ledger Daily & Weekly freeze register (the branch deliverable).
+  // Daily: Branch Accountant freezes → AE approves. Weekly: BA freezes → AE → FM
+  // approve (approvals happen at TK Group Central). No certification, no hard lock.
+  {label:"Freeze", children:[
+    {label:"Daily Freeze",  href:"/reconciliation/daily"},
+    {label:"Weekly Freeze", href:"/reconciliation/weekly"},
+  ]},
+  // Reconciliation Hub — the read-only FULL VIEW / dashboard of a freeze tier:
+  // every cycle ledger + its live status and the attention list.
   {label:"Reconciliation Hub", children:[
-    {label:"Weekly Reconciliation",    href:"/reconciliation/hub/weekly"},
-    {label:"Monthly Reconciliation",   href:"/reconciliation/hub/monthly"},
-    {label:"Quarterly Reconciliation", href:"/reconciliation/hub/quarterly"},
-    {label:"Yearly Reconciliation",    href:"/reconciliation/hub/yearly"},
+    {label:"Daily Reconciliation",  href:"/reconciliation/hub/daily"},
+    {label:"Weekly Reconciliation", href:"/reconciliation/hub/weekly"},
   ]},
-  // The certificate ladder — ONE menu entry per tier (the menu IS the tier
-  // switch; each page renders tier-locked and branch-wise, never mixed).
-  {label:"Certification", children:[
-    {label:"Weekly Certification",    href:"/reconciliation/weekly"},
-    {label:"Monthly Certification",   href:"/reconciliation/monthly"},
-    {label:"Quarterly Certification", href:"/reconciliation/quarterly"},
-    {label:"Yearly Certification",    href:"/reconciliation/yearly"},
-    {label:"Rule Book & Process",     href:"/reconciliation/rulebook"},
-  ]},
-  // One report per tier — that tier's pending closings, certificate register
-  // and open exceptions.
-  {label:"Reports", children:[
-    {label:"Weekly Report",    href:"/reconciliation/reports/weekly"},
-    {label:"Monthly Report",   href:"/reconciliation/reports/monthly"},
-    {label:"Quarterly Report", href:"/reconciliation/reports/quarterly"},
-    {label:"Yearly Report",    href:"/reconciliation/reports/yearly"},
-  ]},
-  // Statement matching — MOVED here from the Accounts pill: all line-level
-  // import/match screens live under Reconciliation now (tax recon stays under
-  // the regime-aware Taxation pill).
+  // Statement matching — all line-level import/match screens live under
+  // Reconciliation (tax recon stays under the regime-aware Taxation pill).
   {label:"Statement Matching", children:[
     {label:"Client Reconciliation",    href:"/accounts/client-reco"},
     {label:"Bank Reconciliation",      href:"/bank-reco"},
@@ -691,6 +676,14 @@ export const MENU_RECONCILIATION = {label:"Statement Reconciliation", icon:Arrow
     {label:"Supplier Reconciliation",  href:"/accounts/supplier-reco"},
     {label:"Inter-Branch Reconciliation", href:"/accounts/interbranch-reco"},
     {label:"Match Guide",              href:"/reconciliation/match-guide"},
+  ]},
+  // One report per freeze tier — pending freezes and open exceptions.
+  {label:"Reports", children:[
+    {label:"Daily Report",  href:"/reconciliation/reports/daily"},
+    {label:"Weekly Report", href:"/reconciliation/reports/weekly"},
+  ]},
+  {label:"Govern", children:[
+    {label:"Rule Book & Process", href:"/reconciliation/rulebook"},
   ]},
 ]};
 
@@ -726,20 +719,10 @@ export const MENU_TALLY_RECON = {label:"Tally Reconciliation", icon:Scale, child
   ]},
 ]};
 
-// Branch-Accountant view of the pill: they PREPARE the weekly certificates
-// only — Month/Quarter/Year entries are hidden (those closings are worked from
-// TK Group Central by AE/FM/Director/Owner; the pages also self-guard).
-const BA_RECON_HIDDEN = new Set([
-  "/reconciliation/hub/monthly", "/reconciliation/hub/quarterly", "/reconciliation/hub/yearly",
-  "/reconciliation/monthly", "/reconciliation/quarterly", "/reconciliation/yearly",
-  "/reconciliation/reports/monthly", "/reconciliation/reports/quarterly", "/reconciliation/reports/yearly",
-]);
-export const MENU_RECONCILIATION_WEEKLY_ONLY = {
-  ...MENU_RECONCILIATION,
-  children: MENU_RECONCILIATION.children.map(g => (g.children
-    ? {...g, children: g.children.filter(c => !BA_RECON_HIDDEN.has(c.href))}
-    : g)), // a direct-href leaf under the pill passes through untouched
-};
+// The branch Statement Reconciliation pill is already FREEZE-ONLY (Daily & Weekly)
+// with no Month/Quarter/Year to hide, so the Branch-Accountant view is identical to
+// the branch pill. Kept as a named export for the callers/tests that reference it.
+export const MENU_RECONCILIATION_WEEKLY_ONLY = MENU_RECONCILIATION;
 
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
 export const MENU_APPROVALS = {label:"Approvals", icon:CheckSquare, href:"/transactions/approvals"};
@@ -975,7 +958,10 @@ export function fullMenuRoots(branch, currentUser){
   // branch pill so branches can RAISE credit/funds/onboarding/investment requests.
   // Dev Control is a Super-Admin-only pill — every other role never sees it
   // (and App.jsx blocks the route for them even by direct URL).
-  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_TALLY_RECON, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
+  // Tally Reconciliation is NOT on the branch surface — it is a TK Group Central
+  // activity only (the cockpit carries it; the BE 403s branch-scoped tokens). The
+  // branch Statement Reconciliation pill is freeze-only (Daily & Weekly).
+  return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
     ...(role === 'Super Admin' ? [MENU_DEV_CONTROL] : [])];
 }
 

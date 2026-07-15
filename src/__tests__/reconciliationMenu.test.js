@@ -28,31 +28,24 @@ describe('Reconciliation pill ▸ Statement Matching (moved out of Accounts)', (
     expect(hrefs(matching)).toEqual(expect.arrayContaining(MATCHING));
   });
 
-  test('Reconciliation Hub: a full-view dashboard, one entry per tier (first sub-head)', () => {
+  test('Freeze is the FIRST sub-head — Daily & Weekly, the branch deliverable', () => {
+    expect(MENU_RECONCILIATION.children[0].label).toBe('Freeze');
+    expect(hrefs(groupByLabel(MENU_RECONCILIATION, 'Freeze'))).toEqual(['/reconciliation/daily', '/reconciliation/weekly']);
+  });
+
+  test('Reconciliation Hub: a full-view dashboard for the freeze tiers only', () => {
     const hub = groupByLabel(MENU_RECONCILIATION, 'Reconciliation Hub');
-    expect(hrefs(hub)).toEqual([
-      '/reconciliation/hub/weekly', '/reconciliation/hub/monthly',
-      '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly',
-    ]);
-    // Hub is the FIRST sub-head under the pill (watch first, then certify).
-    expect(MENU_RECONCILIATION.children[0].label).toBe('Reconciliation Hub');
+    expect(hrefs(hub)).toEqual(['/reconciliation/hub/daily', '/reconciliation/hub/weekly']);
   });
 
-  test('Certification: one entry per tier + the Rule Book', () => {
-    const certs = groupByLabel(MENU_RECONCILIATION, 'Certification');
-    expect(hrefs(certs)).toEqual([
-      '/reconciliation/weekly', '/reconciliation/monthly',
-      '/reconciliation/quarterly', '/reconciliation/yearly',
-      '/reconciliation/rulebook',
-    ]);
+  test('NO Certification group on the branch pill (certification is TK Group Central); Rule Book lives under Govern', () => {
+    expect(groupByLabel(MENU_RECONCILIATION, 'Certification')).toBeUndefined();
+    expect(hrefs(groupByLabel(MENU_RECONCILIATION, 'Govern'))).toEqual(['/reconciliation/rulebook']);
   });
 
-  test('Reports: a separate sub head with one report per tier', () => {
+  test('Reports: a separate sub head with one report per freeze tier', () => {
     const reports = groupByLabel(MENU_RECONCILIATION, 'Reports');
-    expect(hrefs(reports)).toEqual([
-      '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
-      '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',
-    ]);
+    expect(hrefs(reports)).toEqual(['/reconciliation/reports/daily', '/reconciliation/reports/weekly']);
   });
 
   test('stale PRE-SPLIT deny-list keys keep covering the per-tier pages (no silent un-hide on deploy)', () => {
@@ -110,10 +103,10 @@ describe('the Reconciliation pill carries the matching screens in every regime (
     expect(h).toEqual(expect.arrayContaining(MATCHING));
   });
 
-  test('Branch Accountant gets the pill WEEKLY-ONLY (their prep work; central tiers hidden)', () => {
+  test('Branch Accountant gets the freeze-only pill (Daily & Weekly); month+ never appears', () => {
     const menu = getMenu({ code: 'BOM' }, { role: 'Branch Accountant' });
     const h = allHrefs(menu.find((m) => m.label === 'Statement Reconciliation'));
-    expect(h).toEqual(expect.arrayContaining(['/bank-reco', '/reconciliation/hub/weekly', '/reconciliation/weekly', '/reconciliation/reports/weekly', '/reconciliation/rulebook']));
+    expect(h).toEqual(expect.arrayContaining(['/bank-reco', '/reconciliation/daily', '/reconciliation/weekly', '/reconciliation/hub/daily', '/reconciliation/hub/weekly', '/reconciliation/reports/weekly', '/reconciliation/rulebook']));
     ['/reconciliation/hub/monthly', '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly',
       '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
       '/reconciliation/reports/monthly', '/reconciliation/reports/quarterly', '/reconciliation/reports/yearly',

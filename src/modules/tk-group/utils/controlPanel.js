@@ -209,11 +209,28 @@ export const DEFAULT_RULES = [
   { nm: 'Duplicate-bill detection', ds: 'A supplier expense bill with the same supplier + Bill/Invoice no. as an existing entry is blocked on save (overridable with a reason).' },
   { nm: 'Negative-GP block', ds: 'A loss-making SO/PO/GP booking or INB deal (gross profit below 0) is hard-blocked on save for EVERY branch — no exemptions. Zero GP (at-cost) is allowed.' },
   { nm: 'Single active session per user', ds: 'A new Books login invalidates every earlier session, so other devices are signed out on their next request.' },
-  { nm: 'Password strength (minimum length)', ds: 'A minimum length is enforced on every new / changed password, and a change signs the account out on every device.' },
+  { nm: 'Password strength', ds: 'Every new, changed or admin-reset password must be at least 8 characters and contain a letter and a number; a change signs the account out on every device.' },
   { nm: 'Approval-request alerts', ds: 'Pending work surfaces on the Alerts feed and the Inbox badge for the next approver.' },
   { nm: 'Stale-approval SLA + escalation', ds: 'Change-requests are aged against the clearance SLA — on-time / at-risk / breached — on the governance queue.' },
   { nm: 'Exception & risk alerts', ds: 'GP≤0 · negative cash · over-limit surface on the Alerts feed.' },
   { nm: 'Daily digest to Owner / Director', ds: 'An in-app Daily Digest summarises pending approvals, exceptions and close readiness at a glance.' },
+  // ── Posting & entry integrity (always enforced in code, no flag) ──
+  { nm: 'Voucher must be balanced (Dr = Cr)', ds: 'Every voucher’s total debit must equal its total credit or it can never post; the same ledger can’t sit on both the debit and credit side (a self-cancelling wash). Foundational.' },
+  { nm: 'Approval validation gate', ds: 'Before a sale / purchase / booking posts it must pass: GST-rate sanity, total = net + GST + Service Charge-2 GST + TCS + round-off, a Flight/Holiday cost-centre tag (International/Domestic), valid multi-PO leg types, chosen customer & supplier ledgers, and positive totals.' },
+  { nm: 'Inter-branch deals must use the INB Voucher', ds: 'A Travkings inter-branch sale can’t be entered as an SO/PO/GP booking — it is blocked and belongs in the INB pipeline.' },
+  { nm: 'Post only to existing ledgers', ds: 'A standalone / imported voucher can’t silently create a ledger; tax and control heads are seeded in the database only. A line carrying an amount but no ledger is refused.' },
+  // ── Lifecycle & audit ──
+  { nm: 'Approved / posted voucher is immutable', ds: 'A voucher that has posted to the books can’t be edited — it must be revoked back to Pending first. Protects the audit trail.' },
+  { nm: 'Deleted voucher is view-only', ds: 'A deleted voucher can never be edited, re-posted or re-approved, and its number stays retired.' },
+  { nm: 'Every edit needs a reason and re-enters approval', ds: 'Editing a voucher requires an edit reason, forces it back to Pending, and clears the prior approval / review chain — changed figures must be re-checked.' },
+  { nm: 'Full audit trail on every voucher action', ds: 'Approve, edit, revoke, delete, push and un-allocate are all recorded to the audit trail.' },
+  // ── Revoke & refund integrity ──
+  { nm: 'A refund’s original must resolve', ds: 'A refund / reissue that names an original sale/purchase must find it, otherwise it stays Pending — this prevents over-refunding a client.' },
+  { nm: 'Revoke needs a reason and fully un-posts', ds: 'A revoke requires a reason and must completely reverse the journal (verified) — never a half-revoke; it is blocked when it would break a reconciled, pushed-INB, settled, or closed-period record.' },
+  // ── Masters & access ──
+  { nm: 'Ledger integrity', ds: 'Ledger codes are system-generated, ledger names are unique per scope, and a ledger that already has postings can’t be deleted (deactivate it instead).' },
+  { nm: 'Branch isolation', ds: 'A branch-scoped user can only view or act on the branches they are assigned; another branch’s record simply returns “not found”.' },
+  { nm: 'Session security', ds: 'View-only users are blocked from every write; a new login or a password change signs out all earlier sessions on their next request.' },
 ];
 
 // ── Screen 2 · CONFIGURABLE RULES — the Owner's ON/OFF switches, by group ──────

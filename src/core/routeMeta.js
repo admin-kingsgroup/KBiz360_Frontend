@@ -52,6 +52,18 @@ const EXTRA = {
   '/transactions/approvals/adm': ['Finance', 'Approvals', 'ADM'],
   '/transactions/approvals/acm': ['Finance', 'Approvals', 'ACM'],
   '/finance/reco-queue': ['Accounts', 'Reconciliation', 'Reconciliation Queue'],
+  '/reconciliation/inbox': ['Statement Reconciliation', 'Approvals — Daily & Weekly', 'Approval Inbox'],
+  // Month/Quarter/Year reconciliation is CERTIFIED at TK Group Central (cockpit),
+  // so these pages are not on the static branch menu — give them stable crumbs here.
+  '/reconciliation/monthly': ['Statement Reconciliation', 'Certification', 'Monthly Certification'],
+  '/reconciliation/quarterly': ['Statement Reconciliation', 'Certification', 'Quarterly Certification'],
+  '/reconciliation/yearly': ['Statement Reconciliation', 'Certification', 'Yearly Certification'],
+  '/reconciliation/hub/monthly': ['Statement Reconciliation', 'Reconciliation Hub', 'Monthly Reconciliation'],
+  '/reconciliation/hub/quarterly': ['Statement Reconciliation', 'Reconciliation Hub', 'Quarterly Reconciliation'],
+  '/reconciliation/hub/yearly': ['Statement Reconciliation', 'Reconciliation Hub', 'Yearly Reconciliation'],
+  '/reconciliation/reports/monthly': ['Statement Reconciliation', 'Reports', 'Monthly Report'],
+  '/reconciliation/reports/quarterly': ['Statement Reconciliation', 'Reports', 'Quarterly Report'],
+  '/reconciliation/reports/yearly': ['Statement Reconciliation', 'Reports', 'Yearly Report'],
   '/import': ['Admin', 'Import / Export', 'Data Import'],
   '/search': ['Search'],
 };

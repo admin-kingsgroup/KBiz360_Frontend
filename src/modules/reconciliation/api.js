@@ -29,6 +29,13 @@ export async function getPending({ branch } = {}) {
   return (await apiGet('/api/reconciliation/pending', { branch })) || { rows: [] };
 }
 
+// TK Group Central approval inbox — every frozen cert awaiting a signature, tagged
+// with the role it waits on (+ `me` = the signed-in role). THROWS on failure — a
+// dead backend must never read as "no approvals pending" on a compliance board.
+export function getInbox({ branch } = {}) {
+  return apiGet('/api/reconciliation/inbox', { branch });
+}
+
 export async function getList({ branch, tier, period } = {}) {
   return (await apiGet('/api/reconciliation', { branch, tier, period }))?.items || [];
 }

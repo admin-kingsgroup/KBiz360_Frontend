@@ -15,9 +15,9 @@ const STEPS = [
   { icon: Snowflake, title: 'Freeze snapshot', text: 'Balances frozen · branch · period · ledger' },
   { icon: FileUp, title: 'Upload statements', text: 'Scan physical / download portal — hash-tied' },
   { icon: Scale, title: 'Reconcile', text: 'Books vs statement → difference to zero' },
-  { icon: ListChecks, title: 'Verify', text: 'AE, then FM' },
-  { icon: PenLine, title: 'Sign / Certify', text: 'Director · Owner · Auditor per tier' },
-  { icon: LockKeyhole, title: 'Release / Lock', text: 'Pay & collect — or lock the period' },
+  { icon: ListChecks, title: 'Approve / Verify', text: 'Daily: AE · Weekly: AE→FM · Month+: FM' },
+  { icon: PenLine, title: 'Certify', text: 'Month/Quarter/Year: Director (TK Group)' },
+  { icon: LockKeyhole, title: 'Approve / Lock', text: 'Branch freeze — or the Owner locks the period' },
 ];
 
 const cellCls = 'px-3 py-2.5 text-sm border-b border-surface-border align-top';
@@ -25,8 +25,8 @@ const headCls = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider 
 
 // Soft row tint + accent bar per tier tone — mirrors the tone already on that
 // tier's Badge, so the color coding is consistent (and readable) top to bottom.
-const TIER_ROW_BG = { success: 'bg-success-soft/40', info: 'bg-info-soft/40', gold: 'bg-gold-light/30', warning: 'bg-warning-soft/40' };
-const TIER_ROW_BORDER = { success: 'border-l-success', info: 'border-l-info', gold: 'border-l-gold', warning: 'border-l-warning' };
+const TIER_ROW_BG = { neutral: 'bg-surface-alt/60', success: 'bg-success-soft/40', info: 'bg-info-soft/40', gold: 'bg-gold-light/30', warning: 'bg-warning-soft/40' };
+const TIER_ROW_BORDER = { neutral: 'border-l-surface-border', success: 'border-l-success', info: 'border-l-info', gold: 'border-l-gold', warning: 'border-l-warning' };
 
 export function RuleBookPage({ branch, setRoute }) {
   // Periods are regime-aware: India books show FY keys, Africa books CY keys —
@@ -47,7 +47,7 @@ export function RuleBookPage({ branch, setRoute }) {
       </div>
 
       {/* 1 · tiers */}
-      <PageSection icon={Layers} title="1 · The four tiers" subtitle="Each tier reconciles over the one below; higher certificates attach the lower ones as evidence.">
+      <PageSection icon={Layers} title="1 · The five tiers" subtitle="Daily & Weekly freeze at the branch (no certification); Month/Quarter/Year certify at TK Group. Each tier reconciles over the one below.">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse">
             <thead><tr>
@@ -72,21 +72,21 @@ export function RuleBookPage({ branch, setRoute }) {
       </PageSection>
 
       {/* 2 · roles */}
-      <PageSection icon={Users} title="2 · Roles — who does what" subtitle="The Branch Accountant is weekly-only; AE steps up to first verifier at every tier; Owner never signs weekly but sees everything.">
+      <PageSection icon={Users} title="2 · Roles — who does what" subtitle="Branch Accountant freezes Daily & Weekly; AE approves those and freezes Month+; FM verifies (and is the sole editor in an Owner-opened correction window); only the Owner locks and re-opens.">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse">
+          <table className="w-full min-w-[820px] border-collapse">
             <thead><tr>
               <th className={headCls}>Role</th><th className={headCls}>Responsibility</th>
-              <th className={headCls}>Weekly</th><th className={headCls}>Month-End</th><th className={headCls}>Quarterly</th><th className={headCls}>Year-End</th>
+              <th className={headCls}>Daily</th><th className={headCls}>Weekly</th><th className={headCls}>Month-End</th><th className={headCls}>Quarterly</th><th className={headCls}>Year-End</th>
             </tr></thead>
             <tbody>
               {ROLE_MATRIX.map((r, i) => (
                 <tr key={r.role} className={cn(i % 2 === 1 && 'bg-surface-alt/60', 'hover:bg-gold-light/20 transition-colors')}>
                   <td className={cellCls}><b>{r.role}</b><div className="text-xs text-ink-subtle">{r.who}</div></td>
                   <td className={cellCls}>{r.duty}</td>
-                  {['weekly', 'month', 'quarter', 'year'].map((k) => (
+                  {['daily', 'weekly', 'month', 'quarter', 'year'].map((k) => (
                     <td key={k} className={cellCls}>
-                      {r[k] === '—' ? <span className="text-ink-subtle">—</span> : <Badge tone={r[k] === 'Fallback' ? 'neutral' : 'success'} size="sm">{r[k]}</Badge>}
+                      {(!r[k] || r[k] === '—') ? <span className="text-ink-subtle">—</span> : <Badge tone={r[k] === 'Freeze' ? 'info' : 'success'} size="sm">{r[k]}</Badge>}
                     </td>
                   ))}
                 </tr>

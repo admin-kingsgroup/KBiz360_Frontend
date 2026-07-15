@@ -11,11 +11,16 @@ describe('Control Panel structure', () => {
     expect(new Set(POWER_SCREEN_KEYS).size).toBe(POWER_SCREEN_KEYS.length);
     for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log']) expect(POWER_SCREEN_KEYS).toContain(k);
   });
-  test('DEFAULT_RULES (always-on) carry name + description; include the promoted SoD rules', () => {
-    expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(14);
+  test('DEFAULT_RULES (always-on) carry name + description; include SoD + the DB-enforced invariants', () => {
+    expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(25);   // 16 base + 13 audited invariants
     expect(DEFAULT_RULES.every((r) => r.nm && r.ds)).toBe(true);
     expect(DEFAULT_RULES.some((r) => /Maker cannot approve their own routed/.test(r.nm))).toBe(true);
     expect(DEFAULT_RULES.some((r) => /Payment prepared/.test(r.nm))).toBe(true);
+    // the newly-surfaced always-on backend invariants
+    expect(DEFAULT_RULES.some((r) => /balanced \(Dr = Cr\)/.test(r.nm))).toBe(true);          // U-01
+    expect(DEFAULT_RULES.some((r) => /immutable/.test(r.nm))).toBe(true);                      // VOU-03
+    expect(DEFAULT_RULES.some((r) => /refund.s original must resolve/i.test(r.nm))).toBe(true); // RF-01
+    expect(DEFAULT_RULES.some((r) => /Branch isolation/.test(r.nm))).toBe(true);
   });
   test('CONFIGURABLE_GROUPS: every item is a real flag switch; 21 flags across 5 groups', () => {
     expect(CONFIGURABLE_GROUPS.map((g) => g.group)).toEqual(['Approval & Verification', 'Segregation of Duties', 'Access & Export', 'Masters & Locks', 'Data-Entry & Close']);

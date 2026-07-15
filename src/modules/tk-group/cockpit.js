@@ -97,26 +97,31 @@ export function controlCockpitMenu(focus, currentUser) {
       ] },
     ] },
 
-    // Reconciliation — the 4-tier per-ledger certificate ladder (Weekly → Month-End →
-    // Quarterly → Year-End). The central view is oversight of the SAME module: the
-    // pages carry their own branch chips, so everything stays BRANCHWISE, never blended.
+    // Reconciliation — TK Group Central is where branch Daily/Weekly FREEZES are
+    // APPROVED (AE, then FM) and where Month/Quarter/Year are CERTIFIED (AE freeze →
+    // FM verify → Director certify → Owner lock). Per branch throughout — the pages
+    // carry their own branch chips, so nothing is blended across branches.
     { label: 'Statement Reconciliation', icon: ArrowLeftRight, children: [
-      // One entry per tier — the menu is the tier switch (pages are tier-locked).
-      // Reconciliation Hub = the full-view dashboard; Certification = sign-off.
-      { label: 'Reconciliation Hub', children: [
-        { label: 'Weekly Reconciliation', href: '/reconciliation/hub/weekly' },
-        { label: 'Monthly Reconciliation', href: '/reconciliation/hub/monthly' },
-        { label: 'Quarterly Reconciliation', href: '/reconciliation/hub/quarterly' },
-        { label: 'Yearly Reconciliation', href: '/reconciliation/hub/yearly' },
+      // Branch freezes land here for approval — the per-ledger register is the
+      // approval surface (Daily: AE approves · Weekly: AE then FM approve).
+      { label: 'Approvals — Daily & Weekly', children: [
+        { label: 'Approval Inbox', href: '/reconciliation/inbox' },
+        { label: 'Daily Freezes — Approve', href: '/reconciliation/daily' },
+        { label: 'Weekly Freezes — Approve', href: '/reconciliation/weekly' },
+        { label: 'Reconciliation Queue', href: '/finance/reco-queue' },
       ] },
-      { label: 'Certification', children: [
-        { label: 'Weekly Certification', href: '/reconciliation/weekly' },
+      // The certification ladder — one entry per tier (the menu is the tier switch).
+      { label: 'Certification — Month+', children: [
         { label: 'Monthly Certification', href: '/reconciliation/monthly' },
         { label: 'Quarterly Certification', href: '/reconciliation/quarterly' },
         { label: 'Yearly Certification', href: '/reconciliation/yearly' },
       ] },
+      { label: 'Reconciliation Hub', children: [
+        { label: 'Monthly Reconciliation', href: '/reconciliation/hub/monthly' },
+        { label: 'Quarterly Reconciliation', href: '/reconciliation/hub/quarterly' },
+        { label: 'Yearly Reconciliation', href: '/reconciliation/hub/yearly' },
+      ] },
       { label: 'Reports', children: [
-        { label: 'Weekly Report', href: '/reconciliation/reports/weekly' },
         { label: 'Monthly Report', href: '/reconciliation/reports/monthly' },
         { label: 'Quarterly Report', href: '/reconciliation/reports/quarterly' },
         { label: 'Yearly Report', href: '/reconciliation/reports/yearly' },
