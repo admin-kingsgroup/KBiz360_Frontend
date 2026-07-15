@@ -19,6 +19,7 @@ import { toast } from '../../core/ux/toast';
 import { SETTLE_CYCLES, PAY_METHODS } from '../../core/partyEnums';
 // MstrShell / MstrModal modernized (responsive header + shared Modal) — same props.
 import { MstrShell, MstrModal } from './components/mstr';
+import { ExportBtn } from './shared/exportBtn';
 import { useMobile } from '../../core/hooks';
 import { useGpBills } from '../../core/useAccounting';
 import { useModalEsc } from '../../core/ux/useModalEsc';
@@ -57,7 +58,7 @@ export function MastersForex(){
   };
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
+    <div style={{padding:"16px 24px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:36,height:36,borderRadius:9,background:"#fbeedb",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>💱</div>
