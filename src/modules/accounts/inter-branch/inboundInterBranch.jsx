@@ -8,6 +8,11 @@ import React, { useState } from 'react';
 import { useInbInbound, useDeleteInbDeal } from '../../../core/useInterBranchVoucher';
 import { localeOf } from '../../../core/format';
 import { toast } from '../../../core/ux/toast';
+import { bc } from '../../../core/styles.jsx';
+
+// Book-currency symbol for a branch (₹ for India, $ for Africa) — used so a same-currency
+// deal with no fx (e.g. Africa↔Africa USD) still shows the right symbol, not a hardcoded ₹.
+const symOf = (code) => (((bc({ code }) || {}).cur) || '₹');
 
 const C = { dark: '#0d1326', blue: '#185FA5', dim: '#5a6691', border: '#cdd1d8', green: '#27500A', amber: '#8a6d00', bg: '#f7f9fc' };
 const CCY_SYM = { INR: '₹', USD: '$' };
@@ -79,8 +84,8 @@ export function InboundInterBranch({ branch, setRoute }) {
               <tr><td style={{ ...td, color: C.dim }} colSpan={7}>{tab === 'pending' ? 'Nothing awaiting conversion.' : 'No converted deals yet.'}</td></tr>
             ) : shown.map((rw) => {
               const fx = rw.fx && Number(rw.fx.rate) > 0 && rw.fx.fromCcy !== rw.fx.toCcy ? rw.fx : null;
-              const sSym = fx ? (CCY_SYM[fx.fromCcy] || '₹') : '₹';
-              const bSym = fx ? (CCY_SYM[fx.toCcy] || sSym) : sSym;
+              const sSym = fx ? (CCY_SYM[fx.fromCcy] || symOf(rw.fromBranch)) : symOf(rw.fromBranch);
+              const bSym = fx ? (CCY_SYM[fx.toCcy] || symOf(rw.toBranch)) : symOf(rw.toBranch);
               const buyerCost = toBuyer(rw.total, fx);
               return (
                 <tr key={rw.inbLinkNo}>
