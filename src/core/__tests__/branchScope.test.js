@@ -2,7 +2,7 @@
    login and refresh must resolve to a branch the user can actually access, or
    the server-side branch scoping (auth.middleware enforceBranchScope) 403s every
    branch-scoped read. pickBranchForUser is the single picker both paths use. */
-import { pickBranchForUser, isFullScope, hasNoAssignedBranch, canonicalRole, withCanonicalRole } from '../branchScope';
+import { pickBranchForUser, isFullScope, hasNoAssignedBranch, canonicalRole, withCanonicalRole, applyRenewedAccess } from '../branchScope';
 import { BRANCHES } from '../data';
 
 beforeEach(() => { try { localStorage.removeItem('kb360-branch'); } catch { /* ignore */ } });
@@ -115,5 +115,51 @@ describe('role canonicalisation (super_admin ⇒ Super Admin at ingest)', () => 
 
   test('a canonicalised super_admin is full scope + treated as the four central roles', () => {
     expect(isFullScope(withCanonicalRole({ role: 'super_admin' }))).toBe(true);
+  });
+});
+
+describe('applyRenewedAccess (silent refresh propagates admin changes without re-login)', () => {
+  test('a promoted role is applied (Accounts Executive → Sr. Accounts Executive) → new object, now full scope', () => {
+    const prev = { role: 'Accounts Executive', branches: ['BOM'], hidden: [] };
+    const out = applyRenewedAccess(prev, { role: 'Sr. Accounts Executive', branches: ['BOM'], hidden: [] });
+    expect(out).not.toBe(prev);              // re-render
+    expect(out.role).toBe('Sr. Accounts Executive');
+    expect(isFullScope(out)).toBe(true);     // → TK Group Central / Tally Reconciliation appear
+  });
+
+  test('role is canonicalised on renew (super_admin ⇒ Super Admin)', () => {
+    expect(applyRenewedAccess({ role: 'Director' }, { role: 'super_admin' }).role).toBe('Super Admin');
+  });
+
+  test('branch scope + view-only propagate', () => {
+    const prev = { role: 'Sr. Accounts Executive', branches: ['BOM'], allBranches: false, viewOnly: false, hidden: [] };
+    const out = applyRenewedAccess(prev, { role: 'Sr. Accounts Executive', branches: ['ALL'], allBranches: true, viewOnly: true, hidden: [] });
+    expect(out).not.toBe(prev);
+    expect(out.branches).toEqual(['ALL']);
+    expect(out.allBranches).toBe(true);
+    expect(out.viewOnly).toBe(true);
+  });
+
+  test('page-visibility (hidden) still propagates', () => {
+    const out = applyRenewedAccess({ role: 'Director', hidden: [] }, { role: 'Director', hidden: ['/reports/tally-export'] });
+    expect(out.hidden).toEqual(['/reports/tally-export']);
+  });
+
+  test('nothing changed → SAME reference (renew loop never re-renders itself)', () => {
+    const prev = { role: 'Director', branches: ['ALL'], allBranches: true, viewOnly: false, hidden: ['/x'], granted: [] };
+    const out = applyRenewedAccess(prev, { role: 'Director', branches: ['ALL'], allBranches: true, viewOnly: false, hidden: ['/x'], granted: [] });
+    expect(out).toBe(prev);
+  });
+
+  test('null prev or fresh → returns prev untouched (never crashes the renew loop)', () => {
+    expect(applyRenewedAccess(null, { role: 'Director' })).toBe(null);
+    const prev = { role: 'Director' };
+    expect(applyRenewedAccess(prev, null)).toBe(prev);
+  });
+
+  test('preserves identity fields absent from the refresh payload (id / name / email)', () => {
+    const prev = { id: 'u1', name: 'Sughra', email: 's@x.com', role: 'Accounts Executive', hidden: [] };
+    const out = applyRenewedAccess(prev, { role: 'Sr. Accounts Executive', hidden: [] });
+    expect(out).toMatchObject({ id: 'u1', name: 'Sughra', email: 's@x.com', role: 'Sr. Accounts Executive' });
   });
 });
