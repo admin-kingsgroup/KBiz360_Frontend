@@ -214,15 +214,26 @@ export function InterBranchVoucher({ branch }) {
             <thead><tr style={{ textAlign: 'left', color: C.dim }}>
               <th style={{ padding: '4px 8px' }}>INB Link No</th><th style={{ padding: '4px 8px' }}>From</th><th style={{ padding: '4px 8px' }}>Date</th><th style={{ padding: '4px 8px' }}>Passenger</th><th style={{ padding: '4px 8px', textAlign: 'right' }}>Total</th></tr></thead>
             <tbody>
-              {incoming.map((l) => (
+              {incoming.map((l) => {
+                // The leg's total is in the SELLER's currency. This branch is the BUYER, so a
+                // cross-currency leg is shown CONVERTED into our currency at its frozen rate —
+                // that's what we'll actually book. Same-currency legs display as-is.
+                const lfx = l.fx && Number(l.fx.rate) > 0 && l.fx.fromCcy !== l.fx.toCcy ? l.fx : null;
+                const shown = lfx ? convert(r2(l.total), lfx.fromCcy, lfx.toCcy, Number(l.fx.rate)) : r2(l.total);
+                const sym = lfx ? (CCY_SYM[lfx.toCcy] || cur) : cur;
+                return (
                 <tr key={l.inbLinkNo} style={{ borderTop: `1px solid ${C.border}` }}>
                   <td style={{ padding: '4px 8px', fontFamily: 'monospace', color: C.blue }}>{l.inbLinkNo}</td>
                   <td style={{ padding: '4px 8px' }}>{l.fromBranch}</td>
                   <td style={{ padding: '4px 8px' }}>{l.date}</td>
                   <td style={{ padding: '4px 8px' }}>{l.passenger || '—'}</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{cur}{r2(l.total).toLocaleString(loc)}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                    title={lfx ? `${CCY_SYM[lfx.fromCcy] || ''}${r2(l.total).toLocaleString()} @ 1 USD = ₹${Number(l.fx.rate).toLocaleString()}` : undefined}>
+                    {sym}{(shown == null ? r2(l.total) : shown).toLocaleString(localeOf(sym))}
+                  </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

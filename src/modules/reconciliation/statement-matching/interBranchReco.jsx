@@ -25,6 +25,11 @@ const pairKey = (a, b) => [a, b].sort().join('::');
 // shows each side in its OWN currency, so a single top-bar symbol isn't enough.
 const CCY_SYM = { INR: '₹', USD: '$' };
 const symOf = (ccy, fallback) => CCY_SYM[ccy] || fallback;
+// Book currency per branch (mirror of backend taxRegime.BOOK_CCY) — an INB link's `total`
+// is in the SELLER (fromBranch) currency, so it must be shown in that currency, not the
+// viewer's. India → INR, Africa → USD.
+const BOOK_CCY = { BOM: 'INR', AMD: 'INR', BOMMB: 'INR', NBO: 'USD', DAR: 'USD', FBM: 'USD' };
+const bookCcyOf = (b) => BOOK_CCY[b] || 'INR';
 
 export function InterBranchReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
@@ -159,12 +164,17 @@ function InterBranchLinkLevel({ branch, cur }) {
   const q = useInterBranchLinks({ branch: code || undefined });
   const data = q.data || { links: [], totals: {} };
   const open = (data.unbooked || []).slice(0, 50);
+  // The backend openAmount sums link totals across currencies — meaningless when INR and USD
+  // legs mix. Re-total on the FE grouped by the SELLER's currency so each figure is honest.
+  const openByCcy = {};
+  for (const l of (data.unbooked || [])) { const c = bookCcyOf(l.fromBranch); openByCcy[c] = (openByCcy[c] || 0) + (Number(l.total) || 0); }
+  const openAmtStr = Object.entries(openByCcy).map(([c, v]) => `${CCY_SYM[c] || ''}${(Math.round(v * 100) / 100).toLocaleString(c === 'USD' ? undefined : undefined)}`).join(' + ');
   return (
     <div style={{ marginTop: 18 }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: C.dark, marginBottom: 6 }}>
         Line level — by INB Link No
         <span style={{ marginLeft: 10, fontSize: 11.5, fontWeight: 700, color: (data.totals?.open || 0) ? C.red : C.green }}>
-          {data.totals?.open || 0} open · {data.totals?.booked || 0} booked{(data.totals?.open || 0) ? ` · ${money(cur, data.totals?.openAmount)} unbooked` : ''}
+          {data.totals?.open || 0} open · {data.totals?.booked || 0} booked{(data.totals?.open || 0) ? ` · ${openAmtStr} unbooked` : ''}
         </span>
       </div>
       <Table>
