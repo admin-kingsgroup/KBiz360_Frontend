@@ -155,7 +155,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
         </div>
       </div>
 
-      {/* branch-wise readiness matrix — only in group mode (all 4 tiers, at a glance) */}
+      {/* branch-wise readiness matrix — only in group mode (all 5 tiers, at a glance) */}
       {groupMode && Array.isArray(summary?.byBranch) && (
         <PageSection title="Branch-wise readiness" subtitle="Released / in scope per tier — each branch under its own regime, never blended (Rule 06).">
           <div className="overflow-x-auto">
