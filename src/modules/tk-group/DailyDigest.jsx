@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getOverview, getIntegrity } from './api/monitor';
 import { getInbox } from './api/inbox';
 import { digestSummary } from './utils/controlPanel';
-import { Badge } from '../../shell/primitives';
+import { Badge, SkeletonCards } from '../../shell/primitives';
 
 // ─── Control Panel · Daily Digest ────────────────────────────────────────────
 // The Owner/Director's one-glance morning summary — pending approvals, exceptions
@@ -34,7 +34,7 @@ export function DailyDigest({ go }) {
       </div>
 
       {loading ? (
-        <div className="p-4 text-center text-[12.5px] text-ink-muted">Loading digest…</div>
+        <SkeletonCards count={4} min="150px" />
       ) : (ov.isError || iq.isError) ? (
         <div className="rounded-brand border border-danger/40 bg-danger-soft px-3 py-2 text-[12.5px] text-danger">Couldn’t load the digest right now — the monitoring feed is unavailable.</div>
       ) : (

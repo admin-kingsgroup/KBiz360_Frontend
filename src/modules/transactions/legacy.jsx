@@ -18,6 +18,7 @@ import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, REFUNDS_DATA, STATUS_FLOW, TR
 import { triggerSaveRefresh, useMobile } from '../../core/hooks';
 import { useVNo } from '../../core/useNextNo';
 import { ARow, DBtn, FL, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd } from '../../core/styles';
+import { SkeletonTable } from '../../shell/primitives';
 import { Dashboard } from '../dashboard';
 import { MastersSubAgents } from '../masters';
 import { ApiKeySettings } from '../settings';
@@ -204,7 +205,7 @@ export function BillAllocPanel({side,party,q,amount,alloc,onSetAlloc,onFull,mode
       ):(
         <>
           {q?.isLoading?(
-            <div style={{padding:"18px 16px",textAlign:"center",fontSize:11.5,color:"#5b616e"}}>Loading open bills…</div>
+            <SkeletonTable rows={4} cols={6} />
           ):bills.length===0?(
             <div style={{padding:"18px 16px",textAlign:"center",fontSize:11.5,color:"#5b616e"}}>
               {party?(emptyHint||`No open bills for ${party}. Use “On Account” to park this ${settleWord} as an advance.`):`Select a party to load their open bills.`}

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getIntegrity, getIntegrityDetail, getFindingStatus, saveFindingStatus } from '../api/monitor';
 import { integrityKpis, branchCards, matrixRows, branchKeys, findingRows, statusTone, statusGlyph, focusView } from '../utils/integrity';
-import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, FormField } from '../../../shell/primitives';
+import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, FormField, Skeleton } from '../../../shell/primitives';
 import { KpiTile } from '../../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../../shell/DataTable';
 import { BandError } from '../BandError';
@@ -29,7 +29,7 @@ const fmt = (n) => (n ? new Intl.NumberFormat('en-IN').format(Math.round(n)) : '
 function FindingDetail({ branch, checkId }) {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'integrity', 'detail', branch, checkId], queryFn: () => getIntegrityDetail(branch, checkId), staleTime: 60_000 });
   const rows = (q.data && q.data.rows) || [];
-  if (q.isLoading) return <div className="px-3 py-2 text-xs text-ink-subtle">Loading…</div>;
+  if (q.isLoading) return <div className="px-3 py-2 pl-9"><Skeleton className="mb-1.5 h-3 w-2/3" /><Skeleton className="h-3 w-1/2" /></div>;
   if (!rows.length) return <div className="px-3 py-2 text-xs text-ink-subtle">No line-level detail to list for this gate.</div>;
   return (
     <div className="overflow-x-auto">

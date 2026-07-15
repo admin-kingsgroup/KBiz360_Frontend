@@ -5,6 +5,7 @@ import { getRoster } from './api/userLimits';
 import { isOwner } from './utils/owner';
 import { toastSuccess, toastError } from '../../core/ux/toast';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
+import { SkeletonTable } from '../../shell/primitives';
 
 // ─── Control Panel · Delegation — temporary hand-over of approval authority ───
 // The Owner hands one user's Verify/Approve authority to another for a date window; it
@@ -101,7 +102,7 @@ export function Delegation() {
       )}
 
       {q.isLoading ? (
-        <div className="rounded-brand border border-surface-border bg-surface p-4 text-[12.5px] text-ink-muted">Loading delegations…</div>
+        <SkeletonTable rows={5} cols={6} />
       ) : items.length === 0 ? (
         <div className="rounded-brand border border-surface-border bg-surface p-6 text-center text-[12.5px] text-ink-muted">No delegations. Example: <b className="text-ink">Faiz away 10–15 Jul → Sughra approves in his place</b>, reverting automatically.</div>
       ) : (

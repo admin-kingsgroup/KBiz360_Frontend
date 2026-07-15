@@ -14,6 +14,7 @@ import { setNavFocus } from '../core/ux/navFocus';
 import { card } from '../core/styleTokens';
 import { useFocusTrap } from '../core/ux/focus';
 import { pushModal } from '../core/ux/modalStore';
+import { Skeleton } from './primitives';
 
 // Severity → presentation. Matches the Alerts Dashboard / panel palette.
 const SEV = {
@@ -175,7 +176,11 @@ export function NotificationCentre({ branch, setRoute }) {
             </div>
           )}
 
-          {q.isLoading && <div style={{ ...card, padding: 24, textAlign: 'center', color: '#5a6691' }}>Loading alerts…</div>}
+          {q.isLoading && Array.from({ length: 3 }).map((_, i) => (
+            <div key={`sk-${i}`} style={{ ...card, display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+              <Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} />
+            </div>
+          ))}
 
           {/* OPEN */}
           {!q.isLoading && tab === 'open' && (openRows.length === 0

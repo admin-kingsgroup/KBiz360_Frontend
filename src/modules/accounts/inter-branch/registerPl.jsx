@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { bc } from '../../../core/styleTokens';
 import { localeOf } from '../../../core/format';
 import { useInbReconcile, useInbPnlBreakdown } from '../../../core/useInterBranchVoucher';
+import { Skeleton } from '../../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
@@ -61,7 +62,9 @@ export function InterBranchRegister({ branch }) {
               <th key={h} style={{ ...th, ...(i === 5 ? rnum : {}) }}>{h}</th>)}
           </tr></thead>
           <tbody>
-            {q.isLoading && <tr><td colSpan={9} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
+            {q.isLoading && Array.from({ length: 5 }).map((_, i) => (
+              <tr key={`sk-${i}`}><td colSpan={9} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+            ))}
             {!q.isLoading && rows.length === 0 && <tr><td colSpan={9} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No inter-branch legs{onlyOpen ? ' open' : ''}.</td></tr>}
             {rows.map((l) => (
               <tr key={l.inbLinkNo} style={{ background: l.status === 'open' ? '#fdfaf0' : '#fff' }}>

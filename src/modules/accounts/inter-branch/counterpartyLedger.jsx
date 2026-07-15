@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { bc } from '../../../core/styleTokens';
 import { localeOf } from '../../../core/format';
 import { useInbCounterparty } from '../../../core/useInterBranchVoucher';
+import { Skeleton } from '../../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
@@ -62,7 +63,17 @@ export function InterBranchCounterpartyLedger({ branch }) {
         {tile('Net position', money(cur, totals.net), C.gold, `${totals.count || 0} deals`)}
       </div>
 
-      {q.isLoading ? <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>Loading…</div>
+      {q.isLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={`sk-${i}`} style={{ ...card, padding: 14 }}>
+              <Skeleton className="h-4 w-1/3" style={{ marginBottom: 10, opacity: Math.max(0.4, 1 - i * 0.15) }} />
+              <Skeleton className="h-3 w-full" style={{ marginBottom: 6, opacity: Math.max(0.4, 1 - i * 0.15) }} />
+              <Skeleton className="h-3 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} />
+            </div>
+          ))}
+        </div>
+      )
         : groups.length === 0 ? <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>No inter-branch deals for {brLabel(branch)}.</div>
         : groups.map((g) => {
           const isOpen = open[g.counterparty] !== false; // default expanded

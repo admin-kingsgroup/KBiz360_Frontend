@@ -6,6 +6,7 @@
    that receives the resolved employee. */
 
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
+import { SkeletonText } from '../../../shell/primitives';
 
 export const SS_MONTH_LABEL=m=>m?new Date(m+"-01T00:00:00").toLocaleString("en",{month:"short",year:"numeric"}):"—";
 export const SS_DEFAULT_ENT={annual:18,sick:12,casual:6};
@@ -13,7 +14,7 @@ export const SS_DEFAULT_ENT={annual:18,sick:12,casual:6};
 export function SelfServiceGate({title,subtitle,my,children}){
   if(my.isLoading) return (
     <PHASE2_Page title={title} subtitle={subtitle}>
-      <div style={{padding:"48px 16px",textAlign:"center",color:"#8b94b3",fontSize:13}}>Loading your employee profile…</div>
+      <div style={{padding:"48px 16px",maxWidth:420,margin:"0 auto"}}><SkeletonText lines={3} /></div>
     </PHASE2_Page>
   );
   if(!my.employee) return (

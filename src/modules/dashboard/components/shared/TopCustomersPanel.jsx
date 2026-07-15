@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCustomerLtv } from '../../../../core/useAccounting';
+import { SkeletonText } from '../../../../shell/primitives';
 
 // ⑥ Top customers by value (LTV + ABC) — who drives the branch's revenue this period:
 // the top 5 by lifetime value with their ABC class and GP%. Self-contained; period-
@@ -30,7 +31,8 @@ export function TopCustomersPanel({ branch, range, formatMoney = (n) => n, onVie
         {onView && <button onClick={onView} style={{ color: '#2563eb' }} className="cursor-pointer text-[11px] font-bold">View →</button>}
       </div>
       {rows.length === 0 ? (
-        <div className="py-3 text-center text-[11.5px] text-ink-muted">{q.isLoading ? 'Loading customers…' : 'No customer activity for this period.'}</div>
+        q.isLoading ? <div className="py-1"><SkeletonText lines={4} /></div>
+          : <div className="py-3 text-center text-[11.5px] text-ink-muted">No customer activity for this period.</div>
       ) : (
         <table className="w-full border-collapse">
           <tbody>

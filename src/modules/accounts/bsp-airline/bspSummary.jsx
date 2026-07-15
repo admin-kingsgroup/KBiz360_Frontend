@@ -19,6 +19,7 @@ import { ACM_REASON_CODES } from '../../../core/helpers';
 import { useMobile } from '../../../core/hooks';
 import { Menu as StatusMenu } from '../../../core/ux/Menu';
 import { bc, card, inp } from '../../../core/styles';
+import { SkeletonTable } from '../../../shell/primitives';
 
 export function BspSummary({branch}){
   const mob=useMobile();
@@ -178,7 +179,7 @@ export function BspSummary({branch}){
           </div>
         </div>
         {stmtQ.isLoading
-          ?<div style={{padding:"24px",textAlign:"center",color:"#5b616e",fontSize:12}}>Loading BSP ledger…</div>
+          ?<div style={{padding:12}}><SkeletonTable rows={5} cols={6} className="border-0 shadow-none" /></div>
           :stmtQ.isError
           ?<div style={{padding:"20px",textAlign:"center",color:"#dc2626",fontSize:12}}>⚠ Couldn't load BSP ledger — {stmtQ.error?.message||"check your connection"}</div>
           :(<>

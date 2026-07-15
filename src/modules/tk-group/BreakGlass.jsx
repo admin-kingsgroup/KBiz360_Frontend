@@ -4,6 +4,7 @@ import { getBreakglass, invokeBreakglass, endBreakglass } from './api/breakglass
 import { confirmDialog } from '../../core/ux/confirm';
 import { toastSuccess, toastError } from '../../core/ux/toast';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
+import { SkeletonTable } from '../../shell/primitives';
 
 // ─── Control Panel · Break-Glass — emergency elevated access ─────────────────
 // A user self-invokes emergency Verify+Approve authority for a SHORT window with a
@@ -81,7 +82,7 @@ export function BreakGlass() {
       </div>
 
       {q.isLoading ? (
-        <div className="rounded-brand border border-surface-border bg-surface p-4 text-[12.5px] text-ink-muted">Loading sessions…</div>
+        <SkeletonTable rows={5} cols={7} />
       ) : items.length === 0 ? (
         <div className="rounded-brand border border-surface-border bg-surface p-6 text-center text-[12.5px] text-ink-muted">No break-glass session active or recorded. When invoked, it demands a reason, notifies the Owner, and expires on a timer.</div>
       ) : (

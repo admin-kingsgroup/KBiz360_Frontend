@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet } from './api';
 import { money } from './format';
 import { bc } from './styles';
+import { SkeletonText } from '../shell/primitives';
 
 // Currency symbol for a branch code on a snapshot/record (defaults to ₹).
 const curOf = (code) => (bc(code ? { code } : 'ALL') || {}).cur || '₹';
@@ -219,7 +220,7 @@ export function AuditTrail({ entityType, entityId, cur = '₹' }) {
     enabled: !!entityId,
   });
   if (!entityId) return null;
-  if (isLoading) return <div style={{ padding: 12, fontSize: 12, color: C.dim }}>Loading history…</div>;
+  if (isLoading) return <div style={{ padding: 12 }}><SkeletonText lines={4} /></div>;
   if (error) return <div style={{ padding: 12, fontSize: 12, color: C.red }}>Could not load audit history: {error.message}</div>;
   if (!data.length) return <div style={{ padding: 12, fontSize: 12, color: C.dim }}>No audit history recorded for this record yet.</div>;
   return (

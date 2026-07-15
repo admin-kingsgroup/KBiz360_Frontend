@@ -6,6 +6,7 @@
 import { bc } from '../../../core/styleTokens';
 import { localeOf } from '../../../core/format';
 import { useInbMatrix } from '../../../core/useInterBranchVoucher';
+import { SkeletonTable } from '../../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
@@ -47,7 +48,7 @@ export function InterBranchMatrix({ branch }) {
         <div style={{ fontSize: 12, color: C.dim }}>Seller → buyer turnover and the margin (SVF income less discount passed) per branch pair · from the INB Link registry</div>
       </div>
 
-      {q.isLoading && <div style={{ ...card, padding: 20, color: C.dim }}>Loading…</div>}
+      {q.isLoading && <SkeletonTable rows={6} cols={5} />}
       {!q.isLoading && rows.length === 0 && <div style={{ ...card, padding: 20, color: C.dim }}>No inter-branch trade yet.</div>}
 
       {rows.length > 0 && (<>

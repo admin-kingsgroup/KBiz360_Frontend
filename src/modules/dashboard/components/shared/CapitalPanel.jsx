@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCapitalAnalysis } from '../../../../core/useAccounting';
+import { SkeletonText } from '../../../../shell/primitives';
 
 // ⑤ Capital vs Investment (compact) — capital employed, split into BLOCKED (stuck in
 // receivables / stock) vs IN-FLOW (working) capital, plus the GP yield the working
@@ -23,7 +24,8 @@ export function CapitalPanel({ branch, range, formatMoney = (n) => n, onView }) 
         {onView && <button onClick={onView} style={{ color: '#2563eb' }} className="cursor-pointer text-[11px] font-bold">View →</button>}
       </div>
       {!hasData ? (
-        <div className="py-3 text-center text-[11.5px] text-ink-muted">{q.isLoading ? 'Loading capital analysis…' : 'No capital postings for this period.'}</div>
+        q.isLoading ? <div className="py-1"><SkeletonText lines={3} /></div>
+          : <div className="py-3 text-center text-[11.5px] text-ink-muted">No capital postings for this period.</div>
       ) : (
         <>
           <div className="mb-1.5 text-[13px] font-bold tabular-nums text-ink">

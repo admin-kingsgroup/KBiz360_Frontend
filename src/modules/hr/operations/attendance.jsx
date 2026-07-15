@@ -10,6 +10,7 @@ import { toast } from '../../../core/ux/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPut, getAuthToken } from '../../../core/api';
 import { btnG, btnGh, card, inp } from '../../../core/styles';
+import { Skeleton } from '../../../shell/primitives';
 
 export function HrAttendance({branch}){
   // Last 6 months through the current one, derived from the live clock (was hard-coded to
@@ -166,7 +167,7 @@ export function HrAttendance({branch}){
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Attendance Register</h2>
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-              {MONTHS.find(m2=>m2.v===month)?.l} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · {attQ.isLoading?"loading…":`${emps.length} employees`} · click a cell to mark
+              {MONTHS.find(m2=>m2.v===month)?.l} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · {attQ.isLoading?<Skeleton className="inline-block h-3 w-20 align-middle" />:`${emps.length} employees`} · click a cell to mark
             </p>
           </div>
         </div>
@@ -263,9 +264,11 @@ export function HrAttendance({branch}){
               <th style={{padding:"9px 10px",color:"#d4a437",fontWeight:700,fontSize:9,textAlign:"center"}} title="On-time ÷ present days with a punch">Punc%</th>
             </tr>
           </thead>
-          <tbody>{emps.length===0&&(
+          <tbody>{attQ.isLoading&&Array.from({length:5}).map((_,i)=>(
+            <tr key={`sk-${i}`}><td colSpan={days+5} style={{padding:"10px 12px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+          ))}{!attQ.isLoading&&emps.length===0&&(
             <tr><td colSpan={days+5} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
-              {attQ.isLoading?"Loading…":"No employees for this branch — add them in Employee Master first."}
+              No employees for this branch — add them in Employee Master first.
             </td></tr>
           )}{emps.map((emp,ei)=>{
             const s=summary(emp);

@@ -11,6 +11,7 @@ import { buildRevisionDue } from '../hrReports';
 import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
+import { Skeleton } from '../../../shell/primitives';
 
 export function SalaryRevision({branch}){
   const mob=useMobile();
@@ -100,7 +101,15 @@ export function SalaryRevision({branch}){
 
       {tab==="history"&&(
         <div>
-          {history.length===0&&<div style={{...card,padding:"22px",textAlign:"center",color:"#8b94b3",fontSize:12}}>{revQ.isLoading?"Loading…":"No revisions recorded yet. Process one from the Due Reviews tab."}</div>}
+          {revQ.isLoading&&(
+            <div style={{...card,marginBottom:12,padding:16}}>
+              <Skeleton className="mb-3 h-3 w-1/3" />
+              <Skeleton className="mb-1.5 h-3 w-full" />
+              <Skeleton className="mb-1.5 h-3 w-full" style={{opacity:0.7}} />
+              <Skeleton className="h-3 w-full" style={{opacity:0.5}} />
+            </div>
+          )}
+          {!revQ.isLoading&&history.length===0&&<div style={{...card,padding:"22px",textAlign:"center",color:"#8b94b3",fontSize:12}}>No revisions recorded yet. Process one from the Due Reviews tab.</div>}
           {history.map(h=>(
             <div key={h.empId} style={{...card,marginBottom:12}}>
               <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:"#0d1326"}}>{h.empName} — Salary History (Joined: {h.joined})</p>

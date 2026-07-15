@@ -27,6 +27,7 @@ import {
   useBudgetVsActual,
 } from '../../../core/useAccounting';
 import { usePDCSummary } from '../../../core/usePDC';
+import { Skeleton } from '../../../shell/primitives';
 import { useMasterHealth } from '../../../core/useMasters';
 import { useTaxCalendar, useExpenseBudgets } from '../../../core/useReference';
 import { useBankLedgers, useBankReconSummary, useBankReconAggregate } from '../../../core/useBankReco';
@@ -234,7 +235,9 @@ export function CashOutlookCard({ branch, cur, go }) {
             <th style={{ ...th, background: 'transparent', ...rnum }}>Proj. Closing</th>
           </tr></thead>
           <tbody>
-            {q.isLoading && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>Loading forecast…</td></tr>}
+            {q.isLoading && Array.from({ length: 4 }).map((_, i) => (
+              <tr key={`sk-${i}`}><td colSpan={5} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+            ))}
             {!q.isLoading && weeks.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>No upcoming due-dated bills to forecast.</td></tr>}
             {weeks.map((w, i) => {
               const net = (w.inflow || 0) - (w.outflow || 0);

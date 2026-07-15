@@ -17,7 +17,7 @@ import { apiGet } from '../../../core/api';
 import { FocusBanner } from '../../../core/ux/FocusBanner';
 import { bc } from '../../../core/styles';
 import { PeriodBar } from '../../../core/period';
-import { Button, Select, Input, FormField } from '../../../shell/primitives';
+import { Button, Select, Input, FormField, Skeleton } from '../../../shell/primitives';
 import {
   useProfitAndLoss, useModulePL, useBalanceSheet, useAgeing, useInvoiceGP,
   useTaxSummary, useTrialBalance, useVoucherApprovals, useYearOverYear,
@@ -83,7 +83,7 @@ export function ExecutiveOverview({ branch, go }) {
   if (pend > 0) alerts.push(['warn', `${pend} approval(s) pending (${money(cur, pendAmt)}) — awaiting your sign-off`]);
   if (!alerts.length) {
     if (coreError) alerts.push(['bad', 'Couldn’t load some figures — this view may be incomplete. Try refreshing.']);
-    else if (coreLoading) alerts.push(['warn', 'Loading the latest figures…']);
+    else if (coreLoading) alerts.push(['warn', <Skeleton style={{ display: 'inline-block', height: 10, width: 180, verticalAlign: 'middle' }} />]);
     else alerts.push(['good', 'No exceptions — books look healthy for this period.']);
   }
 
@@ -388,7 +388,7 @@ export function BranchPerformanceDash({ go, branch }) {
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         {groups.map((g) => (
           <KPI key={g.cur} label={`${g.label} · Net Profit`} value={loading ? '…' : money(g.cur, g.net)} tone={loading ? undefined : (g.net < 0 ? 'bad' : 'good')}
-            sub={loading ? 'Loading branches…' : `Sales ${money(g.cur, g.sales)} · GP ${pct(g.gpPct)} · Capital ${money(g.cur, g.capital)}`}
+            sub={loading ? <Skeleton style={{ height: 9, width: 130, display: 'inline-block' }} /> : `Sales ${money(g.cur, g.sales)} · GP ${pct(g.gpPct)} · Capital ${money(g.cur, g.capital)}`}
             onClick={go && (() => go('/reports/branch'))} />
         ))}
       </div>
@@ -401,7 +401,9 @@ export function BranchPerformanceDash({ go, branch }) {
             <th style={{ ...th, ...num }}>Capital Employed</th><th style={{ ...th, ...num }}>In-Flow Capital</th>
           </tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>Loading branches…</td></tr>}
+            {loading && Array.from({ length: 5 }).map((_, i) => (
+              <tr key={`sk-${i}`}><td colSpan={7} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+            ))}
             {!loading && groups.map((g) => (
               <React.Fragment key={g.cur}>
                 <tr><td colSpan={7} style={{ ...td, background: C.bg, fontWeight: 800, color: C.dim, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>{g.label}</td></tr>
@@ -841,7 +843,10 @@ export function PerformanceDash({ branch, go }) {
               <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Target</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Ach %</th><th style={th}>Status</th></tr></thead>
               <tbody>
                 {modRows.map((r, i) => (<tr key={i} {...rowNav(go, tab === 'sales' ? '/reports/sreg' : '/reports/gp')}><td style={td}>{r.name}</td><td style={{ ...td, ...num }}>{money(cur, r.target)}</td><td style={{ ...td, ...num }}>{money(cur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(cur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
-                {!modRows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{ld ? 'Loading…' : 'No module-level targets/actuals.'}</td></tr>}
+                {ld && Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={`sk-${i}`}><td colSpan={6} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+                ))}
+                {!ld && !modRows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No module-level targets/actuals.</td></tr>}
               </tbody>
             </table>
           </Card>
@@ -852,7 +857,10 @@ export function PerformanceDash({ branch, go }) {
               <thead><tr><th style={th}>Head</th><th style={{ ...th, ...num }}>Budget</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Used %</th><th style={th}>Status</th></tr></thead>
               <tbody>
                 {budRows.map((r, i) => (<tr key={i} {...rowNav(go, '/reports/pnl')}><td style={td}>{r.name}{r.unbudgeted && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: C.amber }}>· no budget</span>}</td><td style={{ ...td, ...num }}>{money(cur, r.budget)}</td><td style={{ ...td, ...num }}>{money(cur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(cur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
-                {!budRows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{ld ? 'Loading…' : 'No budgets set. Add them in Finance ▸ Expense Budget.'}</td></tr>}
+                {ld && Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={`sk-${i}`}><td colSpan={6} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+                ))}
+                {!ld && !budRows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No budgets set. Add them in Finance ▸ Expense Budget.</td></tr>}
               </tbody>
             </table>
           </Card>
@@ -965,7 +973,10 @@ export function YoYGrowthDash({ branch, go }) {
                 </tr>
               );
             })}
-            {!rows.length && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{yq.isLoading ? 'Loading comparison…' : 'No comparison data for this window.'}</td></tr>}
+            {yq.isLoading && Array.from({ length: 5 }).map((_, i) => (
+              <tr key={`sk-${i}`}><td colSpan={5} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+            ))}
+            {!yq.isLoading && !rows.length && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No comparison data for this window.</td></tr>}
           </tbody>
         </table>
         <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Compared against the matching span of the previous financial year. On cost lines a fall (▼) is the favourable move.</div>
@@ -1024,7 +1035,10 @@ export function CustomerValueDash({ branch, go }) {
                 <td style={{ ...td, ...num, color: r.recencyDays > 180 ? C.red : C.dim }}>{r.recencyDays != null ? `${r.recencyDays}d ago` : '—'}</td>
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{lq.isLoading ? 'Loading customers…' : 'No customer activity for this period.'}</td></tr>}
+            {lq.isLoading && Array.from({ length: 5 }).map((_, i) => (
+              <tr key={`sk-${i}`}><td colSpan={8} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+            ))}
+            {!lq.isLoading && !rows.length && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No customer activity for this period.</td></tr>}
           </tbody>
         </table>
       </Card>

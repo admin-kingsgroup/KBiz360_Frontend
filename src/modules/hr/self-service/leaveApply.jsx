@@ -11,6 +11,7 @@ import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
 import { RPT_tdStyle, RPT_thStyle, inp } from '../../../core/styles';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
+import { Skeleton } from '../../../shell/primitives';
 import { SelfServiceGate, SS_DEFAULT_ENT } from './selfServiceGate';
 
 export function LeaveApply(){
@@ -92,8 +93,10 @@ function LeaveApplyBody({emp}){
             <p style={{margin:"0 0 10px",fontSize:12.5,fontWeight:700,color:"#0d1326"}}>My Leave History</p>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
               <thead><tr style={{background:"#f7f8fb"}}><th style={RPT_thStyle}>Dates</th><th style={RPT_thStyle}>Type</th><th style={{...RPT_thStyle,textAlign:"center"}}>Days</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th></tr></thead>
-              <tbody>{history.length===0&&(
-                <tr><td colSpan={4} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3",padding:"16px 8px"}}>{reqQ.isLoading?"Loading…":"No leave requests yet."}</td></tr>
+              <tbody>{reqQ.isLoading&&Array.from({length:3}).map((_,i)=>(
+                <tr key={`sk-${i}`}><td colSpan={4} style={{...RPT_tdStyle,padding:"10px 8px"}}><Skeleton className="h-3.5 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+              ))}{!reqQ.isLoading&&history.length===0&&(
+                <tr><td colSpan={4} style={{...RPT_tdStyle,textAlign:"center",color:"#8b94b3",padding:"16px 8px"}}>No leave requests yet.</td></tr>
               )}{history.map((h,i)=>{const sc=HIST_CLR[h.status]||HIST_CLR.Pending;return(
                 <tr key={h.id||i} style={{borderBottom:"1px solid #dfe2e7"}}><td style={{...RPT_tdStyle,fontSize:10.5}}>{h.from} → {h.to}</td><td style={RPT_tdStyle}>{h.type}</td><td style={{...RPT_tdStyle,textAlign:"center"}}>{h.days}</td><td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"2px 7px",background:sc.bg,color:sc.c,borderRadius:3,fontSize:10,fontWeight:700}}>{h.status}</span></td></tr>
               );})}</tbody>

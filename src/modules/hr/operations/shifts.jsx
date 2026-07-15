@@ -8,6 +8,7 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { fromShiftDTO, toShiftPayload } from '../hrMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
+import { Skeleton } from '../../../shell/primitives';
 
 export function HrShifts({branch}){
   const brScope=branch==="ALL"?"":(branch?.code||"");
@@ -46,7 +47,7 @@ export function HrShifts({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🕘</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Shift Master</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{shiftsQ.isLoading?"Loading…":`${shifts.length} shift${shifts.length===1?"":"s"}`} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · weekly-off drives the attendance Week-Off default</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{shiftsQ.isLoading?<Skeleton className="inline-block h-3 w-16 align-middle" />:`${shifts.length} shift${shifts.length===1?"":"s"}`} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · weekly-off drives the attendance Week-Off default</p>
           </div>
         </div>
         <button onClick={openNew} style={{...btnG,fontSize:11}}><Plus size={13}/> New Shift</button>
@@ -59,9 +60,11 @@ export function HrShifts({branch}){
               <th key={i} style={{padding:"9px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{shifts.length===0&&(
+          <tbody>{shiftsQ.isLoading&&Array.from({length:5}).map((_,i)=>(
+            <tr key={`sk-${i}`}><td colSpan={9} style={{padding:"10px 12px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+          ))}{!shiftsQ.isLoading&&shifts.length===0&&(
             <tr><td colSpan={9} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
-              {shiftsQ.isLoading?"Loading…":"No shifts yet. Use “New Shift” to add one (e.g. General 09:30–18:30, weekly-off Sun)."}
+              No shifts yet. Use “New Shift” to add one (e.g. General 09:30–18:30, weekly-off Sun).
             </td></tr>
           )}{shifts.map((s,i)=>(
             <tr key={s.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa",cursor:"pointer"}} onClick={()=>openEdit(s)}>

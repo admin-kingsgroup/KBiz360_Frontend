@@ -37,7 +37,7 @@ import { VoucherEditor } from '../accountingLive';
 import { isInterBranch, brName } from '../interbranch';
 import { Printer, FileSpreadsheet, FileText } from 'lucide-react';
 import { PageLayout } from '../../shell/PageLayout';
-import { Button, Card, ResponsiveGrid, LoadingState, EmptyState } from '../../shell/primitives';
+import { Button, Card, ResponsiveGrid, LoadingState, EmptyState, SkeletonTable } from '../../shell/primitives';
 import { clickable } from '../../core/ux/clickable';
 import { openBookingFolder } from '../../core/BookingFolderHost';
 import { openPrintPreview } from '../../core/PrintPreview';
@@ -587,7 +587,7 @@ function InterBranchTab({ branch, from, to, invoices, onVoucher }) {
 function IBLedgerVouchers({ ledger, branch, from, to, onVoucher }) {
   const q = useLedgerStatement(ledger, branch, { from, to });
   const lines = q.data?.lines || [];
-  if (q.isLoading) return <div style={{ padding: 14, fontSize: 11, color: '#5b616e' }}>Loading postings…</div>;
+  if (q.isLoading) return <SkeletonTable rows={4} cols={6} className="m-3.5" />;
   return (
     <div style={{ overflowX: 'auto', borderTop: '1px solid #dfe2e7' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10.5 }}>

@@ -25,7 +25,7 @@ import { CUR_MONTH, MONTH_OPTIONS, ALL_TIME_FROM, todayISO, prevMonthKey } from 
 import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { compactAmt } from '../../../core/format';
 import { PageLayout } from '../../../shell/PageLayout';
-import { PageSection, ResponsiveGrid, Button } from '../../../shell/primitives';
+import { PageSection, ResponsiveGrid, Button, SkeletonCards } from '../../../shell/primitives';
 import { openLedgerModal } from '../../../core/LedgerModalHost';
 
 // Client leaderboard rows drill into that party's ledger statement (→ voucher) via the
@@ -235,7 +235,7 @@ export function MisReport({ branch }) {
   if (isLoading) {
     return (
       <PageLayout title="Management Information System" subtitle={`${brCode || CONSOLIDATED_LABEL} · Monday Morning Report`}>
-        <div className="rounded-brand border border-surface-border bg-surface px-4 py-10 text-center text-[12.5px] text-ink-muted">Loading live figures…</div>
+        <SkeletonCards count={4} />
       </PageLayout>
     );
   }

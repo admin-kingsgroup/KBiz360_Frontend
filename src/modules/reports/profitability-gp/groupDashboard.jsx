@@ -14,6 +14,7 @@ import { inp, card } from '../../../core/styles';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, rangeNote } from '../../../core/dates';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../../core/api';
+import { Skeleton } from '../../../shell/primitives';
 
 // ── Live consolidated group data (all branches, INR-normalised) ──────────────
 // Per-branch P&L + invoice GP, plus group cash (Trial Balance) + overdue
@@ -96,7 +97,7 @@ export function GroupDashboard(){
         />
       </div>
 
-      {loading&&<div style={{margin:"0 0 12px",padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:11,color:"#185FA5",fontWeight:600}}>⏳ Loading live group data…</div>}
+      {loading&&<div style={{margin:"0 0 12px",padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",display:"flex",alignItems:"center",gap:8}}>⏳ <Skeleton className="inline-block h-3 w-40 align-middle" /></div>}
 
       {/* Group KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:10,marginBottom:16}}>
