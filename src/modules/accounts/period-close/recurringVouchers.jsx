@@ -57,7 +57,7 @@ export function RecurringVouchers({branch}){
   };
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
+    <div style={{padding:"16px 24px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"#e8f0ff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔄</div>
