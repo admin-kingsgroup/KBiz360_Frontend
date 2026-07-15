@@ -108,7 +108,6 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Approval Inbox', href: '/reconciliation/inbox' },
         { label: 'Daily Freezes — Approve', href: '/reconciliation/daily' },
         { label: 'Weekly Freezes — Approve', href: '/reconciliation/weekly' },
-        { label: 'Reconciliation Queue', href: '/finance/reco-queue' },
       ] },
       // The certification ladder — one entry per tier (the menu is the tier switch).
       { label: 'Certification — Month+', children: [

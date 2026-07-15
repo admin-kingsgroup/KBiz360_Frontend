@@ -64,7 +64,7 @@ describe('Reconciliation · top-level pill', () => {
     expect(pill).toBeTruthy();
     expect(allHrefs(pill)).toEqual([
       // Approvals — the per-branch inbox + branch Daily & Weekly freezes land here
-      '/reconciliation/inbox', '/reconciliation/daily', '/reconciliation/weekly', '/finance/reco-queue',
+      '/reconciliation/inbox', '/reconciliation/daily', '/reconciliation/weekly',
       // Certification — Month/Quarter/Year
       '/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly',
       // Hub + Reports — Month+
