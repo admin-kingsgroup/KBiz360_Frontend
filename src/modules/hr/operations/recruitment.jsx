@@ -7,6 +7,7 @@ import { fromJobDTO, toJobPayload, JOB_NEXT_STATUS } from '../hrMaps';
 import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styleTokens';
+import { Skeleton } from '../../../shell/primitives';
 
 export function Recruitment({branch}){
   const mob=useMobile();
@@ -36,7 +37,7 @@ export function Recruitment({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#E6F1FB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>👔</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Recruitment</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{jobsQ.isLoading?"Loading…":`${jobs.filter(j=>j.status==="Open").length} open positions`} · {jobs.reduce((s,j)=>s+j.applicants,0)} total applicants · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{jobsQ.isLoading?<Skeleton className="inline-block h-3 w-28 align-middle" />:`${jobs.filter(j=>j.status==="Open").length} open positions`} · {jobs.reduce((s,j)=>s+j.applicants,0)} total applicants · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")}</p>
           </div>
         </div>
         <button onClick={()=>{setForm(blank);setModal(true);}} style={{...btnG,fontSize:11}}><Plus size={13}/> Post Job</button>

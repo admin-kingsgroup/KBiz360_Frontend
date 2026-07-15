@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getUserRules, createUserRule, setUserRuleStatus, testUserRule, deleteUserRule } from '../api/userRules';
 import { SUBJECT_KINDS, CONSTRAINT_KINDS, EFFECTS, SEVERITIES, statusTone, statusLabel, sevTone, subjectLabel, constraintLabel, ruleKpis, toggleTarget, constraintNeeds } from '../utils/userRules';
-import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, Textarea, FormField } from '../../../shell/primitives';
+import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, Textarea, FormField, Skeleton } from '../../../shell/primitives';
 import { KpiTile } from '../../dashboard/components/cards/KpiTile';
 
 // ─── TK GROUP · FE · User Rules Manager (OWNER only) ─────────────────────────
@@ -113,7 +113,15 @@ export function UserRulesManager({ canManage = true }) {
       )}
 
       {isError ? <div className="rounded-lg border border-dashed border-warning p-8 text-center text-sm text-warning">This screen is Owner-only, or the rules service is unavailable.</div>
-        : isLoading ? <div className="text-xs text-ink-subtle">Loading rules…</div>
+        : isLoading ? (
+          <div className="grid gap-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={`sk-${i}`} className="rounded-lg border border-surface-border bg-surface p-3">
+                <Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} />
+              </div>
+            ))}
+          </div>
+        )
           : !rows.length ? <div className="rounded-lg border border-dashed border-surface-border p-8 text-center text-sm text-ink-subtle">No user rules yet — add one above.</div>
             : (
               <div className="grid gap-2">

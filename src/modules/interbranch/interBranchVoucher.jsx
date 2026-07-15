@@ -8,6 +8,7 @@ import { bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
 import { useCreateInb, useOpenInb, usePairRate } from '../../core/useInterBranchVoucher';
 import { toast } from '../../core/ux/toast';
+import { Skeleton } from '../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8', amber: '#8a6d00', amberBg: '#fff7e0' };
 const ALL_BRANCHES = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
@@ -172,7 +173,7 @@ export function InterBranchVoucher({ branch }) {
               <input type="number" min="0" step="0.0001" value={form.fxRate} onChange={(e) => set('fxRate', e.target.value)}
                 placeholder={dailyRate ? String(dailyRate) : '0'} style={{ ...inp, width: 130, textAlign: 'right' }} /></div>
             <div style={{ fontSize: 11.5, color: C.dim }}>
-              {rateQ.isLoading ? 'Loading daily rate…'
+              {rateQ.isLoading ? <Skeleton className="inline-block h-3 w-20 align-middle" />
                 : dailyRate ? <>Daily rate {form.date}: <b>1 USD = ₹{dailyRate.toLocaleString(localeOf('₹'))}</b></>
                 : <span style={{ color: C.amber }}>No daily USD→INR rate set for {form.date} — enter one to post.</span>}
             </div>

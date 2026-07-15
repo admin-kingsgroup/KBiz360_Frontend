@@ -9,6 +9,7 @@ import { BRANCHES } from '../../../core/data';
 import { usePayslips, useMyEmployee } from '../usePayroll';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { SelfServiceGate, SS_MONTH_LABEL } from './selfServiceGate';
+import { SkeletonText } from '../../../shell/primitives';
 
 export function MyPayslip(){
   const my=useMyEmployee();
@@ -36,7 +37,7 @@ function MyPayslipBody({emp}){
       <div style={{maxWidth:680,margin:"0 auto"}}>
         {!slip?(
           <div style={{padding:"48px 24px",background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,textAlign:"center",color:"#8b94b3",fontSize:12.5}}>
-            {isLoading?"Loading your payslips…":(<>
+            {isLoading?<SkeletonText lines={2} className="mx-auto max-w-xs" />:(<>
               <p style={{margin:0,fontSize:30}}>🧾</p>
               <p style={{margin:"10px 0 4px",fontSize:13.5,fontWeight:700,color:"#0d1326"}}>No payslips yet</p>
               <p style={{margin:0,lineHeight:1.6}}>Payslips appear here after HR processes payroll for your branch.</p>

@@ -6,6 +6,7 @@ import { bc, inp, btnGh, card } from '../../../core/styleTokens';
 import { PERIOD_OPTIONS as MONTH_PERIOD_OPTIONS, FY_YTD_MONTHS } from '../../../core/dates';
 import { exportToCSV } from '../../../core/business-logic';
 import { useMobile } from '../../../core/hooks';
+import { Skeleton } from '../../../shell/primitives';
 
 export function PackagePnL({branch}){
   const mob=useMobile();
@@ -77,7 +78,10 @@ export function PackagePnL({branch}){
               <td style={{padding:"8px 12px",textAlign:"right"}}>{r.gpPct>=15?"⭐⭐⭐":r.gpPct>=10?"⭐⭐":"⭐"}</td>
             </tr>
           ))}
-          {rows.length===0&&<tr><td colSpan={10} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>{gpQ.isLoading?"Loading holiday bookings…":"No holiday bookings for this period"}</td></tr>}
+          {gpQ.isLoading && Array.from({length:5}).map((_,i)=>(
+            <tr key={`sk-${i}`}><td colSpan={10} style={{padding:"10px 12px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+          ))}
+          {!gpQ.isLoading && rows.length===0&&<tr><td colSpan={10} style={{padding:"24px",textAlign:"center",color:"#5a6691"}}>No holiday bookings for this period</td></tr>}
           </tbody>
           {rows.length>0&&<tfoot><tr style={{background:"#0d1326",borderTop:"2px solid #d4a437"}}>
             <td colSpan={4} style={{padding:"9px 12px",fontWeight:700,color:"#d4a437",fontSize:12}}>TOTAL</td>

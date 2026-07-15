@@ -10,6 +10,7 @@ import { useReconQueue, useReconSummary } from '../../../core/useReconciliation'
 import { useBankLedgers } from '../../../core/useBankReco';
 import { fmtINR } from '../../../core/format';
 import { btnGh } from '../../../core/styles';
+import { Skeleton } from '../../../shell/primitives';
 
 // The five tiers, in ladder order, for the pending strip (Daily/Weekly are the
 // branch freeze tiers; Month/Quarter/Year certify at TK Group).
@@ -102,7 +103,12 @@ export function ReconciliationQueue({branch,setRoute}){
                   </tr>
                 );
               })}
-              {rows.length===0&&<tr><td colSpan={8} style={{padding:20,textAlign:"center",color:"#5a6691"}}>{qLoading?"Loading…":"No bank ledgers yet - create a Bank ledger to reconcile."}</td></tr>}
+              {qLoading && Array.from({length:5}).map((_,i)=>(
+                <tr key={`sk-${i}`} style={{borderBottom:"1px solid #cdd1d8"}}>
+                  <td colSpan={8} style={{padding:"10px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td>
+                </tr>
+              ))}
+              {!qLoading && rows.length===0&&<tr><td colSpan={8} style={{padding:20,textAlign:"center",color:"#5a6691"}}>No bank ledgers yet - create a Bank ledger to reconcile.</td></tr>}
             </tbody>
           </table>
         </div>

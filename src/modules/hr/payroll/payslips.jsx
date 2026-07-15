@@ -5,6 +5,7 @@ import { useMasterList } from '../../../core/useMasters';
 import { fromEmpDTO } from '../employeeMap';
 import { usePayslips } from '../usePayroll';
 import { btnG, card, inp } from '../../../core/styles';
+import { SkeletonText } from '../../../shell/primitives';
 
 export function HrPayslips({branch}){
   // Rolling last-6-months from the live clock (was frozen at Mar–May 2026, hiding the
@@ -94,7 +95,7 @@ export function HrPayslips({branch}){
         {/* No persisted payslip for this month → honest empty state (never recompute here) */}
         {!slip&&(
           <div style={{padding:"36px 24px",textAlign:"center",color:"#8b94b3",fontSize:12.5}}>
-            {slipQ.isLoading?"Loading payslip…":(<>
+            {slipQ.isLoading?<SkeletonText lines={2} className="mx-auto max-w-xs" />:(<>
               No processed payroll for <b>{MONTHS.find(m=>m.v===month)?.l}</b> — run <b>⚙ Process Payroll</b> in Salary &amp; Payroll to generate this payslip.
             </>)}
           </div>

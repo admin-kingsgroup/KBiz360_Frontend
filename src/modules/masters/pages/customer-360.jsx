@@ -14,7 +14,7 @@ import { useGpBills, useAgeing } from '../../../core/useAccounting';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { Select, PageSection } from '../../../shell/primitives';
+import { Select, PageSection, Skeleton } from '../../../shell/primitives';
 
 const AGE_BUCKETS = [['d0', '0–30'], ['d30', '31–60'], ['d60', '61–90'], ['d90', '90+']];
 
@@ -93,7 +93,7 @@ export function Customer360({ branch }) {
           <div><p className="text-xs font-bold text-navy">No customer sales for {brCode || 'this branch'}{range.mode !== 'all' ? ' in this period' : ''}</p><p className="mt-0.5 text-[11px] text-ink-muted">This view aggregates customer sales from posted bills. Widen the date range (try “All”) or bill some sale vouchers.</p></div>
         </div>
       )}
-      {gpQ.isLoading && <div className="mb-3.5 rounded-brand border border-surface-border bg-surface px-4 py-6 text-center text-xs text-ink-muted">Loading customer sales…</div>}
+      {gpQ.isLoading && <div className="mb-3.5 rounded-brand border border-surface-border bg-surface px-4 py-6 text-center text-xs text-ink-muted"><Skeleton className="mx-auto h-3 w-48" /></div>}
 
       {/* Profile card — navy gradient */}
       <div className="mb-3.5 rounded-brand p-4" style={{ background: 'linear-gradient(135deg,#0d1326,#185FA5)' }}>

@@ -49,10 +49,12 @@ describe('CashOutlookCard — reads { opening, rows } object shape', () => {
     expect(screen.queryByText(/No upcoming due-dated bills/i)).not.toBeInTheDocument();
   });
 
-  test('shows the loading row while the forecast query is in flight', () => {
+  test('shows a loading skeleton while the forecast query is in flight', () => {
     useCashForecast.mockReturnValue({ data: undefined, isLoading: true });
-    render(<CashOutlookCard branch={'BOM'} cur={'₹'} go={() => {}} />);
-    expect(screen.getByText(/Loading forecast/i)).toBeInTheDocument();
+    const { container } = render(<CashOutlookCard branch={'BOM'} cur={'₹'} go={() => {}} />);
+    expect(container.querySelectorAll('.kb-skeleton').length).toBeGreaterThan(0);
+    // The empty-state message must NOT show while still loading.
+    expect(screen.queryByText(/No upcoming due-dated bills/i)).not.toBeInTheDocument();
   });
 
   test('shows the empty state when the forecast has no rows', () => {

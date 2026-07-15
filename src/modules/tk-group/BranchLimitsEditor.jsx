@@ -4,6 +4,7 @@ import { getLimits, setBranchLimits, proposeBranchLimits } from './api/limits';
 import { isOwner } from './utils/owner';
 import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { LIMIT_BRANCHES, symbolFor, effectiveValue, overrideValue, hasOverride, overrideCount, cleanLimitValues } from './utils/branchLimits';
+import { SkeletonCards } from '../../shell/primitives';
 
 // ─── Control Panel · Limits & Thresholds → BRANCH-WISE editor ────────────────
 // Pick a branch, edit its thresholds. The Owner saves live (self-approved); everyone
@@ -91,7 +92,7 @@ export function BranchLimitsEditor({ go, branch: controlledBranch, onBranchChang
       {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}
 
       {q.isLoading ? (
-        <div className="rounded-brand border border-surface-border bg-surface p-4 text-[12.5px] text-ink-muted">Loading limits…</div>
+        <SkeletonCards count={4} min="260px" />
       ) : (
         <div className="grid gap-3 tablet:grid-cols-2">
           {groups.map(([group, gf]) => (

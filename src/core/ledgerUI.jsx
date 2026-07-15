@@ -18,6 +18,7 @@ import { openBookingFolder } from './BookingFolderHost';
 import { PeriodBar } from './period';
 import { useLedgerStatement, useOpenBills, useBillSettlements, useLedgerSplit, useLedgerComponents, branchCode } from './useAccounting';
 import { openPrintPreview } from './PrintPreview';
+import { SkeletonTable, Skeleton } from '../shell/primitives';
 import { exportToExcel } from './exportExcel';
 import { toastSuccess, toastError } from './ux/toast';
 import { CONSOLIDATED_LABEL } from './data';
@@ -348,7 +349,7 @@ export function LedgerAccountView({
             From <b>{from ? dmy(from) : '…'}</b> to <b>{to ? dmy(to) : '…'}</b></div>
         </div>
 
-        {q.isLoading && <div className="loading">Loading ledger…</div>}
+        {q.isLoading && <SkeletonTable rows={6} cols={7} />}
         {!q.isLoading && view === 'ledger' && d && <LedgerBody d={d} cur={cur} segmented={!hasBranch} showNarr={showNarr} showDetail={showDetail} onPickVoucher={onPickVoucher} onPickInvoice={onPickInvoice} onPickFolder={onPickFolder} maxHeight={maxHeight} party={name} branch={branch} side={side} />}
         {!q.isLoading && view === 'bill' && (
           <BillwiseBody side={side} bills={bills} loading={bw.isLoading} hasBranch={hasBranch} group={group} name={name} branch={branch} cur={cur} maxHeight={maxHeight} ledgerRows={d?.rows} />
@@ -584,7 +585,7 @@ function BillBreakup({ party, branch, billVno, side, cur, colSpan, ledgerRows })
     <tr className="exp"><td colSpan={colSpan}>
       <div className="breakup">
         {q.isLoading ? (
-          <div className="bk-cap">Loading settlement history…</div>
+          <div className="bk-cap"><Skeleton style={{ height: 9.5, width: 140 }} /></div>
         ) : (!d || (!set.length && !d.bill)) ? (
           <div className="bk-cap">No directed settlement — this bill was cleared on-account or not bill-wise allocated.</div>
         ) : (
@@ -632,7 +633,7 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, branch, cu
       </>
     );
   }
-  if (loading) return <div className="loading">Loading bills…</div>;
+  if (loading) return <SkeletonTable rows={6} cols={7} />;
   return <BillwiseTable side={side} bills={bills} name={name} branch={branch} cur={cur} maxHeight={maxHeight} ledgerRows={ledgerRows} />;
 }
 
@@ -788,7 +789,7 @@ function BillwiseTable({ side, bills: rawBills, name, branch, cur, maxHeight, le
 
 /* ── Cost-Centre / Components breakdown body (Dr/Cr table, cream-gold theme) ── */
 function BreakdownBody({ title, rows, loading, cur = '₹', maxHeight, hint }) {
-  if (loading) return <div className="loading">Loading…</div>;
+  if (loading) return <SkeletonTable rows={5} cols={3} />;
   const list = rows || [];
   const grand = list.reduce((s, r) => s + (r.side === 'Cr' ? r.amount : -r.amount), 0);
   return (

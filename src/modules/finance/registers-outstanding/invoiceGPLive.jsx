@@ -23,6 +23,7 @@ import { useSalesRegister, usePurchaseRegister, useInvoiceGP } from '../../../co
 import { card, inp } from '../../../core/styles';
 import { clickable } from '../../../core/ux/clickable';
 import { openBookingFolder } from '../../../core/BookingFolderHost';
+import { SkeletonTable, Skeleton } from '../../../shell/primitives';
 import { VoucherLines } from '../../accountingLive/legacy.jsx';
 import {
   DARK, GOLD, DIM, BLUE, RED, GREEN, curOf, money, branchLabel, Page, Banner, State, ExportBtn,
@@ -173,7 +174,7 @@ export function InvoiceGPLive({ branch }) {
       )}
       <State q={q} empty={rows.length === 0}>
         {view === 'detailed' ? (
-          !detailReady ? <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>Loading full detail…</div>
+          !detailReady ? <SkeletonTable rows={6} cols={6} />
             : <DetailedTable columns={detailSheet.columns} rows={detailSheet.rows} />
         ) : (
         <Table>
@@ -211,7 +212,7 @@ export function InvoiceGPLive({ branch }) {
                             File {f.ref} — Sale {money(cur, r.sale)} − Cost {money(cur, r.cost)} = GP <span style={{ color: r.gp >= 0 ? GREEN : RED }}>{money(cur, r.gp)}</span> ({r.gpPct}%)
                           </div>
                           {f.u.sales.length === 0 && f.u.purchases.length === 0 && (
-                            <div style={{ fontSize: 11, color: DIM }}>{detailReady ? 'No underlying voucher detail found.' : 'Loading detail…'}</div>
+                            <div style={{ fontSize: 11, color: DIM }}>{detailReady ? 'No underlying voucher detail found.' : <Skeleton className="inline-block h-3 w-32 align-middle" />}</div>
                           )}
                           {f.u.sales.map((v) => (
                             <div key={v.id || v.vno} style={{ marginBottom: 14 }}><SideTag tone="sale">SALE</SideTag><VoucherLines voucher={v} cur={cur} /></div>

@@ -24,7 +24,7 @@ import { bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
 import { PeriodBar, periodRange } from '../../core/period';
 import { CONSOLIDATED_LABEL } from '../../core/data';
-import { SkeletonTable } from '../../shell/primitives';
+import { SkeletonTable, SkeletonText } from '../../shell/primitives';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
 import { useApprovalChain, nextActionFor, StageTracker } from '../../core/approvalChain';
 
@@ -730,7 +730,7 @@ function EditedVouchersList({ rows, isLoading, open, setOpen, setViewId, cur = '
   const money = (n) => fmtAmount(n, cur);
   const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: `2px solid ${C.border}`, whiteSpace: 'nowrap' };
   const td = { padding: '7px 10px', borderBottom: '1px solid #dfe2e7', fontSize: 12, whiteSpace: 'nowrap' };
-  if (isLoading) return <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>Loading edited vouchers…</div>;
+  if (isLoading) return <div style={{ ...card, padding: 12 }}><SkeletonTable rows={5} cols={9} /></div>;
   if (!rows.length) return <div style={{ ...card, padding: 24, textAlign: 'center', color: C.dim }}>No edited vouchers.</div>;
   const fmtAt = (s) => { const dd = new Date(s); return isNaN(dd) ? (s || '—') : dd.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   return (
@@ -809,7 +809,7 @@ function InbEditGate({ linkNo, branch, onDone }) {
       <button onClick={onDone} style={{ padding: '7px 14px', background: C.dark, color: C.gold, border: 'none', borderRadius: 7, fontWeight: 800, cursor: 'pointer' }}>← Back to INB list</button>
     </div>
   );
-  if (dq.isLoading) return wrap('Loading INB deal…');
+  if (dq.isLoading) return wrap(<SkeletonText lines={3} />);
   if (dq.error || !dq.data) return wrap(`Could not load ${linkNo}${dq.error ? ` — ${dq.error.message}` : ''}.`, C.red);
   const deal = dq.data;
   if (!deal.editable) return wrap(`INB deal ${linkNo} is not fully pending (${deal.saleStatus}${deal.purchaseStatus ? ` / ${deal.purchaseStatus}` : ''}) — Revoke it first, then edit.`, C.gold);
@@ -835,7 +835,7 @@ function InbEditGate({ linkNo, branch, onDone }) {
 function InbEditedList({ rows, isLoading, money }) {
   const th = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', whiteSpace: 'nowrap', textAlign: 'left' };
   const td = { padding: '7px 12px', fontSize: 12, whiteSpace: 'nowrap' };
-  if (isLoading) return <div style={{ padding: 22, textAlign: 'center', color: C.dim, fontSize: 12 }}>Loading edited INB deals…</div>;
+  if (isLoading) return <SkeletonTable rows={5} cols={8} />;
   if (!rows.length) return <div style={{ padding: 22, textAlign: 'center', color: C.dim, fontSize: 12 }}>No edited INB deals.</div>;
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>

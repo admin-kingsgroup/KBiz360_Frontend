@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../core/api';
 import { periodRange } from '../../core/period';
 import { bc } from '../../core/styleTokens';
+import { SkeletonText } from '../../shell/primitives';
 
 const DEFAULT_HURDLE = 18; // initial cost-of-capital benchmark % — user-editable on screen
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
@@ -364,7 +365,7 @@ export function CapitalVsInvestmentLive({ branch }) {
         </div>
 
         <div className="content">
-          {isLoading && <div className="state">Loading live capital analysis…</div>}
+          {isLoading && <div className="state"><SkeletonText lines={3} className="mx-auto max-w-md" /></div>}
           {error && <div className="state" style={{ color: '#dc2626' }}>Couldn’t load: {String(error.message || error)}</div>}
           {/* The report always renders once data has loaded — a branch with no postings
               shows every figure as zero (with a neutral banner) rather than a dead-end

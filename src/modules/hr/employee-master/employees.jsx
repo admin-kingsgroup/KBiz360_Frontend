@@ -10,6 +10,7 @@ import { fromEmpDTO, toEmpPayload, BLANK_EMP } from '../employeeMap';
 import { fromShiftDTO } from '../hrMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
+import { Skeleton } from '../../../shell/primitives';
 
 export function HrEmployees({branch}){
   const mob=useMobile();
@@ -95,7 +96,7 @@ export function HrEmployees({branch}){
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Employee Master</h2>
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>
-              {empQ.isLoading?"Loading…":`${filtered.length} employees`} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
+              {empQ.isLoading?<Skeleton className="inline-block h-3 w-20 align-middle" />:`${filtered.length} employees`} · {branch==="ALL"?"All branches":(branch?.code||brScope||"—")} · {new Date().toLocaleDateString("en-IN",{month:"long",year:"numeric"})}
             </p>
           </div>
         </div>
@@ -132,9 +133,11 @@ export function HrEmployees({branch}){
                 color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{filtered.length===0&&(
+          <tbody>{empQ.isLoading&&Array.from({length:6}).map((_,i)=>(
+            <tr key={`sk-${i}`}><td colSpan={9} style={{padding:"10px 12px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+          ))}{!empQ.isLoading&&filtered.length===0&&(
             <tr><td colSpan={9} style={{padding:"22px 12px",textAlign:"center",color:"#8b94b3",fontSize:12}}>
-              {empQ.isLoading?"Loading employees…":empQ.isError?"Failed to load employees.":"No employees found for this branch. Use “New Employee” to add one."}
+              {empQ.isError?"Failed to load employees.":"No employees found for this branch. Use “New Employee” to add one."}
             </td></tr>
           )}{filtered.map((e,i)=>{
             const bc2=brCfg(e);

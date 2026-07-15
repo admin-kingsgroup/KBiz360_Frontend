@@ -34,7 +34,7 @@ import { Combobox } from '../../../core/ux/Combobox';
 import { toast } from '../../../core/ux/toast';
 import { Kbd } from '../../../core/ux/widgets.jsx';
 import { PageLayout } from '../../../shell/PageLayout';
-import { Button, IconButton, Input, Select, Textarea, FormField, LoadingState, ErrorState, EmptyState } from '../../../shell/primitives';
+import { Button, IconButton, Input, Select, Textarea, FormField, LoadingState, ErrorState, EmptyState, Skeleton } from '../../../shell/primitives';
 
 export const GOLD = '#c2a04a', DARK = '#1a1c22', DIM = '#5b616e', RED = '#dc2626', GREEN = '#16a34a';
 
@@ -226,7 +226,13 @@ export function EmptyHint({ children }) {
 
 // Linked Vouchers — live table of every voucher whose party = this record.
 export function LinkedVouchersTab({ q }) {
-  if (q.isLoading) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Loading vouchers…</p>);
+  if (q.isLoading) return tabPanel(
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" style={{ opacity: 0.75 }} />
+      <Skeleton className="h-9 w-full" style={{ opacity: 0.55 }} />
+    </div>
+  );
   if (q.isError) return tabPanel(<p style={{ color: RED, fontSize: 12 }}>⚠ {q.error?.message || 'Failed to load vouchers'}</p>);
   const rows = (q.data || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
   if (!rows.length) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>No posted or pending vouchers reference this party yet.</p>);
@@ -255,7 +261,13 @@ export function LinkedVouchersTab({ q }) {
 // Outstanding — live open bills (unsettled) for the party.
 export function OutstandingTab({ q, side, branch }) {
   const fmt = (n) => rupee(n, branch);
-  if (q.isLoading) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Loading open bills…</p>);
+  if (q.isLoading) return tabPanel(
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" style={{ opacity: 0.75 }} />
+      <Skeleton className="h-9 w-full" style={{ opacity: 0.55 }} />
+    </div>
+  );
   if (q.isError) return tabPanel(<p style={{ color: RED, fontSize: 12 }}>⚠ {q.error?.message || 'Failed to load open bills'}</p>);
   const data = q.data || { bills: [], advances: 0 };
   const bills = data.bills || [];
@@ -298,7 +310,13 @@ export function OutstandingTab({ q, side, branch }) {
 // History — KPIs + monthly bar chart derived from the party's vouchers.
 export function HistoryTab({ q, branch }) {
   const fmt = (n) => rupee(n, branch);
-  if (q.isLoading) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Loading history…</p>);
+  if (q.isLoading) return tabPanel(
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" style={{ opacity: 0.75 }} />
+      <Skeleton className="h-9 w-full" style={{ opacity: 0.55 }} />
+    </div>
+  );
   const rows = q.data || [];
   if (!rows.length) return tabPanel(<p style={{ color: DIM, fontSize: 12 }}>Once vouchers are posted for this party, monthly totals appear here.</p>);
   const total = rows.reduce((s, v) => s + (Number(v.total) || 0), 0);

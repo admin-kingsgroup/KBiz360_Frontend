@@ -28,7 +28,7 @@ import { periodRange } from '../../../core/period';
 import { compactAmt } from '../../../core/format';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { ResponsiveGrid, PageSection, Button, Input } from '../../../shell/primitives';
+import { ResponsiveGrid, PageSection, Button, Input, Skeleton, SkeletonTable } from '../../../shell/primitives';
 
 const gpClr = (p) => (p >= 20 ? '#16a34a' : p >= 12 ? '#3fb7a3' : p >= 8 ? '#d97706' : '#dc2626');
 const gpBg = (p) => (p >= 12 ? '#e8f6ed' : p >= 8 ? '#fbeedb' : '#fbe9e9');
@@ -314,7 +314,7 @@ export function ReportGP({ branch }) {
     [{ key: 'id', label: 'Voucher / File' }, { key: 'date', label: 'Date' }, { key: 'mod', label: 'Module' }, { key: 'branch', label: 'Branch' }, { key: 'client', label: 'Client' }, { key: 'dest', label: 'Destination' }, { key: 'airline', label: 'Airline' }, { key: 'supplier', label: 'Supplier' }, { key: 'consultant', label: 'Consultant' }, { key: 'sell', label: 'Revenue' }, { key: 'cost', label: 'Cost' }, { key: 'gp', label: 'Gross Profit' }, { key: 'gpPct', label: 'GP %' }],
     [...exportRows].sort((a, b) => b.gp - a.gp));
 
-  const subtitle = gpQuery.isLoading ? 'Loading live books…'
+  const subtitle = gpQuery.isLoading ? <Skeleton className="inline-block h-3 w-32 align-middle" />
     : gpQuery.error ? 'Could not load data'
     : isAll ? 'Consolidated — each branch in its own currency · no cross-currency total'
     : `${singleBills.length} bookings · ${singleMoney(sTotSell)} revenue · ${sTotGPPct}% GP`;
@@ -358,7 +358,7 @@ export function ReportGP({ branch }) {
       }
     >
 
-      {gpQuery.isLoading && <PageSection><p className="py-10 text-center text-sm text-ink-muted">Loading GP data…</p></PageSection>}
+      {gpQuery.isLoading && <PageSection><SkeletonTable rows={6} cols={5} className="border-0 shadow-none" /></PageSection>}
       {gpQuery.error && !gpQuery.isLoading && (
         <PageSection><div className="py-10 text-center"><p className="text-sm font-bold text-maroon">Couldn’t load GP data</p><p className="mt-1.5 text-[11px] text-ink-muted">{String(gpQuery.error?.message || gpQuery.error)}</p></div></PageSection>
       )}

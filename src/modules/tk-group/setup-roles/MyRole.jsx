@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getMyRole } from '../api/myRole';
-import { Card } from '../../../shell/primitives';
+import { Card, SkeletonText } from '../../../shell/primitives';
 
 // ─── TK GROUP · FE · read-only "My Role" briefing ────────────────────────────
 // Each person opens this to understand what applies to them: their role, who they
@@ -19,7 +19,7 @@ const listBlock = (label, items, toneClass, boxClass) => (items && items.length 
 
 // Split out the presentational view so it renders/tests without a fetch.
 export function MyRoleView({ data }) {
-  if (!data) return <div className="tk-myrole p-3.5 text-xs text-ink-muted">Loading your role…</div>;
+  if (!data) return <Card className="tk-myrole"><SkeletonText lines={5} /></Card>;
   const p = data.profile || {};
   const controls = (data.activeControls && data.activeControls.length) ? data.activeControls.join(', ') : 'none yet (dormant)';
   return (

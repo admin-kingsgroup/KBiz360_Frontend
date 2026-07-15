@@ -16,8 +16,9 @@ const data = {
 
 describe('MyRoleView', () => {
   test('loading state when no data', () => {
-    render(<MyRoleView data={null} />);
-    expect(screen.getByText(/Loading your role/)).toBeInTheDocument();
+    const { container } = render(<MyRoleView data={null} />);
+    expect(container.querySelector('.tk-myrole')).toBeInTheDocument();
+    expect(container.querySelectorAll('.kb-skeleton').length).toBeGreaterThan(0);
   });
 
   test('renders name, title, reports-to, duties, and active controls', () => {

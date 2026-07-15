@@ -5,6 +5,7 @@ import { useOutstanding, usePaymentRun } from '../../core/useAccounting';
 import { buildPaymentRunPayload, paymentRunSummary } from './paymentRunPayload';
 import { Wallet, CheckSquare, Square, ArrowRight, ChevronDown } from 'lucide-react';
 import { Menu as DropdownMenu } from '../../core/ux/Menu';
+import { Skeleton } from '../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8', amber: '#854F0B' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
@@ -134,7 +135,9 @@ export function PaymentRun({ branch, setRoute }) {
               <th style={{ ...th, ...rnum }}>Outstanding</th><th style={{ ...th, ...rnum }}>Age (d)</th><th style={{ ...th, ...rnum }}>Pay Amount</th>
             </tr></thead>
             <tbody>
-              {outQ.isLoading && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading outstanding bills…</td></tr>}
+              {outQ.isLoading && Array.from({length:5}).map((_,i)=>(
+                <tr key={`sk-${i}`}><td colSpan={7} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+              ))}
               {!outQ.isLoading && rows.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ No outstanding supplier bills.</td></tr>}
               {rows.map((r) => (
                 <tr key={r.key} style={{ background: r.selected ? '#f4f8ff' : '#fff' }}>

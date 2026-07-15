@@ -10,6 +10,7 @@ import { useHotkey } from '../core/ux/hotkeys';
 import { usePrefs } from '../core/prefs';
 import { pushModal } from '../core/ux/modalStore';
 import { openLedgerModal } from '../core/LedgerModalHost';
+import { Skeleton } from './primitives';
 
 const DARK = '#0d1326', DIM = '#5a6691', BLUE = '#185FA5';
 
@@ -63,7 +64,13 @@ export function LedgerSwitcher({ branch }) {
           <span style={{ fontSize: 10, color: DIM }}>Esc to close</span>
         </div>
         <div style={{ maxHeight: '52vh', overflow: 'auto' }}>
-          {chart.isLoading && <div style={{ padding: 18, fontSize: 12.5, color: DIM }}>Loading ledgers…</div>}
+          {chart.isLoading && (
+            <div style={{ padding: '9px 14px' }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={`sk-${i}`} className="h-4 w-full" style={{ marginBottom: 8, opacity: Math.max(0.4, 1 - i * 0.12) }} />
+              ))}
+            </div>
+          )}
           {!chart.isLoading && filtered.length === 0 && <div style={{ padding: 18, fontSize: 12.5, color: DIM }}>No ledgers match “{q}”.</div>}
           {filtered.map((l, i) => (
             <div key={l.name} onMouseEnter={() => setHi(i)} onMouseDown={(e) => { e.preventDefault(); choose(l.name); }}

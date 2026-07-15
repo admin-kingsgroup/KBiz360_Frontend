@@ -4,6 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTaxReco, useUpsertTaxFigure } from '../../core/useTaxReco';
 import { bc } from '../../core/styles';
+import { Skeleton } from '../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString((cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US');
@@ -79,7 +80,9 @@ export function TaxReco({ branch }) {
             <th style={{ ...th, textAlign: 'center' }}>Status</th>
           </tr></thead>
           <tbody>
-            {q.isLoading && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
+            {q.isLoading && Array.from({ length: 5 }).map((_, i) => (
+              <tr key={`sk-${i}`}><td colSpan={5} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+            ))}
             {!q.isLoading && data.rows.length === 0 && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Pick a period and mode.</td></tr>}
             {data.rows.map((r) => (
               <tr key={r.head} style={{ background: r.matched ? '#f4fbf4' : '#fdf6f4' }}>

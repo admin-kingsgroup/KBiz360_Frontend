@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAllRoles } from '../api/myRole';
-import { Card, Badge, ResponsiveGrid } from '../../../shell/primitives';
+import { Card, Badge, ResponsiveGrid, Skeleton } from '../../../shell/primitives';
 
 // ─── TK GROUP · FE · Roles & Responsibilities (org-wide, shareable) ──────────
 // Every role's responsibilities in one place — read live from the backend profiles,
@@ -46,7 +46,11 @@ export function RolesResponsibilities() {
               {listBlock('Cannot', r.cannot, 'text-danger', 'border-danger/25 bg-danger-soft')}
             </Card>
           );
-        }) : <div className="text-xs text-ink-muted">Loading roles…</div>}
+        }) : Array.from({ length: 4 }).map((_, i) => (
+          <Card key={`sk-${i}`}>
+            <Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} />
+          </Card>
+        ))}
       </ResponsiveGrid>
     </div>
   );
