@@ -26,6 +26,7 @@ import { PeriodBar, periodRange } from '../../core/period';
 import { CONSOLIDATED_LABEL } from '../../core/data';
 import { SkeletonTable, SkeletonText } from '../../shell/primitives';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
+import { voucherParent } from '../../core/voucher/useRevokeAction';
 import { useApprovalChain, nextActionFor, StageTracker } from '../../core/approvalChain';
 
 // Full branch-currency amount (₹ India · $ USD branches) — NO Cr/L abbreviation.
@@ -330,6 +331,17 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // soft warnings, for the narration cell + the Approve tooltip.
   const alertOf = (e) => [e.error, ...((e.errors) || [])].filter(Boolean).join(' · ');
   const warnOf = (e) => ((e.warnings) || []).filter(Boolean).join(' · ');
+  // Admin Delete, lock-aware: a master-locked leg (booking / INB / expense-order / ADM /
+  // ACM) can't be reversed out of the books from this queue — the backend 409s a direct
+  // delete; it must be undone from its master. Show a disabled lock hint (pointing at the
+  // parent) instead of a Delete that would always fail. Mirrors VoucherShell's voucherParent
+  // read-only treatment. Non-locked vouchers keep the normal Delete.
+  const adminDeleteBtn = (e, style, title) => {
+    if (!isAdmin) return null;
+    const parent = voucherParent(e);
+    if (parent) return <button disabled title={`Driven by ${parent.label}${parent.ref ? ' ' + parent.ref : ''} — reverse it from its parent file, not here`} style={{ ...style, background: '#cfd6e4', color: '#6b7280', border: 'none', cursor: 'not-allowed' }}>🔒 Delete</button>;
+    return <button onClick={() => doDelete(e.id)} disabled={busy} title={title} style={style}>Delete</button>;
+  };
   const actionCell = (e) => (
     status === 'pending' ? (
       <>
@@ -345,12 +357,12 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
           return <button onClick={() => doApprove(e.id)} disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (alertOf(e) || 'Fix the error (Edit) before approving'))} aria-label={ok ? undefined : `Approve disabled — ${!na.allowed ? na.hint : (alertOf(e) || 'fix the error (Edit) first')}`} style={{ ...ABTN(C.green, true), background: ok ? C.green : '#cfd6e4', cursor: ok ? 'pointer' : 'not-allowed' }}>Approve</button>;
         })()}
         <button onClick={() => doReject(e.id)} disabled={busy} style={ABTN(C.red)}>Reject</button>
-        {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Delete — remove from Pending, view-only (number not reusable)" style={ABTN(C.red, true)}>Delete</button>}
+        {adminDeleteBtn(e, ABTN(C.red, true), 'Delete — remove from Pending, view-only (number not reusable)')}
       </>
     ) : status === 'approved' ? (
       <>
         {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={ABTN(C.gold)}>Revoke</button>}
-        {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={ABTN(C.red)}>Delete</button>}
+        {adminDeleteBtn(e, ABTN(C.red), 'Reverse out of the books → view-only (number not reusable)')}
       </>
     ) : status === 'deleted' ? (
       <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
@@ -654,12 +666,12 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                                                 return <button onClick={() => doApprove(e.id)} disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? '' : 'Fix the error (Edit) before approving')} style={{ padding: '3px 9px', background: ok ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: ok ? 'pointer' : 'not-allowed', marginRight: 5 }}>Approve</button>;
                                               })()}
                                               <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Reject</button>
-                                              {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Delete — remove from Pending, view-only (number not reusable)" style={{ padding: '3px 9px', background: C.red, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>}
+                                              {adminDeleteBtn(e, { padding: '3px 9px', background: C.red, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }, 'Delete — remove from Pending, view-only (number not reusable)')}
                                             </>
                                           ) : status === 'approved' ? (
                                             <>
                                               {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ padding: '3px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Revoke</button>}
-                                              {isAdmin && <button onClick={() => doDelete(e.id)} disabled={busy} title="Reverse out of the books → view-only (number not reusable)" style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Delete</button>}
+                                              {adminDeleteBtn(e, { padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }, 'Reverse out of the books → view-only (number not reusable)')}
                                             </>
                                           ) : status === 'deleted' ? (
                                             <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
@@ -817,6 +829,10 @@ function InbEditGate({ linkNo, branch, onDone }) {
     isInterBranch: true, linkNo: deal.linkNo, bookingNo: deal.linkNo,
     branch: deal.fromBranch, toBranch: deal.toBranch, module: deal.module,
     packageType: deal.packageType, date: deal.date, headerRef: deal.reference, passenger: deal.passenger,
+    // Carry the frozen FX rate + the IGST tick back into the editor so an edit re-sends the
+    // SAME rate and tax choice (else a cross-currency edit forces re-keying the rate, and a
+    // ticked cross-border edit silently zero-rates the deal).
+    fx: deal.fx || null, billIgst: !!deal.billIgst,
     noSupplier: deal.noSupplier, fareLines: deal.fareLines, serviceFee: deal.serviceFee,
     // Purchase-side detail: the Supplier Service Charge head + incentive/GST-mode live
     // here (not in fareLines) — without them the Edit grid opens blank on those fields
