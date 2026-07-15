@@ -18,6 +18,13 @@ const BUCKETS = [
   { tone: 'danger', name: 'Book-only', means: 'In our books, not on their statement — an unpresented cheque, a deposit still clearing.', action: 'Your action: classify it' },
 ];
 
+const BUCKET_CARD_CLS = {
+  success: 'border-success/25 bg-success-soft/40',
+  warning: 'border-warning/25 bg-warning-soft/40',
+  info: 'border-info/25 bg-info-soft/40',
+  danger: 'border-danger/25 bg-danger-soft/40',
+};
+
 const CLASSIFICATIONS = [
   ['Unpresented cheque', 'Book-only', 'We issued the cheque; they have not cleared it yet.', 'Chq 004512 to Akbar, issued Tuesday, not on the statement.'],
   ['Deposit in transit', 'Book-only', 'We deposited; the bank credits it next working day.', 'Counter deposit made Friday evening.'],
@@ -57,7 +64,7 @@ export function MatchGuidePage({ setRoute }) {
         subtitle="The goal of every matching session: ZERO unexplained lines. A line is explained when it is Matched, Confirmed, or Classified. Never delete, never ignore.">
         <div className="grid gap-3 tablet:grid-cols-2 desktop:grid-cols-4">
           {BUCKETS.map((b) => (
-            <div key={b.name} className="rounded-brand border border-surface-border bg-surface p-4">
+            <div key={b.name} className={`rounded-brand border p-4 ${BUCKET_CARD_CLS[b.tone] || 'border-surface-border bg-surface'}`}>
               <Badge tone={b.tone} dot>{b.name}</Badge>
               <p className="mt-2 text-sm leading-relaxed text-ink-muted">{b.means}</p>
               <p className="mt-2 text-xs font-bold uppercase tracking-wide text-ink">{b.action}</p>
@@ -74,7 +81,7 @@ export function MatchGuidePage({ setRoute }) {
             <thead><tr><th className={headCls}>Label</th><th className={headCls}>Which side</th><th className={headCls}>It means</th><th className={headCls}>Example</th></tr></thead>
             <tbody>
               {CLASSIFICATIONS.map(([label, side, means, example]) => (
-                <tr key={label}>
+                <tr key={label} className={side === 'Book-only' ? 'bg-danger-soft/15' : side === 'Statement-only' ? 'bg-info-soft/15' : ''}>
                   <td className={`${cellCls} whitespace-nowrap font-bold`}>{label}</td>
                   <td className={cellCls}><Badge tone={side === 'Book-only' ? 'danger' : side === 'Statement-only' ? 'info' : 'neutral'} size="sm">{side}</Badge></td>
                   <td className={cellCls}>{means}</td>
@@ -89,7 +96,7 @@ export function MatchGuidePage({ setRoute }) {
       {/* 3 · where matching happens */}
       <PageSection title="3 · Two places matching happens — when to use which" icon={HelpCircle}>
         <div className="grid gap-3 tablet:grid-cols-2">
-          <div className="rounded-brand border border-surface-border bg-surface p-4">
+          <div className="rounded-brand border border-success/25 bg-success-soft/30 p-4">
             <div className="flex items-center gap-2 text-sm font-bold text-ink"><CheckCircle2 size={15} className="text-success" aria-hidden="true" /> Inside a certificate — the Scrutiny</div>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
               The weekly / closing workflow. Attach the Excel/HTML/TXT/CSV statement to the ledger's certificate — it matches automatically against that ledger's postings for that period.
@@ -97,7 +104,7 @@ export function MatchGuidePage({ setRoute }) {
               <b> Reconciling for a certificate? Start here.</b>
             </p>
           </div>
-          <div className="rounded-brand border border-surface-border bg-surface p-4">
+          <div className="rounded-brand border border-info/25 bg-info-soft/30 p-4">
             <div className="flex items-center gap-2 text-sm font-bold text-ink"><FileSearch size={15} className="text-info" aria-hidden="true" /> The standalone Statement Matching screens</div>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
               For ongoing, deep or historical work: big statement imports, multi-period cleanup, party-by-party allocation, migration-era ties. Same buckets, more room — the six screens below.
@@ -138,19 +145,19 @@ export function MatchGuidePage({ setRoute }) {
       {/* 5b · the four superpowers */}
       <PageSection title="5b · Four things that do the work for you">
         <div className="grid gap-3 tablet:grid-cols-2">
-          <div className="rounded-brand border border-surface-border bg-surface p-4">
+          <div className="rounded-brand border border-gold/25 bg-accent-soft/30 p-4">
             <div className="text-sm font-bold text-ink">Carry-forward — explain an item once, ever</div>
             <p className="mt-1 text-sm leading-relaxed text-ink-muted">A classified item (unpresented cheque, deposit in transit…) automatically appears in next period's scrutiny and <b>clears itself</b> the moment it finally hits a statement. You never re-explain it.</p>
           </div>
-          <div className="rounded-brand border border-surface-border bg-surface p-4">
+          <div className="rounded-brand border border-gold/25 bg-accent-soft/30 p-4">
             <div className="text-sm font-bold text-ink">The matcher learns from you</div>
             <p className="mt-1 text-sm leading-relaxed text-ink-muted">Every Probable you Confirm teaches a narration↔party pattern for that ledger. The same pairing lands as <b>Matched (learned)</b> automatically from then on — confirmations shrink every week.</p>
           </div>
-          <div className="rounded-brand border border-surface-border bg-surface p-4">
+          <div className="rounded-brand border border-gold/25 bg-accent-soft/30 p-4">
             <div className="text-sm font-bold text-ink">Re-run match</div>
             <p className="mt-1 text-sm leading-relaxed text-ink-muted">Posted the missing bank charge? Press <b>Re-run match</b> on the scrutiny — it re-matches the stored statement against the current books. No re-upload.</p>
           </div>
-          <div className="rounded-brand border border-surface-border bg-surface p-4">
+          <div className="rounded-brand border border-gold/25 bg-accent-soft/30 p-4">
             <div className="text-sm font-bold text-ink">Bulk classify</div>
             <p className="mt-1 text-sm leading-relaxed text-ink-muted">Tick the checkboxes (or select-all), pick a classification once, <b>Apply</b> — one action for a whole pile of unpresented cheques. "Confirm probables" works the same way.</p>
           </div>
@@ -164,7 +171,7 @@ export function MatchGuidePage({ setRoute }) {
             <thead><tr><th className={headCls}>Pitfall</th><th className={headCls}>What happens</th><th className={headCls}>Avoid it by</th></tr></thead>
             <tbody>
               {PITFALLS.map(([p, happens, avoid]) => (
-                <tr key={p}>
+                <tr key={p} className="bg-warning-soft/15">
                   <td className={`${cellCls} font-bold`}>{p}</td>
                   <td className={cellCls}>{happens}</td>
                   <td className={`${cellCls} text-ink-muted`}>{avoid}</td>
