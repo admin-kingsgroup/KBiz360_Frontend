@@ -120,7 +120,9 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
     ? <span style={pill('#0f2f5c', '#fff')}><Lock size={10} style={{ verticalAlign: -1 }} /> Certified</span>
     : st?.frozen
       ? <span style={pill('#e6f1fb', '#185FA5')}><Snowflake size={10} style={{ verticalAlign: -1 }} /> Frozen{st.signatures ? ` · ${st.signatures} signed` : ''}</span>
-      : <span style={pill('#eef1f5', C.dim)}>Open</span>;
+      : st
+        ? <span style={pill('#eef1f5', C.dim)}>Open</span>
+        : <span style={pill('#fdeab0', '#8a5a00')}>Status unavailable</span>;
 
   return (
     <div style={{ ...card, padding: '9px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, borderLeft: `3px solid ${st?.certified ? '#0f2f5c' : st?.frozen ? '#185FA5' : C.border}` }}>
@@ -153,6 +155,15 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* Freeze state couldn't be read (API error → fail-soft null): never a silent
+            dead-end — surface it and let the user retry instead of showing a bare "Open". */}
+        {!loading && !st && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#8a5a00' }}>
+            Couldn't load freeze status
+            <button type="button" onClick={() => refresh()}
+              style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Retry</button>
+          </span>
+        )}
         {st && !st.certified && (
           <FreezeTab frozen={!!st.frozen} canFreeze={!!st.canFreeze} busy={busy}
             onFreeze={doFreeze} onUnfreeze={doUnfreeze} />
