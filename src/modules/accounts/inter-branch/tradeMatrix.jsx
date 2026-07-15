@@ -9,6 +9,7 @@ import { useInbMatrix } from '../../../core/useInterBranchVoucher';
 import { SkeletonTable } from '../../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
+const CCY_SYM = { INR: '₹', USD: '$' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 
 export function InterBranchMatrix({ branch }) {
@@ -28,13 +29,21 @@ export function InterBranchMatrix({ branch }) {
     ? { count: sum('count'), total: sum('total'), fares: sum('fares'), svf: sum('svf'), discount: sum('discount'), margin: sum('margin') }
     : (data.totals || {});
 
-  // pivot rows → cell[seller][buyer] = total, + row/col totals
-  const cell = {}; const rowTot = {}; const colTot = {};
+  // pivot rows → cell[seller][buyer] = total, + row/col totals. Each pair is single-currency
+  // (the seller's book currency, tagged r.ccy from the BE); a row (one seller) is one currency,
+  // but a column (many sellers) / grand total can span ₹+$ — those are symbol-tagged only when
+  // every row shares one currency, else shown plain to avoid a false single-symbol total.
+  const cell = {}; const rowTot = {}; const colTot = {}; const sellerCcy = {};
   for (const r of rows) {
     (cell[r.fromBranch] = cell[r.fromBranch] || {})[r.toBranch] = r.total;
     rowTot[r.fromBranch] = (rowTot[r.fromBranch] || 0) + r.total;
     colTot[r.toBranch] = (colTot[r.toBranch] || 0) + r.total;
+    sellerCcy[r.fromBranch] = r.ccy || '';
   }
+  const symOf = (c) => CCY_SYM[c] || cur;
+  const ccys = [...new Set(rows.map((r) => r.ccy).filter(Boolean))];
+  const uniCcy = ccys.length <= 1;
+  const totMoney = (n) => (uniCcy ? money(symOf(ccys[0]), n) : Math.round(Number(n) || 0).toLocaleString(localeOf('₹')));
 
   const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 9 };
   const th = { padding: '8px 12px', background: C.dark, color: C.gold, fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4, whiteSpace: 'nowrap' };
@@ -66,15 +75,15 @@ export function InterBranchMatrix({ branch }) {
                 <tr key={s}>
                   <td style={{ ...td, fontWeight: 700, color: C.dark }}>{s}</td>
                   {branches.map((b) => (
-                    <td key={b} style={{ ...td, ...rnum, color: cell[s]?.[b] ? C.dark : '#c8cdd6' }}>{cell[s]?.[b] ? money(cur, cell[s][b]) : '·'}</td>
+                    <td key={b} style={{ ...td, ...rnum, color: cell[s]?.[b] ? C.dark : '#c8cdd6' }}>{cell[s]?.[b] ? money(symOf(sellerCcy[s]), cell[s][b]) : '·'}</td>
                   ))}
-                  <td style={{ ...td, ...rnum, fontWeight: 800, color: C.blue }}>{money(cur, rowTot[s] || 0)}</td>
+                  <td style={{ ...td, ...rnum, fontWeight: 800, color: C.blue }}>{money(symOf(sellerCcy[s]), rowTot[s] || 0)}</td>
                 </tr>
               ))}
               <tr>
                 <td style={{ ...td, fontWeight: 800, color: C.dark, background: '#f6f7fa' }}>Total</td>
-                {branches.map((b) => <td key={b} style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa' }}>{colTot[b] ? money(cur, colTot[b]) : '·'}</td>)}
-                <td style={{ ...td, ...rnum, fontWeight: 800, color: C.green, background: '#f6f7fa' }}>{money(cur, totals.total)}</td>
+                {branches.map((b) => <td key={b} style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa' }}>{colTot[b] ? totMoney(colTot[b]) : '·'}</td>)}
+                <td style={{ ...td, ...rnum, fontWeight: 800, color: C.green, background: '#f6f7fa' }}>{totMoney(totals.total)}</td>
               </tr>
             </tbody>
           </table>
@@ -93,26 +102,27 @@ export function InterBranchMatrix({ branch }) {
                 <tr key={`${r.fromBranch}-${r.toBranch}`}>
                   <td style={{ ...td, fontWeight: 700 }}>{r.fromBranch} → {r.toBranch}</td>
                   <td style={{ ...td, ...rnum }}>{r.count}</td>
-                  <td style={{ ...td, ...rnum }}>{money(cur, r.total)}</td>
-                  <td style={{ ...td, ...rnum, color: C.dim }}>{money(cur, r.fares)}</td>
-                  <td style={{ ...td, ...rnum, color: C.green }}>{money(cur, r.svf)}</td>
-                  <td style={{ ...td, ...rnum, color: r.discount ? C.red : C.dim }}>{r.discount ? '(' + money(cur, r.discount) + ')' : '—'}</td>
-                  <td style={{ ...td, ...rnum, fontWeight: 800, color: C.blue }}>{money(cur, r.margin)}</td>
+                  <td style={{ ...td, ...rnum }}>{money(symOf(r.ccy), r.total)}</td>
+                  <td style={{ ...td, ...rnum, color: C.dim }}>{money(symOf(r.ccy), r.fares)}</td>
+                  <td style={{ ...td, ...rnum, color: C.green }}>{money(symOf(r.ccy), r.svf)}</td>
+                  <td style={{ ...td, ...rnum, color: r.discount ? C.red : C.dim }}>{r.discount ? '(' + money(symOf(r.ccy), r.discount) + ')' : '—'}</td>
+                  <td style={{ ...td, ...rnum, fontWeight: 800, color: C.blue }}>{money(symOf(r.ccy), r.margin)}</td>
                 </tr>
               ))}
               <tr>
                 <td style={{ ...td, fontWeight: 800, background: '#f6f7fa' }}>Total</td>
                 <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa' }}>{totals.count}</td>
-                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa' }}>{money(cur, totals.total)}</td>
-                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa', color: C.dim }}>{money(cur, totals.fares)}</td>
-                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa', color: C.green }}>{money(cur, totals.svf)}</td>
-                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa', color: C.red }}>{totals.discount ? '(' + money(cur, totals.discount) + ')' : '—'}</td>
-                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa', color: C.blue }}>{money(cur, totals.margin)}</td>
+                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa' }}>{totMoney(totals.total)}</td>
+                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa', color: C.dim }}>{totMoney(totals.fares)}</td>
+                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa', color: C.green }}>{totMoney(totals.svf)}</td>
+                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa', color: C.red }}>{totals.discount ? '(' + totMoney(totals.discount) + ')' : '—'}</td>
+                <td style={{ ...td, ...rnum, fontWeight: 800, background: '#f6f7fa', color: C.blue }}>{totMoney(totals.margin)}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
+        {!uniCcy && <div style={{ fontSize: 11, color: C.red, marginTop: 8, fontWeight: 700 }}>Totals span ₹ and $ deals — each pair is shown in its own currency; column and grand totals are unlabelled because they mix currencies.</div>}
         <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
           Read-only from the INB Link registry. <b>Margin (GP)</b> = SVF income − discount passed to the buyer; supplier incentives that fund a discount sit on the linked purchase. No consolidation — branches stay independent.
         </div>

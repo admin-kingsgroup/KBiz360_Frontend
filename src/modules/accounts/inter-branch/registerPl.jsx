@@ -10,6 +10,7 @@ import { useInbReconcile, useInbPnlBreakdown } from '../../../core/useInterBranc
 import { Skeleton } from '../../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
+const CCY_SYM = { INR: '₹', USD: '$' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
 const brLabel = (b) => (b === 'ALL' || !b ? 'All Branches' : (b.name || b.code || b));
 const badge = (s) => ({ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: s === 'booked' ? C.green : s === 'open' ? C.gold : C.dim, textTransform: 'capitalize' });
@@ -46,7 +47,7 @@ export function InterBranchRegister({ branch }) {
         {tile('Total Legs', data.totals?.total || 0, C.dark)}
         {tile('Matched (booked)', data.totals?.booked || 0, C.green, 'both sides entered')}
         {tile('Open (unbooked)', data.totals?.open || 0, C.gold, 'awaiting buyer PO')}
-        {tile('Open Amount', money(cur, data.totals?.openAmount), C.red)}
+        {tile('Open Amount', money(CCY_SYM[data.totals?.openCcy] || cur, data.totals?.openAmount), C.red)}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 2px 10px' }}>
@@ -73,7 +74,7 @@ export function InterBranchRegister({ branch }) {
                 <td style={td}>{l.toBranch}</td>
                 <td style={td}>{l.date}</td>
                 <td style={{ ...td, color: C.dim }}>{l.passenger || '—'}</td>
-                <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(cur, l.total)}</td>
+                <td style={{ ...td, ...rnum, fontWeight: 700 }}>{money(CCY_SYM[l.ccy] || cur, l.amountInBranch != null ? l.amountInBranch : l.total)}</td>
                 <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{l.saleVno || '—'}</td>
                 <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{l.purchaseVno || '—'}</td>
                 <td style={td}><span style={badge(l.status)}>{l.status}</span></td>
