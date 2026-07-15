@@ -4,7 +4,7 @@ import { getModules, getIntegrityDetail } from '../api/monitor';
 import { statusTone, countLabel, sevTone, sevLabel, heads as headsOf, moduleKpis, issuesFor } from '../utils/modules';
 import { useCockpitFocus } from '../../../store/cockpitFocus';
 import { isFocused } from '../utils/cockpitFocus';
-import { ResponsiveGrid, Badge } from '../../../shell/primitives';
+import { ResponsiveGrid, Badge, Skeleton } from '../../../shell/primitives';
 import { KpiTile } from '../../dashboard/components/cards/KpiTile';
 import { BRANCHES } from '../../../core/referenceCache';
 import { curSym } from '../utils/currency';
@@ -32,7 +32,7 @@ function Count({ status, count }) {
 function Detail({ branch, checkId }) {
   const q = useQuery({ queryKey: ['tk', 'monitor', 'integrity', 'detail', branch, checkId], queryFn: () => getIntegrityDetail(branch, checkId), staleTime: 60_000 });
   const rows = (q.data && q.data.rows) || [];
-  if (q.isLoading) return <div className="px-3 py-2 text-xs text-ink-subtle">Loading…</div>;
+  if (q.isLoading) return <div className="px-3 py-2 pl-9"><Skeleton className="mb-1.5 h-3 w-2/3" /><Skeleton className="h-3 w-1/2" /></div>;
   if (!rows.length) return <div className="px-3 py-2 text-xs text-ink-subtle">No line-level list for this item.</div>;
   return (
     <div className="overflow-x-auto">
@@ -163,7 +163,11 @@ export function ModuleTower({ setRoute } = {}) {
         <div>
           <div className="mb-3"><div className="text-[10.5px] font-bold uppercase tracking-wide text-ink-subtle">{crumb}</div><h2 className="text-lg font-bold text-ink">{title}</h2></div>
           {q.isError ? <div className="rounded-lg border border-dashed border-danger p-8 text-center text-sm text-danger">Couldn’t load the module tree — the roll-up failed. Retry shortly.</div>
-            : q.isLoading ? <div className="text-xs text-ink-subtle">Loading module tree…</div>
+            : q.isLoading ? (
+              <div className="grid gap-2">
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} />)}
+              </div>
+            )
               : rows.length ? (
                 <div className="grid gap-2">
                   {rows.map((i, idx) => {

@@ -7,6 +7,7 @@ import { usePayrollRegister, useChallans, useMarkChallanPaid } from '../usePayro
 import { challanDueDate } from '../payrollMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, card, inp } from '../../../core/styles';
+import { Skeleton } from '../../../shell/primitives';
 
 export function PfEsiChallan({branch}){
   const mob=useMobile();
@@ -114,9 +115,13 @@ export function PfEsiChallan({branch}){
                 <th key={i} style={{padding:"8px 12px",textAlign:i>=2?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9.5}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{pfData.length===0&&(
+            <tbody>{regC.isLoading?(
+              Array.from({length:5}).map((_,i)=>(
+                <tr key={`sk-${i}`}><td colSpan={7} style={{padding:10}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+              ))
+            ):pfData.length===0&&(
               <tr><td colSpan={7} style={{padding:"20px",textAlign:"center",color:"#5a6691",fontSize:11}}>
-                {regC.isLoading?"Loading payroll register…":"No payroll lines for this month — add employees or process the run."}
+                No payroll lines for this month — add employees or process the run.
               </td></tr>
             )}{pfData.map((e,i)=>(
               <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>

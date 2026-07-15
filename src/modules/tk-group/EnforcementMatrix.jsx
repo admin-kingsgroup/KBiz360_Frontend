@@ -5,6 +5,7 @@ import { isOwner } from './utils/owner';
 import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { resolveCell, hasCellOverride } from './utils/voucherPolicy';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
+import { Skeleton } from '../../shell/primitives';
 
 // ─── Control Panel · Enforcement Matrix (per voucher type × branch) ──────────
 // For the panel-selected branch: turn on approval enforcement per voucher type, above a
@@ -88,7 +89,9 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
           </thead>
           <tbody>
             {q.isLoading ? (
-              <tr><td colSpan={5} className="p-4 text-center text-[12.5px] text-ink-muted">Loading matrix…</td></tr>
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={`sk-${i}`}><td colSpan={5} className="p-2.5"><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+              ))
             ) : categories.map((c) => {
               const r = rows[c.key] || { enforce: false, threshold: '', effectiveDate: '' };
               const isOv = hasCellOverride(store, branch, c.key);

@@ -20,7 +20,7 @@ import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { PeriodBar } from '../../../core/period';
 import { LedgerActions } from '../../../core/ledgerActions';
 import { PageLayout } from '../../../shell/PageLayout';
-import { SkeletonTable } from '../../../shell/primitives';
+import { SkeletonTable, Skeleton } from '../../../shell/primitives';
 import { toastInfo } from '../../../core/ux/toast';
 import { clickable } from '../../../core/ux/clickable';
 import { JvBlock } from '../../../core/voucher/JvBlock';
@@ -82,7 +82,7 @@ function LedgerComponentsInline({ name, branch, from, to }) {
     queryFn: () => apiGet('/api/accounting/ledger-components/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from, to }),
   });
   const note = (txt) => (<tr><td colSpan={3} style={{ ...tdName, paddingLeft: 54, color: DIM, fontSize: 11, fontStyle: 'italic' }}>{txt}</td></tr>);
-  if (isLoading) return note('Loading components…');
+  if (isLoading) return note(<Skeleton style={{ height: 11, width: 120 }} />);
   const rows = (data && data.rows) || [];
   if (!rows.length) return note('No captured fare components.');
   return (
@@ -220,7 +220,7 @@ function LedgerComponents({ name, costCenter, branch, from, to, onPick }) {
     queryKey: ['ledger-components', name, costCenter || '', brCodeOf(branch), from, to],
     queryFn: () => apiGet('/api/accounting/ledger-components/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from, to, ...(costCenter ? { costCenter } : {}) }),
   });
-  if (isLoading) return <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading…</div>;
+  if (isLoading) return <SkeletonTable rows={6} cols={3} />;
   const rows = (data && data.rows) || [];
   if (!rows.length) return <LedgerVouchers name={name} costCenter={costCenter} branch={branch} from={from} to={to} onPick={onPick} />;
   const grand = rows.reduce((s, r) => s + (r.side === 'Cr' ? r.amount : -r.amount), 0);
@@ -260,7 +260,7 @@ function LedgerDrill({ name, branch, from, to, onPick }) {
     queryKey: ['ledger-split', name, brCodeOf(branch), from, to],
     queryFn: () => apiGet('/api/accounting/ledger-split/' + encodeURIComponent(name), { branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), from, to }),
   });
-  if (isLoading) return <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading…</div>;
+  if (isLoading) return <SkeletonTable rows={6} cols={3} />;
   const rows = data || [];
   // No Domestic/International split → go straight to the fare-component breakdown.
   if (rows.length <= 1) return <LedgerComponents name={name} branch={branch} from={from} to={to} onPick={onPick} />;
@@ -351,7 +351,7 @@ export function LedgerVouchers({ name, branch, from, to, costCenter, onPick }) {
         </div>
       </div>
 
-      {isLoading && <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading ledger…</div>}
+      {isLoading && <SkeletonTable rows={6} cols={7} />}
 
       {!isLoading && showBillwise && <LedgerBillwise name={name} branch={branch} side={partySide} />}
 
@@ -413,7 +413,7 @@ function LedgerBillwise({ name, branch, side }) {
     // includeSettled → full bill-wise picture (raised → settled → outstanding), not open-only.
     queryFn: () => apiGet('/api/vouchers/open-bills', { party: name, branch: brCodeOf(branch) === 'ALL' ? '' : brCodeOf(branch), side, includeSettled: '1' }),
   });
-  if (isLoading) return <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading bills…</div>;
+  if (isLoading) return <SkeletonTable rows={5} cols={7} />;
   const bills = (data && data.bills) || [];
   const advances = (data && data.advances) || 0;
   if (!bills.length && advances <= 0.01) return <div style={{ padding: 24, textAlign: 'center', color: DIM, fontSize: 12 }}>No bills for this ledger.</div>;
@@ -487,7 +487,14 @@ export function VoucherView({ id, cur }) {
   // once posted, else the would-be entry). Shown for every status so an approver
   // sees the full accounting impact when opening a voucher from the Approval queue.
   const { data: jv } = useQuery({ queryKey: ['voucher-journal', id], queryFn: () => apiGet('/api/vouchers/' + id + '/journal'), enabled: !!id });
-  if (isLoading) return <div style={{ padding: 20, color: DIM, fontSize: 12 }}>Loading voucher…</div>;
+  if (isLoading) return (
+    <div style={{ padding: 14 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginBottom: 14 }}>
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} style={{ height: 30, width: 90 }} />)}
+      </div>
+      <SkeletonTable rows={5} cols={2} />
+    </div>
+  );
   const v = data || {};
   const prefix = voucherPrefix(v);
 
@@ -586,7 +593,7 @@ function JVPostings({ jv }) {
         {jv && <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: badge.bg, color: badge.c }}>{badge.t}</span>}
       </div>
       {!jv ? (
-        <div style={{ padding: 12, fontSize: 11.5, color: DIM, background: '#f7f8fb', borderRadius: 8, border: '1px solid ' + LINE }}>Loading ledger postings…</div>
+        <div style={{ padding: 12, fontSize: 11.5, color: DIM, background: '#f7f8fb', borderRadius: 8, border: '1px solid ' + LINE }}><Skeleton style={{ height: 11.5, width: 160 }} /></div>
       ) : ordered.length === 0 ? (
         <div style={{ padding: 12, fontSize: 11.5, color: DIM, background: '#f7f8fb', borderRadius: 8, border: '1px solid ' + LINE }}>
           No ledger postings could be built for this voucher.{jv.error ? ` — ${jv.error}` : ''}

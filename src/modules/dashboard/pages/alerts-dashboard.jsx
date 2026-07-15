@@ -6,6 +6,7 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { toastInfo } from '../../../core/ux/toast';
 import { clickable } from '../../../core/ux/clickable';
 import { bc } from '../../../core/styleTokens';
+import { SkeletonCards } from '../../../shell/primitives';
 
 const DARK = '#14161a', DIM = '#5b616e', LINE = '#cdd1d8', GREEN = '#16a34a', AMBER = '#B7791F', RED = '#dc2626';
 const SEV = {
@@ -392,7 +393,7 @@ export function AlertsDashboard({ branch, setRoute }) {
             )}
           </div>
 
-          {q.isLoading && <div style={{ padding: 30, textAlign: 'center', color: DIM }}>Loading scrutiny…</div>}
+          {q.isLoading && <SkeletonCards count={8} min="150px" />}
           {q.isError && (
             <div className="rounded-brand border border-surface-border bg-surface p-5 text-center shadow-card">
               <div style={{ color: RED, fontSize: 12.5, fontWeight: 600, marginBottom: 10 }}>⚠ {q.error?.message || 'Could not load.'}</div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { card, inp } from '../../core/styles';
+import { Skeleton } from '../../shell/primitives';
 import { localeOf } from '../../core/format';
 import { bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
@@ -159,7 +160,13 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
     lines: form.lines.filter((l) => l.ledger).map((l) => ({ ...l, amt: Number(l.amt) || 0 })),
   } : null;
   const pv = useVoucherPreview(previewBody).data || {};
-  if (vq.isLoading || !form) return <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading voucher...</div>;
+  if (vq.isLoading || !form) return (
+    <div style={{ padding: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
+        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+      </div>
+    </div>
+  );
   if (vq.isError) return <div style={{ padding: 16, color: RED }}>! {vq.error?.message}</div>;
   // Option C: categories with a registry entry render through the unified shell so
   // editing matches the create screen. Others fall back to this generic editor.
@@ -434,7 +441,13 @@ function DrillDown({ branch, group, onClose }) {
 
         {!voucher && ledger && (
           <div>
-            {stmt.isLoading && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading…</div>}
+            {stmt.isLoading && (
+              <div style={{ padding: '10px 14px' }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={`sk-${i}`} style={{ padding: '10px 0' }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></div>
+                ))}
+              </div>
+            )}
             {stmt.data && <>
               <div style={{ padding: '8px 14px', background: '#f3f5f9', fontSize: 11, color: DIM, display: 'flex', justifyContent: 'space-between' }}>
                 <span>Opening {money(cur, stmt.data.openingBalance)} {stmt.data.openingSide}</span>
@@ -460,7 +473,13 @@ function DrillDown({ branch, group, onClose }) {
         {!voucher && !ledger && (
           <div>
             <div style={{ padding: '8px 14px', fontSize: 11, color: DIM, background: '#f3f5f9' }}>{groupLedgers.length} ledger(s) in {group} — tap to open</div>
-            {tb.isLoading && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>Loading…</div>}
+            {tb.isLoading && (
+              <div style={{ padding: '10px 14px' }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={`sk-${i}`} style={{ padding: '10px 0' }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></div>
+                ))}
+              </div>
+            )}
             {!tb.isLoading && groupLedgers.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: DIM }}>No ledgers in this group.</div>}
             {groupLedgers.map((r, i) => {
               // TB rows now expose closingDebit/closingCredit; fall back to the

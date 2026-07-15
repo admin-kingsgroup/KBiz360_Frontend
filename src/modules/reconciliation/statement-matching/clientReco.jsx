@@ -22,6 +22,7 @@ import { parseClientStatement } from '../../../core/clientStatementParse';
 import { C, card, money, brLabel, Shell, th, td, rnum, Table, aBtn, Tile, SecTitle, Row } from '../../accountantWorkspace/shared';
 import { ReconMatcher, wbBadge, downloadCSV } from './shared';
 import ReconFreezePanel from './ReconFreezePanel';
+import { Skeleton } from '../../../shell/primitives';
 
 export function ClientReco({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
@@ -99,7 +100,11 @@ export function ClientReco({ branch, setRoute }) {
               <th key={h} style={{ ...th, ...(i >= 1 && i <= 3 ? rnum : {}) }}>{h}</th>)}
           </tr></thead>
           <tbody>
-            {listQ.isLoading && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
+            {listQ.isLoading && Array.from({ length: 6 }).map((_, i) => (
+              <tr key={`sk-${i}`}>
+                <td colSpan={8} style={{ ...td, padding: 12 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td>
+              </tr>
+            ))}
             {!listQ.isLoading && filtered.length === 0 && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>No client ledgers found for {brLabel(branch)}.</td></tr>}
             {wbPager.pageRows.map((r) => (
               <tr key={r.client} style={{ background: r.status === 'reconciled' ? '#f4fbf4' : r.status === 'differences' ? '#fdf6f4' : '#fff' }}>

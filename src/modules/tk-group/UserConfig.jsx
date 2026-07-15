@@ -5,6 +5,7 @@ import { isOwner } from './utils/owner';
 import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { resolveUserLimit, hasUserBranchOverride, userDefaultLimit } from './utils/userLimits';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
+import { Skeleton } from '../../shell/primitives';
 
 // ─── Control Panel · User Configuration (real roster + per-user ceilings) ────
 // The live user list with role / branches / app access, and each user's approval
@@ -78,7 +79,9 @@ export function UserConfig({ go, branch = 'default' }) {
           </thead>
           <tbody>
             {rosterQ.isLoading ? (
-              <tr><td colSpan={5} className="p-4 text-center text-[12.5px] text-ink-muted">Loading users…</td></tr>
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={`sk-${i}`}><td colSpan={5} className="p-2.5"><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+              ))
             ) : roster.length === 0 ? (
               <tr><td colSpan={5} className="p-4 text-center text-[12.5px] text-ink-muted">No users found.</td></tr>
             ) : roster.map((u) => {

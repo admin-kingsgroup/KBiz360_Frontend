@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Upload, RefreshCcw, AlertTriangle, BookOpenCheck, FileUp, Trash2 } from 'lucide-react';
 import { getTieOut, getPeriods, importTB, getDefects, importDayBook, getDayBookStatus, getInception, clearTB, clearDayBook, getModuleBreakdown } from '../api';
 import { useCockpitFocus } from '../../../store/cockpitFocus';
-import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../../shell/primitives';
+import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select, Skeleton } from '../../../shell/primitives';
 import { VoucherDrawer } from './VoucherDrawer';
 import { CertifyPanel } from './CertifyPanel';
 import { NameMatcherPane } from '../NameMatcherPane';
@@ -400,7 +400,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
         </tr>
         {mShown ? (mInfo?.loading
-          ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-ink-subtle">Loading module split…</td></tr>
+          ? <tr><td colSpan={5} className="px-4 py-1 pl-10"><Skeleton className="h-3 w-40" /></td></tr>
           : mInfo?.error
             ? <tr><td colSpan={5} className="px-4 py-1 pl-10 text-[11px] text-danger">Couldn’t load the module split.</td></tr>
             : (mInfo?.rows || []).length === 0

@@ -10,7 +10,7 @@ import { listKeyNav } from '../../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../core/api';
 import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../../core/useReference';
-import { Switch } from '../../../shell/primitives';
+import { Switch, Skeleton } from '../../../shell/primitives';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { fmt } from '../../../core/format';
 import { PERM_ACTIONS, cardStyle } from '../../../core/helpers';
@@ -61,8 +61,11 @@ function AppAccessTab({ rows, search, setSearch, onToggle, loaded }){
             ))}
           </tr></thead>
           <tbody>
-            {rows.length===0&&(
-              <tr><td colSpan={6} style={{padding:"18px 12px",textAlign:"center",color:"#5a6691"}}>{loaded?"No users match your search.":"Loading users…"}</td></tr>
+            {!loaded && Array.from({length:5}).map((_,i)=>(
+              <tr key={`sk-${i}`}><td colSpan={6} style={{padding:"10px 12px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+            ))}
+            {loaded && rows.length===0&&(
+              <tr><td colSpan={6} style={{padding:"18px 12px",textAlign:"center",color:"#5a6691"}}>No users match your search.</td></tr>
             )}
             {rows.map((u,i)=>(
               <tr key={u.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>

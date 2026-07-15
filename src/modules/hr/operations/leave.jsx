@@ -9,6 +9,7 @@ import { fromEmpDTO } from '../employeeMap';
 import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, takenFor } from '../hrMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
+import { Skeleton } from '../../../shell/primitives';
 
 export function HrLeave({branch}){
   const mob=useMobile();
@@ -87,9 +88,11 @@ export function HrLeave({branch}){
                 <th key={i} style={{padding:"9px 12px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{filtered.length===0&&(
+            <tbody>{leaveQ.isLoading&&Array.from({length:5}).map((_,i)=>(
+              <tr key={`sk-${i}`}><td colSpan={9} style={{padding:"10px 12px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+            ))}{!leaveQ.isLoading&&filtered.length===0&&(
               <tr><td colSpan={9} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
-                {leaveQ.isLoading?"Loading…":"No leave requests for this branch yet. Use “Apply” to add one."}
+                No leave requests for this branch yet. Use “Apply” to add one.
               </td></tr>
             )}{filtered.map((l,i)=>(
               <tr key={l.id} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
@@ -121,9 +124,11 @@ export function HrLeave({branch}){
                 <th key={i} style={{padding:"9px 14px",textAlign:i>=2&&i<6?"right":"left",color:"#d4a437",fontWeight:700,fontSize:10,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
-            <tbody>{emps.length===0&&(
+            <tbody>{balQ.isLoading&&Array.from({length:5}).map((_,i)=>(
+              <tr key={`sk-${i}`}><td colSpan={7} style={{padding:"10px 14px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+            ))}{!balQ.isLoading&&emps.length===0&&(
               <tr><td colSpan={7} style={{padding:"20px 12px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>
-                {balQ.isLoading?"Loading…":"No employees for this branch."}
+                No employees for this branch.
               </td></tr>
             )}{emps.map((e,i)=>{
               const ent=balByEmp[e.id]||{annual:18,sick:12,casual:6,id:null};

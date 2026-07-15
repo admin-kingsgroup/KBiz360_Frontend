@@ -10,6 +10,7 @@ import { fromLoanDTO, toLoanPayload } from '../hrMaps';
 import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
 import { FL, bc, btnG, btnGh, card, inp } from '../../../core/styles';
+import { Skeleton } from '../../../shell/primitives';
 
 export function EmployeeAdvances({branch,setRoute}){
   const mob=useMobile();
@@ -75,7 +76,12 @@ export function EmployeeAdvances({branch,setRoute}){
               <th style={{padding:"9px 8px",textAlign:"center"}}>Status</th>
             </tr></thead>
             <tbody>
-              {visible.length===0&&(<tr><td colSpan={9} style={{padding:"18px 8px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>{loansQ.isLoading?"Loading…":"No loans for this filter. Use “Disburse Loan” to add one."}</td></tr>)}
+              {loansQ.isLoading && Array.from({length:5}).map((_,i)=>(
+                <tr key={`sk-${i}`} style={{borderBottom:"1px solid #cdd1d8"}}>
+                  <td colSpan={9} style={{padding:"7px 8px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td>
+                </tr>
+              ))}
+              {!loansQ.isLoading && visible.length===0&&(<tr><td colSpan={9} style={{padding:"18px 8px",textAlign:"center",color:"#8b94b3",fontSize:11.5}}>No loans for this filter. Use “Disburse Loan” to add one.</td></tr>)}
               {visible.map((l,i)=>(
                 <tr key={l.id} style={{background:i%2===0?"#fff":"#f3f4f8",borderBottom:"1px solid #cdd1d8"}}>
                   <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:"#185FA5"}}>{(l.id||"").slice(-6)}</td>

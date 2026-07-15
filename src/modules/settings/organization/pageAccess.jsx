@@ -27,7 +27,7 @@ import { buildPageCatalog, isPageAccessAdmin, roleVisibleKeys } from '../../../c
 import { hasFullMenu } from '../../../core/menus';
 import { BRANCHES } from '../../../core/referenceCache';
 import { PageLayout } from '../../../shell/PageLayout';
-import { PageSection, Button, StatusPill, Input, ResponsiveGrid, EmptyState } from '../../../shell/primitives';
+import { PageSection, Button, StatusPill, Input, ResponsiveGrid, EmptyState, Skeleton } from '../../../shell/primitives';
 
 // Roles that DEFAULT to all branches at login (mirrors auth.service resolveBranches
 // ALL_SCOPE_ROLES on the backend). For these, an empty selection means "all branches";
@@ -280,7 +280,13 @@ export function PageAccessControl({ currentUser, setRoute, embedded = false }) {
             </div>
           </div>
           <div className="max-h-60 overflow-y-auto desktop:max-h-[560px]">
-            {!usersLive && <div className="p-4 text-xs text-ink-subtle">Loading users…</div>}
+            {!usersLive && (
+              <div className="p-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={`sk-${i}`} className="mb-2 h-8 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.12) }} />
+                ))}
+              </div>
+            )}
             {usersLive && !filteredUsers.length && <div className="p-4 text-xs text-ink-subtle">No users match.</div>}
             {filteredUsers.map((u) => {
               const sel = u.id === selId;

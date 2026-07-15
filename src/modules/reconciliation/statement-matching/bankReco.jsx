@@ -22,6 +22,7 @@ import { bc, btnG, btnGh, card, inp } from '../../../core/styles';
 import { useMobile } from '../../../core/hooks';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import ReconFreezePanel from './ReconFreezePanel';
+import { Skeleton, SkeletonTable } from '../../../shell/primitives';
 
 const RECON_CLR = {
   reconciled:   { c:"#27500A", bg:"#EAF3DE", label:"Reconciled" },
@@ -395,7 +396,9 @@ export function BankReco({branch}){
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                   <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Voucher","Amount","Status"]:["Date","Voucher","Narration","Debit","Credit","Balance","Status"]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount"||h==="Balance")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {bookLoading&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
+                    {bookLoading&&Array.from({length:6}).map((_,i)=>(
+                      <tr key={`sk-${i}`}><td colSpan={7} style={{padding:"8px 9px"}}><Skeleton className="h-3.5 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+                    ))}
                     {!bookLoading&&bookFiltered.length===0&&<tr><td colSpan={7} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No book entries for this bank/period.</td></tr>}
                     {bookFiltered.map((l,i)=>{
                       const sel=selBooks.some(b=>b.bookKey===l.bookKey);
@@ -427,7 +430,9 @@ export function BankReco({branch}){
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
                   <thead><tr style={{background:"#0d1326"}}>{(view==="minimal"?["Date","Description","Amount","Status",""]:["Date","Ref / Cheque / UTR","Description","Debit","Credit","Balance","Status",""]).map((h,i)=><th key={i} style={{padding:"7px 9px",textAlign:(h==="Debit"||h==="Credit"||h==="Amount"||h==="Balance")?"right":"left",color:"#d4a437",fontWeight:700,fontSize:9}}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {stmtLoading&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>Loading…</td></tr>}
+                    {stmtLoading&&Array.from({length:6}).map((_,i)=>(
+                      <tr key={`sk-${i}`}><td colSpan={8} style={{padding:"8px 9px"}}><Skeleton className="h-3.5 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+                    ))}
                     {!stmtLoading&&stmtFiltered.length===0&&<tr><td colSpan={8} style={{padding:14,textAlign:"center",color:"#5a6691",fontSize:11}}>No statement lines. Use <b>Import</b> to load a bank statement (CSV / paste).</td></tr>}
                     {stmtFiltered.map((l,i)=>{
                       const sel=selStmt?.id===l.id;
@@ -474,7 +479,7 @@ export function BankReco({branch}){
             </div>
             <button onClick={()=>openPrintPreview&&openPrintPreview(brsHTML(brs,ledger,to,f))} disabled={!brs} style={{...btnG,fontSize:11,padding:"6px 12px",opacity:brs?1:0.6}}><Printer size={13}/> Print</button>
           </div>
-          {!brs?(<p style={{fontSize:11,color:"#5a6691"}}>Loading…</p>):(
+          {!brs?(<SkeletonTable rows={6} cols={2} />):(
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <tbody>
               <tr style={{borderBottom:"2px solid #0d1326"}}><td style={{padding:"7px 10px",fontWeight:700}}>Balance as per Books</td><td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(brs.bookBalance)}</td></tr>

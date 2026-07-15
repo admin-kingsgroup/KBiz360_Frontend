@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getFlagState } from './api/flags';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
 import { activeControls } from './utils/controlPanel';
-import { Badge } from '../../shell/primitives';
+import { Badge, SkeletonTable } from '../../shell/primitives';
 
 // ─── Control Panel · Active Controls ─────────────────────────────────────────
 // One read-only place that answers "what is actually engaged, and where?" — every control
@@ -44,7 +44,7 @@ export function ActiveControls() {
       </div>
 
       {fl.isLoading ? (
-        <div className="p-4 text-center text-[12.5px] text-ink-muted">Loading…</div>
+        <SkeletonTable rows={5} cols={3} />
       ) : active.length === 0 ? (
         <div className="rounded-brand border border-surface-border bg-surface p-6 text-center text-[13px] text-ink-muted">Everything is dormant — no control is switched on. Engage controls one at a time from the screens on the left.</div>
       ) : (

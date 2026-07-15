@@ -28,6 +28,7 @@ import { useTaxFilingBoard, useStatutoryDues } from './useTaxReco';
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
 import { triggerSaveRefresh, useMobile } from './hooks';
 import { openPrintWindow } from './voucher-print';
+import { Skeleton } from '../shell/primitives';
 
 const PurchaseLinkField = React.lazy(() =>
   import('../modules/transactions').then(m => ({ default: m.PurchaseLinkField })));
@@ -594,7 +595,7 @@ export function RPT_CashPosition({branch}){
 
   return (
     <RPT_Page title="Cash Position Summary" subtitle={`Live cash + bank ledger balances · as of ${range.to || 'today'} · each branch in its own currency`} toolbar={<ReportDateBar value={range} onChange={setRange}/>}>
-      {q.isLoading && <div style={{padding:"14px 2px",fontSize:12.5,color:"#5a6691"}}>Loading balances…</div>}
+      {q.isLoading && <div style={{padding:"14px 2px",fontSize:12.5,color:"#5a6691"}}><Skeleton className="h-3 w-40" /></div>}
       {!q.isLoading && !rows.length && <div style={{padding:"14px 2px",fontSize:12.5,color:"#5a6691"}}>No cash or bank ledgers found for this scope.</div>}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:14}}>
         <div className="rounded-brand border border-t-[3px] border-surface-border bg-surface px-3.5 py-3" style={{borderTopColor:"#2563eb"}}><p className="text-[10.5px] font-bold uppercase tracking-wide" style={{color:"#2563eb"}}>Bank Ledgers</p><p className="mt-1 text-xl font-extrabold tabular-nums text-navy">{bankCount}</p></div>
@@ -625,7 +626,10 @@ export function RPT_CashPosition({branch}){
         <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Ledger</th><th style={RPT_thStyle}>Group</th><th style={RPT_thStyle}>Type</th><th style={{...RPT_thStyle,textAlign:"right"}}>Balance</th></tr></thead>
           <tbody>{rows.map((r,i)=>(<tr key={i}><td style={RPT_tdStyle}>{r.branch}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{r.ledger}</td><td style={{...RPT_tdStyle,color:"#5a6691"}}>{r.group}</td><td style={RPT_tdStyle}>{r.type}</td><td style={{...RPT_tdStyle,textAlign:"right",fontFamily:"monospace",fontWeight:600,color:r.balance<0?"#A32D2D":"#0d1326"}}>{fmtCur(r.currency,r.balance)}</td></tr>))}
-            {!rows.length && <tr><td colSpan={5} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691",padding:16}}>{q.isLoading?"Loading…":"No cash/bank ledgers."}</td></tr>}</tbody>
+            {q.isLoading && Array.from({length:5}).map((_,i)=>(
+              <tr key={`sk-${i}`}><td colSpan={5} style={{...RPT_tdStyle,padding:10}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+            ))}
+            {!q.isLoading && !rows.length && <tr><td colSpan={5} style={{...RPT_tdStyle,textAlign:"center",color:"#5a6691",padding:16}}>No cash/bank ledgers.</td></tr>}</tbody>
         </table></div>
       </div>
     </RPT_Page>
@@ -666,7 +670,9 @@ export function RPT_AuditTrail({ branch }){
         <select value={filterAction} onChange={e=>setFilterAction(e.target.value)} className="rounded-md border border-surface-border bg-surface px-3 py-2 text-[12px] outline-none transition focus:border-navy"><option value="ALL">All actions</option>{actions.map(a=><option key={a} value={a}>{a}</option>)}</select>
       </div>
       <div className="rounded-brand border border-surface-border bg-surface p-3.5 shadow-card">
-        <p className="mb-2.5 inline-block rounded-full bg-surface-alt px-2.5 py-1 text-[10.5px] font-bold text-ink-muted">{q.isLoading?"Loading…":`${filtered.length} entries`}</p>
+        {q.isLoading
+          ? <Skeleton className="mb-2.5 h-5 w-24 rounded-full" />
+          : <p className="mb-2.5 inline-block rounded-full bg-surface-alt px-2.5 py-1 text-[10.5px] font-bold text-ink-muted">{`${filtered.length} entries`}</p>}
         <div className="kb-sticky overflow-x-auto" style={{'--stick-head':'#1a1c22',maxHeight:'calc(100vh - 320px)'}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Timestamp</th><th style={RPT_thStyle}>User</th><th style={RPT_thStyle}>Branch</th><th style={RPT_thStyle}>Action</th><th style={RPT_thStyle}>Module</th><th style={RPT_thStyle}>Description</th><th style={RPT_thStyle}>Ref</th></tr></thead>
           <tbody>{filtered.map((a,i)=>(<tr key={a.id||i} className={`transition hover:bg-[#eef1f6] ${i%2===0?'bg-surface':'bg-surface-alt/40'}`}><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{fmtTs(a.ts)}</td><td style={{...RPT_tdStyle,fontWeight:600}}>{a.user}</td><td style={RPT_tdStyle}><span style={{padding:"2px 6px",background:"#e6e8f1",borderRadius:3,fontSize:10,fontWeight:700}}>{a.branch||"—"}</span></td><td style={RPT_tdStyle}><span style={{padding:"2px 8px",background:colorOf(a.action)+"22",color:colorOf(a.action),borderRadius:3,fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{a.action}</span></td><td style={{...RPT_tdStyle,fontSize:11}}>{a.module}</td><td style={{...RPT_tdStyle,fontSize:11}}>{a.desc}</td><td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:"#5a6691"}}>{a.ref}</td></tr>))}

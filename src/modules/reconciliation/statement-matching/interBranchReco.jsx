@@ -18,6 +18,7 @@ import { useInterBranchReco, useInterBranchLinks } from '../../../core/useInterB
 import { C, card, money, Shell, th, td, rnum, Table, Tile, Row, aBtn } from '../../accountantWorkspace/shared';
 import { wbBadge } from './shared';
 import { getIbFreezeAll, ibFreeze, ibFreezeSign, ibUnfreeze, ibFreezeReopen } from '../api';
+import { Skeleton } from '../../../shell/primitives';
 
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const pairKey = (a, b) => [a, b].sort().join('::');
@@ -76,7 +77,11 @@ export function InterBranchReco({ branch }) {
             <th key={h} style={{ ...th, ...(i >= 2 && i <= 4 ? rnum : {}) }}>{h}</th>)}
         </tr></thead>
         <tbody>
-          {q.isLoading && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 20 }}>Loading…</td></tr>}
+          {q.isLoading && Array.from({ length: 5 }).map((_, i) => (
+            <tr key={`sk-${i}`}>
+              <td colSpan={7} style={{ ...td, padding: 12 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td>
+            </tr>
+          ))}
           {!q.isLoading && data.pairs.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.green, padding: 20 }}>✓ No inter-branch balances to reconcile.</td></tr>}
           {data.pairs.map((p, i) => {
             // Cross-currency pair → each side in its own currency; the difference (and the
@@ -180,7 +185,11 @@ function InterBranchLinkLevel({ branch, cur }) {
       <Table>
         <thead><tr>{['Link No', 'Date', 'From → To', 'Module', 'Total', 'Status'].map((h, i) => <th key={h} style={{ ...th, ...(i === 4 ? rnum : {}) }}>{h}</th>)}</tr></thead>
         <tbody>
-          {q.isLoading && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 16 }}>Loading…</td></tr>}
+          {q.isLoading && Array.from({ length: 5 }).map((_, i) => (
+            <tr key={`sk-${i}`}>
+              <td colSpan={6} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td>
+            </tr>
+          ))}
           {!q.isLoading && open.length === 0 && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.green, padding: 16 }}>✓ Every INB link is booked on both sides.</td></tr>}
           {open.map((l) => (
             <tr key={l.inbLinkNo} style={{ background: '#fdf6f4' }}>

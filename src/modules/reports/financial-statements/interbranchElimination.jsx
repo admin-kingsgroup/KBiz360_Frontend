@@ -12,7 +12,7 @@ import { exportToCSV } from '../../../core/business-logic';
 import { VoucherEditor } from '../../accountingLive';
 import { openLedgerModal } from '../../../core/LedgerModalHost';
 import { PageLayout } from '../../../shell/PageLayout';
-import { Button, StatusPill, Card, ResponsiveGrid, LoadingState, EmptyState } from '../../../shell/primitives';
+import { Button, StatusPill, Card, ResponsiveGrid, LoadingState, EmptyState, SkeletonTable } from '../../../shell/primitives';
 import { clickable } from '../../../core/ux/clickable';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { isInterBranch, brName } from '../../interbranch/interbranch';
@@ -357,7 +357,7 @@ function IBLedgerDrill({ ledger, status, from, to, onVoucher }) {
   const q = useLedgerStatement(ledger, undefined, { from, to });
   const d = q.data;
   const lines = d?.lines || [];
-  if (q.isLoading) return <div style={{ padding: 16, fontSize: 11.5, color: '#5a6691' }}>Loading postings…</div>;
+  if (q.isLoading) return <SkeletonTable rows={4} cols={8} className="m-4" />;
   if (q.isError) return <div style={{ padding: 16, fontSize: 11.5, color: '#A32D2D' }}>⚠ {q.error?.message || 'Could not load postings'}</div>;
   return (
     <div style={{ overflowX: 'auto', borderTop: '1px solid #dfe2e7' }}>

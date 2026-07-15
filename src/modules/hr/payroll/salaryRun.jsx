@@ -8,6 +8,7 @@ import { challanDueDate } from '../payrollMaps';
 import { toast } from '../../../core/ux/toast';
 import { B, btnG, card, inp } from '../../../core/styles';
 import { MiniBar } from '../../../core/insightsUI';
+import { Skeleton } from '../../../shell/primitives';
 
 export function HrPayroll({branch}){
   const mob=useMobile();
@@ -68,7 +69,7 @@ export function HrPayroll({branch}){
           <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>💼</div>
           <div>
             <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>Salary & Payroll</h2>
-            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · {reg.isLoading?"Loading…":`${payroll.length} employees`}{!reg.isLoading&&!processed?" · preview (not yet processed)":""}</p>
+            <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{brCode} · {PERIODS.find(p=>p.v===period)?.l} · {reg.isLoading?<Skeleton className="inline-block h-3 w-20 align-middle" />:`${payroll.length} employees`}{!reg.isLoading&&!processed?" · preview (not yet processed)":""}</p>
           </div>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -107,9 +108,12 @@ export function HrPayroll({branch}){
                 ))}
               </tr></thead>
               <tbody>
-                {payroll.length===0&&(
+                {reg.isLoading&&Array.from({length:6}).map((_,i)=>(
+                  <tr key={`sk-${i}`}><td colSpan={12} style={{padding:"10px 12px"}}><Skeleton className="h-4 w-full" style={{opacity:Math.max(0.4,1-i*0.15)}} /></td></tr>
+                ))}
+                {!reg.isLoading&&payroll.length===0&&(
                   <tr><td colSpan={12} style={{padding:"22px 12px",textAlign:"center",color:"#8b94b3",fontSize:12}}>
-                    {reg.isLoading?"Loading payroll register…":reg.isError?"Failed to load payroll register.":"No active employees for this branch — add them in Employee Master."}
+                    {reg.isError?"Failed to load payroll register.":"No active employees for this branch — add them in Employee Master."}
                   </td></tr>
                 )}
                 {payroll.map((e,i)=>(

@@ -44,6 +44,7 @@ import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
 import { invalidateBooks, useVoucherApprovals, useApproveVoucher, useRejectVoucher } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 import { SoPoGpVoucherEntry, GOLD_SOFT, GOLD_LINE, JournalView } from '../accounts/daily-entry/soPoGpVoucherEntry';
+import { SkeletonTable } from '../../shell/primitives';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', BLUE = '#2563eb';
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -371,7 +372,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
         <span style={{ fontWeight: 800, color: DARK, fontSize: 13 }}>Refunds &amp; Reissues <span style={{ fontWeight: 700, color: '#9197a3', fontSize: 11 }}>— reverse a SO/PO/GP sale</span></span>
         <span style={{ fontSize: 11.5, color: '#5b616e', fontWeight: 700 }}>{list.length} {status}</span>
       </div>
-      {q.isLoading ? <div style={{ padding: 18, textAlign: 'center', color: '#9197a3', fontSize: 12 }}>Loading refunds…</div>
+      {q.isLoading ? <SkeletonTable rows={5} cols={6} />
         : list.length === 0 ? <div style={{ padding: 18, textAlign: 'center', color: '#9197a3', fontSize: 12 }}>No {status} refunds / reissues.</div>
         : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -709,7 +710,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
 function EditedBookingsList({ rows, isLoading, cur, open, setOpen }) {
   const th = { padding: '7px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', letterSpacing: 0.3, borderBottom: '2px solid #cdd1d8', whiteSpace: 'nowrap' };
   const td = { padding: '7px 10px', borderBottom: '1px solid #dfe2e7', fontSize: 12, whiteSpace: 'nowrap' };
-  if (isLoading) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>Loading edited bookings…</div>;
+  if (isLoading) return <div style={{ ...card, padding: 12 }}><SkeletonTable rows={5} cols={10} /></div>;
   if (!rows.length) return <div style={{ ...card, padding: 22, textAlign: 'center', color: '#9197a3' }}>No edited bookings in this period.</div>;
   const fmtAt = (s) => { const d = new Date(s); return isNaN(d) ? (s || '—') : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
   return (

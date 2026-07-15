@@ -15,7 +15,7 @@ import { useAdmMemos } from '../../../core/useAdmMemos';
 import { ReportSearch, ReportDateBar, resolveReportRange, matchNeedle } from '../../../core/reportDateBar';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { PageSection } from '../../../shell/primitives';
+import { PageSection, Skeleton } from '../../../shell/primitives';
 import { Combobox } from '../../../core/ux/Combobox';
 
 export function Supplier360({ branch }) {
@@ -113,7 +113,7 @@ export function Supplier360({ branch }) {
           <div><p className="text-xs font-bold text-navy">No supplier purchases for {brCode || 'this branch'}{range.mode !== 'all' ? ' in this period' : ''}</p><p className="mt-0.5 text-[11px] text-ink-muted">This view aggregates supplier purchases from posted bills. Widen the date range (try “All”) or bill some purchase vouchers.</p></div>
         </div>
       )}
-      {gpQ.isLoading && <div className="mb-3.5 rounded-brand border border-surface-border bg-surface px-4 py-6 text-center text-xs text-ink-muted">Loading supplier purchases…</div>}
+      {gpQ.isLoading && <div className="mb-3.5 rounded-brand border border-surface-border bg-surface px-4 py-6 text-center text-xs text-ink-muted"><Skeleton className="mx-auto h-3 w-48" /></div>}
 
       {/* Profile card — navy gradient */}
       <div className="mb-3.5 rounded-brand p-4" style={{ background: 'linear-gradient(135deg,#1a1c22,#2563eb)' }}>

@@ -309,11 +309,15 @@ export function ErrorState({ title = 'Something went wrong', message, onRetry, c
   );
 }
 
-export function LoadingState({ label = 'Loading…', className = '' }) {
+export function LoadingState({ label = 'Loading…', className = '', lines = 4 }) {
   return (
-    <div className={cn('flex flex-col items-center justify-center gap-3 px-4 py-12 text-center', className)}>
-      <Loader2 className="h-7 w-7 animate-spin text-gold" />
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</p>
+    <div className={cn('px-4 py-6', className)} role="status" aria-label={label}>
+      <div className="flex flex-col gap-2.5">
+        {Array.from({ length: lines }).map((_, i) => (
+          <Skeleton key={i} className="h-9 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} />
+        ))}
+      </div>
+      <span className="sr-only">{label}</span>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getAudit } from './api/monitor';
-import { Badge } from '../../shell/primitives';
+import { Badge, SkeletonTable } from '../../shell/primitives';
 
 // ─── Control Panel · Change Log / Audit ──────────────────────────────────────
 // The real, immutable control-plane trail — every flag / limit / matrix / user-ceiling
@@ -41,7 +41,7 @@ export function ChangeLog({ go }) {
       </p>
 
       {q.isLoading ? (
-        <div className="rounded-brand border border-surface-border bg-surface p-4 text-[12.5px] text-ink-muted">Loading the change log…</div>
+        <SkeletonTable rows={6} cols={5} />
       ) : items.length === 0 ? (
         <div className="rounded-brand border border-surface-border bg-surface p-6 text-center text-[12.5px] text-ink-muted">No control changes recorded yet — this fills as you engage controls, propose, approve, and the guard enforces.</div>
       ) : (
