@@ -57,7 +57,7 @@ export function TallyCertRegister({ branch: appBranch, currentUser, tier: fixedT
   }
 
   return (
-    <div className="mx-auto grid gap-4" style={{ maxWidth: 1600 }}>
+    <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8" style={{ maxWidth: 1600 }}>
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
