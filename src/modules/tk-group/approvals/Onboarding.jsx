@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { UserPlus } from 'lucide-react';
 import { submitDecision, getMyDecisions } from '../api/decisions';
 import { typeLabel } from '../utils/inbox';
 import { statusLabel } from '../utils/decisions';
@@ -52,34 +53,37 @@ export function Onboarding() {
 
   return (
     <div className="grid gap-4">
-      <PageSection title="Onboard a party">
-        {msg ? <div role="status" className="mb-2.5 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
-        <form onSubmit={submit} aria-label="Onboard a party" className="grid max-w-[480px] gap-2.5">
-          <div className="flex gap-2.5">
-            <FormField label="Party type" className="w-[130px]">
+      <PageSection title="Onboard a party" subtitle="Files a counterparty decision for Farhan + Owner approval." icon={UserPlus} className="max-w-[640px]">
+        {msg ? <div role="status" className="mb-3 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
+        <form onSubmit={submit} aria-label="Onboard a party" className="grid gap-3">
+          <div className="flex gap-3">
+            <FormField label="Party type" className="w-[140px] shrink-0">
               <Select aria-label="Party type" value={kind} onChange={(e) => setKind(e.target.value)}>
                 <option value="client">Client</option>
                 <option value="supplier">Supplier</option>
               </Select>
             </FormField>
-            <FormField label="Name" className="flex-1">
-              <Input aria-label="Party name" value={name} onChange={(e) => setName(e.target.value)} />
+            <FormField label="Name" required className="flex-1">
+              <Input aria-label="Party name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Traders" required />
             </FormField>
           </div>
-          <div className="flex gap-2.5">
-            <FormField label="GSTIN / Tax / Reg no. (optional)" className="flex-1">
+          <div className="flex gap-3">
+            <FormField label="GSTIN / tax / reg no." hint="Optional" className="flex-1">
               <Input aria-label="Tax id" value={taxId} onChange={(e) => setTaxId(e.target.value)} />
             </FormField>
-            <FormField label="Credit limit (optional)" className="w-[150px]">
+            <FormField label="Credit limit" hint="Optional" className="w-[160px] shrink-0">
               <Input aria-label="Credit limit" type="number" min="0" value={credit} onChange={(e) => setCredit(e.target.value)} className="tabular-nums" />
             </FormField>
           </div>
-          <FormField label="Terms / note (optional)">
+          <FormField label="Terms / note" hint="Optional">
             <Input aria-label="Terms" value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="e.g. 30-day credit, PDC, advance" />
           </FormField>
-          <Button type="submit" variant="primary" size="sm" disabled={!valid} className="justify-self-start">
-            Submit onboarding
-          </Button>
+          <div className="mt-1 flex items-center gap-2 border-t border-surface-border pt-3">
+            <Button type="submit" variant="primary" size="md" disabled={!valid}>
+              Submit onboarding
+            </Button>
+            <span className="text-[11px] text-ink-subtle">Nothing is created until Farhan and the Owner approve.</span>
+          </div>
         </form>
       </PageSection>
 
