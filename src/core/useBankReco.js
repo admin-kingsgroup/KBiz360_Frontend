@@ -133,6 +133,12 @@ export const useGroupMatch = () =>
 export const useUnmatch = () =>
   useReconMutation(({ id }) => apiPost(`/api/bank-reconciliation/unmatch/${id}`));
 
+// Bulk un-reconcile: release every match in the ledger + period so bank-reconciled
+// receipts/payments become revocable/editable again. Does not delete any line.
+export const useUnmatchAll = () =>
+  useReconMutation(({ ledger, branch, from, to }) =>
+    apiPost('/api/bank-reconciliation/unmatch-all', { ledger, branch, from, to }));
+
 export const useSetReconStatus = () =>
   useReconMutation(({ id, status }) => apiPost(`/api/bank-reconciliation/status/${id}`, { status }));
 

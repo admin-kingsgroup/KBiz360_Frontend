@@ -208,21 +208,30 @@ function findTBHeader(matrix) {
  *  `closing`, or separate closingDebit/closingCredit). Handles a single Closing
  *  column (Dr/Cr suffix), two closing columns, or Tally's terse opening/closing
  *  "Balance" pair with an unlabelled ledger column. Group subtotals are dropped. */
-export function normalizeTB(matrix = []) {
+export function normalizeTB(matrix = [], opts = {}) {
   const { idx, cols } = findTBHeader(matrix);
   if (idx < 0 || !cols) return { rows: [], error: 'No Trial Balance header found (need a Ledger column + a Closing/Debit/Credit column).' };
+  // Chart guard (mirrors the backend importTB): a row whose name is a real ERP ledger is
+  // NEVER silently dropped — not treated as a group subtotal, and not discarded because its
+  // balance cell parsed blank/zero. Otherwise a quirky cell vanishes a ledger and it reads
+  // "in ERP, not in Tally". The name set is optional (passed by the tie-out board); when
+  // absent the parser keeps its exact prior behaviour.
+  const erpLedgers = opts.erpLedgers instanceof Set ? opts.erpLedgers : null;
+  const isErpLedger = (name) => !!erpLedgers && erpLedgers.has(String(name ?? '').trim().toLowerCase());
   const rows = [];
   let droppedGroups = 0;
   for (let i = idx + 1; i < matrix.length; i++) {
     const r = matrix[i] || [];
     const ledger = String(r[cols.ledger] ?? '').trim();
     if (!ledger || isTBNoiseRow(ledger)) continue;
-    if (isTallyGroupRow(ledger)) { droppedGroups += 1; continue; }
+    if (isTallyGroupRow(ledger) && !isErpLedger(ledger)) { droppedGroups += 1; continue; }
     let row = null;
     if (cols.closingDebit !== undefined || cols.closingCredit !== undefined) {
       row = { ledger, closingDebit: Math.abs(num(r[cols.closingDebit]) || 0), closingCredit: Math.abs(num(r[cols.closingCredit]) || 0) };
     } else if (cols.closing !== undefined) {
-      const c = num(r[cols.closing]); if (c === null) continue; row = { ledger, closing: c }; // signed (Cr / parens → negative)
+      // A non-numeric closing cell (a dash / blank) → treat as zero rather than skipping the
+      // row outright, so a real ERP ledger can still be rescued below instead of vanishing.
+      const c = num(r[cols.closing]); row = { ledger, closing: c === null ? 0 : c }; // signed (Cr / parens → negative)
     } else { // opening + movement
       const o = (cols.openingDebit !== undefined ? Math.abs(num(r[cols.openingDebit]) || 0) : 0) - (cols.openingCredit !== undefined ? Math.abs(num(r[cols.openingCredit]) || 0) : 0);
       const dr = Math.abs(num(r[cols.debit]) || 0); const cr = Math.abs(num(r[cols.credit]) || 0);
@@ -242,6 +251,10 @@ export function normalizeTB(matrix = []) {
       if (row.credit === undefined && cols.credit !== undefined) { const cr = Math.abs(num(r[cols.credit]) || 0); if (cr) row.credit = cr; }
     }
     if (row && (row.closingDebit || row.closingCredit || row.closing || row.debit || row.credit || row.opening)) rows.push(row);
+    // A real ERP ledger the file DID list, but whose amounts all parsed blank/zero, is kept
+    // as an explicit zero (never silently dropped) so it surfaces in the tie-out — as a real
+    // 'off' gap when ERP carries a balance — instead of reading "in ERP, not in Tally".
+    else if (isErpLedger(ledger)) rows.push({ ledger, closing: 0, ...(row && row.group ? { group: row.group } : {}) });
   }
   return { rows, error: rows.length ? '' : 'Header found but no ledger rows parsed.', note: groupedNote(droppedGroups) };
 }
@@ -334,10 +347,13 @@ export function parseTallyXmlDayBook(text) {
  *  (ledger) rows each followed by a sibling <DSPACCINFO> whose <DSPCLAMTA> is the
  *  closing balance. Tally's sign there is POSITIVE = Credit, NEGATIVE = Debit, so
  *  our signed closing (Dr +, Cr −) = −DSPCLAMTA. Group subtotals are dropped. */
-export function parseTallyXmlTB(text) {
+export function parseTallyXmlTB(text, opts = {}) {
   const doc = new DOMParser().parseFromString(String(text), 'application/xml');
   const names = [...doc.querySelectorAll('DSPACCNAME')];
   if (!names.length) return { rows: [], error: 'No <DSPACCNAME> ledger rows found — this is not a Tally Trial Balance XML export (export the TB, or use Excel/CSV).' };
+  // Same chart guard as normalizeTB — a real ERP ledger is never silently dropped.
+  const erpLedgers = opts.erpLedgers instanceof Set ? opts.erpLedgers : null;
+  const isErpLedger = (name) => !!erpLedgers && erpLedgers.has(String(name ?? '').trim().toLowerCase());
   const rows = [];
   let droppedGroups = 0;
   let curGroup = ''; // best-effort: the last group HEADER seen becomes the context
@@ -348,8 +364,9 @@ export function parseTallyXmlTB(text) {
     // A recognised Tally group name is a HEADER row, not a ledger — drop it from the
     // tie-out but remember it as the group the following ledgers sit under, so the
     // upload carries a group even without an explicit column (best-effort: only the
-    // 28 primary groups are recognised as headers).
-    if (isTallyGroupRow(ledger)) { curGroup = ledger; droppedGroups += 1; continue; }
+    // 28 primary groups are recognised as headers). Never when the name is also a real
+    // ERP ledger — its balance must be compared, not swallowed as a header.
+    if (isTallyGroupRow(ledger) && !isErpLedger(ledger)) { curGroup = ledger; droppedGroups += 1; continue; }
     // The amounts sit in the <DSPACCINFO> element that follows this <DSPACCNAME>.
     // Stop if we reach the NEXT ledger first (adjacent DSPACCNAMEs) so a name row
     // never borrows the following ledger's amounts.
@@ -357,7 +374,12 @@ export function parseTallyXmlTB(text) {
     while (info && info.tagName !== 'DSPACCINFO') { if (info.tagName === 'DSPACCNAME') { info = null; break; } info = info.nextElementSibling; }
     const clNode = info ? info.querySelector('DSPCLAMTA') : null;
     const cl = num(clNode ? clNode.textContent.trim() : '');
-    if (cl === null || cl === 0) continue; // empty/zero closing (e.g. a pass-through group) — no tie-out signal
+    if (cl === null || cl === 0) {
+      // Empty/zero closing (e.g. a pass-through group) — normally no tie-out signal, but a
+      // real ERP ledger is kept as an explicit zero so it never reads "in ERP, not in Tally".
+      if (isErpLedger(ledger)) { const row = { ledger, closing: 0 }; if (curGroup) row.group = curGroup; rows.push(row); }
+      continue;
+    }
     const row = { ledger, closing: -cl };
     if (curGroup) row.group = curGroup;
     rows.push(row);
@@ -381,14 +403,14 @@ export async function parseDayBookFile(file) {
 
 /** Pick a Trial Balance file → normalized TB rows (importTB shape). Tally XML
  *  routes to the DSPACCNAME parser; Excel/CSV/HTML to the columnar normaliser. */
-export async function parseTBFile(file) {
+export async function parseTBFile(file, opts = {}) {
   const name = (file?.name || '').toLowerCase();
   if (/\.pdf$/.test(name)) return { rows: [], error: 'PDF can’t be parsed — export the Trial Balance as Excel / CSV / XML.' };
-  if (/\.xml$/.test(name)) return parseTallyXmlTB(await readText(file));
-  if (/\.(xlsx?|xlsm)$/.test(name)) return normalizeTB(await excelToMatrix(await file.arrayBuffer()));
+  if (/\.xml$/.test(name)) return parseTallyXmlTB(await readText(file), opts);
+  if (/\.(xlsx?|xlsm)$/.test(name)) return normalizeTB(await excelToMatrix(await file.arrayBuffer()), opts);
   // A non-standard extension that actually holds XML (Tally sometimes writes .txt).
   const text = await readText(file);
-  if (isXml(name, text)) return parseTallyXmlTB(text);
-  if (/\.(html?|htm)$/.test(name) || /^\s*<(!doctype\s+html|html|table)/i.test(text)) return normalizeTB(htmlToMatrix(text));
-  return normalizeTB(delimitedToMatrix(text));
+  if (isXml(name, text)) return parseTallyXmlTB(text, opts);
+  if (/\.(html?|htm)$/.test(name) || /^\s*<(!doctype\s+html|html|table)/i.test(text)) return normalizeTB(htmlToMatrix(text), opts);
+  return normalizeTB(delimitedToMatrix(text), opts);
 }

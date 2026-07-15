@@ -125,6 +125,12 @@ const TALLY_GROUP_NAMES = [
   'Misc. Expenses (Asset)', 'Suspense Account',
 ];
 
+// Party groups are OWNED by the Supplier / Customer (Client) master pipeline —
+// creating the party there auto-provisions its ledger. The Ledger Master therefore
+// must NOT let you file a NEW ledger under these (the backend rejects it with 422);
+// they stay pickable only when EDITING a ledger that's already one.
+const PARTY_GROUPS = ['Sundry Creditors', 'Sundry Debtors'];
+
 // The "Groups" door (Tally: Groups → Create / Alter / Display). Groups and
 // sub-groups are ONE collection (a 3-tier tree), so a single screen manages both:
 // you create a Group under one of the 28 fixed Primary Groups, or a Sub-Group under
@@ -257,7 +263,7 @@ export const LedgersMaster = ({ branch }) => {
         rowFilter={ledgerRowFilter}
         lockedRow={(r) => r.locked}
         mapRow={showHidden ? (r) => ({ ...r, visibility: r.active === false ? 'Inactive' : r.hidden === true ? 'Hidden' : '' }) : undefined}
-        note="Set Group to the Primary Group / Primary Sub Group (e.g. Sundry Debtors), then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. Each branch owns its own copy of the chart — which ledgers are visible in which branch is set on Chart of Accounts (Tree view) ▸ TK Group Central Table (tap a count, then the branch pills). Hidden and deactivated ledgers leave this list and every picker for that branch unless “Show hidden & inactive” is on. Ledgers marked ~* are WIRED to the posting/tax/inter-branch engine — locked (🔒) in every branch: they cannot be created, edited, deleted or deactivated from the app and change only directly in the database."
+        note="Suppliers (Sundry Creditors) and Customers (Sundry Debtors) are NOT created here — add them in the Supplier / Customer (Client) master and their ledger appears in the Chart of Accounts automatically. That keeps one party pipeline (a duplicate ledger would split the balance). Set Group to the Primary Group / Primary Sub Group, then pick a Sub-Group to nest this ledger under it on the Balance Sheet. Create sub-groups first in Masters → Sub-Groups. Each branch owns its own copy of the chart — which ledgers are visible in which branch is set on Chart of Accounts (Tree view) ▸ TK Group Central Table (tap a count, then the branch pills). Hidden and deactivated ledgers leave this list and every picker for that branch unless “Show hidden & inactive” is on. Ledgers marked ~* are WIRED to the posting/tax/inter-branch engine — locked (🔒) in every branch: they cannot be created, edited, deleted or deactivated from the app and change only directly in the database."
         fields={[
           // Code is server-allocated (<BRANCH>-MN-NNNN) — read-only, never typed
           // (matches the Chart-of-Accounts ledger editor). Was editable + required,
@@ -266,7 +272,12 @@ export const LedgersMaster = ({ branch }) => {
           { key: 'name', label: 'Ledger Name', type: 'text', required: true },
           // Changing the Group resets Sub-Group (its old value belongs to a different
           // group and would no longer be valid) — see EditModal's `clears` support.
-          { key: 'group', label: 'Group', type: 'select', options: groupOptions.length ? groupOptions : TALLY_GROUP_NAMES, required: true, clears: ['subGroup'] },
+          // Sundry Creditors/Debtors are hidden here — a party ledger is created from
+          // the Supplier / Customer (Client) master, which auto-provisions it. The
+          // current value is kept when editing a ledger that's already a party one.
+          { key: 'group', label: 'Group', type: 'select', required: true, clears: ['subGroup'],
+            options: (form) => (groupOptions.length ? groupOptions : TALLY_GROUP_NAMES)
+              .filter((g) => !PARTY_GROUPS.includes(g) || g === form?.group) },
           { key: 'subGroup', label: 'Sub-Group', type: 'select', table: false, emptyLabel: '— None —',
             options: (form) => { const subs = subGroupsUnder(form.group); return form.subGroup && !subs.includes(form.subGroup) ? [form.subGroup, ...subs] : subs; } },
           // Changing Branch re-defaults Currency to that branch's main currency

@@ -3,14 +3,18 @@ import { buildNameMatcher } from './nameMatch';
 import { fmt } from './format';
 import { EmptyState, Badge } from '../../shell/primitives';
 
-// ─── Ledger Matcher pane (view-only) — every ledger & master NAME that appears on
-// only one side, split into two sections: "Not in ERP" (in Tally, no ERP head) and
-// "Not in Tally" (in ERP, no Tally name). The second section answers the question a
-// single-name grid can't — which ERP-only head IS which Tally-only head — pairing
-// each ERP orphan against its likely Tally twin(s) (one, or many for a split) with
-// the fix to make. Purely a guide — the fix is made in Tally (rename / regroup /
-// split) or by creating the head in ERP, then re-uploaded; nothing here is saved
-// and no amount gap is accepted (the residual still blocks until it ties).
+// ─── Ledger Matcher pane (view-only) — every ledger & master NAME whose balance
+// lands on only one side FOR THIS PERIOD, split into two sections: "Not in ERP" (a
+// Tally balance with no ERP balance this period) and "Not in Tally" (an ERP balance
+// with no Tally balance this period). A one-sided balance does NOT necessarily mean
+// the account is missing on the other side — it may exist there but be zero this
+// period (a Tally TB export omits zero-balance ledgers, and the tie-out drops zeros
+// on both sides). The second section answers the question a single-name grid can't —
+// which ERP-only head IS which Tally-only head — pairing each ERP orphan against its
+// likely Tally twin(s) (one, or many for a split) with the fix to make. Purely a
+// guide — the fix is made in Tally (rename / regroup / split) or by creating the head
+// in ERP, then re-uploaded; nothing here is saved and no amount gap is accepted (the
+// residual still blocks until it ties).
 
 const KIND_META = {
   code:   { tone: 'info',    label: 'Renamed · code match' },
@@ -27,7 +31,7 @@ function actionText(e, s, targets, cur) {
     ? ` Names then match, but the ${fmt(s.residual, cur)} amount gap still blocks until it's corrected at source.`
     : ' Renaming clears this row.';
   if (s.kind === 'none') {
-    return `No Tally twin found — likely a structural ERP-only head (e.g. an SVC2 / section split). Create or rename it in Tally to match “${e.name}”, then re-upload.`;
+    return `No Tally balance to match this period — either a structural ERP-only head (e.g. an SVC2 / section split) or a Tally ledger that's simply zero this period. Create / rename it in Tally to match “${e.name}”, or re-export the TB including zero-balance ledgers, then re-upload.`;
   }
   if (s.kind === 'split') {
     const names = targets.map((t) => `“${t.name}”`).join(' + ');
@@ -68,16 +72,18 @@ export function NameMatcherPane({ rows = [], cur }) {
   return (
     <div className="grid gap-5">
       <p className="text-sm text-ink-muted">
-        <span className="font-semibold text-ink">{m.unmatchedTally.length}</span> in Tally with no ERP name ·{' '}
-        <span className="font-semibold text-ink">{m.summary.erpOrphans}</span> in ERP with no Tally name ·{' '}
-        <span className="font-semibold text-success">{m.summary.suggested}</span> paired below. A guide only — make the fix in Tally
-        (rename / regroup / split) or create the head in ERP, then re-upload; a row clears when it genuinely ties.
+        <span className="font-semibold text-ink">{m.unmatchedTally.length}</span> in Tally with no ERP balance this period ·{' '}
+        <span className="font-semibold text-ink">{m.summary.erpOrphans}</span> in ERP with no Tally balance this period ·{' '}
+        <span className="font-semibold text-success">{m.summary.suggested}</span> paired below. A guide only — a name here carries a
+        balance on one side but not the other for this period: the account may be missing on that side, or it may simply be zero here
+        (a Tally TB export omits zero-balance ledgers). Fix at source — rename / regroup / split in Tally, or add the head in ERP —
+        then re-upload; a row clears when it genuinely ties.
       </p>
 
       {/* Section 1 — Not in ERP: ledgers/masters in Tally with no ERP head. */}
       <section>
         <SectionHead title="Not in ERP" count={m.unmatchedTally.length}
-          note="In Tally, with no ERP head — create the head in ERP, or they belong to a merge / rename on the ERP side." />
+          note="Has a Tally balance but none in the ERP this period. The ERP head may be missing — or it may already exist here with a zero balance (activity posted in another period). Create / merge it in ERP if it's truly missing; otherwise it's a timing difference." />
         {m.unmatchedTally.length ? (
           <div className="grid grid-cols-1 gap-1 tablet:grid-cols-2">
             {m.unmatchedTally.map((t, i) => (
@@ -94,7 +100,7 @@ export function NameMatcherPane({ rows = [], cur }) {
       {/* Section 2 — Not in Tally: heads in ERP with no Tally name, each paired to its likely twin + the fix. */}
       <section>
         <SectionHead title="Not in Tally" count={m.erp.length}
-          note="In ERP, with no Tally name — rename / regroup / split in Tally to match, then re-upload. A suggested Tally twin is shown where one is likely." />
+          note="Has an ERP balance but none in Tally this period. The Tally ledger may be missing — or it may exist with a zero balance (a Tally TB export omits zero-balance ledgers). Rename / regroup / split in Tally, or re-export the TB including zero-balance ledgers, then re-upload. A suggested Tally twin is shown where one is likely." />
         {m.erp.length ? (
           <div className="flex flex-col gap-2">
             {m.erp.map((e, i) => {
@@ -134,7 +140,7 @@ export function NameMatcherPane({ rows = [], cur }) {
                         <span className="font-semibold text-ink" title={t.name}>{t.name}</span>
                         <span className="ml-2 font-mono text-sm tabular-nums text-ink-muted">{fmt(t.amount, cur)}</span>
                       </div>
-                    )) : <span className="text-sm italic text-ink-subtle">— no Tally ledger</span>}
+                    )) : <span className="text-sm italic text-ink-subtle">— no Tally balance this period</span>}
                   </div>
 
                   {/* the fix to make, spanning the card */}

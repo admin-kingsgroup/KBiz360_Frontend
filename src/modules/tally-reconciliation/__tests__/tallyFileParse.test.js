@@ -180,6 +180,25 @@ describe('normalizeTB', () => {
     expect(rows.find((r) => r.ledger === 'Software & Subscription')).toEqual({ ledger: 'Software & Subscription', closing: 18601.37 });
   });
 
+  test('ERP-ledger guard: a listed chart ledger with a blank/dash closing is kept as an explicit zero, not dropped', () => {
+    // Akbar is IN the export but its closing cell is blank / a dash, so it parses to no
+    // amount. Without the guard the row silently vanishes and the tie-out reads "in ERP,
+    // not in Tally"; with the chart set passed in it is kept as closing 0 → an 'off' gap.
+    const matrix = [
+      ['Ledger', 'Closing Balance'],
+      ['Akbar Travels of India (P) Ltd', ' - '],  // dash → no parseable amount
+      ['Some Vendor Not In Chart', ''],           // blank, NOT an ERP ledger → still dropped
+      ['TRIP JACK Private Limited [Ticketing]', '75679.38 Dr'],
+    ];
+    const erpLedgers = new Set(['akbar travels of india (p) ltd', 'trip jack private limited [ticketing]']);
+    const kept = normalizeTB(matrix, { erpLedgers }).rows;
+    expect(kept.map((r) => r.ledger)).toEqual(['Akbar Travels of India (P) Ltd', 'TRIP JACK Private Limited [Ticketing]']);
+    expect(kept.find((r) => r.ledger === 'Akbar Travels of India (P) Ltd')).toEqual({ ledger: 'Akbar Travels of India (P) Ltd', closing: 0 });
+    // Same file, NO chart set → prior behaviour: the amount-less Akbar row is dropped.
+    const withoutGuard = normalizeTB(matrix).rows.map((r) => r.ledger);
+    expect(withoutGuard).toEqual(['TRIP JACK Private Limited [Ticketing]']);
+  });
+
   test('single signed Closing column (Cr / parentheses / no-space Cr → negative)', () => {
     const matrix = [
       ['Ledger', 'Closing Balance'],

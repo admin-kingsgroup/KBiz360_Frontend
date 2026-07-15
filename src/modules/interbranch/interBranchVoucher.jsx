@@ -163,29 +163,45 @@ export function InterBranchVoucher({ branch }) {
         </div>
       </div>
 
-      {crossCcy && (
-        <div style={{ ...card, background: fxMissing ? C.amberBg : '#f4f8ff', border: `1px solid ${fxMissing ? C.amber : C.blue}` }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', marginBottom: 8 }}>
-            Inter-Branch FX · {sellerCcy} → {buyerCcy} ({form.toBranch} books in {buyerCcy})
-          </div>
+      {/* Inter-Branch FX Rate — ALWAYS shown so the rate field is discoverable. The
+          input is ACTIVE only for a cross-currency deal (India ₹ ↔ Africa $); a
+          same-currency deal shows a disabled field explaining why no rate is needed. */}
+      <div style={{ ...card, background: !crossCcy ? '#f7f9fc' : (fxMissing ? C.amberBg : '#f4f8ff'), border: `1px solid ${!crossCcy ? C.border : (fxMissing ? C.amber : C.blue)}` }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', marginBottom: 8 }}>
+          Inter-Branch FX Rate{crossCcy ? ` · ${sellerCcy} → ${buyerCcy} (${form.toBranch} books in ${buyerCcy})` : ''}
+        </div>
+        {crossCcy ? (
+          <>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div><label style={lbl}>Rate — 1 USD = ₹</label>
+                <input type="number" min="0" step="0.0001" value={form.fxRate} onChange={(e) => set('fxRate', e.target.value)}
+                  placeholder={dailyRate ? String(dailyRate) : '0'} style={{ ...inp, width: 130, textAlign: 'right' }} /></div>
+              <div style={{ fontSize: 11.5, color: C.dim }}>
+                {rateQ.isLoading ? <Skeleton className="inline-block h-3 w-20 align-middle" />
+                  : dailyRate ? <>Daily rate {form.date}: <b>1 USD = ₹{dailyRate.toLocaleString(localeOf('₹'))}</b></>
+                  : <span style={{ color: C.amber }}>No daily USD→INR rate set for {form.date} — enter one to post.</span>}
+              </div>
+              <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: fxMissing ? C.amber : C.blue }}>
+                {fxMissing ? 'Set the FX rate' : <>Buyer books ≈ {buyerSym}{(buyerTotal || 0).toLocaleString(localeOf(buyerSym), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>}
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
+              Your legs post in {sellerCcy}; the frozen rate translates the deal so {form.toBranch}’s pending PO lands in {buyerCcy}. Books stay single-currency.
+            </div>
+          </>
+        ) : (
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <div><label style={lbl}>Rate — 1 USD = ₹</label>
-              <input type="number" min="0" step="0.0001" value={form.fxRate} onChange={(e) => set('fxRate', e.target.value)}
-                placeholder={dailyRate ? String(dailyRate) : '0'} style={{ ...inp, width: 130, textAlign: 'right' }} /></div>
+              <input disabled value="" placeholder="—" title="Only needed for a cross-currency (₹ ↔ $) deal"
+                style={{ ...inp, width: 130, textAlign: 'right', background: '#eef1f5', color: C.dim, cursor: 'not-allowed' }} /></div>
             <div style={{ fontSize: 11.5, color: C.dim }}>
-              {rateQ.isLoading ? <Skeleton className="inline-block h-3 w-20 align-middle" />
-                : dailyRate ? <>Daily rate {form.date}: <b>1 USD = ₹{dailyRate.toLocaleString(localeOf('₹'))}</b></>
-                : <span style={{ color: C.amber }}>No daily USD→INR rate set for {form.date} — enter one to post.</span>}
-            </div>
-            <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color: fxMissing ? C.amber : C.blue }}>
-              {fxMissing ? 'Set the FX rate' : <>Buyer books ≈ {buyerSym}{(buyerTotal || 0).toLocaleString(localeOf(buyerSym), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>}
+              {form.toBranch
+                ? <><b>No FX needed</b> — {fromBranch} and {form.toBranch} both keep books in <b>{sellerCcy === 'INR' ? '₹ INR' : '$ USD'}</b>. A rate is required only when the two branches book in different currencies (an India branch ₹ ↔ an Africa branch $).</>
+                : <>Pick a destination branch. If it books in a different currency (an India branch ₹ ↔ an Africa branch $), this <b>FX Rate</b> field activates so you can freeze the rate.</>}
             </div>
           </div>
-          <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
-            Your legs post in {sellerCcy}; the frozen rate translates the deal so {form.toBranch}’s pending PO lands in {buyerCcy}. Books stay single-currency.
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div style={{ ...card, background: '#f7f9fc' }}>
         <div style={{ fontSize: 11, color: C.dim }}>Posts in {fromBranch || 'your branch'}:</div>
@@ -213,7 +229,7 @@ export function InterBranchVoucher({ branch }) {
           <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', marginBottom: 8 }}>Open inter-branch legs sent TO {fromBranch} ({incoming.length}) — book these on SO/PO/GP</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ textAlign: 'left', color: C.dim }}>
-              <th style={{ padding: '4px 8px' }}>INB Link No</th><th style={{ padding: '4px 8px' }}>From</th><th style={{ padding: '4px 8px' }}>Date</th><th style={{ padding: '4px 8px' }}>Passenger</th><th style={{ padding: '4px 8px', textAlign: 'right' }}>Total</th></tr></thead>
+              <th style={{ padding: '4px 8px' }}>INB Link No</th><th style={{ padding: '4px 8px' }}>From</th><th style={{ padding: '4px 8px' }}>Date</th><th style={{ padding: '4px 8px' }}>Passenger</th><th style={{ padding: '4px 8px', textAlign: 'right' }}>FX Rate</th><th style={{ padding: '4px 8px', textAlign: 'right' }}>Total</th></tr></thead>
             <tbody>
               {incoming.map((l) => {
                 // The leg's total is in the SELLER's currency. This branch is the BUYER, so a
@@ -228,6 +244,10 @@ export function InterBranchVoucher({ branch }) {
                   <td style={{ padding: '4px 8px' }}>{l.fromBranch}</td>
                   <td style={{ padding: '4px 8px' }}>{l.date}</td>
                   <td style={{ padding: '4px 8px' }}>{l.passenger || '—'}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: lfx ? C.blue : C.dim }}
+                    title={lfx ? `Frozen at deal creation (${lfx.fromCcy}→${lfx.toCcy})` : 'Same-currency deal — no FX'}>
+                    {lfx ? `1 USD = ₹${Number(l.fx.rate).toLocaleString(localeOf('₹'), { minimumFractionDigits: 2, maximumFractionDigits: 4 })}` : '—'}
+                  </td>
                   <td style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                     title={lfx ? `${CCY_SYM[lfx.fromCcy] || ''}${r2(l.total).toLocaleString()} @ 1 USD = ₹${Number(l.fx.rate).toLocaleString()}` : undefined}>
                     {sym}{(shown == null ? r2(l.total) : shown).toLocaleString(localeOf(sym))}
