@@ -11,7 +11,7 @@ import { confirmDialog } from '../../../core/ux/confirm';
 import { toast } from '../../../core/ux/toast';
 import { clickable } from '../../../core/ux/clickable';
 import { AlertTriangle, Download, Plus, Printer, Upload, RefreshCw, Link2, Unlink, Search, FileText, Trash2, X } from 'lucide-react';
-import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useGroupMatch, useUnmatch, useSetReconStatus, useClearStatement, useRefreshBankReco } from '../../../core/useBankReco';
+import { useBankLedgers, useBankBook, useBankStatement, useBankReconSummary, useBankBRS, useImportStatement, useAutoMatch, useManualMatch, useGroupMatch, useUnmatch, useUnmatchAll, useSetReconStatus, useClearStatement, useRefreshBankReco } from '../../../core/useBankReco';
 import { useParseStatementFile } from '../../../core/useStatementFile';
 import { usePDCs, usePDCSummary, useCreatePDC, useDepositPDC, useBouncePDC, useRepresentPDC, useDeletePDC } from '../../../core/usePDC';
 import { branchCode } from '../../../core/useAccounting';
@@ -207,6 +207,7 @@ export function BankReco({branch}){
   const matchMut=useManualMatch();
   const groupMut=useGroupMatch();
   const unmatchMut=useUnmatch();
+  const unmatchAllMut=useUnmatchAll();
   const statusMut=useSetReconStatus();
   const clearMut=useClearStatement();
 
@@ -271,6 +272,24 @@ export function BankReco({branch}){
     }
   };
   const runAutoMatch=()=>autoMut.mutate({ledger,branch:code,from,to});
+
+  /* Bulk un-reconcile — release EVERY match for this ledger+period so a
+     bank-reconciled receipt/payment can be revoked/edited (BLOCK 2). Non-destructive:
+     no line/entry is deleted; you can re-match or Auto-match again after. */
+  const reconciledCount=stmt.filter(l=>l.status==="reconciled"||l.status==="partial").length;
+  const doUnmatchAll=async()=>{
+    if(!reconciledCount) return;
+    const {confirmed}=await confirmDialog({
+      title:`Un-reconcile all ${reconciledCount} matched line(s)?`,
+      message:`This releases every match for ${ledger} between ${from} and ${to}, sending those lines back to Unreconciled — so a matched receipt/payment that won't revoke/edit ("bank-reconciled" block) can be corrected.\n\nIt does NOT delete any statement line or book entry. You can re-match or Auto-match again afterwards. If the ledger is also Frozen, un-freeze it first.`,
+      danger:true, confirmLabel:`Un-reconcile ${reconciledCount}`, cancelLabel:'Cancel',
+    });
+    if(!confirmed) return;
+    unmatchAllMut.mutate({ledger,branch:code,from,to},{
+      onSuccess:(d)=>{ toast(`Un-reconciled ${d?.unmatched ?? reconciledCount} line(s)`,'success'); clearSel(); },
+      onError:(e)=>toast(e?.message||'Could not un-reconcile','error'),
+    });
+  };
 
   /* Re-fetch ERP Books after a voucher was corrected (pulls the live ledger again). */
   const refreshBooks=useRefreshBankReco();
@@ -363,6 +382,7 @@ export function BankReco({branch}){
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search date / ref / narration…" style={{border:"none",background:"transparent",outline:"none",fontSize:11,minWidth:200}}/>
             </div>
             <div style={{display:"flex",gap:4}}>
+              <button onClick={doUnmatchAll} disabled={!reconciledCount||unmatchAllMut.isPending} title="Release every match in this ledger + period back to Unreconciled (so matched receipts/payments can be revoked/edited)" style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#A32D2D",opacity:(!reconciledCount||unmatchAllMut.isPending)?0.5:1}}><Unlink size={11}/> {unmatchAllMut.isPending?"Un-reconciling…":`Unmatch all${reconciledCount?` (${reconciledCount})`:""}`}</button>
               <button onClick={()=>setOnlyOpen(o=>!o)} title="Show only the still-open (unreconciled / exception) lines" style={{...((onlyOpen)?btnG:btnGh),fontSize:10,padding:"4px 10px"}}>{onlyOpen?"● ":""}Unreconciled only</button>
               {["detailed","minimal"].map(v=>(
                 <button key={v} onClick={()=>setView(v)} style={{...((view===v)?btnG:btnGh),fontSize:10,padding:"4px 10px",textTransform:"capitalize"}}>{v}</button>
