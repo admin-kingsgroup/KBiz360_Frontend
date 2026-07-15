@@ -84,8 +84,6 @@ const isIndiaCountry = (c) => { const s = String(c || '').trim().toLowerCase(); 
 const today = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
-// Currency symbols for the frozen inter-branch FX line (buyer books in its own currency).
-const CCY_SYM = { INR: '₹', USD: '$' };
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /* shared cell styles */
@@ -421,10 +419,6 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // the link is marked booked (consumed). inbLinkNo holds the fetched link.
   const [inbLinkNo, setInbLinkNo] = useState(''); // display (INB Link No)
   const [inbId, setInbId] = useState('');         // the InbLink _id (API target)
-  // Frozen FX of a fetched cross-currency leg (INR-branch ↔ USD-branch) — read-only,
-  // just so the buyer sees the rate the seller locked and what it books in its own
-  // currency; null for same-currency legs. Set in fetchInb, cleared on consume.
-  const [inbFx, setInbFx] = useState(null);
   const openInbQ = useOpenInb(branch);
   const bookInb = useBookInb();
   // Inter-branch SALE mode: the customer is a counterparty branch; the SO grid's
@@ -674,7 +668,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       // If this PO was fetched from an open inter-branch leg, consume it (mark the
       // INB link booked). Non-fatal: a miss leaves the link open to retry.
       if (inbId && booking?.bookingNo) {
-        try { await bookInb.mutateAsync({ id: inbId, purchaseVno: booking.bookingNo }); setInbLinkNo(''); setInbId(''); setInbFx(null); }
+        try { await bookInb.mutateAsync({ id: inbId, purchaseVno: booking.bookingNo }); setInbLinkNo(''); setInbId(''); }
         catch (_) { /* link stays open; surfaced in the INB reconciliation */ }
       }
       setResult({ ...booking, _approved: false, _edited: editing });
@@ -699,18 +693,6 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     setLines([ln]);
     setInbLinkNo(link.inbLinkNo);
     setInbId(link._id || link.id || '');
-    // Cross-currency leg → surface the frozen rate + what we book in our own currency.
-    // The seller's total is in fromCcy; we (the buyer) settle in toCcy. Same-currency
-    // legs carry no fx and this line stays hidden. Rate is always quoted 1 USD = ₹x.
-    const fx = link.fx && Number(link.fx.rate) > 0 && link.fx.fromCcy !== link.fx.toCcy ? link.fx : null;
-    if (fx) {
-      const rate = Number(fx.rate);
-      const sellerTotal = num(link.total);
-      const buyerTotal = fx.fromCcy === 'USD' && fx.toCcy === 'INR' ? round2(sellerTotal * rate)
-        : fx.fromCcy === 'INR' && fx.toCcy === 'USD' ? round2(sellerTotal / rate)
-        : sellerTotal;
-      setInbFx({ rate, fromCcy: fx.fromCcy, toCcy: fx.toCcy, sellerTotal, buyerTotal });
-    } else setInbFx(null);
     toast(`Fetched ${link.inbLinkNo} from ${link.fromBranch} — review & save`);
   };
 
@@ -853,13 +835,6 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {(openInbQ.data || []).map((l) => <option key={l.inbLinkNo} value={l.inbLinkNo}>{l.inbLinkNo} · from {l.fromBranch} · {l.passenger || '—'} · {fmt(l.total)}</option>)}
           </select>
           {inbLinkNo && <span style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>✓ {inbLinkNo} — fares & Service Fee pre-filled (IGST)</span>}
-          {inbFx && (
-            <div style={{ width: '100%', marginTop: 2, fontSize: 11.5, fontWeight: 700, color: '#185FA5', background: '#f4f8ff', border: '1px solid #185FA5', borderRadius: 6, padding: '5px 9px' }}>
-              FX Rate (frozen): 1 USD = ₹{Number(inbFx.rate).toLocaleString(localeOf('₹'), { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-              {' · '}{CCY_SYM[inbFx.fromCcy] || ''}{fmt(inbFx.sellerTotal)} → {CCY_SYM[inbFx.toCcy] || cur}{fmt(inbFx.buyerTotal)}
-              <span style={{ fontWeight: 500, color: '#5a6691' }}> · you book in {inbFx.toCcy} at the seller's locked rate</span>
-            </div>
-          )}
         </div>
       )}
       <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
