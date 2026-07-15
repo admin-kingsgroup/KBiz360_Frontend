@@ -72,8 +72,8 @@ export function CertifyPanel({ branch, period, tier, offTotal, fixTotal = 0, cur
         ) : !tied && !frozen ? (
           <div className="rounded-brand border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-ink">
             <b className="text-danger">Not certifiable yet.</b>{' '}
-            {(offTotal || 0) > 0 && <>The ERP doesn't tie to Tally — {offTotal} ledger{offTotal === 1 ? '' : 's'} still off. Clear them in the <b>Defects</b> tab. </>}
-            {(fixTotal || 0) > 0 && <>{fixTotal} Tally ledger name/group{fixTotal === 1 ? '' : 's'} still differ{fixTotal === 1 ? 's' : ''} from ERP — rename/regroup in Tally and re-upload (use “Show only items to fix in Tally”). </>}
+            {(offTotal || 0) > 0 && <>The ERP doesn't tie to Tally — {offTotal} ledger{offTotal === 1 ? '' : 's'} still off. Clear them in the <b>Unmatched Entries</b> and <b>Ledger Matcher</b> tabs. </>}
+            {(fixTotal || 0) > 0 && <>{fixTotal} Tally ledger name/group{fixTotal === 1 ? '' : 's'} still differ{fixTotal === 1 ? 's' : ''} from ERP — rename/regroup in Tally (see <b>Ledger Matcher</b>) and re-upload. </>}
             Then freeze &amp; certify.
           </div>
         ) : (

@@ -258,7 +258,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // filter so the board never sits on an empty view with its toggle already hidden.
   useEffect(() => { if (!blocking && onlyFixes) setOnlyFixes(false); }, [blocking, onlyFixes]);
 
-  // Defect Register — lazily loaded (the per-off-ledger voucher scan is heavier).
+  // Unmatched Entries — lazily loaded (the per-off-ledger voucher scan is heavier).
   const { data: defectsData, isLoading: defectsLoading, isError: defectsError, refetch: refetchDefects } = useQuery({
     queryKey: ['tally-tieout', 'defects', branch, tier, period],
     queryFn: () => getDefects({ branch, period, tier }),
@@ -276,7 +276,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // uploaded > 24h apart → likely different exports.
   const dbSync = useMemo(() => {
     if (!imported.count) return null; // nothing uploaded yet — the onboarding copy covers it
-    if (!(dbStatus?.vouchers > 0)) return { tone: 'warn', msg: 'A Tally TB is uploaded but no Day Book — the voucher drill and Defect Register will be empty. Upload the Day Book for this period too.' };
+    if (!(dbStatus?.vouchers > 0)) return { tone: 'warn', msg: 'A Tally TB is uploaded but no Day Book — the voucher drill and Unmatched Entries will be empty. Upload the Day Book for this period too.' };
     if (imported.at && dbStatus?.at) {
       const gapH = Math.abs(new Date(imported.at) - new Date(dbStatus.at)) / 3.6e6;
       if (gapH > 24) return { tone: 'info', msg: `The TB and Day Book were uploaded ${Math.round(gapH / 24)} day(s) apart — re-upload BOTH from the same Tally export after any correction so they stay consistent.` };
@@ -754,7 +754,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
 
       {/* tabs */}
       <div className="flex gap-1 border-b border-surface-border">
-        {[['tb', 'All Ledgers · Trial Balance'], ['bs', 'Balance Sheet'], ['pl', 'Profit & Loss'], ['defects', 'Defects'], ['names', 'Name Matcher']].map(([k, lbl]) => (
+        {[['tb', 'All Ledgers · Trial Balance'], ['bs', 'Balance Sheet'], ['pl', 'Profit & Loss'], ['defects', 'Unmatched Entries'], ['names', 'Ledger Matcher']].map(([k, lbl]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-semibold ${tab === k ? 'border-accent text-accent' : 'border-transparent text-ink-muted hover:text-ink'}`}>
             {k === 'defects' && <AlertTriangle size={14} aria-hidden="true" />}{lbl}
@@ -764,8 +764,8 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         ))}
       </div>
 
-      <PageSection title={tab === 'defects' ? `Defect Register — ${branch} · ${periodLabel(period)}` : tab === 'names' ? `Name Matcher — ${branch} · ${periodLabel(period)}` : `${branch} · ${periodLabel(period)}`}
-        subtitle={tab === 'defects' ? 'Every off ledger drilled to its voucher defects — click a row to see the vouchers.' : tab === 'names' ? 'Unmatched ledger names paired ERP ↔ Tally — a guide for the rename / regroup / split to make in Tally. Nothing is saved; the fix is made at source.' : 'Left: ERP (live) · Middle: Tally (upload) · Right: difference. Click an off ledger to drill its vouchers.'}>
+      <PageSection title={tab === 'defects' ? `Unmatched Entries — ${branch} · ${periodLabel(period)}` : tab === 'names' ? `Ledger Matcher — ${branch} · ${periodLabel(period)}` : `${branch} · ${periodLabel(period)}`}
+        subtitle={tab === 'defects' ? 'Vouchers that appear on only one side — grouped Not in ERP / Not in Tally, by voucher number. Click a voucher to drill its ledger legs.' : tab === 'names' ? 'Every ledger & master name that appears on only one side — Not in ERP / Not in Tally, with the rename / regroup / split to make in Tally. Nothing is saved; the fix is made at source.' : 'Left: ERP (live) · Middle: Tally (upload) · Right: difference. Click an off ledger to drill its vouchers.'}>
         {tab === 'defects' ? (
           <DefectRegister data={defectsData} loading={defectsLoading} error={defectsError} onRetry={refetchDefects} cur={cur}
             /* Resolve the FULL tie-out row for the drilled ledger (inter-branch badge etc. ride along),
@@ -889,121 +889,59 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   );
 }
 
-// ── Defect Register — classified discrepancies across every off ledger ────────
-// Triage cuts: a Master/Voucher tier segment (structural vs posting defects) and
-// per-type toggle chips. Both are in-session filters over the already-loaded
-// `defects` array — instant, no refetch. Chip counts stay fixed to the full
-// totals so the distribution reads even while a subset is filtered.
-const DEFECT_TIERS = [
-  { key: 'all', label: 'All' },
-  { key: 'master', label: 'Master mismatches' },
-  { key: 'voucher', label: 'Voucher mismatches' },
+// ── Unmatched Entries — voucher-level presence gaps, split BY SIDE ─────────────
+// The whole-books tie-out drills every off ledger to the individual vouchers that
+// don't reconcile. A voucher present on only ONE side is an "unmatched entry"; we
+// group them by side — Not in ERP (in Tally only) / Not in Tally (in ERP only) —
+// and, within a side, BY VOUCHER NUMBER (one voucher touches many ledgers, so a
+// single fix clears every leg). "Amount differs" — the same voucher on BOTH sides
+// with a different figure — belongs to neither side, so it shows as a trailing
+// band. Whole-ledger gaps (a ledger absent on one side) are a MASTER problem and
+// live in the Ledger Matcher tab, not here.
+const ENTRY_SECTIONS = [
+  { key: 'not-in-erp', type: 'missing-in-erp', title: 'Not in ERP', tone: 'warning',
+    blurb: 'In Tally, with no matching ERP voucher — post it in ERP. (If the whole ledger is absent in ERP, fix that in Ledger Matcher first.)' },
+  { key: 'not-in-tally', type: 'missing-in-tally', title: 'Not in Tally', tone: 'warning',
+    blurb: 'In ERP, with no matching Tally voucher — enter it in Tally. (If the whole ledger is absent in Tally, fix that in Ledger Matcher first.)' },
+  { key: 'amount-differs', type: 'amount-mismatch', title: 'Amount differs', tone: 'danger',
+    blurb: 'The same voucher is on BOTH sides but the figures don’t match — correct the amount at source, then re-upload.' },
 ];
 function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
-  const [tier, setTier] = useState('all');       // 'all' | 'master' | 'voucher'
-  const [types, setTypes] = useState(() => new Set()); // active type chips; empty = all in tier
-
   const defects = data?.defects || [];
-  const byType = data?.summary?.byType || {};
+  // Voucher-level only — whole-ledger (master) gaps now live in the Ledger Matcher tab.
+  const entries = useMemo(() => defects.filter((d) => defectMeta(d.type).tier === 'voucher'), [defects]);
+  const byType = useMemo(() => {
+    const m = { 'missing-in-erp': [], 'missing-in-tally': [], 'amount-mismatch': [] };
+    for (const d of entries) (m[d.type] || (m[d.type] = [])).push(d);
+    return m;
+  }, [entries]);
 
-  // Fixed per-tier totals for the segment badges (independent of active filter).
-  const tierCount = useMemo(() => {
-    const c = { all: 0, master: 0, voucher: 0 };
-    for (const [type, n] of Object.entries(byType)) { c.all += n; c[defectMeta(type).tier] += n; }
-    return c;
-  }, [byType]);
-
-  // Chips belonging to the active tier, in a stable severity-then-count order.
-  const chips = useMemo(() => Object.entries(byType)
-    .filter(([type]) => tier === 'all' || defectMeta(type).tier === tier)
-    .sort((a, b) => (defectMeta(b[0]).tone === 'danger') - (defectMeta(a[0]).tone === 'danger') || b[1] - a[1]),
-  [byType, tier]);
-
-  const visible = useMemo(() => defects.filter((d) => {
-    if (tier !== 'all' && defectMeta(d.type).tier !== tier) return false;
-    if (types.size && !types.has(d.type)) return false;
-    return true;
-  }), [defects, tier, types]);
-
-  const selectTier = (k) => { setTier(k); setTypes(new Set()); };  // tier change resets chip picks
-  const toggleType = (t) => setTypes((prev) => { const n = new Set(prev); if (n.has(t)) n.delete(t); else n.add(t); return n; });
-  const clearFilters = () => { setTier('all'); setTypes(new Set()); };
-  const filtered = tier !== 'all' || types.size > 0;
-
-  if (loading) return <LoadingState label="Scanning off ledgers for defects…" />;
-  if (error) return <ErrorState title="Couldn’t load the Defect Register" message="The service didn’t respond." onRetry={onRetry} />;
-  if (!defects.length) {
-    return <EmptyState title="No defects" hint="Every off ledger's vouchers reconcile — or there are no off ledgers this period." />;
+  if (loading) return <LoadingState label="Scanning off ledgers for unmatched entries…" />;
+  if (error) return <ErrorState title="Couldn’t load Unmatched Entries" message="The service didn’t respond." onRetry={onRetry} />;
+  if (!entries.length) {
+    return <EmptyState title="No unmatched entries"
+      hint="Every voucher reconciles ERP ↔ Tally — or there are no off ledgers this period. Whole-ledger name gaps (if any) are in the Ledger Matcher tab." />;
   }
+  const notInErp = byType['missing-in-erp'];
+  const notInTally = byType['missing-in-tally'];
+  const amountDiff = byType['amount-mismatch'];
   return (
     <div className="grid gap-4">
-      {/* Tier segment + scope badge */}
+      {/* summary + scope badge */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-xs font-semibold" role="group" aria-label="Filter defects by tier">
-          {DEFECT_TIERS.map((t) => (
-            <button key={t.key} type="button" aria-pressed={tier === t.key} onClick={() => selectTier(t.key)}
-              className={`rounded-[6px] px-3 py-1 transition focus:outline-none focus:ring-2 focus:ring-accent ${tier === t.key ? 'bg-accent text-navy shadow-card' : 'text-ink-muted hover:text-ink'}`}>
-              {t.label} <span className="tabular-nums opacity-80">({tierCount[t.key]})</span>
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+          <span className="rounded-full bg-warning/15 px-3 py-1 text-warning">Not in ERP: {notInErp.length}</span>
+          <span className="rounded-full bg-warning/15 px-3 py-1 text-warning">Not in Tally: {notInTally.length}</span>
+          {amountDiff.length > 0 && <span className="rounded-full bg-danger/10 px-3 py-1 text-danger">Amount differs: {amountDiff.length}</span>}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {data.pairedRenames > 0 && (
-            <span className="rounded-full bg-info/10 px-3 py-1 text-xs font-semibold text-info" title="Ledgers renamed between ERP and Tally — each pair (ERP name absent in Tally + Tally name absent in ERP) is one account, collapsed to a single row instead of two.">
-              {data.pairedRenames} rename pair{data.pairedRenames === 1 ? '' : 's'} collapsed
-            </span>
-          )}
-          <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data.offLedgers} off ledgers</span>
-        </div>
+        <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data.offLedgers} off ledgers</span>
       </div>
-      {/* Type toggle chips */}
-      <div className="flex flex-wrap items-center gap-2">
-        {chips.map(([type, n]) => {
-          const m = defectMeta(type);
-          const on = types.has(type);
-          const dim = types.size > 0 && !on;
-          return (
-            <button key={type} type="button" onClick={() => toggleType(type)} aria-pressed={on}
-              className={`rounded-full px-3 py-1 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-accent ${m.tone === 'danger' ? 'bg-danger/10 text-danger' : 'bg-warning/15 text-warning'} ${on ? 'ring-2 ring-accent shadow-card' : dim ? 'opacity-45 hover:opacity-100' : 'hover:opacity-90'}`}>
-              {m.label}: {n}
-            </button>
-          );
-        })}
-        {filtered && (
-          <button type="button" onClick={clearFilters}
-            className="rounded-full px-3 py-1 text-xs font-semibold text-ink-subtle underline decoration-dotted underline-offset-2 hover:text-ink focus:outline-none focus:ring-2 focus:ring-accent">
-            Clear
-          </button>
-        )}
+      {/* Two sides always shown (so a clean side reads as clean); the amount band only when present. */}
+      <div className="grid gap-4">
+        <EntrySection section={ENTRY_SECTIONS[0]} rows={notInErp} cur={cur} onDrill={onDrill} />
+        <EntrySection section={ENTRY_SECTIONS[1]} rows={notInTally} cur={cur} onDrill={onDrill} />
+        {amountDiff.length > 0 && <EntrySection section={ENTRY_SECTIONS[2]} rows={amountDiff} cur={cur} onDrill={onDrill} />}
       </div>
-      {filtered && (
-        <div className="text-xs font-semibold text-ink-subtle">Showing {visible.length} of {defects.length} defects</div>
-      )}
-      {/* Two stacked panels — master (ledger-level) and voucher (transaction-level)
-          defects are DIFFERENT problems with different fixes, so they never share one
-          flat table. Under "All" both render, master FIRST because it's the root cause:
-          an absent/renamed ledger turns all its postings into voucher mismatches, so
-          clearing the master usually clears those on the same ledger too. Selecting a
-          tier shows only that panel; a chip filter can empty a panel (its own empty row). */}
-      {(() => {
-        const master = visible.filter((d) => defectMeta(d.type).tier === 'master');
-        const voucher = visible.filter((d) => defectMeta(d.type).tier === 'voucher');
-        const showMaster = (tier === 'all' || tier === 'master') && (master.length > 0 || tier === 'master');
-        const showVoucher = (tier === 'all' || tier === 'voucher') && (voucher.length > 0 || tier === 'voucher');
-        if (!showMaster && !showVoucher) {
-          return (
-            <div className="rounded-brand border border-dashed border-surface-border px-4 py-8 text-center text-sm text-ink-subtle">
-              No defects match this filter. <button type="button" onClick={clearFilters} className="font-semibold text-accent underline underline-offset-2">Clear</button>
-            </div>
-          );
-        }
-        return (
-          <div className="grid gap-4">
-            {showMaster && <DefectPanel kind="master" rows={master} cur={cur} onDrill={onDrill} onClear={clearFilters} />}
-            {showVoucher && <DefectPanel kind="voucher" rows={voucher} cur={cur} onDrill={onDrill} onClear={clearFilters} />}
-          </div>
-        );
-      })()}
     </div>
   );
 }
@@ -1039,26 +977,28 @@ function groupDefectsByVoucher(rows) {
     .sort((a, b) => b.legs.length - a.legs.length || b.absMax - a.absMax);
 }
 
-// One stacked panel of the Defect Register — master (ledger-level) OR voucher
-// (transaction-level). Master defects have no single offending voucher (the WHOLE
-// ledger is absent / renamed), so their middle column is the *reason*. Voucher
-// defects toggle between two lenses: BY VOUCHER (default — one row per voucher, so a
-// single fix visibly clears its many ledger legs) and BY LEDGER (the raw legs).
-function DefectPanel({ kind, rows, cur, onDrill, onClear }) {
-  const master = kind === 'master';
-  const [view, setView] = useState('voucher');   // voucher panel: 'voucher' (grouped) | 'ledger' (raw legs)
-  const grouped = !master && view === 'voucher';
+// One side-section of Unmatched Entries — all rows share a single defect type
+// (Not in ERP / Not in Tally / Amount differs). Two lenses: BY VOUCHER (default —
+// one row per voucher number, so a single fix visibly clears its many ledger legs)
+// and BY LEDGER (the raw legs). An empty section still renders, reading as "clean
+// on this side", so a reviewer sees both sides at a glance.
+function EntrySection({ section, rows, cur, onDrill }) {
+  const [view, setView] = useState('voucher');   // 'voucher' (by number, grouped) | 'ledger' (raw legs)
+  const grouped = view === 'voucher';
   const groups = useMemo(() => (grouped ? groupDefectsByVoucher(rows) : []), [grouped, rows]);
+  const count = grouped ? groups.length : rows.length;
+  const dot = section.tone === 'danger' ? 'bg-danger' : 'bg-warning';
   return (
     <section className="overflow-hidden rounded-brand border border-surface-border bg-surface shadow-card">
       <header className="border-b border-surface-border bg-surface-alt/60 px-4 py-3">
         <h4 className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
-          {master ? 'Master defects' : 'Voucher defects'}
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">· {master ? 'ledger-level' : grouped ? 'by voucher' : 'by ledger leg'}</span>
-          <span className="rounded-full bg-surface-alt px-2 text-xs font-bold tabular-nums text-ink-muted">{grouped ? groups.length : rows.length}</span>
-          {grouped && groups.length > 0 && <span className="text-[11px] font-semibold text-ink-subtle">{rows.length} legs</span>}
-          {!master && (
-            <div className="ml-auto inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-[11px] font-semibold" role="group" aria-label="Group voucher defects">
+          <span className={`inline-block h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
+          {section.title}
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">· {grouped ? 'by voucher' : 'by ledger leg'}</span>
+          <span className="rounded-full bg-surface-alt px-2 text-xs font-bold tabular-nums text-ink-muted">{count}</span>
+          {grouped && groups.length > 0 && rows.length !== groups.length && <span className="text-[11px] font-semibold text-ink-subtle">{rows.length} legs</span>}
+          {rows.length > 0 && (
+            <div className="ml-auto inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-[11px] font-semibold" role="group" aria-label={`Group ${section.title} by`}>
               {[{ k: 'voucher', l: 'By voucher' }, { k: 'ledger', l: 'By ledger' }].map((o) => (
                 <button key={o.k} type="button" aria-pressed={view === o.k} onClick={() => setView(o.k)}
                   className={`rounded-[6px] px-2.5 py-1 transition focus:outline-none focus:ring-2 focus:ring-accent ${view === o.k ? 'bg-accent text-navy shadow-card' : 'text-ink-muted hover:text-ink'}`}>
@@ -1068,56 +1008,42 @@ function DefectPanel({ kind, rows, cur, onDrill, onClear }) {
             </div>
           )}
         </h4>
-        <p className="mt-0.5 text-xs text-ink-muted">
-          {master
-            ? 'The whole ledger is missing or named differently on one side. Fix in Tally — create / rename / regroup — then re-upload. Clearing these usually clears the voucher mismatches on the same ledger too.'
-            : grouped
-              ? 'Grouped by voucher — one voucher touches many ledgers, so fixing it once clears every leg below. Click a row to open the voucher; ▸ show its ledger legs.'
-              : 'Individual voucher legs that don’t tie. Fix the specific voucher in ERP or Tally.'}
-        </p>
+        <p className="mt-0.5 text-xs text-ink-muted">{section.blurb}</p>
       </header>
       <div className="overflow-x-auto">
-        {grouped
-          ? <VoucherGroupedTable groups={groups} cur={cur} onDrill={onDrill} onClear={onClear} />
-          : <LedgerLegTable master={master} rows={rows} cur={cur} onDrill={onDrill} onClear={onClear} />}
+        {rows.length === 0
+          ? <div className="px-4 py-6 text-center text-sm text-ink-subtle">✓ Nothing here — every entry on this side has a match.</div>
+          : grouped
+            ? <VoucherGroupedTable groups={groups} cur={cur} onDrill={onDrill} />
+            : <LedgerLegTable rows={rows} cur={cur} onDrill={onDrill} />}
       </div>
     </section>
   );
 }
 
-// The raw one-row-per-leg table (master reasons, or voucher legs in the "By ledger" lens).
-function LedgerLegTable({ master, rows, cur, onDrill, onClear }) {
+// The raw one-row-per-leg table (a section's "By ledger" lens).
+function LedgerLegTable({ rows, cur, onDrill }) {
   return (
     <table className="w-full text-sm" style={{ minWidth: 640 }}>
       <thead>
         <tr className="border-b border-surface-border text-xs uppercase tracking-wider text-ink-subtle">
           <th className="px-4 py-2 text-left font-bold">Ledger</th>
-          <th className="px-4 py-2 text-left font-bold">{master ? 'Reason' : 'Voucher'}</th>
+          <th className="px-4 py-2 text-left font-bold">Voucher</th>
           <th className="px-4 py-2 text-right font-bold">Amount</th>
           <th className="px-4 py-2 text-right font-bold">Defect</th>
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? (
-          <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-ink-subtle">No {master ? 'master' : 'voucher'} defects match this filter. <button type="button" onClick={onClear} className="font-semibold text-accent underline underline-offset-2">Clear</button></td></tr>
-        ) : rows.map((d, i) => {
+        {rows.map((d, i) => {
           const m = defectMeta(d.type);
           return (
-            <tr key={i} onClick={() => onDrill({ ledger: d.ledger, focusVoucherId: d.voucherId || null, focusRef: master ? null : (d.ref || null) })}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDrill({ ledger: d.ledger, focusVoucherId: d.voucherId || null, focusRef: master ? null : (d.ref || null) }); } }}
+            <tr key={i} onClick={() => onDrill({ ledger: d.ledger, focusVoucherId: d.voucherId || null, focusRef: d.ref || null })}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDrill({ ledger: d.ledger, focusVoucherId: d.voucherId || null, focusRef: d.ref || null }); } }}
               role="button" tabIndex={0} aria-label={`Drill ${d.ledger} vouchers`}
               className="cursor-pointer border-b border-surface-border hover:bg-accent-soft focus:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-accent">
               <td className="px-4 py-2 font-semibold text-ink">{d.ledger}</td>
-              {master ? (
-                <td className="px-4 py-2 text-ink-muted">
-                  <span className="block">{d.desc || '—'}</span>
-                  {d.suggest ? <span className="mt-0.5 block text-[10.5px] font-semibold text-info" title="Closest unmatched Tally ledger — if it's the same account, rename it in Tally to match ERP (counted once, not twice)">Did you mean Tally “{d.suggest.ledger}”? — rename it in Tally to match ERP</span> : null}
-                  {d.strandedCount ? <span className="mt-0.5 block text-[10.5px] font-semibold text-warning" title="ERP postings on this ledger with no Tally counterpart — they'll reconcile once this ledger exists in Tally">{d.strandedCount} ERP {d.strandedCount === 1 ? 'entry has' : 'entries have'} no Tally match</span> : null}
-                </td>
-              ) : (
-                <td className="px-4 py-2"><span className="block text-ink">{d.desc || '—'}</span>
-                  <span className="font-mono text-xs text-ink-subtle">{[d.date, d.vtype, d.ref].filter(Boolean).join(' · ') || '—'}</span></td>
-              )}
+              <td className="px-4 py-2"><span className="block text-ink">{d.desc || '—'}</span>
+                <span className="font-mono text-xs text-ink-subtle">{[d.date, d.vtype, d.ref].filter(Boolean).join(' · ') || '—'}</span></td>
               <td className="px-4 py-2 text-right font-mono tabular-nums">{fmt(d.amount, cur)}</td>
               <td className="px-4 py-2 text-right"><Badge tone={m.tone} size="sm" dot>{m.label}</Badge></td>
             </tr>
@@ -1128,9 +1054,9 @@ function LedgerLegTable({ master, rows, cur, onDrill, onClear }) {
   );
 }
 
-// The BY-VOUCHER table: one row per voucher, expandable to its ledger legs. A row click
-// opens the voucher (drill focus); the ▸ chip toggles the leg preview inline.
-function VoucherGroupedTable({ groups, cur, onDrill, onClear }) {
+// The BY-VOUCHER table: one row per voucher number, expandable to its ledger legs. A row
+// click opens the voucher (drill focus); the ▸ chip toggles the leg preview inline.
+function VoucherGroupedTable({ groups, cur, onDrill }) {
   return (
     <table className="w-full text-sm" style={{ minWidth: 640 }}>
       <thead>
@@ -1142,9 +1068,7 @@ function VoucherGroupedTable({ groups, cur, onDrill, onClear }) {
         </tr>
       </thead>
       <tbody>
-        {groups.length === 0 ? (
-          <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-ink-subtle">No voucher defects match this filter. <button type="button" onClick={onClear} className="font-semibold text-accent underline underline-offset-2">Clear</button></td></tr>
-        ) : groups.map((g) => <VoucherGroupRow key={g.key} g={g} cur={cur} onDrill={onDrill} />)}
+        {groups.map((g) => <VoucherGroupRow key={g.key} g={g} cur={cur} onDrill={onDrill} />)}
       </tbody>
     </table>
   );

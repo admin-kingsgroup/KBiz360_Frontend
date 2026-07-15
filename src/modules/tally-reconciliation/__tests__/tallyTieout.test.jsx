@@ -83,9 +83,13 @@ describe('Tally Reconciliation · pill + routes', () => {
       '/tally-reconciliation/guide',                                                       // Help · staff guide
     ]);
   });
-  test('appears in the full menu for a Super Admin', () => {
-    const labels = getMenu('ALL', { role: 'Super Admin' }).map((m) => m.label);
-    expect(labels).toContain('Tally Reconciliation');
+  test('is TK Group Central ONLY — in the cockpit, NOT on the branch full menu', () => {
+    // Tally Reconciliation is a TK Group activity now (the BE also 403s branch tokens).
+    const branchLabels = getMenu('ALL', { role: 'Super Admin' }).map((m) => m.label);
+    expect(branchLabels).not.toContain('Tally Reconciliation');
+    const { controlCockpitMenu } = require('../../tk-group/cockpit');
+    const cockpitLabels = controlCockpitMenu('', { role: 'Super Admin' }).filter(Boolean).map((m) => m.label);
+    expect(cockpitLabels).toContain('Tally Reconciliation');
   });
   test('every /tally-reconciliation pill href resolves to a route (+ bare path)', () => {
     const paths = tallyReconRoutes.map((r) => r.path);
@@ -489,11 +493,11 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(await screen.findByText('Tally Reconciliation · Yearly Tie-Out')).toBeInTheDocument();
   });
 
-  test('Defects tab shows the classified Defect Register (Phase 2)', async () => {
+  test('Unmatched Entries tab shows the by-side register (Phase 2)', async () => {
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
-    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab (word also appears in the certificate message)
-    expect(await screen.findByText(/In Tally, not ERP: 1/)).toBeInTheDocument(); // summary chip
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ })); // the tab (words also appear in the certificate message)
+    expect(await screen.findByText('Not in ERP: 1')).toBeInTheDocument(); // summary chip (default mock: 1 missing-in-erp)
     expect(screen.getByText('3 off ledgers')).toBeInTheDocument();
   });
 
@@ -519,8 +523,8 @@ describe('Tally Reconciliation · tie-out board render', () => {
     });
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('Travkings NBO');                              // tie-out loaded (default TB tab)
-    fireEvent.click(screen.getByRole('button', { name: /Defects/ }));      // → Defect Register
-    await screen.findByText(/In Tally, not ERP: 1/);                       // register rendered
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));      // → Unmatched Entries
+    await screen.findByText('Not in ERP: 1');                             // register rendered
     // The Voucher-defect panel defaults to the By-Voucher lens (ledger names live inside the
     // expandable legs); switch to By ledger to click the ledger row directly.
     fireEvent.click(screen.getByRole('button', { name: /^By ledger$/ }));
@@ -530,7 +534,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(await screen.findByText('inter-branch')).toBeInTheDocument();
   });
 
-  test('Defect Register — tier segment + type chips filter the table, Clear resets', async () => {
+  test('Unmatched Entries — voucher defects split into Not in ERP / Not in Tally; whole-ledger (master) gaps are excluded', async () => {
     const { getDefects } = require('../api');
     getDefects.mockResolvedValueOnce({
       branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 5,
@@ -544,61 +548,41 @@ describe('Tally Reconciliation · tie-out board render', () => {
     });
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
-    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
-    // All four defects present. Voucher-tier rows render BY VOUCHER (their ref); master-tier
-    // rows render under the master panel (by ledger).
-    expect(await screen.findByText('V1')).toBeInTheDocument();   // Alpha's voucher
-    expect(screen.getByText('V2')).toBeInTheDocument();          // Beta's voucher
-    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
-    expect(screen.getByText('Delta Master')).toBeInTheDocument();
-
-    // Master tier → only the two ledger-absent (structural) rows survive.
-    fireEvent.click(screen.getByRole('button', { name: /Master mismatches/ }));
-    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
-    expect(screen.getByText('Delta Master')).toBeInTheDocument();
-    expect(screen.queryByText('V1')).not.toBeInTheDocument();
-    expect(screen.queryByText('V2')).not.toBeInTheDocument();
-    expect(screen.getByText('Showing 2 of 4 defects')).toBeInTheDocument();
-
-    // Toggle the "Ledger absent in Tally" chip → narrows to just Gamma.
-    fireEvent.click(screen.getByRole('button', { name: /Ledger absent in Tally: 1/ }));
-    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ })); // the tab
+    // Both side-sections render, each grouped by voucher number.
+    expect(await screen.findByText('Not in ERP')).toBeInTheDocument();
+    expect(screen.getByText('Not in Tally')).toBeInTheDocument();
+    expect(screen.getByText('V1')).toBeInTheDocument();   // Alpha (In ERP, not Tally → Not in Tally)
+    expect(screen.getByText('V2')).toBeInTheDocument();   // Beta  (In Tally, not ERP → Not in ERP)
+    // Whole-ledger (master) gaps are NOT shown here — they live in Ledger Matcher.
+    expect(screen.queryByText('Gamma Master')).not.toBeInTheDocument();
     expect(screen.queryByText('Delta Master')).not.toBeInTheDocument();
-
-    // Clear → every row returns and the "Showing X of Y" line is gone.
-    fireEvent.click(screen.getByRole('button', { name: /^Clear$/ }));
-    expect(screen.getByText('V1')).toBeInTheDocument();
-    expect(screen.getByText('Delta Master')).toBeInTheDocument();
-    expect(screen.queryByText(/Showing \d+ of \d+ defects/)).not.toBeInTheDocument();
   });
 
-  test('Defect Register — master and voucher defects render as two separate stacked panels', async () => {
+  test('Unmatched Entries — Not in ERP / Not in Tally / Amount differs render as separate sections; master gaps excluded', async () => {
     const { getDefects } = require('../api');
     getDefects.mockResolvedValueOnce({
       branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 5,
-      summary: { total: 3, byType: { 'missing-in-tally': 1, 'ledger-missing-tally': 1, 'amount-mismatch': 1 } },
+      summary: { total: 4, byType: { 'missing-in-erp': 1, 'missing-in-tally': 1, 'amount-mismatch': 1, 'ledger-missing-tally': 1 } },
       defects: [
+        { ledger: 'Beta Ledger', date: '2026-07-02', ref: 'V2', desc: 'only in tally', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 200, variance: 0, side: 'tally' },
         { ledger: 'Alpha Ledger', date: '2026-07-01', ref: 'V1', desc: 'only in erp', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 100, variance: 0, side: 'erp' },
-        { ledger: 'Gamma Master', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 300, variance: 300, side: 'balance' },
         { ledger: 'Zeta Ledger', date: '2026-07-03', ref: 'V3', desc: 'amount off', type: 'amount-mismatch', label: 'Amount differs', amount: 50, variance: 10, side: 'both' },
+        { ledger: 'Gamma Master', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 300, variance: 300, side: 'balance' },
       ],
     });
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
-    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
-    // Under "All" both panels render, each with its own header — never one merged list.
-    expect(await screen.findByText('Master defects')).toBeInTheDocument();
-    expect(screen.getByText('Voucher defects')).toBeInTheDocument();
-    // The ledger-level defect lives under the master panel (by ledger); the two posting defects
-    // under the voucher panel — shown BY VOUCHER (their refs).
-    expect(screen.getByText('Gamma Master')).toBeInTheDocument();
-    expect(screen.getByText('V1')).toBeInTheDocument();   // Alpha's voucher
-    expect(screen.getByText('V3')).toBeInTheDocument();   // Zeta's voucher
-    // Selecting the Voucher tier drops the master panel entirely.
-    fireEvent.click(screen.getByRole('button', { name: /Voucher mismatches/ }));
-    expect(screen.queryByText('Master defects')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ })); // the tab
+    // Three sections, each with its own header — never one merged list.
+    expect(await screen.findByText('Not in ERP')).toBeInTheDocument();
+    expect(screen.getByText('Not in Tally')).toBeInTheDocument();
+    expect(screen.getByText('Amount differs: 1')).toBeInTheDocument();   // the amount-differs summary chip
+    // Vouchers land under their side; the master gap is excluded (it's a Ledger Matcher item).
+    expect(screen.getByText('V1')).toBeInTheDocument();   // Not in Tally
+    expect(screen.getByText('V2')).toBeInTheDocument();   // Not in ERP
+    expect(screen.getByText('V3')).toBeInTheDocument();   // Amount differs
     expect(screen.queryByText('Gamma Master')).not.toBeInTheDocument();
-    expect(screen.getByText('V1')).toBeInTheDocument();
   });
 
   test('Defect Register — By Voucher collapses one voucher’s many ledger legs into a single row', async () => {
@@ -615,7 +599,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     });
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
-    fireEvent.click(screen.getByRole('button', { name: /Defects/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
     // ONE voucher row by default, not three; the ledger legs are hidden until expanded.
     expect(await screen.findByText('RF/BOM/26/0039')).toBeInTheDocument();
     expect(screen.getByText(/SO\/BOM\/26\/0128/)).toBeInTheDocument();               // link no shown on the row
@@ -630,22 +614,23 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('SVC2 CGST Output [BOM]')).toBeInTheDocument();
   });
 
-  test('Defect Register — master panel shows the rename hint, stranded count and the collapsed-pairs badge', async () => {
+  test('Unmatched Entries — a side with no rows shows the clean ✓ state; ledger-level rename/stranded cues do NOT appear here', async () => {
     const { getDefects } = require('../api');
     getDefects.mockResolvedValueOnce({
-      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 4, pairedRenames: 1,
-      summary: { total: 2, byType: { 'ledger-missing-tally': 2 } },
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 2, pairedRenames: 1,
+      summary: { total: 1, byType: { 'missing-in-tally': 1 } },
+      // Only an ERP-only voucher: "Not in Tally" has a row, "Not in ERP" is clean.
       defects: [
-        { ledger: 'Round Off', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 0.1, variance: 0.1, side: 'balance', suggest: { ledger: 'Rounded Off', code: '', score: 0.88, side: 'tally' } },
-        { ledger: 'Consultancy Fees', date: '', ref: '', desc: 'no Tally Day Book imported for this ledger', type: 'ledger-missing-tally', label: 'Ledger absent in Tally', amount: 5000, variance: 5000, side: 'balance', strandedCount: 7 },
+        { ledger: 'Round Off', date: '2026-07-04', ref: 'V9', desc: 'rounding', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 0.1, variance: 0, side: 'erp' },
       ],
     });
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
-    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
-    expect(await screen.findByText(/Did you mean Tally “Rounded Off”/)).toBeInTheDocument(); // fuzzy rename hint
-    expect(screen.getByText(/7 ERP entries have no Tally match/)).toBeInTheDocument();       // stranded-entry blast radius
-    expect(screen.getByText(/1 rename pair collapsed/)).toBeInTheDocument();                 // de-dup badge
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ })); // the tab
+    expect(await screen.findByText('V9')).toBeInTheDocument();                        // ERP-only voucher → Not in Tally
+    expect(screen.getByText(/Nothing here — every entry on this side has a match/)).toBeInTheDocument(); // Not in ERP is clean
+    // Whole-ledger cues (collapsed-pairs badge / stranded count / rename hint) are a Ledger-Matcher concern now.
+    expect(screen.queryByText(/rename pair collapsed/)).not.toBeInTheDocument();
   });
 
   test('clicking an off ledger opens the voucher drill drawer (Phase 2)', async () => {
@@ -836,7 +821,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     const { getDefects, getTieOut } = require('../api');
     wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
     await screen.findByText('HDFC Bank A/c');
-    fireEvent.click(screen.getByRole('button', { name: /Defects/ })); // the tab
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ })); // the tab
     await screen.findByText('3 off ledgers'); // the Defect Register loaded
     const defectsBefore = getDefects.mock.calls.length;
     const tieBefore = getTieOut.mock.calls.length;

@@ -110,7 +110,7 @@ export function TallyGuidePage({ setRoute }) {
             </div>
           ))}
         </div>
-        <p className="mt-3 text-sm text-ink-muted">The <b className="text-ink">Defects</b> tab collects every off ledger, classified (missing-in-ERP / missing-in-Tally / amount differs). Click any row to drill to its vouchers.</p>
+        <p className="mt-3 text-sm text-ink-muted">The <b className="text-ink">Unmatched Entries</b> tab lists the vouchers on only one side — <b>Not in ERP</b> / <b>Not in Tally</b> (plus an amount-differs band), grouped by voucher number; click one to drill its ledger legs. The <b className="text-ink">Ledger Matcher</b> tab does the same for whole ledger &amp; master names — <b>Not in ERP</b> / <b>Not in Tally</b> — with the rename / regroup / split to make in Tally.</p>
       </PageSection>
 
       {/* 4 · the certificate + gate */}

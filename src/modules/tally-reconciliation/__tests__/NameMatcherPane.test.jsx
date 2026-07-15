@@ -35,8 +35,9 @@ describe('<NameMatcherPane>', () => {
     expect(screen.getByText('SVC2 CGST Output [BOM]')).toBeInTheDocument();
     expect(screen.getAllByText(/No Tally twin/i).length).toBeGreaterThan(0);
 
-    // CGST Purchase has no ERP twin → unmatched-Tally panel
-    expect(screen.getByText(/In Tally, no ERP twin suggested/i)).toBeInTheDocument();
+    // Two side-sections; CGST Purchase (no ERP twin) sits under "Not in ERP".
+    expect(screen.getByText('Not in ERP')).toBeInTheDocument();
+    expect(screen.getByText('Not in Tally')).toBeInTheDocument();
     expect(screen.getByText('CGST Purchase')).toBeInTheDocument();
   });
 
