@@ -42,16 +42,18 @@ export function MasterControl() {
     <div className="grid gap-4">
       <PageSection title="Raise a master change">
         {msg ? <div role="status" className="mb-2.5 rounded-md bg-success-soft px-3 py-1.5 text-xs text-success">{msg}</div> : null}
-        <form onSubmit={submit} aria-label="Raise a master change" className="grid max-w-[460px] gap-2.5">
-          <FormField label="Change kind">
-            <Select aria-label="Change kind" value={kind} onChange={(e) => setKind(e.target.value)}>
-              {MASTER_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
-            </Select>
-          </FormField>
-          <FormField label="Head / target">
-            <Input aria-label="Head or target" placeholder="e.g. ledger name or code" value={target} onChange={(e) => setTarget(e.target.value)} />
-          </FormField>
-          <FormField label="Detail (optional)">
+        <form onSubmit={submit} aria-label="Raise a master change" className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3 tablet:grid-cols-2">
+            <FormField label="Change kind">
+              <Select aria-label="Change kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+                {MASTER_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Head / target">
+              <Input aria-label="Head or target" placeholder="e.g. ledger name or code" value={target} onChange={(e) => setTarget(e.target.value)} />
+            </FormField>
+          </div>
+          <FormField label="Detail (optional)" className="max-w-xl">
             <Textarea aria-label="Detail" rows={2} value={detail} onChange={(e) => setDetail(e.target.value)} />
           </FormField>
           <Button type="submit" variant="primary" size="sm" disabled={!valid} className="justify-self-start">
