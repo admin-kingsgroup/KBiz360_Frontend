@@ -71,6 +71,10 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
 
   const un = st?.unreconciled || {};
   const label = ledgerLabel || name || code;
+  // Usable freeze state = loaded AND the backend reached the DB. A null fetch (API
+  // error) or a { connected:false } payload both mean "can't read status" — treat
+  // them the same so the panel never shows a bare/greyed control with no reason.
+  const ok = !!st && st.connected !== false;
 
   const doFreeze = async () => {
     if (!st?.canFreeze) return;
@@ -120,7 +124,7 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
     ? <span style={pill('#0f2f5c', '#fff')}><Lock size={10} style={{ verticalAlign: -1 }} /> Certified</span>
     : st?.frozen
       ? <span style={pill('#e6f1fb', '#185FA5')}><Snowflake size={10} style={{ verticalAlign: -1 }} /> Frozen{st.signatures ? ` · ${st.signatures} signed` : ''}</span>
-      : st
+      : ok
         ? <span style={pill('#eef1f5', C.dim)}>Open</span>
         : <span style={pill('#fdeab0', '#8a5a00')}>Status unavailable</span>;
 
@@ -136,7 +140,7 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
       </div>
 
       {/* Reconciled-gate message when open and not yet freezable + jump-to-blockers chip */}
-      {st && !st.frozen && !st.certified && (un.total == null
+      {ok && !st.frozen && !st.certified && (un.total == null
         ? <span style={{ fontSize: 11, color: C.dim }}>{un.error ? `Can't check: ${un.error}` : ''}</span>
         : un.total > 0
           ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11.5, color: '#8a5a00', fontWeight: 700 }}>
@@ -155,25 +159,25 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        {/* Freeze state couldn't be read (API error → fail-soft null): never a silent
-            dead-end — surface it and let the user retry instead of showing a bare "Open". */}
-        {!loading && !st && (
+        {/* Freeze state couldn't be read (API error → fail-soft null, or DB down →
+            connected:false): never a silent dead-end — surface it and let the user retry. */}
+        {!loading && !ok && (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#8a5a00' }}>
             Couldn't load freeze status
             <button type="button" onClick={() => refresh()}
               style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Retry</button>
           </span>
         )}
-        {st && !st.certified && (
+        {ok && !st.certified && (
           <FreezeTab frozen={!!st.frozen} canFreeze={!!st.canFreeze} busy={busy}
             onFreeze={doFreeze} onUnfreeze={doUnfreeze} />
         )}
-        {st && st.frozen && !st.certified && st.nextSigner && (
+        {ok && st.frozen && !st.certified && st.nextSigner && (
           <button onClick={doSign} disabled={busy} style={{ ...aBtn(C.green), opacity: busy ? 0.6 : 1 }}>
             <PenLine size={12} style={{ verticalAlign: -2 }} /> Sign as {st.nextSigner}
           </button>
         )}
-        {st && st.certified && (
+        {ok && st.certified && (
           <span style={{ fontSize: 11, color: C.dim }}><Lock size={11} style={{ verticalAlign: -1 }} /> Re-open in the Certification register to change.</span>
         )}
       </div>

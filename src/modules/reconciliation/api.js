@@ -64,7 +64,10 @@ export function freezeSnapshot(id, { statementBalance, adjustments }) {
 // ledger for a month (BE refuses unless every entry is reconciled), or un-freeze
 // (SOFT-lock release while unsigned). Ledger keyed by CODE or NAME.
 export async function getLedgerFreeze({ branch, code, name, period, tier = 'month' } = {}) {
-  try { return (await apiGet('/api/reconciliation/ledger-freeze', { branch, code, name, period, tier }))?.data || null; }
+  // apiGet's response interceptor already unwraps the { success, data } envelope,
+  // so this resolves to the freeze-state object directly — do NOT re-read `.data`
+  // (that always yielded undefined → null and left the Freeze panel non-functional).
+  try { return (await apiGet('/api/reconciliation/ledger-freeze', { branch, code, name, period, tier })) || null; }
   catch { return null; }
 }
 export function freezeLedger({ branch, code, name, period, tier = 'month', statementBalance, adjustments }) {
@@ -76,11 +79,13 @@ export function unfreezeLedger({ branch, code, name, period, tier = 'month' }) {
 // Inter-Branch pair freeze (no per-ledger cert — a branch-pair balance agreement).
 // One call → every pair's month-scoped agreement + freeze/signing state (avoids N× reconcile).
 export async function getIbFreezeAll({ period } = {}) {
-  try { return (await apiGet('/api/interbranch-reconciliation/freeze/status-all', { period }))?.data || []; }
+  // Envelope already unwrapped by the interceptor → resolves to the pair-status ARRAY
+  // directly. Re-reading `.data` here always gave [] and left every pair's freeze state blank.
+  try { return (await apiGet('/api/interbranch-reconciliation/freeze/status-all', { period })) || []; }
   catch { return []; }
 }
 export async function getIbFreeze({ branchA, branchB, period } = {}) {
-  try { return (await apiGet('/api/interbranch-reconciliation/freeze', { branchA, branchB, period }))?.data || null; }
+  try { return (await apiGet('/api/interbranch-reconciliation/freeze', { branchA, branchB, period })) || null; }
   catch { return null; }
 }
 export function ibUnfreeze({ branchA, branchB, period }) {
