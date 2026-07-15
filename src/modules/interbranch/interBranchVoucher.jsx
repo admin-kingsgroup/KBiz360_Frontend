@@ -212,7 +212,7 @@ export function InterBranchVoucher({ branch }) {
           <div style={{ fontSize: 11, fontWeight: 800, color: C.dim, textTransform: 'uppercase', marginBottom: 8 }}>Open inter-branch legs sent TO {fromBranch} ({incoming.length}) — book these on SO/PO/GP</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead><tr style={{ textAlign: 'left', color: C.dim }}>
-              <th style={{ padding: '4px 8px' }}>INB Link No</th><th style={{ padding: '4px 8px' }}>From</th><th style={{ padding: '4px 8px' }}>Date</th><th style={{ padding: '4px 8px' }}>Passenger</th><th style={{ padding: '4px 8px', textAlign: 'right' }}>Total</th></tr></thead>
+              <th style={{ padding: '4px 8px' }}>INB Link No</th><th style={{ padding: '4px 8px' }}>From</th><th style={{ padding: '4px 8px' }}>Date</th><th style={{ padding: '4px 8px' }}>Passenger</th><th style={{ padding: '4px 8px', textAlign: 'right' }}>FX Rate</th><th style={{ padding: '4px 8px', textAlign: 'right' }}>Total</th></tr></thead>
             <tbody>
               {incoming.map((l) => {
                 // The leg's total is in the SELLER's currency. This branch is the BUYER, so a
@@ -227,6 +227,10 @@ export function InterBranchVoucher({ branch }) {
                   <td style={{ padding: '4px 8px' }}>{l.fromBranch}</td>
                   <td style={{ padding: '4px 8px' }}>{l.date}</td>
                   <td style={{ padding: '4px 8px' }}>{l.passenger || '—'}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: lfx ? C.blue : C.dim }}
+                    title={lfx ? `Frozen at deal creation (${lfx.fromCcy}→${lfx.toCcy})` : 'Same-currency deal — no FX'}>
+                    {lfx ? `1 USD = ₹${Number(l.fx.rate).toLocaleString(localeOf('₹'), { minimumFractionDigits: 2, maximumFractionDigits: 4 })}` : '—'}
+                  </td>
                   <td style={{ padding: '4px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                     title={lfx ? `${CCY_SYM[lfx.fromCcy] || ''}${r2(l.total).toLocaleString()} @ 1 USD = ₹${Number(l.fx.rate).toLocaleString()}` : undefined}>
                     {sym}{(shown == null ? r2(l.total) : shown).toLocaleString(localeOf(sym))}
