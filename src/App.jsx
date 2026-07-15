@@ -28,7 +28,7 @@ import { canReachRoute, expandHidden } from './core/menus';
    ── */
 const { BudgetPlanning, DashboardRouter, DocumentTypeMaster, FxRevaluation, MarkupRateSheet, MsmeTracker, PackagePnL, PendingApprovals, Recruitment, SeatInventory, TdsCertRegister, UxPreferences } = lazyModule(() => import('./core/helpers'));
 const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RPT_CashPosition, RPT_CurrencyExposure, RPT_CustomerLTV, RPT_LeaveUtilization, RPT_StatutoryDues, RPT_TaxFilingBoard, RPT_YieldConsultant, RPT_YieldDestination, RPT_YieldSupplier, RPT_YoY } = lazyModule(() => import('./core/styles'));
-const { RPT_InterbranchElim, InterBranchRegister, InterBranchMatrix, InterBranchCounterpartyLedger } = lazyModule(() => import('./modules/interbranch'));
+const { RPT_InterbranchElim, InterBranchRegister, InterBranchMatrix, InterBranchCounterpartyLedger, InboundInterBranch } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/reports/salesGpAnalytics'));
 const { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } = lazyModule(() => import('./modules/assets'));
 const { Dashboard, AlertsDashboard, OwnerDashboard, AdCockpit, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
@@ -606,6 +606,7 @@ export default function KB360App(){
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/client-reco")   return <ClientReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/interbranch-reco") return <InterBranchReco branch={branch} setRoute={navigate}/>;
+    if(route==="/accounts/inb-inbound")    return <InboundInterBranch branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-register")   return <InterBranchRegister branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-matrix")     return <InterBranchMatrix branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-counterparty") return <InterBranchCounterpartyLedger branch={branch} setRoute={navigate}/>;

@@ -388,6 +388,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
      Voucher itself stays under Daily Entry ▸ Sales & Inter-Branch (it's a daily
      entry); these are the read-only analytics over the INB Link registry. */
   {label:"Inter Branch", children:[
+    {label:"Inbound · Convert",         href:"/accounts/inb-inbound"},
     {label:"Trade Matrix & Margin",     href:"/accounts/inb-matrix"},
     {label:"Register & P&L Breakdown",  href:"/accounts/inb-register"},
     {label:"Counterparty Ledger",       href:"/accounts/inb-counterparty"},

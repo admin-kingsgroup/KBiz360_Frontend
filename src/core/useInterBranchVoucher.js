@@ -43,6 +43,17 @@ export function useInbReconcile(branch) {
   });
 }
 
+// Buyer worklist: inbound INB deals sent TO this branch, split pending-conversion / converted.
+export function useInbInbound(branch) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['inb', 'inbound', code || 'all'],
+    queryFn: () => apiGet('/api/inter-branch/inbound', { branch: code }),
+    enabled: enabled(),
+    staleTime: 15_000,
+  });
+}
+
 // Inter-branch P&L breakdown: counterparty branch → module → component.
 export function useInbPnlBreakdown(branch, { from, to } = {}) {
   const code = branchCode(branch);

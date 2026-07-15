@@ -10,5 +10,6 @@ export * from './interbranch';
 export { InterBranchRegister } from '../accounts/inter-branch/registerPl';
 export { InterBranchMatrix } from '../accounts/inter-branch/tradeMatrix';
 export { InterBranchCounterpartyLedger } from '../accounts/inter-branch/counterpartyLedger';
+export { InboundInterBranch } from '../accounts/inter-branch/inboundInterBranch';
 export { RPT_InterbranchElim } from '../reports/financial-statements/interbranchElimination';
 export * from './interBranchVoucher';
