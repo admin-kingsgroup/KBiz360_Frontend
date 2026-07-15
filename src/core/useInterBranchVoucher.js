@@ -107,3 +107,6 @@ export const useCreateInb = () => useInbMutation((body) => apiPost('/api/inter-b
 export const useUpdateInb = () => useInbMutation((body) => apiPut('/api/inter-branch/deal', body));
 export const useBookInb   = () => useInbMutation(({ id, ...body }) => apiPost(`/api/inter-branch/${id}/book`, body));
 export const useReopenInb = () => useInbMutation(({ id }) => apiPost(`/api/inter-branch/${id}/reopen`));
+// Cascade delete-and-recreate correction: soft-deletes BOTH sides of the deal (buyer SO/PO/GP
+// + seller INB legs, reversing postings) and retires the link. BOM then re-raises a fresh deal.
+export const useDeleteInbDeal = () => useInbMutation((body) => apiPost('/api/inter-branch/delete', body));

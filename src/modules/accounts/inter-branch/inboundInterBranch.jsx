@@ -5,8 +5,9 @@
 // book currency with the seller's ₹ breakdown for reference. Read-only; the actual
 // convert/complete happens on the pending SO/PO/GP booking.
 import React, { useState } from 'react';
-import { useInbInbound } from '../../../core/useInterBranchVoucher';
+import { useInbInbound, useDeleteInbDeal } from '../../../core/useInterBranchVoucher';
 import { localeOf } from '../../../core/format';
+import { toast } from '../../../core/ux/toast';
 
 const C = { dark: '#0d1326', blue: '#185FA5', dim: '#5a6691', border: '#cdd1d8', green: '#27500A', amber: '#8a6d00', bg: '#f7f9fc' };
 const CCY_SYM = { INR: '₹', USD: '$' };
@@ -27,6 +28,17 @@ export function InboundInterBranch({ branch, setRoute }) {
   const rows = Array.isArray(data.rows) ? data.rows : [];
   const [tab, setTab] = useState('pending');
   const shown = rows.filter((r) => r.state === tab);
+  const del = useDeleteInbDeal();
+  // Cascade delete — reverses BOTH sides (kept for audit); the selling branch re-raises a fresh,
+  // corrected deal. Used when the seller's cost was wrong after we converted (it can't be edited).
+  const onDelete = (rw) => {
+    const reason = window.prompt(`Delete inter-branch deal ${rw.inbLinkNo}?\n\nBoth sides are reversed and soft-deleted (kept for audit); ${rw.fromBranch} then re-raises a corrected deal. Reason:`);
+    if (!reason || !reason.trim()) return;
+    del.mutate({ linkNo: rw.inbLinkNo, reason: reason.trim() }, {
+      onSuccess: () => toast(`Deal ${rw.inbLinkNo} deleted — ${rw.fromBranch} can re-raise a corrected deal`, 'success'),
+      onError: (e) => toast(e?.message || 'Delete failed', 'error'),
+    });
+  };
 
   const card = { background: '#fff', border: `1px solid ${C.border}`, borderRadius: 9, padding: 0, overflow: 'hidden' };
   const th = { padding: '8px 12px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: C.dim, textAlign: 'left', background: C.bg, borderBottom: `1px solid ${C.border}` };
@@ -87,10 +99,15 @@ export function InboundInterBranch({ branch, setRoute }) {
                     </div>
                   </td>
                   <td style={td}>
-                    {tab === 'pending'
-                      ? <button type="button" onClick={() => setRoute && setRoute('/bookings/pending')}
-                          style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: 'pointer', color: '#fff', background: C.green }}>Convert →</button>
-                      : <span style={{ fontFamily: 'monospace', color: C.dark }}>{rw.buyerBookingNo || '—'}<div style={{ fontSize: 10.5, color: C.dim }}>{rw.buyerStatus || ''}</div></span>}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {tab === 'pending'
+                        ? <button type="button" onClick={() => setRoute && setRoute('/bookings/pending')}
+                            style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: 'pointer', color: '#fff', background: C.green }}>Convert →</button>
+                        : <span style={{ fontFamily: 'monospace', color: C.dark }}>{rw.buyerBookingNo || '—'}<div style={{ fontSize: 10.5, color: C.dim }}>{rw.buyerStatus || ''}</div></span>}
+                      <button type="button" onClick={() => onDelete(rw)} disabled={del.isPending}
+                        title="Delete this deal — reverses both sides (kept for audit); the selling branch re-raises a corrected one"
+                        style={{ padding: '5px 9px', fontSize: 11, fontWeight: 700, border: '1px solid #A32D2D', borderRadius: 6, cursor: del.isPending ? 'default' : 'pointer', color: '#A32D2D', background: '#fff', opacity: del.isPending ? 0.6 : 1 }}>Delete</button>
+                    </div>
                   </td>
                 </tr>
               );
