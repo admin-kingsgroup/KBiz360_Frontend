@@ -19,7 +19,7 @@ import { useNavFocusStore } from '../../core/ux/navFocus';
 import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useRevokeVoucher, fetchRevokeCheck, useApproveMany, useApproveAll, branchCode } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 import { BookingApprovals, SoPoGpVoucherEntry } from '../bookingOrder';
-import { useInbDeal } from '../../core/useInterBranchVoucher';
+import { useInbDeal, useInbReconcile } from '../../core/useInterBranchVoucher';
 import { bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
 import { PeriodBar, periodRange } from '../../core/period';
@@ -897,6 +897,20 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const money = (n, brc) => fmtAmount(n, brc ? curOf(brc) : cur);
   const isApprover = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test(currentUser?.role || '');
   const chainCfg = useApprovalChain(); // three-level chain assignees (Check → Verify → Approve)
+  // The other half of the deal's story. The voucher legs know they were pushed; only the
+  // InbLink registry knows what the BUYER then did with it. Without this a Pushed row said
+  // "🔒 pushed" and nothing more — we hand a deal over and never learn whether it was taken
+  // up, so 290 pushed deals would be an unreadable pile. Joined by BOTH keys: engine-created
+  // deals display the INB link no, while folded/migrated ones display their sale vno.
+  const linkQ = useInbReconcile(branch);
+  const linkByRef = useMemo(() => {
+    const m = new Map();
+    for (const l of (linkQ.data?.links || [])) {
+      if (l.inbLinkNo) m.set(l.inbLinkNo, l);
+      if (l.saleVno) m.set(l.saleVno, l);
+    }
+    return m;
+  }, [linkQ.data]);
 
   const [status, setStatus] = useState(initialStatus || 'pending');
   const [open, setOpen] = useState(null);     // single expanded deal key (mirrors SO/PO/GP)
@@ -1249,7 +1263,18 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                     <tr style={{ borderTop: `1px solid ${C.border}` }}>
                       {actionTab && <td style={{ padding: '7px 12px' }}><input type="checkbox" checked={sel.has(d.key)} onChange={() => toggle(d.key)} aria-label={`select ${d.linkNo}`} /></td>}
                       <td {...clickable(() => setOpen((o) => (o === d.key ? null : d.key)))} title="Show JV details" style={{ padding: '7px 12px', fontFamily: 'monospace', color: C.blue, cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}>{open === d.key ? '▾ ' : '▸ '}{d.linkNo}
-                        {pushedTab && <span title="Pushed to the buyer branch — locked" style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>🔒 pushed</span>}</td>
+                        {pushedTab && <span title="Pushed to the buyer branch — locked" style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>🔒 pushed</span>}
+                        {/* What the BUYER did with it. A pushed deal is out of our hands but
+                            not out of our interest: until they Convert, nothing exists in
+                            their books and the deal is going nowhere. Saying "pushed" and
+                            stopping there left that invisible. */}
+                        {pushedTab && (() => {
+                          const lk = linkByRef.get(d.linkNo);
+                          if (!lk) return null;
+                          return lk.status === 'booked'
+                            ? <span title={`${d.to} converted it into ${lk.buyerBookingNo || 'their SO/PO/GP'}`} style={{ marginLeft: 5, padding: '1px 6px', borderRadius: 4, background: '#e7f3e7', color: C.green, fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>✓ converted{lk.buyerBookingNo ? ` · ${lk.buyerBookingNo}` : ''}</span>
+                            : <span title={`Offered to ${d.to} — it is in their INB · Incoming worklist, not yet accepted. Nothing exists in their books until they Convert.`} style={{ marginLeft: 5, padding: '1px 6px', borderRadius: 4, background: '#fdf3e0', color: '#8a6d00', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>awaiting {d.to} convert</span>;
+                        })()}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{fmtDate(d.date)}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{d.from} → {d.to}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{d.module}</td>

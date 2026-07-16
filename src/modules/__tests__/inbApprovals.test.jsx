@@ -10,6 +10,8 @@ const mockApproveMany = jest.fn();
 const mockApproveOne = jest.fn(() => Promise.resolve({}));
 const mockRejectAsync = jest.fn(() => Promise.resolve());
 const mockConfirm = jest.fn(() => Promise.resolve({ confirmed: true, reason: 'x' }));
+// The InbLink registry — the ONLY place that knows what the buyer did with a pushed deal.
+const mockInbLinks = jest.fn(() => []);
 
 // Route the edited-vouchers feed to its own mock so setting the deals list doesn't
 // accidentally populate the Edited tab.
@@ -32,6 +34,10 @@ jest.mock('../../core/useAccounting', () => ({
   // preview to mirror the Edit modal; no data needed here, just the two hooks present.
   useVoucher: jest.fn(() => ({ data: null, isLoading: false })),
   useVoucherPreview: jest.fn(() => ({ data: {} })),
+}));
+jest.mock('../../core/useInterBranchVoucher', () => ({
+  useInbDeal: jest.fn(() => ({ data: null, isLoading: false })),
+  useInbReconcile: jest.fn(() => ({ data: { links: mockInbLinks() } })),
 }));
 jest.mock('../../core/styles', () => ({ bc: () => ({ cur: '₹' }) }));
 jest.mock('../../core/data', () => ({ CONSOLIDATED_LABEL: 'TK Head Office Group' }));
@@ -222,5 +228,53 @@ describe('INB is reachable from the Approvals toggle', () => {
     // the deal's link no proves we rendered InbApprovals and not the SO/PO/GP queue.
     expect(await screen.findByText(LINK, { exact: false })).toBeInTheDocument();
     expect(mockApiGet).toHaveBeenCalledWith('/api/vouchers', { type: 'INB', branch: 'BOM' });
+  });
+});
+
+// ─── A pushed deal must say what the BUYER did with it ───────────────────────────────
+// "Don't leave a screen silent." A pushed row showed "🔒 pushed" and nothing else — we hand
+// the deal over and never learn whether it was taken up, so 290 pushed deals would be an
+// unreadable pile. The voucher legs only know they were pushed; the InbLink registry is the
+// only place that knows the buyer's side, so the screen joins the two.
+describe('a pushed deal reports the buyer side', () => {
+  test('offered but not yet accepted → "awaiting <buyer> convert"', async () => {
+    mockInbLinks.mockReturnValue([{ inbLinkNo: LINK, saleVno: 'INB/BOM/26/0003', status: 'open', buyerBookingNo: '' }]);
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
+    expect(screen.getByText(/awaiting AMD convert/i)).toBeInTheDocument();
+  });
+
+  test('accepted → "converted" with the buyer booking no', async () => {
+    mockInbLinks.mockReturnValue([{ inbLinkNo: LINK, saleVno: 'INB/BOM/26/0003', status: 'booked', buyerBookingNo: 'BKG/AMD/26/0107' }]);
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
+    expect(screen.getByText(/converted · BKG\/AMD\/26\/0107/i)).toBeInTheDocument();
+  });
+
+  // Folded/migrated deals display their SALE VNO as the link no (their per-leg sourceRefs are
+  // Tally refs, not the INB link), so the join must resolve on that key too or every migrated
+  // deal silently loses its buyer state.
+  test('joins on the sale vno for a folded deal whose link no is not the INB link', async () => {
+    mockInbLinks.mockReturnValue([{ inbLinkNo: 'INB/BOM-AMD/26/9999', saleVno: 'INB/BOM/26/0003', status: 'booked', buyerBookingNo: 'BKG/AMD/26/0200' }]);
+    const legs = mkLegs('approved', true).map((l) => ({ ...l, sourceRef: 'IS/77/26-27' })); // Tally refs → deal keys on the sale vno
+    legs[0].againstPurchase = 'INB/BOM/26/0004';
+    mockApiGet.mockResolvedValue(legs);
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
+    expect(screen.getByText(/converted · BKG\/AMD\/26\/0200/i)).toBeInTheDocument();
+  });
+
+  test('no registry row → no badge, and nothing breaks', async () => {
+    mockInbLinks.mockReturnValue([]);
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
+    expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
+    // Match the BADGES specifically — the screen's help text legitimately explains Convert,
+    // so a loose /convert/ here would match the prose and never fail.
+    expect(screen.queryByText(/awaiting AMD convert/i)).toBeNull();
+    expect(screen.queryByText(/converted · BKG/i)).toBeNull();
   });
 });
