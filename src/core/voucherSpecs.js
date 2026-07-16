@@ -33,8 +33,13 @@ const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 // / costNet / heads (on the TRUE net), so round-off never moves gross profit. Legacy
 // snapshots without `roundOff` read 0 → unchanged.
 const ROUND_OFF_EPS = 0.05;
-const applyRoundOff = (side) => {
+// Whole-UNIT snap is a rupee (INR) convention that absorbs GST paise noise. A USD-book
+// (Africa/VAT) branch bills to the CENT, so snapping to a whole dollar would throw away
+// real cents; for a non-INR book keep 2dp and no roundOff plug. Mirrors the backend.
+// `ccy` defaults to INR so every legacy call site stays byte-for-byte unchanged.
+const applyRoundOff = (side, ccy = 'INR') => {
   const raw = num(side.total);
+  if (String(ccy || 'INR').toUpperCase() !== 'INR') { side.total = r2(raw); side.roundOff = 0; return; }
   const off = r2(Math.round(raw) - raw);
   if (off !== 0 && Math.abs(off) <= ROUND_OFF_EPS) { side.total = Math.round(raw); side.roundOff = off; }
   else side.roundOff = 0;
@@ -258,15 +263,25 @@ export const gstPur = (spec, l, rate = moduleRate(spec)) => {
 // Africa (VAT) branches → branch VAT rate; noVat → tax forced to 0. Default = India.
 const VAT_RATE = { NBO: 16, DAR: 18, FBM: 16 };
 const isVatBranch = (b) => ['NBO', 'DAR', 'FBM'].includes(String(b || '').toUpperCase());
-const vatRateOf = (b) => num(VAT_RATE[String(b || '').toUpperCase()]) / 100;
+// Effective VAT fraction for a VAT branch — prefers the LIVE rate threaded on the ctx
+// (ctx.vatRate, a percent sourced from the branch config / VAT master), falling back to
+// the static VAT_RATE constant. This keeps the manual SO/PO/GP screen in step with a
+// Super-Admin rate amendment (and with the backend, which reads the same master override).
+const vatRateOf = (ctx) => {
+  const live = ctx && ctx.vatRate;
+  const pct = (live !== undefined && live !== null && live !== '')
+    ? Number(live)
+    : VAT_RATE[String((ctx && ctx.branch) || '').toUpperCase()];
+  return num(pct) / 100;
+};
 export const isTaxable = (ctx) => !(ctx && ctx.noVat);
 // Input (purchase) VAT is DECOUPLED from the client's Without-VAT SALE choice — it
 // follows the supplier's invoice, so a VAT (Africa) branch still records/reclaims it
 // under Without VAT. India never sets noVat → unchanged.
 const isInputTaxable = (ctx) => ((ctx && isVatBranch(ctx.branch)) ? true : !(ctx && ctx.noVat));
-const svcRateOf = (ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return GST_RATE; };
-const purRateOf = (spec, ctx) => { if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); if (ctx && ctx.noVat) return 0; return moduleRate(spec); };
-const pkgRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx.branch); return spec.gstRate || PKG_GST; };
+const svcRateOf = (ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return GST_RATE; };
+const purRateOf = (spec, ctx) => { if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); if (ctx && ctx.noVat) return 0; return moduleRate(spec); };
+const pkgRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return spec.gstRate || PKG_GST; };
 export { isVatBranch };
 
 export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(spec, l) - num(l.incentive) + r2(num(l.incentive) * 0.02));
@@ -359,8 +374,10 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false, clientType = '', date = '' } = {}) {
-  const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType };
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false, clientType = '', date = '', vatRate = null } = {}) {
+  const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType, vatRate };
+  // A USD-book (Africa/VAT) branch bills to the cent → no whole-unit round-off snap.
+  const bookCcy = isVatBranch(branch) ? 'USD' : 'INR';
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };
   // `otherTaxesGst` = GST carved out of the SVC2 margin (GST-inclusive, so the
   // customer total is unchanged); kept OUT of `gst` so it posts to the dedicated
@@ -443,7 +460,7 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'incentiveAmt', 'incentiveGst', 'incentiveTds', 'total'].forEach((k) => { po[k] = 0; });
     po.lines = []; po.heads = [];
     const pct0 = so.total > 0 ? r2((saleNet / so.total) * 100) : 0;
-    applyRoundOff(so); po.roundOff = 0;
+    applyRoundOff(so, bookCcy); po.roundOff = 0;
     return { po, so, gp: { total: saleNet, pct: pct0, saleNet, costNet: 0 } };
   }
   // Commission (our income, netted off the payable) ADDS to GP → off the cost; the 2%
@@ -451,9 +468,10 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
   const costNetForGp = r2(costNet - po.incentiveAmt);
   const total = r2(saleNet - costNetForGp);
   const pct = so.total > 0 ? r2((total / so.total) * 100) : 0;
-  // Snap each side's invoice total to a whole rupee (residue → `roundOff`). Done last,
-  // so pct and every net/head above stay on the un-rounded value → GP is untouched.
-  applyRoundOff(so);
-  applyRoundOff(po);
+  // Snap each side's invoice total to a whole unit (residue → `roundOff`) — INR-book only;
+  // a USD-book (Africa) branch bills to the cent (no snap). Done last, so pct and every
+  // net/head above stay on the un-rounded value → GP is untouched.
+  applyRoundOff(so, bookCcy);
+  applyRoundOff(po, bookCcy);
   return { po, so, gp: { total, pct, saleNet, costNet: costNetForGp } };
 }

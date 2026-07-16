@@ -198,7 +198,7 @@ const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
 });
 export function legToPayload(leg, brCode, noVat, foreign = false) {
   const spec = VSPECS[leg.module] || VSPECS.SM;
-  const { po } = bookingTotals(spec, [leg.line], { branch: brCode, noVat, availItc: leg.availItc, packageType: leg.packageType, foreignSupplier: foreign });
+  const { po } = bookingTotals(spec, [leg.line], { branch: brCode, noVat, availItc: leg.availItc, packageType: leg.packageType, foreignSupplier: foreign, vatRate: (bc({ code: brCode }) || {}).vatRate });
   return {
     module: leg.module,
     supplier: { name: leg.supplier.name, ledgerName: leg.supplier.name, ledgerGroup: leg.supplier.ledgerGroup },
@@ -468,14 +468,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
   const taxLabel = isVatBr ? 'VAT' : 'GST';
   const effNoVat = isVatBr && noVat;
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign, clientType, date }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign, clientType, date]);
+  // Live VAT % from the branch config / VAT master (null → voucherSpecs static fallback),
+  // so a Super-Admin rate amendment flows into the on-screen math and the saved booking.
+  const liveVatRate = (bc({ code: brCode }) || {}).vatRate;
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign, clientType, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign, clientType, date, liveVatRate]);
   // Effective TCS 206C(1G) rate for this booking's date (5% up to 31-03-2026, else 2%).
   const tcsRate = spec.tcs ? tcs206cRate(spec, date) : 0;
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
   const getGstRate = () => {
     if (effNoVat) return 0;
     if (isVatBr) {
-      return brCode === 'NBO' ? 16 : brCode === 'DAR' ? 18 : brCode === 'FBM' ? 16 : 18;
+      return liveVatRate != null ? liveVatRate : (brCode === 'NBO' ? 16 : brCode === 'DAR' ? 18 : brCode === 'FBM' ? 16 : 18);
     }
     if (spec.model === 'package') return spec.gstRate ? spec.gstRate * 100 : 5;
     return spec.tax && spec.tax.rate != null ? spec.tax.rate : 18;
