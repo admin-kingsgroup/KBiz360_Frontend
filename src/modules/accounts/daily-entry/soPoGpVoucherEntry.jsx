@@ -1076,16 +1076,23 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 )}
               />
             </FL>
-            {crossCcy && (
-              <FL label={<>Deal FX Rate — 1 USD = ₹ <span style={{ color: '#dc2626' }}>*</span></>}>
-                <input type="number" min="0" step="0.0001" value={fxRate} onChange={(e) => setFxRate(e.target.value)} placeholder="e.g. 95" style={inp} />
-                <p style={fxRateNum > 0 ? hintOk : hintWarn}>
-                  {fxRateNum > 0
+            {/* FX Rate — ALWAYS shown on the INB voucher; EDITABLE only for a cross-currency
+                (different-country) deal (BOM→FBM/DAR/NBO); DISABLED for a same-currency one
+                (BOM→AMD) since no translation is needed. */}
+            <FL label={<>Deal FX Rate — 1 USD = ₹ {crossCcy && <span style={{ color: '#dc2626' }}>*</span>}</>}>
+              <input type="number" min="0" step="0.0001" value={crossCcy ? fxRate : ''} onChange={(e) => setFxRate(e.target.value)}
+                disabled={!crossCcy} placeholder={crossCcy ? 'e.g. 95' : '—'}
+                style={{ ...inp, ...(crossCcy ? {} : { background: '#eef1f5', color: '#9197a3', cursor: 'not-allowed' }) }} />
+              <p style={!crossCcy ? hintMuted : (fxRateNum > 0 ? hintOk : hintWarn)}>
+                {!crossCcy
+                  ? (toBranch
+                    ? <>Same currency — {brCode} &amp; {toBranch} both book in <b>{sellerCcy === 'INR' ? '₹ INR' : '$ USD'}</b>; no rate needed.</>
+                    : <>Pick a destination — the rate activates for a cross-currency (₹ ↔ $) deal.</>)
+                  : fxRateNum > 0
                     ? <>✓ {toBranch} books in {buyerCcy}: {(bc({ code: toBranch }) || {}).cur}{round2(sellerCcy === 'INR' ? num(totals.so.total) / fxRateNum : num(totals.so.total) * fxRateNum).toLocaleString()}</>
                     : <>⚠ {sellerCcy} → {buyerCcy} deal — enter the frozen rate so {toBranch} books in {buyerCcy}</>}
-                </p>
-              </FL>
-            )}
+              </p>
+            </FL>
             {crossBorderInb && (
               <FL label="IGST on Service Fee">
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer', fontSize: 12.5, color: '#1F2328' }}>
