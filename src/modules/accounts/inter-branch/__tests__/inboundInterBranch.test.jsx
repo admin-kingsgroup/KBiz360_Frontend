@@ -92,3 +92,40 @@ test('tab counts come from the server totals', () => {
   expect(screen.getByText(/Pending Conversion/).textContent).toContain('(1)');
   expect(screen.getByText(/^Converted/).textContent).toContain('(1)');
 });
+
+// ─── An EMPTY screen must explain itself, not look broken ─────────────────────────────
+// Reported live: "INB Incoming screen not available in BOM and AMD". It WAS available —
+// BOM has genuinely never been sold to, and AMD's only deal was already converted while the
+// screen always opened on the empty Pending tab. Both read as a fault. 305 of 306 live
+// deals are `unpushed` (never offered), which is the Convert gate working — but nothing on
+// screen said so.
+test('lands on Converted when Pending is empty but Converted has rows', async () => {
+  feed([{ ...ROW, state: 'converted', buyerBookingNo: 'BKG/AMD/26/0107', saleDone: true }]);
+  render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+  // Without the steer this showed "Nothing awaiting conversion" with the row one click away.
+  await waitFor(() => expect(screen.getByText('BKG/AMD/26/0107')).toBeInTheDocument());
+});
+
+test('stays on Pending when Pending has rows (the steer must not fight real work)', async () => {
+  feed([ROW, { ...ROW, inbLinkNo: 'INB/BOM-AMD/26/0228', state: 'converted', buyerBookingNo: 'BKG/AMD/26/0108' }]);
+  render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+  await waitFor(() => expect(screen.getByText('Convert →')).toBeInTheDocument());
+});
+
+test('an empty Pending tab explains that the seller must Push first', () => {
+  feed([]);
+  render(<InboundInterBranch branch="BOM" setRoute={mockSetRoute} currentUser={{}} />);
+  expect(screen.getByText('Nothing awaiting conversion.')).toBeInTheDocument();
+  // The WHY is the whole point — a bare "nothing here" is what read as broken. 305 of 306
+  // live deals are unpushed, so this is the message almost every branch sees today.
+  expect(screen.getByText(/approves and Pushes/i)).toBeInTheDocument();
+});
+
+test('an empty Pending tab points at the Converted tab when rows are hiding there', () => {
+  // Belt and braces with the auto-steer: if a user clicks back to Pending and it is empty
+  // while Converted has rows, say so rather than leave them staring at nothing.
+  feed([{ ...ROW, state: 'converted', buyerBookingNo: 'BKG/AMD/26/0107' }]);
+  render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+  fireEvent.click(screen.getByText(/Pending Conversion/));
+  expect(screen.getByText(/already converted/i)).toBeInTheDocument();
+});

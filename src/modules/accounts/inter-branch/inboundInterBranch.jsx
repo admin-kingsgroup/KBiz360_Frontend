@@ -6,7 +6,7 @@
 // only offers) — so this screen is the ONLY door into our SO/PO/GP queue for an INB deal.
 // The purchase cost is the SELLING branch's frozen figure, shown in OUR book currency with
 // the seller's breakdown for reference.
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useInbInbound, useDeleteInbDeal, useConvertInb } from '../../../core/useInterBranchVoucher';
 import { localeOf } from '../../../core/format';
 import { toast } from '../../../core/ux/toast';
@@ -40,7 +40,19 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
   const q = useInbInbound(branch);
   const data = q.data || { rows: [], totals: { pending: 0, converted: 0 } };
   const rows = Array.isArray(data.rows) ? data.rows : [];
+  // `branch` arrives as a code string or a {code} object depending on the caller.
+  const brLabel = typeof branch === 'string' ? branch : (branch?.code || 'this branch');
   const [tab, setTab] = useState('pending');
+  // Land on the tab that actually HAS rows. The screen always opened on Pending Conversion,
+  // so a branch whose only deal was already converted saw an empty table and reasonably
+  // concluded the pipeline was broken — the row was one click away on Converted. Steers the
+  // first render only, once data lands; after that the user's choice wins.
+  const [tabSteered, setTabSteered] = useState(false);
+  useEffect(() => {
+    if (tabSteered || q.isLoading) return;
+    if (!data.totals.pending && data.totals.converted) setTab('converted');
+    setTabSteered(true);
+  }, [tabSteered, q.isLoading, data.totals.pending, data.totals.converted]);
   const shown = rows.filter((r) => r.state === tab);
   const del = useDeleteInbDeal();
   const conv = useConvertInb();
@@ -101,7 +113,7 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>INB · Incoming <span style={{ fontWeight: 700, fontSize: 12.5, color: C.dim }}>— deals another branch sells to us</span></div>
         <div style={{ fontSize: 12, color: C.dim }}>
-          Deals pushed to <b>{typeof branch === 'string' ? branch : (branch?.code || '—')}</b> · Convert accepts one into a pending SO/PO/GP — until then it is not in your books or your approval queue. The purchase from the selling branch is locked.
+          Deals pushed to <b>{brLabel}</b> · Convert accepts one into a pending SO/PO/GP — until then it is not in your books or your approval queue. The purchase from the selling branch is locked.
         </div>
       </div>
 
@@ -121,7 +133,20 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
             {q.isLoading ? (
               <tr><td style={td} colSpan={7}>Loading…</td></tr>
             ) : shown.length === 0 ? (
-              <tr><td style={{ ...td, color: C.dim }} colSpan={7}>{tab === 'pending' ? 'Nothing awaiting conversion.' : 'No converted deals yet.'}</td></tr>
+              /* An empty table here is almost always "nobody has pushed anything to us yet",
+                 NOT a broken screen — a deal is invisible to the buyer until the seller
+                 Pushes it (that is the Convert gate). Saying so turns a dead end into an
+                 explanation; the bare "Nothing awaiting conversion." read as a fault. */
+              <tr><td style={{ ...td, color: C.dim }} colSpan={7}>
+                {tab === 'pending' ? <>
+                  <div style={{ fontWeight: 700, color: C.dark, marginBottom: 3 }}>Nothing awaiting conversion.</div>
+                  <div>A deal appears here only once the selling branch <b>approves and Pushes</b> it to {brLabel}. Until then it stays in their own pipeline and is invisible to you.</div>
+                  {(data.totals.converted > 0) && <div style={{ marginTop: 4 }}>You have <b>{data.totals.converted}</b> already converted — see the Converted tab.</div>}
+                </> : <>
+                  <div style={{ fontWeight: 700, color: C.dark, marginBottom: 3 }}>No converted deals yet.</div>
+                  <div>Deals you accept from the Pending Conversion tab land here, along with the SO/PO/GP they created.</div>
+                </>}
+              </td></tr>
             ) : shown.map((rw) => {
               const fx = rw.fx && Number(rw.fx.rate) > 0 && rw.fx.fromCcy !== rw.fx.toCcy ? rw.fx : null;
               const sSym = fx ? (CCY_SYM[fx.fromCcy] || symOf(rw.fromBranch)) : symOf(rw.fromBranch);
