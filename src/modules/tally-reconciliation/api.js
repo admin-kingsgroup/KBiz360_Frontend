@@ -49,6 +49,19 @@ export function signTallyCert({ branch, period, tier }) {
 export function reopenTallyCert({ branch, period, tier, reason }) {
   return apiPost('/api/tally-tieout/certificate/reopen', { branch, period, tier, reason });
 }
+// Phase 4 — rounding settlement. NOT an accept-variance switch: it posts a real,
+// dated, reversible JV that moves ERP onto Tally for sub-rupee residue, so the strict
+// gate is then satisfied on merit. Preview is always fetched before the commit so the
+// operator sees the exact legs — and whether the period actually ends up certifiable.
+export function previewRoundOff({ branch, period, tier, maxDiff } = {}) {
+  return apiGet('/api/tally-tieout/roundoff', { branch, period, tier, maxDiff });
+}
+export function settleRoundOff({ branch, period, tier, maxDiff }) {
+  return apiPost('/api/tally-tieout/roundoff', { branch, period, tier, maxDiff, commit: true });
+}
+export function reverseRoundOff({ branch, period, tier = 'month' }) {
+  return apiDelete(`/api/tally-tieout/roundoff?branch=${encodeURIComponent(branch)}&period=${encodeURIComponent(period)}&tier=${encodeURIComponent(tier)}`);
+}
 export function importTB({ branch, period, tier, rows }) {
   return apiPost('/api/tally-tieout/import', { branch, period, tier, rows });
 }

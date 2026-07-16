@@ -530,6 +530,12 @@ export const VOUCHER_REGISTRY = {
       gstApplicable: (+v.taxAmt || 0) > 0 || !!v.gstMode,
       gstMode: v.gstMode || 'intra', gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18, gstAmt: +v.taxAmt || 0,
       tdsSection: v.tdsSection || 'None', tdsAmt: +v.tdsAmt || 0,
+      // `whtRate` (Africa) is only a UI helper for Auto-calc — the withheld AMOUNT is
+      // canonical and is what posts, so it isn't persisted. Re-derive it from the saved
+      // withholding instead of resetting to the 2% default: otherwise a voucher withheld at
+      // 5% reopens showing "2%" beside the 5% amount, and one Auto-calc click would silently
+      // under-withhold. `subtotal` is the taxable base the rate was applied to (see toBody).
+      whtRate: (+v.subtotal > 0 && +v.tdsAmt > 0) ? r2((+v.tdsAmt / +v.subtotal) * 100) : 2,
       remarks: v.remarks || '', attachments: v.attachments || [],
       lines: (v.lines && v.lines.length ? v.lines : [{ ledger: '', drCr: 'Dr', amt: '', desc: '' }])
         .map((l, i) => ({ _k: i + 1, ledger: l.ledger || '', drCr: l.drCr === 'Cr' ? 'Cr' : 'Dr', amt: l.amt ?? '', desc: l.desc || '' })),

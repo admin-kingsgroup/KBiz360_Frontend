@@ -4,6 +4,7 @@ import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
 import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
+import { isVatBranch } from '../../voucherSpecs';
 import { money2, r2 } from '../ui';
 
 /**
@@ -15,7 +16,10 @@ import { money2, r2 } from '../ui';
  * posting.builder refundPartialLines (triggered by partialAmount > 0).
  */
 export function RefundPartialFields({ state, setState, ctx }) {
-  const { branch, cur } = ctx;
+  const { branch, branchCode, cur } = ctx;
+  // Place of Supply is India-GST only (intra = CGST+SGST / inter = IGST); an Africa (VAT)
+  // branch has a single VAT rate and no such split. Mirrors PXP / RefundReissueFields.
+  const isVatBr = isVatBranch(branchCode || (branch && (branch.code || branch)) || '');
   const patch = (p) => setState((s) => ({ ...s, ...p }));
   const amt = r2(+state.partialAmount || 0);
 
@@ -25,7 +29,7 @@ export function RefundPartialFields({ state, setState, ctx }) {
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Against sales invoice"><input value={state.againstInvoice || ''} onChange={(e) => patch({ againstInvoice: e.target.value })} style={inp} placeholder="BOM/0626/SF00495" /></FL>
         <FL label="Related purchase invoice"><input value={state.againstPurchase || ''} onChange={(e) => patch({ againstPurchase: e.target.value })} style={inp} placeholder="BOM/0626/PF00495" /></FL>
-        <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} />
+        {!isVatBr ? <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} /> : <div />}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>

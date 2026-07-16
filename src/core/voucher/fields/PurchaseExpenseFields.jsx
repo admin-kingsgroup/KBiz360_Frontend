@@ -19,7 +19,7 @@ import { V_DR, V_CR, DARK, DIM, money2, pxpTotals, r2 } from '../ui';
  * editable amount (posting routes it to VAT Input / WHT by regime), so edits round-trip.
  */
 export function PurchaseExpenseFields({ state, setState, ctx }) {
-  const { branch, cur, branchCode } = ctx;
+  const { branch, cur, branchCode, editId } = ctx;
   const isVat = isVatBranch(branchCode);
   const brVatRate = (bc({ code: branchCode }) || {}).vatRate;   // live VAT % (Africa), else null
   const taxLabel = isVat ? 'VAT' : 'GST';
@@ -46,6 +46,19 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
   const effGstRate = isVat ? (brVatRate != null ? brVatRate : (VAT_RATE[String(branchCode || '').toUpperCase()] ?? 16)) : (+state.gstPct || 0);
   const autoGst = () => patch(isVat ? { gstPct: effGstRate, gstAmt: r2(t.taxable * effGstRate / 100) } : { gstAmt: r2(t.taxable * effGstRate / 100) });
   const autoTds = () => patch({ tdsAmt: r2(t.taxable * rate / 100) });
+  // The initial state carries India's 18% slab, and a VAT branch has no slab picker to
+  // change it — so an untouched NEW Africa PXP would DISPLAY the read-only branch rate (16%)
+  // yet SAVE gstPct 18. Seed the stored rate to the branch's own.
+  // CREATE ONLY (`!editId`): gstPct is what accounting.repository.taxByRate buckets the
+  // Rate-Wise report by, so re-seeding on EDIT would silently re-rate a voucher that was
+  // legitimately posted at a different historical rate (e.g. before a VAT-master amendment)
+  // and move it to the wrong bucket. An old rate-less voucher self-corrects instead via the
+  // "amount is 0" warning → Auto-calc, which sets both together.
+  // Functional setState → no-op when already correct, so no render loop.
+  React.useEffect(() => {
+    if (!isVat || editId) return;
+    setState((s) => (+s.gstPct === effGstRate ? s : { ...s, gstPct: effGstRate }));
+  }, [isVat, editId, effGstRate, setState]);
   const cgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt / 2);
   const sgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt - cgst);
   const igst = state.gstMode === 'inter' ? t.gstAmt : 0;
@@ -148,6 +161,11 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
               <button onClick={autoGst} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
             </div>
             {t.gstAmt > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#185FA5' }}>{isVat ? <>VAT <b>{money2(cur, t.gstAmt)}</b></> : (state.gstMode === 'inter' ? <>IGST <b>{money2(cur, igst)}</b></> : <>CGST <b>{money2(cur, cgst)}</b> · SGST <b>{money2(cur, sgst)}</b></>)} · Invoice total <b>{money2(cur, t.total)}</b></p>}
+            {/* The breakdown above is gated on an amount > 0, so it went silent EXACTLY when
+                the tax was unfilled. A VAT branch has no slab picker to auto-fill it (the rate
+                cell is read-only), so an untouched Africa purchase would post 0 input tax.
+                Say so instead of hiding it. */}
+            {t.taxable > 0 && !(t.gstAmt > 0) && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#A32D2D', fontWeight: 700 }}>{taxLabel} amount is 0 — click <b>Auto-calc</b> (or type it) so the input {taxLabel} posts.</p>}
           </>
         )}
       </div>

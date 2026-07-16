@@ -5,6 +5,11 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+// The board now reaches the books' query roots (the settlement posts a real JV), and
+// core/useAccounting pulls in core/api → import.meta, which Jest can't parse. Mocked
+// the same way every other suite that touches useAccounting does.
+jest.mock('../../../core/useAccounting', () => ({ invalidateBooks: jest.fn() }));
+
 jest.mock('../api', () => ({
   getPeriods: jest.fn(() => Promise.resolve([
     { period: '2026-07', tier: 'month', ledgers: 4, certStatus: 'none' },
@@ -35,6 +40,15 @@ jest.mock('../api', () => ({
   freezeTallyCert: jest.fn(),
   signTallyCert: jest.fn(),
   reopenTallyCert: jest.fn(() => Promise.resolve({ certificate: { status: 'open', signatures: [] } })),
+  // Phase 4 — rounding settlement. Default: a clean period with nothing to settle,
+  // so the panel self-hides and the existing board assertions are unaffected.
+  previewRoundOff: jest.fn(() => Promise.resolve({
+    branch: 'BOM', period: '2026-07', tier: 'month', maxDiff: 0.5,
+    before: { off: 0, absDiff: 0 }, after: { offAfter: 0, onlyErpAfter: 0, onlyTallyAfter: 0, absDiffAfter: 0, tiesAfter: true },
+    lines: [], plug: 0, total: 0, settles: [], skipped: [], existing: null,
+  })),
+  settleRoundOff: jest.fn(),
+  reverseRoundOff: jest.fn(),
   getLedgerVouchers: jest.fn(() => Promise.resolve({
     ledger: 'HDFC Bank A/c', branch: 'BOM', period: '2026-07', tier: 'month', from: '2026-07-01', to: '2026-07-31',
     erpBalance: 810000, tallyImported: 2, summary: { total: 1 },

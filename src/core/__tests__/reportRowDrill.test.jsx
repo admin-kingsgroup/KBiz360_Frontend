@@ -13,7 +13,6 @@ jest.mock('../useAccounting', () => ({
   useYieldByDestination: jest.fn(() => ({ data: {} })),
   useAbcAnalysis: jest.fn(() => ({ data: {} })),
   useYearOverYear: jest.fn(() => ({ data: {} })),
-  useFxExposure: jest.fn(() => ({ data: {} })),
   useTrialBalance: jest.fn(() => ({ data: {} })),
   useAuditTrail: jest.fn(() => ({ data: [] })),
 }));

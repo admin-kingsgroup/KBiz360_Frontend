@@ -11,7 +11,7 @@ import { useCockpitFocus } from '../../../store/cockpitFocus';
 // ─── TK GROUP · FE · Close-Readiness & Integrity (SAP-style checklist) ───────
 // A branch-wise financial-close cockpit: accounting-integrity + governance gates that
 // a period must pass before lock (journal drift, orphan journals, self-approvals, dup
-// numbers/masters, suspense, sub-ledger↔GL, FX revaluation, depreciation, accruals,
+// numbers/masters, suspense, sub-ledger↔GL, depreciation, accruals,
 // GSTR-2B). LIVE — a fix clears the gate on refresh. Read-only; dormant-safe.
 
 const TONE_COLOR = { pass: '#1a7a4c', fail: '#b23b3b', warn: '#a86a10', na: '#7a8090' };

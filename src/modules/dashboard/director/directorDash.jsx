@@ -206,6 +206,10 @@ function deltaPct(cur, prev) { cur = Number(cur) || 0; prev = Number(prev) || 0;
 export function ProfitabilityDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
+  // A consolidated P&L folds INR + USD into one figure (and would print it as Rs) — every
+  // money KPI and every bridge bar would be rupees-plus-dollars. Refuse it, the same way
+  // Executive Overview, the Owner dashboard and PerformanceDash's bridge do.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
   const pl = useProfitAndLoss(branch, range).data || {};
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const sales = mpl?.totals?.sales || 0, cogs = mpl?.totals?.cogs || 0, gp = pl?.grossProfit ?? (sales - cogs);
@@ -220,22 +224,32 @@ export function ProfitabilityDash({ branch, go }) {
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Profitability (P&L)" sub={`Revenue → Net Profit · ${range.label}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Revenue" icon={TrendingUp} value={money(cur, sales)} onClick={go && (() => go('/dashboards/sales'))} />
-        <KPI label="Gross Profit" icon={PieChart} value={money(cur, gp)} sub={pct(sales ? gp / sales * 100 : 0)} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
-        <KPI label="Indirect Expenses" icon={Receipt} value={money(cur, indExp)} onClick={go && (() => go('/dashboards/expenses'))} />
-        <KPI label="Net Profit" icon={CircleDollarSign} value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} sub={pct(sales ? net / sales * 100 : 0)} onClick={go && (() => go('/reports/pnl'))} />
-      </div>
-      <Card title="Profit Bridge">
-        <div style={{ padding: '10px 16px' }}>
-          {bar('Revenue', sales, sales, C.blue)}
-          {bar('– COGS', -cogs, sales, '#9aa7c2')}
-          {bar('= Gross Profit', gp, sales, C.green)}
-          {bar('+ Indirect Income', indInc, sales, '#6fae7e')}
-          {bar('– Indirect Expense', -indExp, sales, '#d99')}
-          {bar('= Net Profit', net, sales, net < 0 ? C.red : C.dark)}
-        </div>
-      </Card>
+      {isAll ? (
+        <Card title="Profitability (P&L)">
+          <div style={{ padding: '14px 16px', fontSize: 12.5, color: C.dim }}>
+            Per-branch — pick a branch from the selector (top-right) to view its P&amp;L and profit bridge. A consolidated P&amp;L isn’t shown because branches report in different currencies (₹ / $).
+          </div>
+        </Card>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <KPI label="Revenue" icon={TrendingUp} value={money(cur, sales)} onClick={go && (() => go('/dashboards/sales'))} />
+            <KPI label="Gross Profit" icon={PieChart} value={money(cur, gp)} sub={pct(sales ? gp / sales * 100 : 0)} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
+            <KPI label="Indirect Expenses" icon={Receipt} value={money(cur, indExp)} onClick={go && (() => go('/dashboards/expenses'))} />
+            <KPI label="Net Profit" icon={CircleDollarSign} value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} sub={pct(sales ? net / sales * 100 : 0)} onClick={go && (() => go('/reports/pnl'))} />
+          </div>
+          <Card title="Profit Bridge">
+            <div style={{ padding: '10px 16px' }}>
+              {bar('Revenue', sales, sales, C.blue)}
+              {bar('– COGS', -cogs, sales, '#9aa7c2')}
+              {bar('= Gross Profit', gp, sales, C.green)}
+              {bar('+ Indirect Income', indInc, sales, '#6fae7e')}
+              {bar('– Indirect Expense', -indExp, sales, '#d99')}
+              {bar('= Net Profit', net, sales, net < 0 ? C.red : C.dark)}
+            </div>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

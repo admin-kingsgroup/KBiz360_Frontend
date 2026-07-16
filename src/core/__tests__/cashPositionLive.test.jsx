@@ -21,7 +21,6 @@ jest.mock('../useAccounting', () => ({
   useCustomerLtv: jest.fn(() => ({ data: {} })),
   useAbcAnalysis: jest.fn(() => ({ data: {} })),
   useYearOverYear: jest.fn(() => ({ data: {} })),
-  useFxExposure: jest.fn(() => ({ data: {} })),
 }));
 
 import { render, screen } from '@testing-library/react';

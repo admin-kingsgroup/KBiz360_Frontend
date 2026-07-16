@@ -62,7 +62,9 @@ const drCrOf = (e) => {
 // the .map()) so useRefundLiveAmount's hooks run once per row, consistently, per the
 // Rules of Hooks. Mirrors the Edit modal's Live JV exactly instead of the bulk preview.
 function RefundAmountCell({ entry, money }) {
-  return money(useRefundLiveAmount(entry));
+  // Price the refund in the ENTRY's own branch currency — an Africa (USD) branch's refund
+  // rendered with the page-level symbol printed dollars as rupees on the CENTRAL 'ALL' view.
+  return money(useRefundLiveAmount(entry), entry && entry.branch);
 }
 
 export function VoucherApprovals({ branch, currentUser, category = '' }) {
@@ -867,7 +869,10 @@ function InbEditedList({ rows, isLoading, money }) {
           <tr key={r.id} style={{ borderTop: `1px solid ${C.border}` }}>
             <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>{r.vno}</td>
             <td style={td}>{r.party || '—'}</td>
-            <td style={{ ...td, ...num }}>{money(r.total || 0)}</td>
+            {/* Each leg is priced in ITS OWN branch's book currency — the Edited tab's count
+                already subtotals per currency, so a page-level symbol here would print an
+                Africa (USD) leg as ₹ directly under a "$" header. */}
+            <td style={{ ...td, ...num }}>{money(r.total || 0, r.branch)}</td>
             <td style={{ ...td, color: C.dim }}>{r.status === 'saved' ? 'approved' : (r.status === 'approved' && r.pushed) ? 'pushed' : r.status}</td>
             <td style={{ ...td, ...num, fontWeight: 700 }}>{r.edits}</td>
             <td style={td}>{r.lastBy || '—'}</td>

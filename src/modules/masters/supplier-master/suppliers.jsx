@@ -44,8 +44,13 @@ export const SuppliersMaster = ({ branch } = {}) => {
       // TDS is only actually deducted on some suppliers — flag it explicitly instead of
       // inferring from tdsSection, and only then does PAN become mandatory (needed to
       // deduct at the correct rate instead of the higher no-PAN default).
-      { key: 'isTdsDeducted', label: 'Is TDS Deducted', type: 'bool', default: false, table: false },
-      { key: 'pan', label: 'PAN', type: 'text', table: false, required: (f) => !!f.isTdsDeducted },
+      // India-only: TDS (and the PAN it forces) has no meaning on a VAT branch — Africa
+      // withholds via whtSection/whtRate below. Leaving this ungated let a user tick it on a
+      // Kenyan vendor and get blocked by a mandatory Indian PAN.
+      { key: 'isTdsDeducted', label: 'Is TDS Deducted', type: 'bool', default: false, table: false, show: (f) => !isVatBranch(f.branch) },
+      // PAN is mandatory only when India TDS is deducted — never force it on a VAT branch
+      // (belt-and-braces: an existing Africa record carrying isTdsDeducted=true can still save).
+      { key: 'pan', label: 'PAN', type: 'text', table: false, required: (f) => !!f.isTdsDeducted && !isVatBranch(f.branch) },
       // Address line sits before Country/State (matches the physical order on the form).
       { key: 'addressLine', label: 'Address Line', type: 'text', required: true, table: false },
       // Country '' (the default) is treated as India downstream but does NOT force a state;
@@ -62,7 +67,8 @@ export const SuppliersMaster = ({ branch } = {}) => {
       { key: 'vatRegNo', label: 'VAT Registration No', type: 'text', table: false, show: (f) => isVatBranch(f.branch) },
       { key: 'whtSection', label: 'WHT Section', type: 'text', table: false, show: (f) => isVatBranch(f.branch) },
       { key: 'whtRate', label: 'WHT Rate (%)', type: 'number', table: false, show: (f) => isVatBranch(f.branch) },
-      { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
+      // MSME is an Indian statute (MSMED Act) — not applicable to an Africa (VAT) party.
+      { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false, show: (f) => !isVatBranch(f.branch) },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },
       { key: 'email', label: 'Email', type: 'text', table: false, required: true },

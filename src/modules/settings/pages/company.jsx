@@ -87,10 +87,13 @@ const profileToForm = (p, code) => ({
   code,
 });
 
-function EditProfileModal({ profiles, onClose }) {
+function EditProfileModal({ profiles, initialCode = 'BOM', onClose }) {
   const qc = useQueryClient();
   const { create, update } = useMasterMutations('company-profile');
-  const [form, setForm] = useState(() => profileToForm(profiles.find((x) => x.code === 'BOM') || {}, 'BOM'));
+  // Seed from the entity tab the user opened this from (not always BOM) — otherwise you can
+  // sit on the Kenya tab, hit Edit, and unknowingly type Kenyan details over India's profile.
+  // The in-modal branch picker still lets you switch.
+  const [form, setForm] = useState(() => profileToForm(profiles.find((x) => x.code === initialCode) || {}, initialCode));
   const pick = (code) => setForm(profileToForm(profiles.find((x) => x.code === code) || {}, code));
   const toggleGstRate = (r) => setForm((s) => ({
     ...s,
@@ -168,7 +171,9 @@ export function SettingsCompany() {
   const bom = profiles.find((p) => p.code === 'BOM') || {};
   const amd = profiles.find((p) => p.code === 'AMD') || {};
   const india = {
-    key: 'india', flag: '🇮🇳', label: 'India Entity',
+    // `code` (like africaEntity's) lets "Edit legal profile" seed the modal from the entity
+    // tab you're actually looking at, instead of always defaulting to BOM.
+    key: 'india', flag: '🇮🇳', label: 'India Entity', code: 'BOM',
     name: bom.entity || 'Travkings Tours & Travels', type: bom.entityType || 'Partnership Firm', cin: bom.cin,
     country: bom.country || 'India', pan: bom.pan,
     gstin1: bom.gstin, gstState1: bom.state ? `${bom.state} (${bom.stateCode || ''})`.trim() : '',
@@ -263,7 +268,7 @@ export function SettingsCompany() {
         </div>
       </ResponsiveGrid>
 
-      {editing && <EditProfileModal profiles={profiles} onClose={() => setEditing(false)} />}
+      {editing && <EditProfileModal profiles={profiles} initialCode={co.code || 'BOM'} onClose={() => setEditing(false)} />}
     </PageLayout>
   );
 }

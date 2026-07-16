@@ -50,10 +50,9 @@ import { MsmeTracker } from '../modules/taxation/msmeTracker';
 import { Recruitment } from '../modules/hr/operations/recruitment';
 import { BudgetPlanning } from '../modules/reports/compliance-tax/budgetVsActual';
 import { PackagePnL } from '../modules/reports/profitability-gp/packagePnLLive';
-import { FxRevaluation } from '../modules/finance/fxRevaluation';
 import { PendingApprovals } from '../modules/settings/compliance-workflow/pendingApprovals';
 import { UxPreferences } from '../modules/settings/tools/uxPreferences';
-export { MarkupRateSheet, SeatInventory, DocumentTypeMaster, TdsCertRegister, MsmeTracker, Recruitment, BudgetPlanning, PackagePnL, FxRevaluation, PendingApprovals, UxPreferences };
+export { MarkupRateSheet, SeatInventory, DocumentTypeMaster, TdsCertRegister, MsmeTracker, Recruitment, BudgetPlanning, PackagePnL, PendingApprovals, UxPreferences };
 /* Dashboards render lazily inside DashboardRouter (under App's <Suspense>), so
    helpers no longer STATICALLY imports the dashboard feature. This is the
    keystone that breaks the helpers ↔ feature-modules ↔ styles dependency cycle
@@ -570,8 +569,6 @@ export const FIXED_ASSETS_DATA = [];
 
 export const VENDOR_ADVANCES_DATA = [];
 
-// FxRevaluation moved to modules/finance/fxRevaluation.jsx (business
-// sub-module reorg); re-exported below for App.jsx's direct chunk import.
 
 /* ══════════════════════════════════════════════════════════════════
    TAXATION ADDITIONS — GSTR-9C, 3CD Tax Audit, GSTR-2A Reconciliation
@@ -767,8 +764,6 @@ export const ATTRITION_DATA = [];
    useStatutoryDues → GET /api/tax-calendar/dues */
 
 
-/* FX_EXPOSURE removed — the Currency Exposure report is now live:
-   useFxExposure → GET /api/accounting/fx-exposure */
 
 /* ════════════════════════════════════════════════════════════════════
    FINANCIAL REPORTS (4)

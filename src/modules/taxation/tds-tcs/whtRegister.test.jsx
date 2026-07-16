@@ -21,6 +21,9 @@ describe('Withholding Tax menu is regime-aware', () => {
     wrap(<TaxTdsTcs branch={{ code: 'NBO' }} />);
     expect(screen.getByText(/Withholding Tax \(WHT\) Register/i)).toBeTruthy();
     expect(screen.getByText(/WHT Payable \(we withheld\)/i)).toBeTruthy();
+    // USD books bill to the CENT — amounts must show 2dp, not be rounded to whole dollars.
+    // Both the Payable and Receivable tiles render it, hence getAllByText.
+    expect(screen.getAllByText('$0.00').length).toBeGreaterThan(0);
     expect(screen.queryByText(/206C/)).toBeNull();
     expect(screen.queryByText(/26Q/)).toBeNull();
     expect(screen.queryByText(/TDS \/ TCS Register/i)).toBeNull();

@@ -13,7 +13,7 @@ jest.mock('../../../core/ux/toast', () => ({ toast: jest.fn() }));
 jest.mock('../../../core/ux/confirm', () => ({ confirmDialog: jest.fn(() => Promise.resolve({ confirmed: false })) }));
 
 import { VSPECS, bookingTotals } from '../../../core/voucherSpecs.js';
-import { inbRowsFromDeal, rowsForEdit, legsFromEdit } from '../legacy';
+import { inbRowsFromDeal, rowsForEdit, legsFromEdit, legFilled } from '../legacy';
 
 const CTX = { branch: 'BOM' };
 
@@ -31,6 +31,37 @@ function dealFromEntry(spec, line, { gstMode = 'inter' } = {}) {
   };
 }
 
+// A leg only counts as "filled" if it carries money — but the predicate must ask the LEG's OWN
+// module spec which columns hold it. It used to hardcode `base`, so a Misc leg (whose spec is
+// [Base Fare, Taxes]) carrying ONLY tax — a real shape: seat-booking charges booked as pure tax —
+// read as empty. It was then skipped by the folder-GP fold AND dropped from the save payload;
+// on an INB edit that means the server DELETES it (the payload always carries `purchases` now).
+describe('N-PO leg "filled" test — spec-aware, not base-only', () => {
+  test('a Misc leg with ONLY tax counts as filled (the tax-only seat-charge shape)', () => {
+    expect(legFilled({ module: 'SM', line: { base: 0, tax: 1272, psvc: 0 } })).toBe(true);
+  });
+
+  test('a Misc leg with only base, or only psvc, still counts', () => {
+    expect(legFilled({ module: 'SM', line: { base: 500, tax: 0, psvc: 0 } })).toBe(true);
+    expect(legFilled({ module: 'SM', line: { base: 0, tax: 0, psvc: 60 } })).toBe(true);
+  });
+
+  test('a genuinely empty leg does NOT count (no phantom legs posted)', () => {
+    expect(legFilled({ module: 'SM', line: { base: 0, tax: 0, psvc: 0 } })).toBe(false);
+    expect(legFilled({ module: 'SM', line: {} })).toBe(false);
+  });
+
+  test('a Flight leg counts on any of its own fare columns (k3-only, tax-only)', () => {
+    expect(legFilled({ module: 'SF', line: { base: 0, k3: 800, tax: 0 } })).toBe(true);
+    expect(legFilled({ module: 'SF', line: { base: 0, k3: 0, tax: 287 } })).toBe(true);
+  });
+
+  test('an unknown module falls back to the Misc spec rather than throwing', () => {
+    expect(legFilled({ module: 'ZZ', line: { base: 10 } })).toBe(true);
+    expect(legFilled({ module: undefined, line: { base: 0, tax: 0 } })).toBe(false);
+  });
+});
+
 // N-PO: an INB deal's EXTRA cost legs arrive from getDeal as component `heads` off the
 // "<pfx>-<component> [IB-Pur]" ledgers — a booking leg carries a grid `rows`, an INB leg does
 // not. legsFromEdit must map those heads onto the grid, else the editor opens the leg BLANK and
@@ -43,18 +74,51 @@ describe('INB deal edit — extra N-PO legs rehydrate from getDeal `heads`', () 
         vno: 'INB/BOM/26/0551', module: 'SM', packageType: '',
         supplier: { name: 'Seat Co', ledgerName: 'Seat Co', ledgerGroup: 'Sundry Creditors' },
         costCenter: 'BOM-INB-MISC', purTallyRef: 'IP/229/26-27', gstMode: 'intra',
-        heads: [{ amt: 500, desc: 'Misc' }, { amt: 60, desc: 'Supp SVCHG' }],
+        // Engine-created legs name components off the fare-column LABELS, so they map exactly.
+        heads: [{ amt: 500, desc: 'Base Fare' }, { amt: 60, desc: 'Supp SVCHG' }],
         purchase: { gst: 90, incentiveAmt: 25, incentiveTds: 0, gstMode: 'intra' },
       }],
     });
     expect(legs).toHaveLength(1);
     const [leg] = legs;
+    expect(leg.vno).toBe('INB/BOM/26/0551');   // identifies the leg so the server patches in place
     expect(leg.module).toBe('SM');
     expect(leg.supplier).toEqual({ name: 'Seat Co', ledgerGroup: 'Sundry Creditors' });
     expect(leg.purTallyRef).toBe('IP/229/26-27');
     expect(leg.costCenter).toBe('BOM-INB-MISC');
+    // The fare amount MUST land — asserting only psvc/incentive is what let a silent drop pass.
+    expect(leg.line.base).toBe(500);
     expect(leg.line.psvc).toBe(60);        // 'Supp SVCHG' is the psvc column, not a fare column
     expect(leg.line.incentive).toBe(25);   // rides on leg.purchase, not the heads
+    expect(leg.unmapped).toEqual([]);      // everything represented → safe to rebuild
+  });
+
+  test('two heads on ONE column ACCUMULATE (assigning kept only the last and ate the rest)', () => {
+    const [leg] = legsFromEdit({
+      purchases: [{ module: 'SM', supplier: { ledgerName: 'X' }, heads: [{ amt: 300, desc: 'Taxes' }, { amt: 200, desc: 'Taxes' }] }],
+    });
+    expect(leg.line.tax).toBe(500);
+  });
+
+  // Migrated legs carry descs that drifted from the spec labels — 'K3-Taxes', 'Supplier Service',
+  // 'Room / Basic', 'Visa Fee' and 'Premium' all exist in the live books. The grid has no column
+  // for them, so the leg must be flagged and sent back keep-untouched: rebuilding it from a read
+  // that lost the amount would rewrite a real cost leg into a smaller one.
+  test('an UNMAPPED component is reported, never silently dropped', () => {
+    const [leg] = legsFromEdit({
+      purchases: [{
+        vno: 'INB/BOM/26/0999', module: 'SF', supplier: { ledgerName: 'Y' },
+        heads: [{ amt: 21230, desc: 'Base Fare' }, { amt: 800, desc: 'K3-Taxes' }, { amt: 99, desc: 'Supplier Service' }],
+      }],
+    });
+    expect(leg.line.base).toBe(21230);                             // what we could map still lands
+    expect(leg.unmapped).toEqual(['K3-Taxes', 'Supplier Service']); // what we couldn't is surfaced
+  });
+
+  test('a leg whose money is ONLY in an unmapped component still counts as filled (never dropped)', () => {
+    // It maps to nothing, so every column reads 0 — the old base-only/fareSum test would drop it,
+    // and the server retires whatever it is not sent.
+    expect(legFilled({ module: 'SF', line: { base: 0, k3: 0, tax: 0 }, unmapped: ['K3-Taxes'] })).toBe(true);
   });
 
   test('a booking-style leg with saved `rows` still wins over heads (unchanged path)', () => {

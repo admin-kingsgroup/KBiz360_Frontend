@@ -6,6 +6,7 @@ import { useCockpitFocus } from '../../../store/cockpitFocus';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select, Skeleton } from '../../../shell/primitives';
 import { VoucherDrawer } from './VoucherDrawer';
 import { CertifyPanel } from './CertifyPanel';
+import { RoundOffPanel } from './RoundOffPanel';
 import { NameMatcherPane } from '../NameMatcherPane';
 import { parseTBFile, parseDayBookFile } from '../tallyFileParse';
 import { BRANCHES, AFRICA, CUR, localeOf, round2, branchCodeOf, fmt, statusOf, statusMeta, defectMeta, isCentralRole } from '../format';
@@ -753,6 +754,12 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       {/* Before any Tally TB is uploaded, onboard calmly (not a wall of red);
           once uploaded, show the certificate close gate. Deferred until the board
           has loaded so the gate never flashes a wrong state (U4). */}
+      {/* Rounding settlement sits ABOVE the certificate: it's the last thing that can
+          legitimately clear a residual gap, and it must be posted before the freeze. */}
+      {!empty && !isLoading && imported.count
+        ? <RoundOffPanel branch={branch} period={period} tier={tier} currentUser={currentUser} />
+        : null}
+
       {!empty && !isLoading && (imported.count
         ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} fixTotal={fixTotal} currentUser={currentUser} />
         : (

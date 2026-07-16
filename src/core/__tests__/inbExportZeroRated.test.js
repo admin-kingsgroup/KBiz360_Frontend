@@ -48,10 +48,55 @@ describe('INB zero-rated export — sale-side fee tax off, purchase VAT untouche
     expect(isTaxable({ branch: 'FBM', noVat: false })).toBe(true);
   });
 
-  test('an India (GST) branch is unaffected — noVat is an Africa-only control', () => {
-    // soPoGpVoucherEntry gates effNoVat on isVatBranch, so a BOM INB export never zero-rates
-    // its own fee here (BOM bills IGST cross-border by rule — billIgst defaults ON).
+  test('noVat stays an Africa-only control — an India branch ignores it', () => {
     const bom = lineCalc(VSPECS.SF, line, { branch: 'BOM', noVat: false });
     expect(bom.gstSvc).toBeGreaterThan(0);
+  });
+});
+
+// A zero-rated export is zero-rated for ANY seller — the server applies taxRate 0 on
+// cross-border + tick-off with no India/Africa split. `noVat` could not express that: it is
+// isVatBranch-gated in the entry screen, so AMD/BOMMB (which default the IGST tick OFF) showed
+// 18% under an "Export · zero-rated" banner and over-quoted the buyer on the FX preview. It also
+// could not simply be un-gated: on India, noVat zeroes purRateOf and would wipe the purchase
+// GST/ITC. Hence a sale-side-only flag.
+describe('saleZeroRated — sale-side only, works for India sellers too', () => {
+  const IN = { branch: 'AMD' };   // India/GST branch — an INB export seller that defaults tick OFF
+
+  test('India seller: a zero-rated export bills nothing on the fee (the AMD/BOMMB gap)', () => {
+    const taxed = lineCalc(VSPECS.SF, line, { ...IN, saleZeroRated: false });
+    const zero = lineCalc(VSPECS.SF, line, { ...IN, saleZeroRated: true });
+    expect(taxed.gstSvc).toBeGreaterThan(0);   // normally 18% GST on the fee
+    expect(zero.gstSvc).toBe(0);
+    expect(zero.gstMk).toBe(0);
+  });
+
+  test('India seller: the PURCHASE GST/ITC survives — the reason noVat could not be reused', () => {
+    const taxed = lineCalc(VSPECS.SF, line, { ...IN, saleZeroRated: false });
+    const zero = lineCalc(VSPECS.SF, line, { ...IN, saleZeroRated: true });
+    expect(taxed.gstPur).toBeGreaterThan(0);
+    expect(zero.gstPur).toBe(taxed.gstPur);
+    // Contrast: noVat on India DOES kill the input GST — exactly the trap avoided.
+    expect(lineCalc(VSPECS.SF, line, { ...IN, noVat: true }).gstPur).toBe(0);
+  });
+
+  test('Africa seller: saleZeroRated zeroes the fee and keeps input VAT', () => {
+    const zero = lineCalc(VSPECS.SF, line, { ...FBM, saleZeroRated: true });
+    expect(zero.gstSvc).toBe(0);
+    expect(zero.gstPur).toBe(lineCalc(VSPECS.SF, line, { ...FBM, saleZeroRated: false }).gstPur);
+  });
+
+  test('SO total drops by the fee tax on an India export; PO cost untouched', () => {
+    const taxed = bookingTotals(VSPECS.SF, [line], { branch: 'AMD', saleZeroRated: false });
+    const zero = bookingTotals(VSPECS.SF, [line], { branch: 'AMD', saleZeroRated: true });
+    expect(zero.so.gst).toBe(0);
+    expect(zero.so.total).toBeLessThan(taxed.so.total);
+    expect(zero.po.gst).toBe(taxed.po.gst);       // ITC intact
+    expect(zero.po.total).toBe(taxed.po.total);
+  });
+
+  test('isTaxable reflects saleZeroRated as well as noVat', () => {
+    expect(isTaxable({ branch: 'AMD', saleZeroRated: true })).toBe(false);
+    expect(isTaxable({ branch: 'AMD', saleZeroRated: false })).toBe(true);
   });
 });

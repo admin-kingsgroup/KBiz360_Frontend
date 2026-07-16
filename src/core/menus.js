@@ -98,7 +98,6 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
   {label:"Period-End, Targets & Accruals", children:[
     {divider:true, label:"Period-End"},
     {label:"Intercompany", href:"/accounting/intercompany"},
-    {label:"FX Revaluation", href:"/accounting/fx-revaluation"},
     {divider:true, label:"Targets & Budgets"},
     {label:"Sales Targets", href:"/finance/targets"},
     {label:"Expense Budget", href:"/expense/budget"},
@@ -110,7 +109,6 @@ export const MENU_FINANCE = {label:"Finance", icon:Wallet, children:[
     {label:"Interest Calculator", href:"/finance/interest-calc"},
     {label:"Loan Amortization Schedule", href:"/finance/loan-amort"},
     {divider:true, label:"Entry helpers"},
-    {label:"Multi-Currency Voucher", href:"/finance/multi-currency"},
     {label:"Print Preview Before Saving", href:"/finance/print-preview"},
     {label:"Auto-linked Vouchers", href:"/finance/auto-linked"},
     {label:"Voucher Entry (8-Tab View)", href:"/transactions/voucher-tabs"},
@@ -152,7 +150,6 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
   {label:"Operational", children:[
     {label:"Consultant Report", href:"/reports/consultant"},
     {label:"Destination Intel", href:"/reports/destination"},
-    {label:"Forex Report", href:"/reports/forex"},
     {label:"Commission Income", href:"/reports/commission"},
   ]},
   // Receivables & Payables are account reports — see Accounts ▸ Receivables &
@@ -166,7 +163,6 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Variance Analysis", href:"/reports/variance"},
     // GST/VAT Summary, Statutory Dues Calendar & Tax Filing Status Board are tax
     // reports — they live under the regime-aware Taxation pill (see core/data.js).
-    {label:"Currency Exposure", href:"/reports/fx-exposure"},
     {label:"Budget vs Actual", href:"/reports/budget"},
     {label:"Expense Budget vs Actual", href:"/reports/exp-bgt"},
     // Tally XML Export lives under Admin ▸ Import / Export Data ▸ Export.

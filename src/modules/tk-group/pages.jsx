@@ -152,7 +152,7 @@ export function TkAdoptionPage() {
 
 export function TkIntegrityPage() {
   return (
-    <Page title="Close Readiness & Integrity" subtitle="SAP-style close checklist, branchwise: journal drift, orphan journals, self-approvals, duplicate numbers/masters, suspense, sub-ledger↔GL, FX revaluation, depreciation, accruals & GSTR-2B. Live — a fix clears the gate on refresh.">
+    <Page title="Close Readiness & Integrity" subtitle="SAP-style close checklist, branchwise: journal drift, orphan journals, self-approvals, duplicate numbers/masters, suspense, sub-ledger↔GL, depreciation, accruals & GSTR-2B. Live — a fix clears the gate on refresh.">
       <IntegrityChecks />
     </Page>
   );

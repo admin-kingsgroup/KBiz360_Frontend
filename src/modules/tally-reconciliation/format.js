@@ -50,6 +50,16 @@ export const isApproverRole = (role) => {
   return /director|owner|super[\s_-]*admin/i.test(r);
 };
 
+// Posting a rounding settlement moves the BOOKS, so it is approver-grade but one
+// rung lower than re-open: mirrors the backend roleSatisfies(role,'FM') — FM,
+// Director or Owner. Same Branch-Accountant-first / AE precedence as the others.
+export const isSettlerRole = (role) => {
+  const r = String(role || '');
+  if (/branch\s*account/i.test(r)) return false;
+  if (/account.*(exec|executive)|(^|[^a-z])ae([^a-z]|$)/i.test(r)) return false;
+  return /finance\s*manager|(^|[^a-z])fm([^a-z]|$)|director|owner|super[\s_-]*admin/i.test(r);
+};
+
 export const STATUS_META = {
   tied: { tone: 'success', label: 'Tied' },
   off: { tone: 'danger', label: 'Off' },

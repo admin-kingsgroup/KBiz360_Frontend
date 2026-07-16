@@ -33,9 +33,11 @@ import { useApprovalChain, nextActionFor, StageChip } from '../../../core/approv
 import { useOpenInb, useBookInb, useCreateInb, useUpdateInb } from '../../../core/useInterBranchVoucher';
 import { useVNo } from '../../../core/useNextNo';
 
-// Inter-branch jurisdiction (mirror of backend): same country (India) = IGST;
-// different country = cross-border export (zero-rated on the seller side).
-const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'FB' };
+// Inter-branch jurisdiction (mirror of backend inb.service.COUNTRY): same country (India) = IGST;
+// different country = cross-border export (zero-rated on the seller side). These codes are PRINTED
+// in the tax-treatment banner, so they must be the real ISO ones — FBM is Lubumbashi, DR Congo =
+// 'CD' (it read 'FB', which is not a country, and the banner showed "zero-rated (IN→FB)").
+const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' };
 const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
 const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTRY[to] || 'IN');
 import { AuditTrail } from '../../../core/AuditTrail';
@@ -192,36 +194,58 @@ const newLeg = (module) => ({ module, supplier: { name: '', ledgerGroup: '' }, c
 // `rows`, an INB leg does not. Map heads onto the grid the same way inbRowsFromDeal does for
 // the primary leg, else the editor opens the leg BLANK and the next save rebuilds the deal
 // without its cost. 'Supp SVCHG' is a psvc column, not a fare column.
+// Returns { line, unmapped } — `unmapped` lists any component this spec has no column for.
+// Amounts ACCUMULATE (never assign): a leg can carry two lines on one component and the server's
+// own mirror sums them ("same col twice → sum"), so assigning kept only the last and silently ate
+// the rest. An UNMAPPED component is reported, not swallowed: migrated legs carry descs that
+// drifted from the spec labels ('K3-Taxes', 'Supplier Service', 'Room / Basic', 'Visa Fee',
+// 'Premium' all exist live), and since the save re-sends `purchases`, quietly dropping one would
+// rebuild the leg WITHOUT that cost. The caller marks such a leg keep-untouched instead.
 const legLineFromHeads = (sp, leg) => {
   const line = blankLine(sp);
   const cols = sp.fareCols || [];
+  const unmapped = [];
   for (const h of (leg.heads || [])) {
     const desc = String(h.desc || '').trim();
+    if (!desc) continue;
     if (/^supp\s*svchg$/i.test(desc)) { line.psvc = round2(num(line.psvc) + num(h.amt)); continue; }
     const col = cols.find((c) => String(c.label).trim().toLowerCase() === desc.toLowerCase());
-    if (col) line[col.key] = num(h.amt);
+    if (col) line[col.key] = round2(num(line[col.key]) + num(h.amt));
+    else if (num(h.amt)) unmapped.push(desc);
   }
   if (leg.purchase) {
     if (num(leg.purchase.incentiveAmt)) line.incentive = num(leg.purchase.incentiveAmt);
     if (sp && sp.model === 'package' && num(leg.purchase.gst)) line.psvcGst = num(leg.purchase.gst);
   }
-  return line;
+  return { line, unmapped };
 };
 export const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
   const sp = VSPECS[leg.module] || VSPECS.SM;
+  const fromHeads = (!(Array.isArray(leg.rows) && leg.rows[0]) && (leg.heads || []).length) ? legLineFromHeads(sp, leg) : null;
   return {
+    // `vno` identifies an EXISTING leg so the server patches it in place (keeping its number and
+    // Tally ref) instead of recreating it. Absent ⇒ a newly added leg.
+    vno: leg.vno || '',
     module: leg.module, supplier: { name: leg.supplier?.ledgerName || leg.supplier?.name || '', ledgerGroup: leg.supplier?.ledgerGroup || '' },
     costCenter: leg.costCenter || '', purTallyRef: leg.purTallyRef || '', gstMode: leg.gstMode || 'intra',
     packageType: leg.packageType || '', availItc: !!leg.availItc,
+    // Components this spec can't represent (a migrated leg's drifted desc). The grid cannot show
+    // them, so the leg is sent back keep-untouched rather than rebuilt from a lossy read.
+    unmapped: (fromHeads && fromHeads.unmapped) || [],
     line: (Array.isArray(leg.rows) && leg.rows[0])
       ? { ...blankLine(sp), ...leg.rows[0] }
-      : ((leg.heads || []).length ? legLineFromHeads(sp, leg) : blankLine(sp)),
+      : (fromHeads ? fromHeads.line : blankLine(sp)),
   };
 });
 export function legToPayload(leg, brCode, noVat, foreign = false) {
   const spec = VSPECS[leg.module] || VSPECS.SM;
   const { po } = bookingTotals(spec, [leg.line], { branch: brCode, noVat, availItc: leg.availItc, packageType: leg.packageType, foreignSupplier: foreign, vatRate: (bc({ code: brCode }) || {}).vatRate });
   return {
+    // `vno` lets the INB server match an EXISTING leg and patch it in place (preserving its number
+    // + Tally ref) rather than recreate it. `keep` says "this leg holds a component the grid can't
+    // represent — leave it exactly as it is", so a lossy read can never rewrite it to a smaller leg.
+    ...(leg.vno ? { vno: leg.vno } : {}),
+    ...((leg.unmapped || []).length ? { keep: true } : {}),
     module: leg.module,
     supplier: { name: leg.supplier.name, ledgerName: leg.supplier.name, ledgerGroup: leg.supplier.ledgerGroup },
     costCenter: leg.costCenter, purTallyRef: leg.purTallyRef, gstMode: leg.gstMode,
@@ -229,12 +253,39 @@ export function legToPayload(leg, brCode, noVat, foreign = false) {
   };
 }
 
+// A leg actually carries money. Keyed off the LEG's OWN module spec (fareSum sums that spec's
+// fare columns) — never a hardcoded `base`, which silently skipped any leg whose cost sits in a
+// different column. Misc is [Base Fare, Taxes], so a TAX-ONLY leg (e.g. a seat-booking charge
+// with base 0) read as empty: it was dropped from the GP fold AND from the save payload. On an
+// INB edit that is data LOSS — the payload always carries `purchases` now, so a leg filtered out
+// here is deleted server-side. Shared by the GP fold and both save paths so the three can never
+// drift (the GP fold's comment explicitly relies on mirroring the save-time filter).
+export const legFilled = (leg) => {
+  // A leg whose cost sits in a component the grid can't represent reads as EMPTY on every column —
+  // dropping it here would hand the server a list without it, and the server retires whatever it
+  // isn't sent. It demonstrably holds money, so it always counts (and rides back keep-untouched).
+  if ((leg.unmapped || []).length) return true;
+  const sp = VSPECS[leg.module] || VSPECS.SM;
+  // Non-ZERO, not positive: every other stage is deliberately sign-agnostic (the payload builder
+  // keeps `amt !== 0`, getDeal keeps `amt !== 0`), so demanding > 0 here made this the odd one out
+  // — a credit/adjustment leg, or one whose columns net to zero (+500 / −500), read as empty and
+  // was dropped from the payload, which retires it server-side.
+  return (sp.fareCols || []).some((c) => num(leg.line[c.key]) !== 0) || num(leg.line.psvc) !== 0;
+};
+
 function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, isForeign, supplyOf }) {
   const allowed = ALLOWED_LEG_MODULES[parentModule];
   if (!allowed) return null;
   const setLeg = (i, patch) => onChange(legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const setLine = (i, key, val) => setLeg(i, { line: { ...legs[i].line, [key]: val } });
-  const setModule = (i, m) => onChange(legs.map((l, idx) => (idx === i ? { ...newLeg(m), supplier: l.supplier, costCenter: l.costCenter, purTallyRef: l.purTallyRef } : l)));
+  // Re-picking the module reseeds the grid line, but MUST carry the leg's identity: `vno` (an
+  // existing leg — without it the server can't match and would mint a new number and retire the
+  // original) and `unmapped` (its keep-untouched marker — without it the reseeded blank line reads
+  // as empty and the leg is dropped from the payload entirely, i.e. retired). newLeg() has
+  // neither, so spreading it first silently discarded both.
+  const setModule = (i, m) => onChange(legs.map((l, idx) => (idx === i
+    ? { ...newLeg(m), vno: l.vno, unmapped: l.unmapped, supplier: l.supplier, costCenter: l.costCenter, purTallyRef: l.purTallyRef }
+    : l)));
   const del = (i) => onChange(legs.filter((_, idx) => idx !== i));
   const add = () => onChange([...legs, newLeg(allowed[0])]);
   const cell = { width: 90, padding: '5px 7px', border: '1px solid #cdd1d8', borderRadius: 5, fontSize: 12 };
@@ -250,11 +301,21 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
         const spec = VSPECS[leg.module] || VSPECS.SM;
         const pkg = spec.model === 'package';
         const po = legToPayload(leg, brCode, noVat, isForeign ? isForeign(leg.supplier.name) : false).po;
+        // This leg carries a component the grid has no column for (a migrated leg whose desc
+        // drifted from the spec labels). It is saved back UNTOUCHED, so editing it here would be
+        // silently discarded — say so and lock it, rather than accept keystrokes that go nowhere.
+        const locked = (leg.unmapped || []).length > 0;
         return (
-          <div key={i} style={{ padding: 11, marginBottom: 10, background: '#fffdf7', border: '1px solid #eee3cf', borderRadius: 7 }}>
+          <div key={i} style={{ padding: 11, marginBottom: 10, background: locked ? '#f6f7f9' : '#fffdf7', border: `1px solid ${locked ? '#cdd1d8' : '#eee3cf'}`, borderRadius: 7 }}>
+            {locked && (
+              <div role="status" style={{ marginBottom: 8, padding: '6px 9px', borderRadius: 5, background: '#fff7e0', border: '1px solid #eee3cf', fontSize: 11, color: '#8a6d00' }}>
+                🔒 Read-only — this leg holds {leg.unmapped.map((u) => `“${u}”`).join(', ')}, which this grid has no column for.
+                It is kept exactly as it is on save. To change it, revoke the deal and re-raise the leg.
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
               <strong style={{ fontSize: 12 }}>PO #{i + 1}</strong>
-              <select value={leg.module} onChange={(e) => setModule(i, e.target.value)} style={{ ...cell, width: 'auto' }}>
+              <select value={leg.module} onChange={(e) => setModule(i, e.target.value)} disabled={locked} style={{ ...cell, width: 'auto', ...(locked ? { background: '#eef1f5', color: '#9197a3', cursor: 'not-allowed' } : {}) }}>
                 {allowed.map((m) => <option key={m} value={m}>{VSPECS[m].name}</option>)}
               </select>
               <div style={{ minWidth: 220 }}>
@@ -459,7 +520,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // CROSS-CURRENCY: the seller keys ONE frozen rate (1 USD = ₹x) on this INSO voucher; the
   // buyer branch's converted INPO is derived from it on push. Same-currency deals never
   // see the field. The rate is frozen onto the deal on save (fx on the INB payload).
-  const [fxRate, setFxRate] = useState(editing ? (editBooking.fx && editBooking.fx.rate ? String(editBooking.fx.rate) : '') : '');
+  // The group settles inter-branch at ONE fixed internal rate — never a keyed/market rate — so
+  // both branches mirror permanently, a pair reconciles EXACTLY, and no FX gain/loss can arise.
+  // DISPLAY ONLY: the backend freezes the authoritative value (taxRegime.INB_INTERNAL_RATE) when
+  // the payload omits `fx`; this constant only drives the on-screen preview. Keep it in step.
+  // An EXISTING deal shows its OWN frozen historic rate — a frozen quote is immutable (a change
+  // needs revoke + re-raise), so an edit must never silently re-rate it.
+  const INB_INTERNAL_RATE = 95;   // ← KEEP IN STEP with taxRegime.INB_INTERNAL_RATE (backend authority)
+  const [fxRate] = useState(editing && editBooking.fx && editBooking.fx.rate ? String(editBooking.fx.rate) : String(INB_INTERNAL_RATE));
   const inbCcyOf = (code) => (((bc({ code }) || {}).cur) === '$' ? 'USD' : 'INR');
   const sellerCcy = inbCcyOf(brCode);
   const buyerCcy = interBranch && toBranch ? inbCcyOf(toBranch) : sellerCcy;
@@ -489,26 +557,28 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const isVatBr = isVatBranch(brCode);
   // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
   const taxLabel = isVatBr ? 'VAT' : 'GST';
-  // A zero-rated inter-branch EXPORT bills no tax on the Service Fee — the banner above the grid
-  // already says so, and the server posts taxAmt 0. The grid used to ignore that and still price
-  // the fee at the branch's VAT rate, so an FBM→BOM export showed a phantom "VAT/Service Fee
-  // (16%)" amount, an inflated INSO total, and an FX preview quoting the buyer MORE than the
-  // backend derives. `billIgst === false` is exactly the zero-rated case (a same-country INB
-  // pins it true; a non-INB voucher leaves it undefined), so fold it into the Without-VAT flag.
-  // SAFE for input tax: isInputTaxable/purRateOf keep a VAT branch's PURCHASE VAT at full rate
-  // regardless of noVat (voucherSpecs deliberately decouples input VAT from the sale choice) —
-  // so the supplier-side VAT/ITC stays intact and optional, only the sale-side fee tax goes to 0.
+  // A zero-rated inter-branch EXPORT bills no tax on the Service Fee — the banner says so and the
+  // server posts taxAmt 0 (inbTaxTreatment: cross-border + tick off ⇒ rate 0, for ANY seller).
+  // `billIgst === false` is exactly that case: a same-country INB pins it true, a non-INB voucher
+  // leaves it undefined. It rides its OWN sale-side flag rather than the Africa Without-VAT
+  // toggle, because that toggle is `isVatBr`-gated: folding it in there fixed FBM/NBO/DAR but left
+  // AMD/BOMMB (which default the tick OFF) showing 18% under a "zero-rated" banner — and simply
+  // dropping the isVatBr gate would zero India's purchase GST/ITC via purRateOf. saleZeroRated
+  // touches the sale side only, so input tax keeps following the supplier's invoice either way.
   const inbZeroRated = interBranch && billIgst === false;
-  const effNoVat = isVatBr && (noVat || inbZeroRated);
+  const effNoVat = isVatBr && noVat;
   // Live VAT % from the branch config / VAT master (null → voucherSpecs static fallback),
   // so a Super-Admin rate amendment flows into the on-screen math and the saved booking.
   const liveVatRate = (bc({ code: brCode }) || {}).vatRate;
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign, clientType, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, suppForeign, clientType, date, liveVatRate]);
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, clientType, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, inbZeroRated, suppForeign, clientType, date, liveVatRate]);
   // Effective TCS 206C(1G) rate for this booking's date (5% up to 31-03-2026, else 2%).
   const tcsRate = spec.tcs ? tcs206cRate(spec, date) : 0;
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
+  // The SALE-side rate — drives the "{taxLabel}/Service Fee ({activeRate}%)" captions. Mirrors
+  // svcRateOf: zero when the fee isn't billed, whether that's the Africa Without-VAT toggle or a
+  // zero-rated inter-branch export (which applies to an India seller too).
   const getGstRate = () => {
-    if (effNoVat) return 0;
+    if (effNoVat || inbZeroRated) return 0;
     if (isVatBr) {
       return liveVatRate != null ? liveVatRate : (brCode === 'NBO' ? 16 : brCode === 'DAR' ? 18 : brCode === 'FBM' ? 16 : 18);
     }
@@ -521,7 +591,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // screen shows the same folder GP the booking saves with (backend gpForMulti), not the
   // primary-PO-only figure. Mirrors backend purchaseNetOf (total − roundOff − GST − TCS −
   // incentive) and the save-time leg filter. The per-passenger table below stays PRIMARY.
-  const extraLegsFilled = (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0);
+  const extraLegsFilled = (isNoSupp ? [] : extraPOs).filter(legFilled);
   const extraLegNet = extraLegsFilled.reduce((s, leg) => {
     const po = legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name)).po;
     return s + (num(po.total) - num(po.roundOff) - num(po.gst) - num(po.tcs) - num(po.incentiveAmt));
@@ -670,11 +740,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         // editor). Sent unconditionally now, which is safe ONLY because legsFromEdit above
         // rehydrates the deal's existing legs — otherwise an edit would post [] and delete them.
         purchases: (isNoSupp ? [] : extraPOs)
-          .filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0)
+          .filter(legFilled)
           .map((leg) => legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name))),
         // Freeze the manual FX quote onto a cross-currency deal (base USD, quote INR) so the
         // buyer branch's converted INPO is derived from it; omitted for same-currency deals.
-        ...(crossCcy ? { fx: { base: 'USD', quote: 'INR', rate: fxRateNum, date, fromCcy: sellerCcy, toCcy: buyerCcy, source: 'manual' } } : {}),
+        // `fx` is deliberately NOT sent: the backend freezes the group's fixed internal rate
+        // (taxRegime.INB_INTERNAL_RATE) as the single source of truth, and an EDIT preserves the
+        // deal's own immutable historic quote. Sending a keyed rate here is what let a deal
+        // freeze off-rate while reconciliation compared at the internal rate — an unclearable
+        // difference that blocked the pair's freeze/certify forever.
       };
       // Editing an existing INB deal → rebuild BOTH pending legs as a unit (reason to the
       // audit trail); a fresh voucher raises a new deal. Same body either way.
@@ -709,7 +783,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     setError(''); setSaving(true);
     try {
       const gpLines = lines.map((l) => {
-        const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat });
+        const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated });
         return { fn: l.fn, sn: l.sn, finalSales: c.finalSales, salesGST: c.salesGST, finalPurchase: c.finalPurchase, gstPur: c.gstPur, gp: c.gp, gpPct: c.gpPct };
       });
       const payload = {
@@ -724,7 +798,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks, saleTallyRef, purTallyRef,
         // N-PO: additional purchase legs (empty unless Flight+Misc / Holiday components).
-        purchases: (isNoSupp ? [] : extraPOs).filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0).map((leg) => legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name))),
+        purchases: (isNoSupp ? [] : extraPOs).filter(legFilled).map((leg) => legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name))),
       };
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, payload)
@@ -921,7 +995,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </tr></thead>
           <tbody>
             {lines.map((l, i) => {
-              const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
+              const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign });
               return (
                 <React.Fragment key={i}>
                 <tr className="transition hover:bg-[#fdf7f9]">
@@ -1032,8 +1106,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* Africa/VAT branches: VAT applies at the branch rate by default, OR tick
           "Without VAT" to zero-rate this booking (e.g. international air). India
-          branches always follow the per-module GST rule, so this is hidden there. */}
-      {isVatBr && (
+          branches always follow the per-module GST rule, so this is hidden there.
+          HIDDEN on an inter-branch voucher too: the INB payload sends `billIgst`, never
+          `noVat`, so this control changed nothing there — while still highlighting "With VAT"
+          over a grid the IGST tick had already zero-rated. The tick below is the one
+          and only tax control on an INB deal. */}
+      {isVatBr && !interBranch && (
         <div style={{ ...card, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, fontWeight: 800, color: DARK, textTransform: 'uppercase', letterSpacing: '.3px' }}>VAT</span>
           <div style={{ display: 'inline-flex', border: '1px solid #cdd1d8', borderRadius: 7, overflow: 'hidden' }}>
@@ -1129,9 +1207,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 (different-country) deal (BOM→FBM/DAR/NBO); DISABLED for a same-currency one
                 (BOM→AMD) since no translation is needed. */}
             <FL label={<>Deal FX Rate — 1 USD = ₹ {crossCcy && <span style={{ color: '#dc2626' }}>*</span>}</>}>
-              <input type="number" min="0" step="0.0001" value={crossCcy ? fxRate : ''} onChange={(e) => setFxRate(e.target.value)}
-                disabled={!crossCcy} placeholder={crossCcy ? 'e.g. 95' : '—'}
-                style={{ ...inp, ...(crossCcy ? {} : { background: '#eef1f5', color: '#9197a3', cursor: 'not-allowed' }) }} />
+              {/* READ-ONLY: the rate is the group's fixed internal rate, never keyed per deal — a
+                  keyed rate would freeze the deal off-rate while inter-branch reconciliation
+                  compares at the internal rate, leaving a difference no journal can clear. */}
+              <input type="number" value={crossCcy ? fxRate : ''} readOnly disabled placeholder={crossCcy ? '' : '—'}
+                style={{ ...inp, background: '#eef1f5', color: '#4b5563', cursor: 'not-allowed' }} />
               <p style={!crossCcy ? hintMuted : (fxRateNum > 0 ? hintOk : hintWarn)}>
                 {!crossCcy
                   ? (toBranch
@@ -1288,7 +1368,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign });
                 // TCS (Intl packages, u/s 206C(1G)) is a booking-level charge on the sale incl GST;
                 // show each line's share only when it actually applies (totals.so.tcs > 0).
                 const lineTcs = (spec.tcs && totals.so.tcs > 0) ? c.finalSales * tcsRate / 100 : 0;
@@ -1384,7 +1464,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
-                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, foreignSupplier: suppForeign });
+                const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign });
                 return (
                   <tr key={i}>
                     <td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.sn || ''}</td>

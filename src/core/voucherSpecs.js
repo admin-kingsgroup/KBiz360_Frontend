@@ -274,14 +274,22 @@ const vatRateOf = (ctx) => {
     : VAT_RATE[String((ctx && ctx.branch) || '').toUpperCase()];
   return num(pct) / 100;
 };
-export const isTaxable = (ctx) => !(ctx && ctx.noVat);
+// `saleZeroRated` — the SALE side bills no tax on the agency's fee/markup, independent of the
+// Africa "Without VAT" toggle. It exists because a zero-rated INTER-BRANCH EXPORT is zero-rated
+// for ANY seller (the server: cross-border + tick off ⇒ taxRate 0, with no India/Africa split),
+// but `noVat` cannot express that: on an INDIA branch noVat also zeroes purRateOf, which would
+// wipe the purchase GST/ITC. So this flag gates the SALE side ONLY — isInputTaxable/purRateOf
+// below never read it, and input tax keeps following the supplier's invoice.
+export const isTaxable = (ctx) => !(ctx && (ctx.noVat || ctx.saleZeroRated));
 // Input (purchase) VAT is DECOUPLED from the client's Without-VAT SALE choice — it
 // follows the supplier's invoice, so a VAT (Africa) branch still records/reclaims it
 // under Without VAT. India never sets noVat → unchanged.
 const isInputTaxable = (ctx) => ((ctx && isVatBranch(ctx.branch)) ? true : !(ctx && ctx.noVat));
-const svcRateOf = (ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return GST_RATE; };
+const svcRateOf = (ctx) => { if (ctx && (ctx.noVat || ctx.saleZeroRated)) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return GST_RATE; };
+// NB: purRateOf must NOT read saleZeroRated — a zero-rated sale says nothing about what the
+// supplier charged us, and reading it here would destroy the purchase GST/ITC.
 const purRateOf = (spec, ctx) => { if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); if (ctx && ctx.noVat) return 0; return moduleRate(spec); };
-const pkgRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return spec.gstRate || PKG_GST; };
+const pkgRateOf = (spec, ctx) => { if (ctx && (ctx.noVat || ctx.saleZeroRated)) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return spec.gstRate || PKG_GST; };
 export { isVatBranch };
 
 export const finalPurchase = (spec, l) => r2(fareSum(spec, l) + num(l.psvc) + gstPur(spec, l) - num(l.incentive) + r2(num(l.incentive) * 0.02));
@@ -374,8 +382,8 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, availItc = false, foreignSupplier = false, clientType = '', date = '', vatRate = null } = {}) {
-  const ctx = { branch, noVat: !!noVat, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType, vatRate };
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, saleZeroRated = false, availItc = false, foreignSupplier = false, clientType = '', date = '', vatRate = null } = {}) {
+  const ctx = { branch, noVat: !!noVat, saleZeroRated: !!saleZeroRated, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType, vatRate };
   // A USD-book (Africa/VAT) branch bills to the cent → no whole-unit round-off snap.
   const bookCcy = isVatBranch(branch) ? 'USD' : 'INR';
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };

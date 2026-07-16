@@ -250,7 +250,11 @@ function WhtRegister({ branch }) {
   const { data, isLoading } = useWithholdingRegister(branch, period);
   const rows = (data && data.rows) || [];
   const totals = (data && data.totals) || { payable: 0, receivable: 0 };
-  const f = (n) => cur + Number(Math.round(n || 0)).toLocaleString('en-US');
+  // 2dp, NOT whole units: a USD book bills to the CENT (voucherSpecs deliberately skips the
+  // whole-unit round-off for non-INR), so rounding a $12.50 withholding to "$13" would both
+  // misstate it and stop the tiles footing to the rows. Whole-unit is an INR convention
+  // inherited from the India register.
+  const f = (n) => cur + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <div style={{ padding: '12px 10px', maxWidth: 1600, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>

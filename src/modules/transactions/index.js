@@ -6,7 +6,7 @@
 
    BUSINESS SUB-MODULE REORG (2026-07-14): the MENU_FINANCE-routed screens
    (GdsPnrImport, SalesCancellation, PurchaseRefunds → finance/bsp-airline-memos/;
-   MultiCurrencyVoucher, PrintPreviewDemo, AutoLinkedVouchers, VoucherEntryTabbed
+   PrintPreviewDemo, AutoLinkedVouchers, VoucherEntryTabbed
    → finance/tools-calculators/) moved to finance's business sub-module folders,
    re-exported below for the same reason. All remaining dead/unrouted code
    (RefundVoucher, ReissueVoucher, the per-module Sales-X / Purchase-X screens,
@@ -22,7 +22,6 @@ export { RecurringVouchers } from '../accounts/period-close/recurringVouchers';
 export { GdsPnrImport } from '../finance/bsp-airline-memos/gdsPnrImport';
 export { SalesCancellation } from '../finance/bsp-airline-memos/salesCancellation';
 export { PurchaseRefunds } from '../finance/bsp-airline-memos/purchaseRefunds';
-export { MultiCurrencyVoucher } from '../finance/tools-calculators/multiCurrencyVoucher';
 export { PrintPreviewDemo, amountInWordsINR } from '../finance/tools-calculators/printPreviewDemo';
 export { AutoLinkedVouchers } from '../finance/tools-calculators/autoLinkedVouchers';
 export { VoucherEntryTabbed } from '../finance/tools-calculators/voucherEntryTabbed';

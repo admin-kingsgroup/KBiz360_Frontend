@@ -22,7 +22,7 @@ import { fmt, fmtINR, compactAmt } from './format';
 import { todayISO, nowLabel, CUR_FY } from './dates';
 import { openPrintPreview } from './PrintPreview';
 import { cardStyle } from './helpers';
-import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear, useFxExposure, useTrialBalance, useAuditTrail } from './useAccounting';
+import { useGpBills, useProfitAndLoss, useYieldByDestination, useCustomerLtv, useAbcAnalysis, useYearOverYear, useTrialBalance, useAuditTrail } from './useAccounting';
 import { isLiquidRow, liquidityKind } from './ledgerKind';
 import { useTaxFilingBoard, useStatutoryDues } from './useTaxReco';
 import { ReportDateBar, resolveReportRange } from './reportDateBar';
@@ -48,13 +48,12 @@ import { RPT_YieldSupplier } from '../modules/reports/profitability-gp/yieldSupp
 import { RPT_YoY } from '../modules/reports/profitability-gp/yoyComparison';
 import { RPT_CustomerLTV } from '../modules/reports/profitability-gp/customerLtv';
 import { RPT_ABCAnalysis } from '../modules/reports/profitability-gp/abcAnalysis';
-import { RPT_CurrencyExposure } from '../modules/reports/compliance-tax/currencyExposure';
 import { RPT_Attrition } from '../modules/hr/hr-reports/attrition';
 import { RPT_LeaveUtilization } from '../modules/hr/hr-reports/leaveUtilization';
 import { RPT_BirthdayCalendar } from '../modules/hr/hr-reports/birthdayCalendar';
 import { RPT_StatutoryDues } from '../modules/taxation/statutoryDues';
 import { RPT_TaxFilingBoard } from '../modules/taxation/taxFilingBoard';
-export { RPT_YieldDestination, RPT_YieldConsultant, RPT_YieldSupplier, RPT_YoY, RPT_CustomerLTV, RPT_ABCAnalysis, RPT_CurrencyExposure, RPT_Attrition, RPT_LeaveUtilization, RPT_BirthdayCalendar, RPT_StatutoryDues, RPT_TaxFilingBoard };
+export { RPT_YieldDestination, RPT_YieldConsultant, RPT_YieldSupplier, RPT_YoY, RPT_CustomerLTV, RPT_ABCAnalysis, RPT_Attrition, RPT_LeaveUtilization, RPT_BirthdayCalendar, RPT_StatutoryDues, RPT_TaxFilingBoard };
 
 
 export function vDate(){
@@ -688,8 +687,7 @@ export function RPT_AuditTrail({ branch }){
 // (aggBills/cmoney/rrow/partyLink -> analyticsShared.js); RPT_Attrition/
 // RPT_LeaveUtilization/RPT_BirthdayCalendar moved to modules/hr/hr-reports/;
 // RPT_StatutoryDues/RPT_TaxFilingBoard moved to modules/taxation/;
-// RPT_CurrencyExposure moved to modules/reports/compliance-tax/ — all business
-// sub-module reorg. RptState + RPT_Page moved together to core/reportPage.jsx
+// All business sub-module reorg. RptState + RPT_Page moved together to core/reportPage.jsx
 // since they're shared across the reports/hr/taxation destinations. Re-exported
 // below for App.jsx's direct chunk import.
 

@@ -269,7 +269,10 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Against sales invoice 🔒"><input value={state.againstInvoice || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="fetch by Link No" title="Locked — set by Link No lookup" /></FL>
         <FL label="Related purchase invoice 🔒"><input value={state.againstPurchase || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="fetch by Link No" title="Locked — set by Link No lookup" /></FL>
-        <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} />
+        {/* Place of Supply is an India-GST concept (intra = CGST+SGST, inter = IGST). An
+            Africa (VAT) branch has a single VAT rate and no such split — hide it there, but
+            keep the grid cell so the 5-column layout doesn't shift. Mirrors PXP. */}
+        {!isVatBr ? <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} /> : <div />}
         {/* GST rate on OUR retained charges (Service Fee + SVC2) and the supplier fee /
             cancellation. Auto-seeded from the linked sale on fetch (a holiday sale at 5%
             refunds at 5%, not a blanket 18%); still editable to any valid GST slab. */}

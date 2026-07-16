@@ -57,9 +57,11 @@ export const CustomersMaster = ({ branch } = {}) => {
       { key: 'whtRate', label: 'WHT Rate (%)', type: 'number', table: false, show: (f) => isVatBranch(f.branch) },
       // Some customers deduct TDS on what they pay us — flag it and capture the rate they
       // deduct at (applied per invoice); leave blank/hidden when the customer doesn't deduct.
-      { key: 'isTdsDeducted', label: 'Is TDS Deducted (by Customer)', type: 'bool', default: false, table: false },
-      { key: 'tdsRate', label: 'TDS Rate (%) per Invoice', type: 'number', table: false, show: (f) => !!f.isTdsDeducted, required: (f) => !!f.isTdsDeducted },
-      { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
+      // India-only: a customer withholding TDS is a GST-regime concept — an Africa (VAT)
+      // client withholds WHT, captured by whtSection/whtRate above. MSME is an Indian statute.
+      { key: 'isTdsDeducted', label: 'Is TDS Deducted (by Customer)', type: 'bool', default: false, table: false, show: (f) => !isVatBranch(f.branch) },
+      { key: 'tdsRate', label: 'TDS Rate (%) per Invoice', type: 'number', table: false, show: (f) => !!f.isTdsDeducted && !isVatBranch(f.branch), required: (f) => !!f.isTdsDeducted && !isVatBranch(f.branch) },
+      { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false, show: (f) => !isVatBranch(f.branch) },
       { key: 'address', label: 'Address', type: 'text', table: false },
       // Country sits right below Address. Anything other than India → the customer is
       // treated as overseas (GST Treatment auto-set to 'Overseas'), same country-driven

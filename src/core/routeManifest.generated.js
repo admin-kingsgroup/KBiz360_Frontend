@@ -7,7 +7,6 @@
 
 export const APP_ROUTES = [
   "/",
-  "/accounting/fx-revaluation",
   "/accounting/intercompany",
   "/accounting/loans",
   "/accounting/recurring",
@@ -93,7 +92,6 @@ export const APP_ROUTES = [
   "/finance/module-register",
   "/finance/module-sales-register",
   "/finance/module-sp-register",
-  "/finance/multi-currency",
   "/finance/outstanding",
   "/finance/payment-register",
   "/finance/print-preview",
@@ -234,9 +232,7 @@ export const APP_ROUTES = [
   "/reports/customer-ltv",
   "/reports/destination",
   "/reports/exp-bgt",
-  "/reports/forex",
   "/reports/fs-notes",
-  "/reports/fx-exposure",
   "/reports/gp",
   "/reports/inb-preg",
   "/reports/inb-sreg",

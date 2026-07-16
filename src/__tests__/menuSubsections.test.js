@@ -13,7 +13,8 @@ const CASES = [
   [MENU_HR,         'Self-Service',                   ['Portal', 'Requests', 'Pay & Tax', 'Performance'],                     9],
   [MENU_SETTINGS,   'Admin Power',                    ['Templates & Branding', 'Approvals & Access', 'Data & Users'],         8],
   [MENU_DASHBOARDS, 'Financials',                     ['P&L & Growth', 'Balance & Cash', 'Working Capital & Tax'],            8],
-  [MENU_FINANCE,    'Period-End, Targets & Accruals', ['Period-End', 'Targets & Budgets', 'Registers'],                       6],
+  // 5 (was 6): FX Revaluation removed — the group never revalues foreign balances.
+  [MENU_FINANCE,    'Period-End, Targets & Accruals', ['Period-End', 'Targets & Budgets', 'Registers'],                       5],
   [MENU_MASTERS,    'Inventory & Catalog Master',     ['Travel Inventory', 'Codes & Rates'],                                  6],
 ];
 

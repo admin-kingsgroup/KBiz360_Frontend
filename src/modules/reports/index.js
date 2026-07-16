@@ -41,7 +41,6 @@ export { GroupDashboard } from './profitability-gp/groupDashboard';
 // ── Business sub-module regroup — operational/ ───────────────────────────────
 export { ConsultantReport } from './operational/consultantReport';
 export { DestinationIntelligence } from './operational/destinationIntelligence';
-export { ForexReport } from './operational/forex';
 export { ReportCommission } from './operational/commissionIncome';
 
 // ── Business sub-module regroup — working-capital/ ───────────────────────────

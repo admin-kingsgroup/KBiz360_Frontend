@@ -62,7 +62,6 @@ describe('guard — fixed screens stay branch-currency aware', () => {
     'modules/reports/pages/client-statement.jsx',
     'modules/reports/compliance-tax/clientConcentration.jsx',
     'modules/reports/compliance-tax/expenseBudgetVsActual.jsx',
-    'modules/reports/operational/forex.jsx',
     'modules/reports/operational/consultantReport.jsx',
     'modules/reports/operational/destinationIntelligence.jsx',
     'modules/masters/pages/customer-360.jsx',
