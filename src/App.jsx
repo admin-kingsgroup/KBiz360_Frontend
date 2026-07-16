@@ -651,9 +651,13 @@ export default function KB360App(){
     // Unified Approvals — SO/PO/GP + Vouchers, each with Pending/Approved/Rejected/Deleted.
     if(route==="/transactions/approvals")          return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     if(route==="/transactions/voucher-approvals")  return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
-    // OUTGOING — deals THIS branch sells to another (its INB legs post in `branch`, so the
-    // queue self-scopes). '/transactions/inb-approvals' is the legacy path, kept working.
-    if(route==="/inb/outgoing" || route==="/transactions/inb-approvals") return <InbOutgoing branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    // INB ▸ OUTGOING — deals THIS branch sells to another (its INB legs post in `branch`, so
+    // the queue self-scopes). Two doors to the SAME queue, deliberately: this standalone
+    // route is the pipeline's home under Inter Branch, while '/transactions/inb-approvals'
+    // keeps opening it inside the Approvals shell (segment 'INB') — an outgoing INB deal is
+    // an approval queue, so an approver doing their Approvals round must still find it there.
+    if(route==="/inb/outgoing") return <InbOutgoing branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/transactions/inb-approvals") return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="inbspg"/>;
     // Per-type approval screens: /transactions/approvals/<category> opens the split
     // screen for one gated voucher type (Receipt / Payment / … / ACM), bookmarkable.
     if(/^\/transactions\/approvals\/(receipt|payment|contra|journal|purchase-expense|debit-note|adm|acm)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain={route.split('/').pop()}/>;

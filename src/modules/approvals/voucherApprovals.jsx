@@ -1439,12 +1439,14 @@ export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain 
   return (
     <div style={{ margin: '12px 0' }}>
       <FocusBanner />
-      {/* INB is NOT a segment here any more — it is its own pipeline with its own two
-          screens (INB ▸ Outgoing / Incoming), because inter-branch runs both ways and each
-          branch owns both sides. The 'inbspg' render branch below is retained so a stale
-          file deep-link still lands on something sensible rather than the wrong queue. */}
+      {/* INB keeps its segment HERE as well as owning its standalone pipeline screens
+          (INB ▸ Outgoing / Incoming). Not duplication — the same InbApprovals component,
+          two doors. An outgoing INB deal IS an approval queue, so an approver working this
+          pill must see the deals waiting on them; dropping the segment made INB invisible
+          to exactly the person who has to action it. Inter Branch ▸ Outgoing is the
+          pipeline's home; this is the approver's round. */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-        {seg('sopogp', 'SO / PO / GP')}
+        {seg('sopogp', 'SO / PO / GP')}{seg('inbspg', 'INB')}
         {VOUCHER_TABS.map(([k, l]) => seg(k, l))}
       </div>
       {domain === 'sopogp'

@@ -52,7 +52,7 @@ jest.mock('../../shell/primitives', () => ({ SkeletonTable: () => null }));
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { InbApprovals } from '../approvals';
+import { InbApprovals, UnifiedApprovals } from '../approvals';
 
 // One INB deal = a SALE leg + a PURCHASE leg sharing the same sourceRef (INB Link No).
 // Legs are already Checked + Verified so the deal sits at the final Approve stage
@@ -197,5 +197,30 @@ describe('INB SPG Approvals', () => {
     await waitFor(() => expect(mockApproveOne).toHaveBeenCalled());
     expect(mockApproveOne.mock.calls[0][0]).toMatchObject({ id: 'rf1' });
     useVoucherApprovals.mockReturnValue({ data: {} }); // restore default for any later test
+  });
+});
+
+// ─── INB must stay reachable from the Approvals toggle ────────────────────────────────
+// REGRESSION GUARD. An outgoing INB deal IS an approval queue, so an approver doing their
+// Approvals round has to find it on this pill. Giving INB its own pipeline screens
+// (Inter Branch ▸ Outgoing / Incoming) is right — but it is an ADDITIONAL door, not a
+// replacement: removing the segment here once made INB invisible to exactly the person
+// who has to action it, with no error and nothing in the UI to say where it went.
+// Same InbApprovals component either way — two doors, one queue, no duplicated logic.
+describe('INB is reachable from the Approvals toggle', () => {
+  test('the INB segment is rendered alongside SO / PO / GP', () => {
+    mockApiGet.mockResolvedValue([]);
+    wrap(<UnifiedApprovals branch="BOM" setRoute={jest.fn()} currentUser={{ role: 'Super Admin' }} />);
+    expect(screen.getByRole('button', { name: 'INB' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'SO / PO / GP' })).toBeInTheDocument();
+  });
+
+  test('opening the shell on the INB domain lands on the INB queue, not SO/PO/GP', async () => {
+    mockApiGet.mockResolvedValue(mkLegs('pending'));
+    wrap(<UnifiedApprovals branch="BOM" setRoute={jest.fn()} currentUser={{ role: 'Super Admin' }} initialDomain="inbspg" />);
+    // The INB queue asks for INB vouchers; BookingApprovals is mocked to null, so seeing
+    // the deal's link no proves we rendered InbApprovals and not the SO/PO/GP queue.
+    expect(await screen.findByText(LINK, { exact: false })).toBeInTheDocument();
+    expect(mockApiGet).toHaveBeenCalledWith('/api/vouchers', { type: 'INB', branch: 'BOM' });
   });
 });
