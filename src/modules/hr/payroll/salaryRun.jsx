@@ -60,7 +60,7 @@ export function HrPayroll({branch}){
   const jDr=journalEntries.filter(e=>e.side==="Dr").reduce((s,e)=>s+e.amount,0);
   const jCr=journalEntries.filter(e=>e.side==="Cr").reduce((s,e)=>s+e.amount,0);
   const balDiff=jDr-jCr; const balanced=balDiff>=-0.01&&balDiff<=0.01;
-  const hrpContainerStyle={padding:"12px 10px",maxWidth:1600,margin:"0 auto"};
+  const hrpContainerStyle={padding:"20px 32px",maxWidth:1600,margin:"0 auto"};
 
   return (
     <div style={hrpContainerStyle}>

@@ -86,7 +86,7 @@ export function HrEmployees({branch}){
   const net=e=>gross(e)-deductions(e);
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
+    <div style={{padding:"20px 32px",maxWidth:1600,margin:"0 auto"}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",
         flexWrap:"wrap",gap:10,marginBottom:14}}>
