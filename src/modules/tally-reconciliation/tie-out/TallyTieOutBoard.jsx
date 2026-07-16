@@ -932,17 +932,35 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
   const amountDiff = byType['amount-mismatch'];
   const total = notInErp.length + notInTally.length + amountDiff.length;
 
+  // Truncation notice — the register caps its payload at a ledger boundary on a very
+  // large period. Say so plainly so a capped list is never mistaken for a clean one.
+  // Built ONCE here because it must render in BOTH branches: when every loaded defect is a
+  // whole-ledger gap the entry list is empty, yet the scan may STILL have been capped — letting
+  // the empty-state early-return swallow this would read as "all clear" over a partial scan,
+  // the exact thing the notice exists to prevent.
+  // The parenthetical counts the entries actually RENDERED here (`total`) — not `data.shown`,
+  // which also counts master gaps that live in the Ledger Matcher tab and show nothing here.
+  const truncNotice = data?.truncated ? (
+    <div role="status" className="rounded-brand border border-warning/40 bg-warning/10 px-4 py-2 text-xs font-semibold text-warning">
+      Showing the first {data.ledgersShown} of {data.offLedgers} off ledgers ({total} unmatched {total === 1 ? 'entry' : 'entries'} loaded).
+      {data.ledgersRemaining > 0 ? ` ${data.ledgersRemaining} more off ledger${data.ledgersRemaining === 1 ? '' : 's'} still to load — clear these, then reload to continue.` : ''}
+    </div>
+  ) : null;
+
   if (loading) return <LoadingState label="Scanning off ledgers for unmatched entries…" />;
   if (error) return <ErrorState title="Couldn’t load Unmatched Entries" message="The service didn’t respond." onRetry={onRetry} />;
   if (!total) {
     // offLedgers > 0 with no voucher-tier entries ⇒ every off ledger is a whole-ledger gap
     // (a ledger absent on one side) — its home is the Ledger Matcher tab, not here. Say so
-    // rather than implying nothing is off (which would contradict the KPI / gate).
+    // rather than implying nothing is off (which would contradict the KPI / gate). When the scan
+    // was CAPPED that claim only holds for the ledgers reached, so the hint is hedged and the
+    // truncation notice rides above it.
     const hasLedgerGaps = (data?.offLedgers || 0) > 0;
-    return <EmptyState title="No unmatched entries"
+    const empty = <EmptyState title="No unmatched entries"
       hint={hasLedgerGaps
-        ? 'No voucher is on only one side. The off ledgers this period are whole-ledger gaps (a ledger absent on one side) — fix those in the Ledger Matcher tab.'
+        ? `No voucher is on only one side. The off ledgers ${data?.truncated ? 'scanned so far' : 'this period'} are whole-ledger gaps (a ledger absent on one side) — fix those in the Ledger Matcher tab.`
         : 'Every voucher reconciles ERP ↔ Tally. Whole-ledger name gaps (if any) are in the Ledger Matcher tab.'} />;
+    return truncNotice ? <div className="grid gap-4">{truncNotice}{empty}</div> : empty;
   }
   return (
     <div className="grid gap-4">
@@ -955,14 +973,7 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
         </div>
         <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data?.offLedgers || 0} off ledgers</span>
       </div>
-      {/* Truncation notice — the register caps its payload at a ledger boundary on a very
-          large period. Say so plainly so a capped list is never mistaken for a clean one. */}
-      {data?.truncated && (
-        <div role="status" className="rounded-brand border border-warning/40 bg-warning/10 px-4 py-2 text-xs font-semibold text-warning">
-          Showing the first {data.ledgersShown} of {data.offLedgers} off ledgers ({data.shown} unmatched {data.shown === 1 ? 'entry' : 'entries'} loaded).
-          {data.ledgersRemaining > 0 ? ` ${data.ledgersRemaining} more off ledger${data.ledgersRemaining === 1 ? '' : 's'} still to load — clear these, then reload to continue.` : ''}
-        </div>
-      )}
+      {truncNotice}
       {/* Two sides always shown (so a clean side reads as clean); the amount band only when present. */}
       <div className="grid gap-4">
         <EntrySection section={ENTRY_SECTIONS[0]} rows={notInErp} cur={cur} onDrill={onDrill} />

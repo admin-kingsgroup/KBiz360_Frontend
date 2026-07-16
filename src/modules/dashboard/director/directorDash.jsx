@@ -911,10 +911,15 @@ export function PerformanceDash({ branch, go }) {
       <div className="mt-1.5 text-[11px] text-ink-muted">Green ≥100% · amber ≥90% · red &lt;90% (budget inverts: green = under budget).{noNpTarget && <> · <b>No Nett Profit target set</b> — add one in <b>Finance ▸ Sales Targets</b> (metric “Nett Profit”).</>}</div>
 
       {/* PnlWaterfallPanel is a self-titled card ("📉 Profit Bridge") — render it
-          directly (NO wrapping Card) to avoid a card-in-card + duplicate title. */}
-      <div className="mt-3.5">
-        <PnlWaterfallPanel branch={branch} range={range} formatMoney={(n) => money(cur, n)} onViewFullReport={go && (() => go('/reports/pnl'))} />
-      </div>
+          directly (NO wrapping Card) to avoid a card-in-card + duplicate title.
+          D2: a consolidated bridge would fold INR + USD into ONE waterfall (the tiles
+          above and tables below already split ₹/$), so in a mixed-currency view show the
+          same per-branch note the Owner/Director dashboards use instead of a blended figure. */}
+      {anySplit
+        ? <Card title="Profit Bridge"><div className="px-0.5 py-3 text-xs text-ink-muted">Per-branch — pick a branch (top-right) to view its profit bridge. A consolidated bridge isn’t shown because branches report in different currencies (₹ / $).</div></Card>
+        : <div className="mt-3.5">
+            <PnlWaterfallPanel branch={branch} range={range} formatMoney={(n) => money(cur, n)} onViewFullReport={go && (() => go('/reports/pnl'))} />
+          </div>}
 
       {anySplit
         ? curList.map((c) => <div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{tablesRow(c.symbol, entryFor(salesSplit, c.currency).rows || [], entryFor(gpSplit, c.currency).rows || [], entryFor(budSplit, c.currency).rows || [])}</div>)

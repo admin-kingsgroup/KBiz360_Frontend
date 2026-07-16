@@ -838,6 +838,11 @@ function InbEditGate({ linkNo, branch, onDone }) {
     // here (not in fareLines) — without them the Edit grid opens blank on those fields
     // and the next save silently drops them from the rebuilt purchase leg.
     purchaseHeads: deal.purchaseHeads || [], purchase: deal.purchase || null,
+    // N-PO: the deal's EXTRA cost legs, so the editor opens showing them (legsFromEdit maps
+    // each leg's component heads onto its grid). Without this the editor opened with none and
+    // the save — which now carries `purchases` — would rebuild the deal without them, deleting
+    // legs the INB list itself advertises as "(+N legs)".
+    purchases: deal.purchases || [],
     supplier: deal.supplier
       ? { name: deal.supplier.name, ledgerName: deal.supplier.ledgerName, ledgerGroup: deal.supplier.ledgerGroup }
       : { name: '', ledgerName: '', ledgerGroup: '' },

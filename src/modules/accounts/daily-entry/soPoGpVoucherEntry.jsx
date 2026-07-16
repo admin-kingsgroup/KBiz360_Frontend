@@ -187,13 +187,35 @@ export function inbRowsFromDeal(spec, deal) {
 // Purchase voucher on approval; the sale stays single. blank leg → dropped on save.
 export const ALLOWED_LEG_MODULES = { SF: ['SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'], SV: ['SV', 'SM', 'SI'] };
 const newLeg = (module) => ({ module, supplier: { name: '', ledgerGroup: '' }, costCenter: '', purTallyRef: '', gstMode: 'intra', packageType: '', availItc: false, line: blankLine(VSPECS[module] || VSPECS.SM) });
-const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
+// An INB deal's extra legs come back from getDeal as component `heads` (read off the
+// "<pfx>-<component> [IB-Pur]" ledgers) rather than a stored grid `rows` — a booking leg has
+// `rows`, an INB leg does not. Map heads onto the grid the same way inbRowsFromDeal does for
+// the primary leg, else the editor opens the leg BLANK and the next save rebuilds the deal
+// without its cost. 'Supp SVCHG' is a psvc column, not a fare column.
+const legLineFromHeads = (sp, leg) => {
+  const line = blankLine(sp);
+  const cols = sp.fareCols || [];
+  for (const h of (leg.heads || [])) {
+    const desc = String(h.desc || '').trim();
+    if (/^supp\s*svchg$/i.test(desc)) { line.psvc = round2(num(line.psvc) + num(h.amt)); continue; }
+    const col = cols.find((c) => String(c.label).trim().toLowerCase() === desc.toLowerCase());
+    if (col) line[col.key] = num(h.amt);
+  }
+  if (leg.purchase) {
+    if (num(leg.purchase.incentiveAmt)) line.incentive = num(leg.purchase.incentiveAmt);
+    if (sp && sp.model === 'package' && num(leg.purchase.gst)) line.psvcGst = num(leg.purchase.gst);
+  }
+  return line;
+};
+export const legsFromEdit = (booking) => (booking.purchases || []).map((leg) => {
   const sp = VSPECS[leg.module] || VSPECS.SM;
   return {
     module: leg.module, supplier: { name: leg.supplier?.ledgerName || leg.supplier?.name || '', ledgerGroup: leg.supplier?.ledgerGroup || '' },
     costCenter: leg.costCenter || '', purTallyRef: leg.purTallyRef || '', gstMode: leg.gstMode || 'intra',
     packageType: leg.packageType || '', availItc: !!leg.availItc,
-    line: (Array.isArray(leg.rows) && leg.rows[0]) ? { ...blankLine(sp), ...leg.rows[0] } : blankLine(sp),
+    line: (Array.isArray(leg.rows) && leg.rows[0])
+      ? { ...blankLine(sp), ...leg.rows[0] }
+      : ((leg.heads || []).length ? legLineFromHeads(sp, leg) : blankLine(sp)),
   };
 });
 export function legToPayload(leg, brCode, noVat, foreign = false) {
@@ -467,7 +489,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const isVatBr = isVatBranch(brCode);
   // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
   const taxLabel = isVatBr ? 'VAT' : 'GST';
-  const effNoVat = isVatBr && noVat;
+  // A zero-rated inter-branch EXPORT bills no tax on the Service Fee — the banner above the grid
+  // already says so, and the server posts taxAmt 0. The grid used to ignore that and still price
+  // the fee at the branch's VAT rate, so an FBM→BOM export showed a phantom "VAT/Service Fee
+  // (16%)" amount, an inflated INSO total, and an FX preview quoting the buyer MORE than the
+  // backend derives. `billIgst === false` is exactly the zero-rated case (a same-country INB
+  // pins it true; a non-INB voucher leaves it undefined), so fold it into the Without-VAT flag.
+  // SAFE for input tax: isInputTaxable/purRateOf keep a VAT branch's PURCHASE VAT at full rate
+  // regardless of noVat (voucherSpecs deliberately decouples input VAT from the sale choice) —
+  // so the supplier-side VAT/ITC stays intact and optional, only the sale-side fee tax goes to 0.
+  const inbZeroRated = interBranch && billIgst === false;
+  const effNoVat = isVatBr && (noVat || inbZeroRated);
   // Live VAT % from the branch config / VAT master (null → voucherSpecs static fallback),
   // so a Super-Admin rate amendment flows into the on-screen math and the saved booking.
   const liveVatRate = (bc({ code: brCode }) || {}).vatRate;
@@ -631,6 +663,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         noSupplier: isNoSupp,
         supplier: hasPurchase ? { name: supplier.name, ledgerName: supplier.ledgerName || supplier.name, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name), foreign: suppForeign } : null,
         purchase: hasPurchase ? { heads: totals.po.heads || [], gst: totals.po.gst || 0, incentiveAmt: totals.po.incentiveAmt || 0, incentiveTds: totals.po.incentiveTds || 0, gstMode: purGstMode } : null,
+        // N-PO: the ADDITIONAL supplier cost legs under this same Link No (a Flight may add a
+        // Misc cost leg; a Holiday any component). Same shape + filter as the SO/PO/GP payload.
+        // These were silently DROPPED before — the key was absent, so the server never posted
+        // the extra legs on create, and on edit it left the old ones untouched (invisible in the
+        // editor). Sent unconditionally now, which is safe ONLY because legsFromEdit above
+        // rehydrates the deal's existing legs — otherwise an edit would post [] and delete them.
+        purchases: (isNoSupp ? [] : extraPOs)
+          .filter((leg) => num(leg.line.base) > 0 || num(leg.line.psvc) > 0)
+          .map((leg) => legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name))),
         // Freeze the manual FX quote onto a cross-currency deal (base USD, quote INR) so the
         // buyer branch's converted INPO is derived from it; omitted for same-currency deals.
         ...(crossCcy ? { fx: { base: 'USD', quote: 'INR', rate: fxRateNum, date, fromCcy: sellerCcy, toCcy: buyerCcy, source: 'manual' } } : {}),
@@ -1133,8 +1174,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </FL>
           )}
           {/* VAT has no intra/inter (place-of-supply) split — these CGST/SGST vs IGST
-              selectors are India-only and are hidden on Africa/VAT branches. */}
-          {!isVatBr && <FL label="Sale GST mode">
+              selectors are India-only and are hidden on Africa/VAT branches.
+              An INB deal's SALE tax is not the user's to pick: the server derives it from the
+              branch pair (inbTaxTreatment) — same-country is always inter-state IGST, and a
+              cross-border deal is zero-rated unless the "Bill IGST" tick above says otherwise.
+              `saleGstMode` is never read into `inbBody`, so on INB this control was decoration:
+              it always opened showing "Intra-state (CGST+SGST)" (InbEditGate supplies no
+              so/gstMode to seed it), and changing it moved the UI but sent nothing — the
+              accountant saw CGST, switched to IGST, saved, and nothing happened. Hide it on
+              INB so the Bill IGST tick is the single, honest control. */}
+          {!isVatBr && !interBranch && <FL label="Sale GST mode">
             <DropdownMenu
               ariaLabel="Sale GST mode"
               menuRole="listbox"

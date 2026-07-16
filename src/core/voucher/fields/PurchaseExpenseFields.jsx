@@ -8,6 +8,7 @@ import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
 import { isVatBranch } from '../../voucherSpecs';
+import { VAT_RATE } from '../../referenceCache';   // per-branch seeded VAT % (NBO 16 / DAR 18 / FBM 16)
 import { V_DR, V_CR, DARK, DIM, money2, pxpTotals, r2 } from '../ui';
 
 /**
@@ -39,8 +40,10 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
   // Withholding rate: India = the chosen TDS section's rate; Africa = a flat WHT rate
   // (editable, defaults to the common 2%).
   const rate = isVat ? (+state.whtRate || 2) : ((TDS_SECTIONS[state.tdsSection] || {}).rate || 0);
-  // Effective input-tax rate: India = the picked GST slab; Africa = the branch's single VAT rate.
-  const effGstRate = isVat ? (brVatRate != null ? brVatRate : 16) : (+state.gstPct || 0);
+  // Effective input-tax rate: India = the picked GST slab; Africa = the branch's single VAT
+  // rate. Fall back PER BRANCH (not a flat 16) when the live cfg rate hasn't hydrated yet —
+  // a flat 16 would silently under-rate DAR (18%). Mirrors RefundReissueFields' fallback.
+  const effGstRate = isVat ? (brVatRate != null ? brVatRate : (VAT_RATE[String(branchCode || '').toUpperCase()] ?? 16)) : (+state.gstPct || 0);
   const autoGst = () => patch(isVat ? { gstPct: effGstRate, gstAmt: r2(t.taxable * effGstRate / 100) } : { gstAmt: r2(t.taxable * effGstRate / 100) });
   const autoTds = () => patch({ tdsAmt: r2(t.taxable * rate / 100) });
   const cgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt / 2);
