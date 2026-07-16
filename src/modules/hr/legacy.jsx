@@ -73,7 +73,7 @@ export function ExpenseBudget({branch,setRoute}){
   const ff=n=>n>0?cur+Number(n).toLocaleString(localeOf(cur)):"—";
 
   return (
-    <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
+    <div style={{padding:"20px 32px",maxWidth:1600,margin:"0 auto"}}>
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>

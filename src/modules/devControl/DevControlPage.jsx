@@ -412,11 +412,11 @@ export function DevControlPage({ setRoute, currentUser }) {
           subtitle="Every feature not yet wired end-to-end, worst first. Expand a finding for the What's-wrong note and the How-to-fix remark; assign an owner, set status / due date, leave a progress note. Mark Done / Won't do (or flip the registry row to 'live') to clear it — it also clears from the TK Control Tower's Development lens automatically."
         >
           <FilterBar className="mb-2">
-            <Select value={sevFilter} onChange={(e) => setSevFilter(e.target.value)} aria-label="Filter by severity">
+            <Select value={sevFilter} onChange={(e) => setSevFilter(e.target.value)} aria-label="Filter by severity" className="w-full sm:w-56">
               <option value="">All severities</option>
               {Object.entries(STATUS_META).filter(([k]) => k !== 'live').map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
             </Select>
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search findings, routes, APIs…" className="min-w-[240px] flex-1" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search findings, routes, APIs…" className="w-full sm:min-w-[240px] sm:w-auto flex-1" />
           </FilterBar>
           {boardItems.length ? (
             <div className="grid gap-1.5">

@@ -23,7 +23,7 @@ export function GratuityRegister({branch}){
   const totProvision=data.reduce((s,e)=>{const g=GRATUITY(e);const basic=(e.basic||0)+(e.da||0);return s+Math.round(basic*g.yrs*15/26);},0);
 
   return(
-    <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"20px 32px",maxWidth:1600,margin:"0 auto"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
         <div style={{width:40,height:40,borderRadius:10,background:"#EAF3DE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎁</div>
         <div>
