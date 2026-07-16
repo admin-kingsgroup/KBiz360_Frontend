@@ -57,7 +57,7 @@ jest.mock('../api', () => ({
   })),
 }));
 
-import { TallyTieOutBoard } from '../tie-out/TallyTieOutBoard';
+import { TallyTieOutBoard, groupDefectsByVoucher, voucherTypeOf, compareVoucherNo } from '../tie-out/TallyTieOutBoard';
 import { CertifyPanel } from '../tie-out/CertifyPanel';
 import { TallyCertRegister } from '../certification/TallyCertRegister';
 import { TallyReconReport } from '../reports/TallyReconReport';
@@ -1017,5 +1017,68 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     const paths = tallyReconRoutes.map((r) => r.path);
     ['/tally-reconciliation/certification/monthly', '/tally-reconciliation/certification/yearly',
       '/tally-reconciliation/reports/monthly', '/tally-reconciliation/reports/yearly'].forEach((h) => expect(paths).toContain(h));
+  });
+});
+
+describe('Tally Reconciliation · Unmatched Entries — By-voucher sort (type / vch no / impact)', () => {
+  // A minimal voucher-tier defect leg. Tally-only legs carry NO vtype — their type lives
+  // in the ref prefix ("MP/10" → "MP"); ERP legs carry an explicit vtype.
+  const leg = (ref, over = {}) => ({ ledger: 'L', date: '2026-01-31', ref, type: 'missing-in-erp', amount: 100, ...over });
+
+  test('voucherTypeOf: prefers the ERP vtype, else the ref prefix, else ZZZ (untyped sinks last)', () => {
+    expect(voucherTypeOf({ vtype: 'PMT', ref: 'PV/5' })).toBe('PMT');   // explicit field wins over the ref prefix
+    expect(voucherTypeOf({ ref: 'MP/10' })).toBe('MP');                 // parsed from the Tally voucher no
+    expect(voucherTypeOf({ ref: 'dp/14' })).toBe('DP');                 // upper-cased
+    expect(voucherTypeOf({ ref: '' })).toBe('ZZZ');                     // no ref → bottom of an A→Z order
+    expect(voucherTypeOf({ ref: '12345' })).toBe('ZZZ');               // no leading alpha token
+  });
+
+  test('compareVoucherNo: numeric-aware so MP/2 < MP/10 < MP/100 (not the lexical MP/10 < MP/100 < MP/2); blanks last', () => {
+    expect(['MP/100', 'MP/10', 'MP/2', ''].sort(compareVoucherNo)).toEqual(['MP/2', 'MP/10', 'MP/100', '']);
+  });
+
+  test('type sort (default): clusters by type A→Z, voucher-no ascending within a type', () => {
+    const rows = [leg('MP/10'), leg('DP/20'), leg('MP/2'), leg('DP/14'), leg('MP/100')];
+    // DP before MP (A→Z); within each type the numbers read 2 < 10 < 100, NOT the lexical order.
+    expect(groupDefectsByVoucher(rows, 'type').map((g) => g.ref)).toEqual(['DP/14', 'DP/20', 'MP/2', 'MP/10', 'MP/100']);
+    // Same order with no arg / an unknown key → the default falls back to type.
+    expect(groupDefectsByVoucher(rows).map((g) => g.ref)).toEqual(['DP/14', 'DP/20', 'MP/2', 'MP/10', 'MP/100']);
+    expect(groupDefectsByVoucher(rows, 'bogus').map((g) => g.ref)).toEqual(['DP/14', 'DP/20', 'MP/2', 'MP/10', 'MP/100']);
+  });
+
+  test('vchno sort: a pure voucher-no order across types (numeric-aware)', () => {
+    const rows = [leg('MP/2'), leg('DP/14'), leg('MP/10')];
+    expect(groupDefectsByVoucher(rows, 'vchno').map((g) => g.ref)).toEqual(['DP/14', 'MP/2', 'MP/10']);
+  });
+
+  test('impact sort: the old most-legs-first (leverage) order is preserved', () => {
+    // MP/2 spans 3 ledger legs, DP/14 just one → impact surfaces MP/2 first regardless of type/number.
+    const rows = [leg('DP/14'), leg('MP/2', { ledger: 'A' }), leg('MP/2', { ledger: 'B' }), leg('MP/2', { ledger: 'C' })];
+    expect(groupDefectsByVoucher(rows, 'impact').map((g) => g.ref)[0]).toBe('MP/2');
+  });
+
+  test('the Sort control reorders the By-voucher rows in the UI (Type default → Impact)', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 3,
+      summary: { total: 4, byType: { 'missing-in-erp': 4 } },
+      // Tally-only vouchers (no vtype); MP/2 spans 2 legs → highest impact.
+      defects: [
+        { ledger: 'A', date: '2026-01-31', ref: 'MP/10', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 10, side: 'tally' },
+        { ledger: 'B', date: '2026-01-31', ref: 'DP/14', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 20, side: 'tally' },
+        { ledger: 'C', date: '2026-01-31', ref: 'MP/2', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 30, side: 'tally' },
+        { ledger: 'D', date: '2026-01-31', ref: 'MP/2', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 30, side: 'tally' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
+    const section = (await screen.findByText('Not in ERP')).closest('section');
+    const order = () => within(section).getAllByText(/^(MP|DP)\//).map((n) => n.textContent);
+    // Default = Type: DP before MP (A→Z); MP/2 before MP/10 (numeric, not lexical).
+    expect(order()).toEqual(['DP/14', 'MP/2', 'MP/10']);
+    // Impact = most-legs-first: MP/2 (2 legs) leads regardless of type/number.
+    fireEvent.click(within(section).getByRole('button', { name: /^Impact$/ }));
+    expect(order()[0]).toBe('MP/2');
   });
 });

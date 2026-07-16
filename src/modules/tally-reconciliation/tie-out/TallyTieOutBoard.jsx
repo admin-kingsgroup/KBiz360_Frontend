@@ -965,6 +965,37 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
   );
 }
 
+// Voucher type for the "Sort · Type" order. ERP-side legs carry an explicit vtype
+// (JV / PMT / RV …); Tally-only legs don't — their type is the leading alpha token of
+// the Tally voucher no ("MP/10" → "MP"). Prefer the field, else parse the leading
+// letters off the ref; anything without one buckets under "ZZZ" so untyped vouchers
+// sink to the bottom of an A→Z ordering rather than jumping to the top.
+export function voucherTypeOf(g) {
+  if (g.vtype) return String(g.vtype).trim().toUpperCase();
+  const m = String(g.ref || '').trim().match(/^[A-Za-z]{1,8}/);
+  return m ? m[0].toUpperCase() : 'ZZZ';
+}
+
+// Natural voucher-no compare so "MP/2" < "MP/10" < "MP/100" — a plain string sort would
+// order them MP/10, MP/100, MP/11, MP/2. Numeric collation reads each digit run as a
+// number. Blank voucher nos sink to the bottom of their group.
+export function compareVoucherNo(a, b) {
+  const ra = String(a || '').trim(), rb = String(b || '').trim();
+  if (!ra && !rb) return 0;
+  if (!ra) return 1;
+  if (!rb) return -1;
+  return ra.localeCompare(rb, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+// Row order for the grouped By-voucher table. `type` (default) clusters same-type
+// vouchers and reads voucher-no ascending within each type; `vchno` is a pure voucher-no
+// order across types; `impact` keeps the most-legs-first leverage order.
+const VCH_SORTS = {
+  type: (a, b) => voucherTypeOf(a).localeCompare(voucherTypeOf(b)) || compareVoucherNo(a.ref, b.ref),
+  vchno: (a, b) => compareVoucherNo(a.ref, b.ref),
+  impact: (a, b) => b.legs.length - a.legs.length || b.absMax - a.absMax,
+};
+
 // One voucher = many ledger legs, so the flat register lists the SAME voucher once per
 // off ledger — inflating the count and hiding that ONE fix clears MANY rows. Regroup the
 // voucher-tier legs by voucher: key on the ERP voucherId (reliable identity), else the
@@ -974,8 +1005,10 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
 // is filled from whichever leg carries it. `net` = signed balance impact of the captured
 // legs; `gross` = the voucher's value (the larger of the Dr / Cr side) — for a wholly-
 // missing (balanced) voucher `net` is ~0, so `gross` is what tells the reviewer its size.
-// Sorted MOST off-legs first, so the highest-leverage fixes surface at the top.
-function groupDefectsByVoucher(rows) {
+// Row order is chosen by the caller via `sort` (see VCH_SORTS) — default `type` clusters
+// same-type vouchers, voucher-no ascending within each type; `impact` keeps the old
+// most-off-legs-first leverage order.
+export function groupDefectsByVoucher(rows, sort = 'type') {
   const map = new Map();
   rows.forEach((d, i) => {
     const key = d.voucherId || (d.ref ? `${d.date || ''}|${d.ref}` : `noref:${i}:${d.ledger || ''}`);
@@ -999,7 +1032,7 @@ function groupDefectsByVoucher(rows) {
   });
   return [...map.values()]
     .map((g) => ({ ...g, net: Math.round(g.net * 100) / 100, gross: Math.round(Math.max(g.sumPos, g.sumNeg) * 100) / 100 }))
-    .sort((a, b) => b.legs.length - a.legs.length || b.absMax - a.absMax);
+    .sort(VCH_SORTS[sort] || VCH_SORTS.type);
 }
 
 // One side-section of Unmatched Entries — all rows share a single defect type
@@ -1009,8 +1042,9 @@ function groupDefectsByVoucher(rows) {
 // on this side", so a reviewer sees both sides at a glance.
 function EntrySection({ section, rows, cur, onDrill }) {
   const [view, setView] = useState('voucher');   // 'voucher' (by number, grouped) | 'ledger' (raw legs)
+  const [sort, setSort] = useState('type');       // grouped row order: 'type' | 'vchno' | 'impact'
   const grouped = view === 'voucher';
-  const groups = useMemo(() => (grouped ? groupDefectsByVoucher(rows) : []), [grouped, rows]);
+  const groups = useMemo(() => (grouped ? groupDefectsByVoucher(rows, sort) : []), [grouped, rows, sort]);
   const count = grouped ? groups.length : rows.length;
   const dot = section.tone === 'danger' ? 'bg-danger' : 'bg-warning';
   return (
@@ -1027,13 +1061,29 @@ function EntrySection({ section, rows, cur, onDrill }) {
             {grouped && groups.length > 0 && rows.length !== groups.length && <span className="text-[11px] font-semibold text-ink-subtle">{rows.length} legs</span>}
           </h4>
           {rows.length > 0 && (
-            <div className="ml-auto inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-[11px] font-semibold" role="group" aria-label={`Group ${section.title} by`}>
-              {[{ k: 'voucher', l: 'By voucher' }, { k: 'ledger', l: 'By ledger' }].map((o) => (
-                <button key={o.k} type="button" aria-pressed={view === o.k} onClick={() => setView(o.k)}
-                  className={`rounded-[6px] px-2.5 py-1 transition focus:outline-none focus:ring-2 focus:ring-accent ${view === o.k ? 'bg-accent text-navy shadow-card' : 'text-ink-muted hover:text-ink'}`}>
-                  {o.l}
-                </button>
-              ))}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {/* Sort only bites in the grouped (By voucher) lens — the raw-legs table has its own natural order. */}
+              {grouped && (
+                <div className="inline-flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-subtle">Sort</span>
+                  <div className="inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-[11px] font-semibold" role="group" aria-label={`Sort ${section.title} vouchers by`}>
+                    {[{ k: 'type', l: 'Type' }, { k: 'vchno', l: 'Vch no' }, { k: 'impact', l: 'Impact' }].map((o) => (
+                      <button key={o.k} type="button" aria-pressed={sort === o.k} onClick={() => setSort(o.k)}
+                        className={`rounded-[6px] px-2.5 py-1 transition focus:outline-none focus:ring-2 focus:ring-accent ${sort === o.k ? 'bg-accent text-navy shadow-card' : 'text-ink-muted hover:text-ink'}`}>
+                        {o.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="inline-flex rounded-brand border border-surface-border bg-surface p-0.5 text-[11px] font-semibold" role="group" aria-label={`Group ${section.title} by`}>
+                {[{ k: 'voucher', l: 'By voucher' }, { k: 'ledger', l: 'By ledger' }].map((o) => (
+                  <button key={o.k} type="button" aria-pressed={view === o.k} onClick={() => setView(o.k)}
+                    className={`rounded-[6px] px-2.5 py-1 transition focus:outline-none focus:ring-2 focus:ring-accent ${view === o.k ? 'bg-accent text-navy shadow-card' : 'text-ink-muted hover:text-ink'}`}>
+                    {o.l}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
