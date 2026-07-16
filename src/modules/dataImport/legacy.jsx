@@ -380,7 +380,7 @@ function EntityCard({ spec, onUpload, onPreview, onViewExisting, state, subgroup
   const previewId = `prev-${spec.entity}`;
   const [showRef, setShowRef] = useState(false);
   return (
-    <div style={{ ...card, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ ...card, background: 'linear-gradient(180deg, #ffffff 0%, #f5f8ff 100%)', border: '1px solid #dde4f5', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ width: 34, height: 34, borderRadius: 8, background: '#eef4ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <FileSpreadsheet size={17} style={{ color: BLUE }} />
@@ -724,7 +724,7 @@ export function DataImportPage({ currentUser }) {
   };
 
   return (
-    <div style={{ padding: '12px 14px', maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: '20px 32px', maxWidth: 1600, margin: '0 auto' }}>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: DARK }}>Data Import — Tally Migration</h2>
         <p style={{ margin: '3px 0 0', fontSize: 11.5, color: DIM }}>
