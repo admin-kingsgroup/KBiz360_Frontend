@@ -35,9 +35,14 @@ jest.mock('../../core/useAccounting', () => ({
   useVoucher: jest.fn(() => ({ data: null, isLoading: false })),
   useVoucherPreview: jest.fn(() => ({ data: {} })),
 }));
+// InbPipelines renders the Incoming screen beside the seller queue, so its hooks must exist
+// here too — an unmocked one throws the moment the Incoming side is shown.
 jest.mock('../../core/useInterBranchVoucher', () => ({
   useInbDeal: jest.fn(() => ({ data: null, isLoading: false })),
   useInbReconcile: jest.fn(() => ({ data: { links: mockInbLinks() } })),
+  useInbInbound: jest.fn(() => ({ isLoading: false, data: { rows: [], totals: { pending: 0, converted: 0, approved: 0, deleted: 0, edited: 0 } } })),
+  useConvertInb: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
+  useDeleteInbDeal: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
 }));
 jest.mock('../../core/styles', () => ({ bc: () => ({ cur: '₹' }) }));
 jest.mock('../../core/data', () => ({ CONSOLIDATED_LABEL: 'TK Head Office Group' }));
@@ -231,50 +236,90 @@ describe('INB is reachable from the Approvals toggle', () => {
   });
 });
 
-// ─── A pushed deal must say what the BUYER did with it ───────────────────────────────
-// "Don't leave a screen silent." A pushed row showed "🔒 pushed" and nothing else — we hand
-// the deal over and never learn whether it was taken up, so 290 pushed deals would be an
-// unreadable pile. The voucher legs only know they were pushed; the InbLink registry is the
-// only place that knows the buyer's side, so the screen joins the two.
-describe('a pushed deal reports the buyer side', () => {
-  test('offered but not yet accepted → "awaiting <buyer> convert"', async () => {
+// ─── Pushed vs LOCKED — "offered" and "taken up" are different facts ─────────────────
+// Owner's model: a pushed deal moves to LOCKED once it is "already reflected in receiving
+// branch for further process" — i.e. once the buyer Converts it. Only the second is
+// irreversible, so they cannot share a tab. The voucher legs only know they were pushed;
+// the InbLink registry is the only place that knows the buyer's side, so the screen joins
+// the two and buckets on link.status ('open' = Pushed, 'booked' = Locked).
+describe('Pushed vs Locked', () => {
+  test('offered, buyer has NOT converted → PUSHED tab, "awaiting <buyer> convert"', async () => {
     mockInbLinks.mockReturnValue([{ inbLinkNo: LINK, saleVno: 'INB/BOM/26/0003', status: 'open', buyerBookingNo: '' }]);
     mockApiGet.mockResolvedValue(mkLegs('approved', true));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
     fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
+    expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
     expect(screen.getByText(/awaiting AMD convert/i)).toBeInTheDocument();
+    // and NOT on Locked — nothing exists in the buyer's books yet
+    fireEvent.click(screen.getByRole('button', { name: /^Locked/ }));
+    expect(screen.queryByText(LINK, { exact: false })).toBeNull();
   });
 
-  test('accepted → "converted" with the buyer booking no', async () => {
+  test('buyer converted → LOCKED tab, with their booking no', async () => {
     mockInbLinks.mockReturnValue([{ inbLinkNo: LINK, saleVno: 'INB/BOM/26/0003', status: 'booked', buyerBookingNo: 'BKG/AMD/26/0107' }]);
     mockApiGet.mockResolvedValue(mkLegs('approved', true));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
-    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
-    expect(screen.getByText(/converted · BKG\/AMD\/26\/0107/i)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /^Locked/ }));
+    expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('BKG/AMD/26/0107')).toBeInTheDocument();   // the buyer-booking column
+    expect(screen.getByText(/locked · AMD/i)).toBeInTheDocument();
+    // a locked deal has left Pushed — it is the buyer's now
+    fireEvent.click(screen.getByRole('button', { name: /^Pushed/ }));
+    expect(screen.queryByText(LINK, { exact: false })).toBeNull();
   });
 
   // Folded/migrated deals display their SALE VNO as the link no (their per-leg sourceRefs are
-  // Tally refs, not the INB link), so the join must resolve on that key too or every migrated
-  // deal silently loses its buyer state.
+  // Tally refs, not the INB link), so the join must resolve on that key too — otherwise every
+  // migrated deal is stuck in Pushed forever even after the buyer converts it.
   test('joins on the sale vno for a folded deal whose link no is not the INB link', async () => {
     mockInbLinks.mockReturnValue([{ inbLinkNo: 'INB/BOM-AMD/26/9999', saleVno: 'INB/BOM/26/0003', status: 'booked', buyerBookingNo: 'BKG/AMD/26/0200' }]);
-    const legs = mkLegs('approved', true).map((l) => ({ ...l, sourceRef: 'IS/77/26-27' })); // Tally refs → deal keys on the sale vno
+    const legs = mkLegs('approved', true).map((l) => ({ ...l, sourceRef: 'IS/77/26-27', bookingId: '' }));
     legs[0].againstPurchase = 'INB/BOM/26/0004';
     mockApiGet.mockResolvedValue(legs);
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
-    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
-    expect(screen.getByText(/converted · BKG\/AMD\/26\/0200/i)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: /^Locked/ }));
+    expect(screen.getByText('BKG/AMD/26/0200')).toBeInTheDocument();
   });
 
-  test('no registry row → no badge, and nothing breaks', async () => {
+  test('no registry row → stays in Pushed, no Locked badge, nothing breaks', async () => {
     mockInbLinks.mockReturnValue([]);
     mockApiGet.mockResolvedValue(mkLegs('approved', true));
     wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
     fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
     expect(screen.getByText(LINK, { exact: false })).toBeInTheDocument();
-    // Match the BADGES specifically — the screen's help text legitimately explains Convert,
-    // so a loose /convert/ here would match the prose and never fail.
-    expect(screen.queryByText(/awaiting AMD convert/i)).toBeNull();
-    expect(screen.queryByText(/converted · BKG/i)).toBeNull();
+    // Match the BADGE specifically — the help text legitimately explains Locked, so a loose
+    // /locked/ would match the prose and never fail.
+    expect(screen.queryByText(/locked · AMD/i)).toBeNull();
+  });
+
+  test('an empty Locked tab explains what fills it', async () => {
+    mockInbLinks.mockReturnValue([]);
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Locked/ }));
+    expect(screen.getByText(/once the buyer branch Converts it/i)).toBeInTheDocument();
+  });
+});
+
+// ─── One INB door, both pipelines ────────────────────────────────────────────────────
+// A branch is a SELLER and a BUYER — inter-branch runs both ways depending on where the
+// price is best. Landing the INB segment on the outgoing queue alone hid half a branch's
+// inter-branch work, and there was no way to reach the incoming side from Approvals at all.
+describe('InbPipelines — Outgoing | Incoming', () => {
+  test('offers both sides and opens on Outgoing', async () => {
+    mockApiGet.mockResolvedValue(mkLegs('pending'));
+    wrap(<UnifiedApprovals branch="BOM" setRoute={jest.fn()} currentUser={{ role: 'Super Admin' }} initialDomain="inbspg" />);
+    expect(screen.getByRole('tab', { name: 'INB Outgoing' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'INB Incoming' })).toBeInTheDocument();
+    expect(await screen.findByText(LINK, { exact: false })).toBeInTheDocument();   // the seller queue
+  });
+
+  test('switching to Incoming shows the buyer pipeline, not the seller queue', async () => {
+    mockApiGet.mockResolvedValue(mkLegs('pending'));
+    wrap(<UnifiedApprovals branch="BOM" setRoute={jest.fn()} currentUser={{ role: 'Super Admin' }} initialDomain="inbspg" />);
+    await screen.findByText(LINK, { exact: false });
+    fireEvent.click(screen.getByRole('tab', { name: 'INB Incoming' }));
+    expect(screen.getByText(/deals another branch sells to us/i)).toBeInTheDocument();
+    expect(screen.queryByText(LINK, { exact: false })).toBeNull();
   });
 });

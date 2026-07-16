@@ -38,7 +38,7 @@ const CAN_DELETE = /super.?admin|director/i;
 export function InboundInterBranch({ branch, setRoute, currentUser }) {
   const canDelete = CAN_DELETE.test(String(currentUser?.role || ''));
   const q = useInbInbound(branch);
-  const data = q.data || { rows: [], totals: { pending: 0, converted: 0 } };
+  const data = q.data || { rows: [], totals: { pending: 0, converted: 0, approved: 0, deleted: 0, edited: 0 } };
   const rows = Array.isArray(data.rows) ? data.rows : [];
   // `branch` arrives as a code string or a {code} object depending on the caller.
   const brLabel = typeof branch === 'string' ? branch : (branch?.code || 'this branch');
@@ -50,10 +50,16 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
   const [tabSteered, setTabSteered] = useState(false);
   useEffect(() => {
     if (tabSteered || q.isLoading) return;
-    if (!data.totals.pending && data.totals.converted) setTab('converted');
+    // Land on the first tab that actually has something, in lifecycle order.
+    if (!data.totals.pending) {
+      const first = ['converted', 'approved', 'edited', 'deleted'].find((k) => data.totals[k] > 0);
+      if (first) setTab(first);
+    }
     setTabSteered(true);
-  }, [tabSteered, q.isLoading, data.totals.pending, data.totals.converted]);
-  const shown = rows.filter((r) => r.state === tab);
+  }, [tabSteered, q.isLoading, data.totals]);
+  // Edited is a CROSS-CUT (a deal changed after it was raised), not a lifecycle bucket — a
+  // deal can be both Converted and Edited — so it filters on its own flag, not on `state`.
+  const shown = tab === 'edited' ? rows.filter((r) => r.edited) : rows.filter((r) => r.state === tab);
   const del = useDeleteInbDeal();
   const conv = useConvertInb();
   const [converting, setConverting] = useState('');
@@ -117,9 +123,16 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
         </div>
       </div>
 
-      <div role="tablist" aria-label="Inbound state" style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 9, background: '#eef1f5', border: `1px solid ${C.border}`, marginBottom: 12 }}>
-        {tabBtn('pending', 'Pending Conversion', data.totals.pending || 0)}
+      {/* The buyer-side lifecycle, mirroring the seller's Outgoing pipeline:
+          Pending (offered, not ours yet) → Converted (accepted; our SO/PO/GP is a draft, still
+          nothing in our books) → Approved & Locked (our SO/PO/GP is approved and its JV is
+          passed in OUR books — live on both sides, immutable). Edited is a cross-cut. */}
+      <div role="tablist" aria-label="Incoming state" style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 9, background: '#eef1f5', border: `1px solid ${C.border}`, marginBottom: 12, flexWrap: 'wrap' }}>
+        {tabBtn('pending', 'Pending', data.totals.pending || 0)}
         {tabBtn('converted', 'Converted', data.totals.converted || 0)}
+        {tabBtn('approved', 'Approved & Locked', data.totals.approved || 0)}
+        {tabBtn('edited', 'Edited', data.totals.edited || 0)}
+        {tabBtn('deleted', 'Deleted', data.totals.deleted || 0)}
       </div>
 
       <div style={{ ...card, overflowX: 'auto' }}>
@@ -133,18 +146,27 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
             {q.isLoading ? (
               <tr><td style={td} colSpan={7}>Loading…</td></tr>
             ) : shown.length === 0 ? (
-              /* An empty table here is almost always "nobody has pushed anything to us yet",
+              /* An empty tab here is almost always "nobody has pushed anything to us yet",
                  NOT a broken screen — a deal is invisible to the buyer until the seller
-                 Pushes it (that is the Convert gate). Saying so turns a dead end into an
-                 explanation; the bare "Nothing awaiting conversion." read as a fault. */
+                 Pushes it (that is the Convert gate). Every state says WHAT it means and WHAT
+                 fills it; a bare "nothing here" is what read as a fault. */
               <tr><td style={{ ...td, color: C.dim }} colSpan={7}>
                 {tab === 'pending' ? <>
                   <div style={{ fontWeight: 700, color: C.dark, marginBottom: 3 }}>Nothing awaiting conversion.</div>
                   <div>A deal appears here only once the selling branch <b>approves and Pushes</b> it to {brLabel}. Until then it stays in their own pipeline and is invisible to you.</div>
                   {(data.totals.converted > 0) && <div style={{ marginTop: 4 }}>You have <b>{data.totals.converted}</b> already converted — see the Converted tab.</div>}
-                </> : <>
+                </> : tab === 'converted' ? <>
                   <div style={{ fontWeight: 700, color: C.dark, marginBottom: 3 }}>No converted deals yet.</div>
-                  <div>Deals you accept from the Pending Conversion tab land here, along with the SO/PO/GP they created.</div>
+                  <div>Deals you accept from the Pending tab land here with the SO/PO/GP they created. They stay here until that SO/PO/GP is approved, which moves them to <b>Approved &amp; Locked</b>.</div>
+                </> : tab === 'approved' ? <>
+                  <div style={{ fontWeight: 700, color: C.dark, marginBottom: 3 }}>Nothing approved &amp; locked yet.</div>
+                  <div>A converted deal lands here once <b>your</b> SO/PO/GP is approved and its JV is passed in {brLabel}&apos;s books. From then the deal is live on both branches and immutable — a correction is a cascade Delete and a fresh deal from the seller, never an edit.</div>
+                </> : tab === 'edited' ? <>
+                  <div style={{ fontWeight: 700, color: C.dark, marginBottom: 3 }}>No edited deals.</div>
+                  <div>Deals the selling branch changed after raising them show here, so a figure that moved under you is never silent.</div>
+                </> : <>
+                  <div style={{ fontWeight: 700, color: C.dark, marginBottom: 3 }}>No deleted deals.</div>
+                  <div>A deal retired by a cascade Delete stays here for audit — both branches&apos; postings are reversed and the seller re-raises a corrected one.</div>
                 </>}
               </td></tr>
             ) : shown.map((rw) => {
@@ -170,7 +192,9 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
                   </td>
                   <td style={td}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      {tab === 'pending'
+                      {/* Convert is the ACCEPT action and only exists while the deal is still
+                          only offered. Every later state shows what it became instead. */}
+                      {rw.state === 'pending'
                         ? <button type="button" onClick={() => onConvert(rw)} disabled={!!converting}
                             title={`Accept this deal — creates a pending SO/PO/GP with ${rw.fromBranch}'s purchase locked in`}
                             style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: converting ? 'default' : 'pointer', color: '#fff', background: C.green, opacity: converting ? 0.6 : 1 }}>
@@ -178,13 +202,19 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
                           </button>
                         : <span style={{ fontFamily: 'monospace', color: C.dark }}>
                             {rw.buyerBookingNo || '—'}
-                            <div style={{ fontSize: 10.5, color: C.dim }}>{rw.buyerStatus || ''}</div>
+                            <div style={{ fontSize: 10.5, color: C.dim }}>
+                              {rw.state === 'approved' ? <span style={{ color: C.green, fontWeight: 800 }}>🔒 approved · JV passed</span>
+                                : rw.state === 'deleted' ? <span style={{ color: '#A32D2D', fontWeight: 800 }}>deleted</span>
+                                  : (rw.buyerStatus || '')}
+                            </div>
                             {/* Converted but the client sale isn't filled in yet — the booking can't be
                                 approved until it is, so surface it rather than let it sit unnoticed. */}
-                            {!rw.saleDone && <button type="button" onClick={() => setRoute && setRoute('/bookings/pending')}
+                            {rw.state === 'converted' && !rw.saleDone && <button type="button" onClick={() => setRoute && setRoute('/bookings/pending')}
                               style={{ marginTop: 3, padding: '3px 7px', fontSize: 10, fontWeight: 700, border: `1px solid ${C.amber}`, borderRadius: 5, cursor: 'pointer', color: C.amber, background: '#fff' }}>Add sale →</button>}
                           </span>}
-                      {canDelete && <button type="button" onClick={() => onDelete(rw)} disabled={del.isPending}
+                      {/* An already-deleted deal has nothing left to delete — offering the
+                          button would be a control that can only fail. */}
+                      {canDelete && rw.state !== 'deleted' && <button type="button" onClick={() => onDelete(rw)} disabled={del.isPending}
                         title="Delete this deal — reverses both sides (kept for audit); the selling branch re-raises a corrected one"
                         style={{ padding: '5px 9px', fontSize: 11, fontWeight: 700, border: '1px solid #A32D2D', borderRadius: 6, cursor: del.isPending ? 'default' : 'pointer', color: '#A32D2D', background: '#fff', opacity: del.isPending ? 0.6 : 1 }}>Delete</button>}
                     </div>

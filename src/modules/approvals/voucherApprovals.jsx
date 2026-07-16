@@ -20,6 +20,9 @@ import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVouc
 import { VoucherEditor } from '../accountingLive';
 import { BookingApprovals, SoPoGpVoucherEntry } from '../bookingOrder';
 import { useInbDeal, useInbReconcile } from '../../core/useInterBranchVoucher';
+// The buyer half of the INB pipeline pair. Imported directly (inter-branch has no barrel) —
+// InbPipelines renders it beside the seller queue so one door gives both sides.
+import { InboundInterBranch } from '../accounts/inter-branch/inboundInterBranch';
 import { bc } from '../../core/styles';
 import { localeOf } from '../../core/format';
 import { PeriodBar, periodRange } from '../../core/period';
@@ -967,10 +970,18 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     const used = new Set();
     const mk = (sale, purchase) => {
       const lead = sale || purchase;
-      // Bucket the deal into the INB tabs: Pending · Approved · Pushed · Edited · Deleted.
-      //  • Approve POSTS to OUR (seller) books → status 'approved'/'saved', pushed:false → APPROVED
+      // Bucket the deal into the INB Outgoing tabs:
+      //   Pending · Approved · Pushed · Locked · Edited · Deleted
+      //  • Approve POSTS to OUR (seller) books → 'approved'/'saved', pushed:false → APPROVED
       //    (still revocable/editable-after-revoke).
-      //  • Push locks it + hands it to the buyer branch → pushed:true → PUSHED (read-only).
+      //  • Push hands it to the buyer → pushed:true. That splits in TWO, because "handed over"
+      //    and "taken up" are different facts and only the second is irreversible:
+      //      – PUSHED  = offered, the buyer has NOT converted yet (link 'open'). Nothing exists
+      //                  in their books; the deal is in flight.
+      //      – LOCKED  = the buyer CONVERTED it (link 'booked') — it is now reflected in the
+      //                  receiving branch for further process, so it is theirs, not ours.
+      //    The legs themselves only know they were pushed; the InbLink registry is the only
+      //    place that knows the buyer's side, hence the linkByRef join.
       //  • 'rejected'/'deleted' → Deleted; legacy 'unpushed' → Pending (re-approve to post).
       // Edited is a cross-cut (own data source), not a status bucket.
       const pushed = !!((sale && sale.pushed) || (purchase && purchase.pushed));
@@ -993,8 +1004,16 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
         || [sale, purchase].map((l) => l && l.sourceRef).find((s) => s && /^INB\//.test(s));
       const saleTotal = sale ? Number(sale.total) || 0 : 0;
       const margin = Math.round((saleNet - purNet) * 100) / 100;
+      const dealRef = inbLink || (sale && sale.vno) || (purchase && purchase.vno);
+      // The buyer's side, from the registry. Resolve on the link no OR the sale vno — a folded
+      // deal displays its sale vno (its per-leg sourceRefs are Tally refs, not the link), so a
+      // link-only lookup would leave every migrated deal stuck in Pushed forever.
+      const lk = linkByRef.get(dealRef) || (sale && linkByRef.get(sale.vno)) || null;
+      // Taken up by the buyer ⇒ LOCKED, not merely Pushed.
+      if (st === 'pushed' && lk && lk.status === 'booked') st = 'locked';
       return {
-        key: (sale && sale.vno) || (purchase && purchase.vno), linkNo: inbLink || (sale && sale.vno) || (purchase && purchase.vno),
+        key: (sale && sale.vno) || (purchase && purchase.vno), linkNo: dealRef,
+        link: lk, buyerBookingNo: (lk && lk.buyerBookingNo) || '',
         sale, purchase, extras: [], status: st, rawStatus: raw, pushed, from: lead.branch, to: toOf((sale || lead).party), date: lead.date,
         module: inbModuleOf(sale || purchase), saleVno: (sale && sale.vno) || '', purchaseVno: (purchase && purchase.vno) || '',
         approvedAt: (sale && (sale.approvedAt || sale.updatedAt)) || '',
@@ -1029,7 +1048,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     out.forEach((d) => { if (d.extras.length) d.purchaseVno = `${d.purchaseVno} (+${d.extras.length} leg${d.extras.length > 1 ? 's' : ''})`; });
     for (const p of purchases) if (!used.has(p.vno)) out.push(mk(null, p)); // orphan purchase (no matching sale)
     return out.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.linkNo).localeCompare(String(b.linkNo)));
-  }, [rows]);
+  }, [rows, linkByRef]);   // linkByRef decides Pushed vs Locked — re-bucket when it lands
 
   // Tab counts + value. The value is subtotalled PER CURRENCY: on the CENTRAL 'ALL' view the
   // list mixes India (INR) and Africa (USD) deals, and a single figure literally added dollars
@@ -1056,8 +1075,10 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const shown = deals.filter((d) => d.status === status && matchDeal(d));
   const pendingTab = status === 'pending';       // Edit / Approve / Reject + bulk Approve
   const approvedTab = status === 'approved';      // Push / Revoke + bulk Push (posted to our books, pre-push)
-  const pushedTab = status === 'pushed';          // locked — handed to buyer branch, read-only
+  const pushedTab = status === 'pushed';          // offered — handed over, buyer hasn't converted
+  const lockedTab = status === 'locked';          // converted by the buyer — reflected in their books
   const editedTab = status === 'edited';          // cross-cut list, own data source
+  const handedTab = pushedTab || lockedTab;       // both are past-Push: read-only, no revoke
   const actionTab = pendingTab || approvedTab;    // tabs that show the checkbox + Actions column
   // Edited INB legs (type INB, edited ≥ once), search-filtered like the deals list.
   const editedInb = useMemo(() => {
@@ -1204,7 +1225,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
 
   const COLS = actionTab
     ? ['', 'INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', 'Actions']
-    : ['INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', pushedTab ? 'Pushed' : 'Status'];
+    : ['INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', lockedTab ? 'Buyer booking' : pushedTab ? 'Pushed' : 'Status'];
   const colSpan = COLS.length;
 
   // Editing a whole INB deal takes over the screen with the unified SPG editor (both
@@ -1225,7 +1246,10 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       </div>
 
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 10 }}>
-        <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('pushed', 'Pushed')}{tab('edited', 'Edited')}{tab('deleted', 'Deleted')}</div>
+        {/* Pushed and Locked are deliberately separate: "offered" and "taken up" are different
+            facts, and only the second is irreversible. Pushed = still in flight (the buyer has
+            nothing yet); Locked = converted, reflected in the receiving branch, theirs now. */}
+        <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, flexWrap: 'wrap' }}>{tab('pending', 'Pending')}{tab('approved', 'Approved')}{tab('pushed', 'Pushed')}{tab('locked', 'Locked')}{tab('edited', 'Edited')}{tab('deleted', 'Deleted')}</div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -1249,7 +1273,14 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
         {editedTab
           ? <InbEditedList rows={editedInb} isLoading={editedQ.isLoading} money={money} />
           : q.isLoading ? <div style={{ padding: 12 }}><SkeletonTable rows={6} cols={COLS.length} /></div>
-          : shown.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: C.dim, fontSize: 12 }}>{pendingTab ? 'No pending INB deals. Create one under “INB Voucher”.' : approvedTab ? 'No approved INB deals awaiting Push.' : pushedTab ? 'No pushed INB deals.' : `No ${status} INB deals.`}</div>
+          : shown.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: C.dim, fontSize: 12 }}>
+              {/* Never a bare "nothing here" — say WHY it's empty and what fills it. */}
+              {pendingTab ? 'No pending INB deals. Create one under “INB Voucher”.'
+                : approvedTab ? 'No approved INB deals awaiting Push. Approve a pending deal to post it to our books, then Push it to the buyer.'
+                  : pushedTab ? 'Nothing awaiting the buyer. A deal lands here once you Push it, and moves to Locked once the buyer Converts it.'
+                    : lockedTab ? 'No locked deals. A pushed deal moves here once the buyer branch Converts it into their own SO/PO/GP — from then on it is reflected in their books and can only be corrected by a cascade Delete + re-raise.'
+                      : `No ${status} INB deals.`}
+            </div>
           : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
@@ -1263,18 +1294,10 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                     <tr style={{ borderTop: `1px solid ${C.border}` }}>
                       {actionTab && <td style={{ padding: '7px 12px' }}><input type="checkbox" checked={sel.has(d.key)} onChange={() => toggle(d.key)} aria-label={`select ${d.linkNo}`} /></td>}
                       <td {...clickable(() => setOpen((o) => (o === d.key ? null : d.key)))} title="Show JV details" style={{ padding: '7px 12px', fontFamily: 'monospace', color: C.blue, cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}>{open === d.key ? '▾ ' : '▸ '}{d.linkNo}
-                        {pushedTab && <span title="Pushed to the buyer branch — locked" style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>🔒 pushed</span>}
-                        {/* What the BUYER did with it. A pushed deal is out of our hands but
-                            not out of our interest: until they Convert, nothing exists in
-                            their books and the deal is going nowhere. Saying "pushed" and
-                            stopping there left that invisible. */}
-                        {pushedTab && (() => {
-                          const lk = linkByRef.get(d.linkNo);
-                          if (!lk) return null;
-                          return lk.status === 'booked'
-                            ? <span title={`${d.to} converted it into ${lk.buyerBookingNo || 'their SO/PO/GP'}`} style={{ marginLeft: 5, padding: '1px 6px', borderRadius: 4, background: '#e7f3e7', color: C.green, fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>✓ converted{lk.buyerBookingNo ? ` · ${lk.buyerBookingNo}` : ''}</span>
-                            : <span title={`Offered to ${d.to} — it is in their INB · Incoming worklist, not yet accepted. Nothing exists in their books until they Convert.`} style={{ marginLeft: 5, padding: '1px 6px', borderRadius: 4, background: '#fdf3e0', color: '#8a6d00', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>awaiting {d.to} convert</span>;
-                        })()}</td>
+                        {/* The tab already says which bucket this is; the badge says WHY, on the
+                            row, so a deal read in isolation still explains itself. */}
+                        {pushedTab && <span title={`Offered to ${d.to} — it sits in their INB · Incoming worklist, not yet accepted. Nothing exists in their books until they Convert, and we can no longer revoke it.`} style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#fdf3e0', color: '#8a6d00', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>⇪ awaiting {d.to} convert</span>}
+                        {lockedTab && <span title={`${d.to} converted it into ${d.buyerBookingNo || 'their SO/PO/GP'} — it is reflected in their books for further process. Locked on both sides; a correction is a cascade Delete + re-raise.`} style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#e7f3e7', color: C.green, fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>🔒 locked · {d.to}</span>}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{fmtDate(d.date)}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{d.from} → {d.to}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{d.module}</td>
@@ -1310,8 +1333,10 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                             </>}
                           </td>
                         : <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: C.dim }}>{pushedTab
-                            ? <span title="Pushed to the buyer branch — locked (no revoke)">Pushed {fmtDate((d.sale && d.sale.pushedAt) || (d.purchase && d.purchase.pushedAt)) || ''} · awaiting buyer</span>
-                            : (d.rawStatus || d.status)}</td>}
+                            ? <span title="Pushed to the buyer branch — locked (no revoke). It moves to the Locked tab once they Convert it.">Pushed {fmtDate((d.sale && d.sale.pushedAt) || (d.purchase && d.purchase.pushedAt)) || ''} · awaiting {d.to}</span>
+                            : lockedTab
+                              ? <span style={{ fontFamily: 'monospace', color: C.dark }} title={`${d.to} converted this deal into ${d.buyerBookingNo || 'their SO/PO/GP'}`}>{d.buyerBookingNo || '—'}</span>
+                              : (d.rawStatus || d.status)}</td>}
                     </tr>
                     {open === d.key && (
                       <tr><td colSpan={colSpan} style={{ padding: 0, background: '#fbfcfd' }}>
@@ -1324,7 +1349,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
             </table>
           )}
       </div>
-      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>Outgoing INB deals are three-step: <b>Approve</b> (Pending → Approved) posts the INB Sale + airline Purchase to OUR (seller) books; the deal stays <b>revocable + editable</b> (Revoke → un-post to Pending). <b>Push</b> (Approved → Pushed) <b>locks</b> the deal — no more revoke — and <b>offers</b> it to the buyer branch; nothing exists in their books yet. They then <b>Convert</b> it on their INB · Incoming screen, which creates their SO/PO/GP with our purchase locked in, and approve it through their own pipeline. The <b>Edited</b> tab lists deals changed ≥ once. Click a row for the JV (Dr/Cr) of both legs.</div>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}><b>Pending</b> → <b>Approve</b> posts the INB Sale + airline Purchase to OUR (seller) books; the deal stays <b>revocable + editable</b> (Revoke → un-post to Pending). <b>Push</b> → <b>Pushed</b>: locked (no more revoke) and <b>offered</b> to the buyer branch — nothing exists in their books yet. <b>Locked</b>: the buyer <b>Converted</b> it into their own SO/PO/GP, so it is now reflected in the receiving branch for further process — a correction from here is a cascade Delete + re-raise, never an edit. The <b>Edited</b> tab lists deals changed ≥ once. Click a row for the JV (Dr/Cr) of both legs.</div>
 
       {/* INB Refunds — RF/RI vouchers that reverse an INB deal. Routed here (not the
           SO/PO/GP queue); each is a single voucher, approved/rejected on its own row.
@@ -1446,6 +1471,41 @@ export function InbOutgoing({ branch, setRoute, currentUser }) {
   );
 }
 
+/** INB — the branch's TWO mirror pipelines behind one door.
+ *
+ *  Inter-branch trade runs both ways (AMD→BOM is as real as BOM→AMD, depending on where the
+ *  price is best), so a branch is a seller AND a buyer and needs both sides. They are separate
+ *  SCREENS, not tabs of one table, because they answer different questions and carry different
+ *  actions: Outgoing is "what have we sold, and has the buyer taken it up?" (Approve · Push);
+ *  Incoming is "what has been offered to us, and what did we do with it?" (Convert).
+ *  One branch's Outgoing IS another's Incoming. */
+export function InbPipelines({ branch, setRoute, currentUser, initialSide = 'outgoing' }) {
+  const navFocus = useNavFocusStore((s) => s.focus);
+  // A revoke deep-link targets a SELLER-side leg, so it must land on Outgoing whatever the
+  // caller asked for — otherwise the link opens the wrong pipeline and the deal isn't there.
+  const fileFocus = navFocus && navFocus.params && navFocus.params.kind === 'file' && navFocus.params.domain === 'inbspg'
+    ? navFocus.params : null;
+  const [side, setSide] = useState(fileFocus ? 'outgoing' : initialSide);
+  const seg = (k, label, hint) => (
+    <button key={k} type="button" role="tab" aria-selected={side === k} onClick={() => setSide(k)} title={hint}
+      style={{ padding: '8px 16px', fontSize: 12.5, fontWeight: 800, borderRadius: 7, cursor: 'pointer',
+        border: `1px solid ${side === k ? C.dark : '#d6dbe6'}`, background: side === k ? C.dark : '#fff', color: side === k ? C.gold : C.dim }}>{label}</button>
+  );
+  return (
+    <div style={{ margin: '12px 0' }}>
+      <FocusBanner />
+      <div role="tablist" aria-label="INB pipeline" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+        {seg('outgoing', 'INB Outgoing', 'Deals WE sell to another branch — Approve, then Push')}
+        {seg('incoming', 'INB Incoming', 'Deals another branch sells to US — Convert into our own SO/PO/GP')}
+      </div>
+      {side === 'outgoing'
+        ? <InbApprovals branch={branch} setRoute={setRoute} currentUser={currentUser}
+            initialSearch={fileFocus?.search || ''} initialStatus={fileFocus?.status || ''} />
+        : <InboundInterBranch branch={branch} setRoute={setRoute} currentUser={currentUser} />}
+    </div>
+  );
+}
+
 export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain = 'sopogp' }) {
   // Opened from an Alert deep-link targeting a voucher → start on the combined Vouchers
   // queue (the deep-link auto-opens the flagged voucher's editor, which VoucherApprovals
@@ -1477,7 +1537,10 @@ export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain 
       {domain === 'sopogp'
         ? <BookingApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} initialSearch={fileFocus?.search || ''} initialStatus={fileFocus?.status || ''} />
         : domain === 'inbspg'
-          ? <InbApprovals branch={branch} setRoute={setRoute} currentUser={currentUser} initialSearch={fileFocus?.search || ''} initialStatus={fileFocus?.status || ''} />
+          /* INB gives BOTH pipelines behind this one segment — a branch is a seller AND a
+             buyer, so landing them on only the outgoing queue hid half their inter-branch
+             work. InbPipelines carries the Outgoing | Incoming switch. */
+          ? <InbPipelines branch={branch} setRoute={setRoute} currentUser={currentUser} />
           : <VoucherApprovals branch={branch} currentUser={currentUser} category={catDomain} />}
     </div>
   );

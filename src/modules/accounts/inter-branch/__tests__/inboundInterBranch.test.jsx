@@ -40,6 +40,9 @@ const feed = (rows) => mockInbound.mockReturnValue({
       total: rows.length,
       pending: rows.filter((r) => r.state === 'pending').length,
       converted: rows.filter((r) => r.state === 'converted').length,
+      approved: rows.filter((r) => r.state === 'approved').length,
+      deleted: rows.filter((r) => r.state === 'deleted').length,
+      edited: rows.filter((r) => r.edited).length,
     },
   },
 });
@@ -71,7 +74,7 @@ test('Convert is confirmed first — it is the buyer point of no return', async 
 test('a CONVERTED row shows its booking, not a Convert button', () => {
   feed([{ ...ROW, state: 'converted', buyerBookingNo: 'BKG/AMD/26/0107', buyerStatus: 'pending', saleDone: true }]);
   render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
-  fireEvent.click(screen.getByText(/Converted/));
+  fireEvent.click(screen.getByRole('tab', { name: /^Converted/ }));
   expect(screen.getByText('BKG/AMD/26/0107')).toBeInTheDocument();
   expect(screen.queryByText('Convert →')).not.toBeInTheDocument();
 });
@@ -81,7 +84,7 @@ test('a CONVERTED row shows its booking, not a Convert button', () => {
 test('a converted row whose sale is unfilled offers "Add sale"', () => {
   feed([{ ...ROW, state: 'converted', buyerBookingNo: 'BKG/AMD/26/0107', saleDone: false }]);
   render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
-  fireEvent.click(screen.getByText(/Converted/));
+  fireEvent.click(screen.getByRole('tab', { name: /^Converted/ }));
   fireEvent.click(screen.getByText('Add sale →'));
   expect(mockSetRoute).toHaveBeenCalledWith('/bookings/pending');
 });
@@ -89,8 +92,8 @@ test('a converted row whose sale is unfilled offers "Add sale"', () => {
 test('tab counts come from the server totals', () => {
   feed([ROW, { ...ROW, inbLinkNo: 'INB/BOM-AMD/26/0228', state: 'converted', buyerBookingNo: 'BKG/AMD/26/0108' }]);
   render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
-  expect(screen.getByText(/Pending Conversion/).textContent).toContain('(1)');
-  expect(screen.getByText(/^Converted/).textContent).toContain('(1)');
+  expect(screen.getByRole('tab', { name: /^Pending/ }).textContent).toContain('(1)');
+  expect(screen.getByRole('tab', { name: /^Converted/ }).textContent).toContain('(1)');
 });
 
 // ─── An EMPTY screen must explain itself, not look broken ─────────────────────────────
@@ -126,6 +129,58 @@ test('an empty Pending tab points at the Converted tab when rows are hiding ther
   // while Converted has rows, say so rather than leave them staring at nothing.
   feed([{ ...ROW, state: 'converted', buyerBookingNo: 'BKG/AMD/26/0107' }]);
   render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
-  fireEvent.click(screen.getByText(/Pending Conversion/));
+  fireEvent.click(screen.getByRole('tab', { name: /^Pending/ }));
   expect(screen.getByText(/already converted/i)).toBeInTheDocument();
+});
+
+// ─── The buyer-side lifecycle: Pending → Converted → Approved & Locked ────────────────
+// Owner's model. "Approved & Locked" = OUR SO/PO/GP is approved and its JV is passed in the
+// receiving branch's books — the deal is live on both sides and immutable from then on.
+// Converted is NOT that: a converted booking is a draft, so nothing is in our books yet.
+// The distinction is the whole point — it is the line between reversible and not.
+test('Approved & Locked is its own tab, separate from Converted', () => {
+  feed([
+    { ...ROW, inbLinkNo: 'INB/BOM-AMD/26/0300', state: 'converted', buyerBookingNo: 'BKG/AMD/26/0107' },
+    { ...ROW, inbLinkNo: 'INB/BOM-AMD/26/0301', state: 'approved', buyerBookingNo: 'BKG/AMD/26/0108', saleDone: true },
+  ]);
+  render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+  fireEvent.click(screen.getByRole('tab', { name: /^Converted/ }));
+  expect(screen.getByText('BKG/AMD/26/0107')).toBeInTheDocument();
+  expect(screen.queryByText('BKG/AMD/26/0108')).toBeNull();
+
+  fireEvent.click(screen.getByRole('tab', { name: /Approved & Locked/ }));
+  expect(screen.getByText('BKG/AMD/26/0108')).toBeInTheDocument();
+  expect(screen.getByText(/JV passed/i)).toBeInTheDocument();
+  expect(screen.queryByText('BKG/AMD/26/0107')).toBeNull();
+});
+
+test('a deleted deal stays visible for audit and offers no Delete button', () => {
+  feed([{ ...ROW, state: 'deleted', buyerBookingNo: 'BKG/AMD/26/0109' }]);
+  render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{ role: 'Super Admin' }} />);
+  fireEvent.click(screen.getByRole('tab', { name: /^Deleted/ }));
+  expect(screen.getByText('BKG/AMD/26/0109')).toBeInTheDocument();
+  // Deleting an already-deleted deal is a control that can only fail — don't offer it.
+  expect(screen.queryByText('Delete')).toBeNull();
+});
+
+// Edited is a CROSS-CUT, not a bucket — a deal can be Converted AND Edited at once, so it
+// must filter on its own flag rather than on `state`.
+test('Edited is a cross-cut — a converted deal that was edited shows on BOTH tabs', () => {
+  feed([{ ...ROW, state: 'converted', buyerBookingNo: 'BKG/AMD/26/0110', edited: true }]);
+  render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+  fireEvent.click(screen.getByRole('tab', { name: /^Converted/ }));
+  expect(screen.getByText('BKG/AMD/26/0110')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: /^Edited/ }));
+  expect(screen.getByText('BKG/AMD/26/0110')).toBeInTheDocument();
+});
+
+test('every empty tab explains itself — never a bare "nothing here"', () => {
+  feed([]);
+  render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+  fireEvent.click(screen.getByRole('tab', { name: /Approved & Locked/ }));
+  expect(screen.getByText(/JV is passed/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: /^Deleted/ }));
+  expect(screen.getByText(/cascade Delete/i)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: /^Edited/ }));
+  expect(screen.getByText(/changed after raising them/i)).toBeInTheDocument();
 });
