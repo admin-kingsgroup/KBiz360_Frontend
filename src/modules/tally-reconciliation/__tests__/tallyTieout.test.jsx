@@ -668,7 +668,7 @@ describe('Tally Reconciliation · tie-out board render', () => {
     await screen.findByText('HDFC Bank A/c');
     fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
     await screen.findByText('Not in ERP');
-    expect(screen.queryByText(/off ledgers remain/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/still to load/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Showing the first/)).not.toBeInTheDocument();
   });
 
