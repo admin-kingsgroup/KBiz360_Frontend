@@ -7,8 +7,9 @@ import { useState } from 'react';
 import { AlertTriangle, ChevronDown, Plus, Search } from 'lucide-react';
 import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../../../core/data';
 import { useAdmReasonCodes } from '../../../core/useReference';
-import { useAdmMemos, useCreateAdmMemo, useDisputeAdmMemo, useAcceptAdmMemo, useRejectAdmMemo } from '../../../core/useAdmMemos';
+import { useAdmMemos, useCreateAdmMemo, useDisputeAdmMemo, useAcceptAdmMemo, useRejectAdmMemo, useReverseAdmMemo } from '../../../core/useAdmMemos';
 import { toast } from '../../../core/ux/toast';
+import { confirmDialog } from '../../../core/ux/confirm';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { Menu as StatusMenu } from '../../../core/ux/Menu';
 import { todayISO } from '../../../core/dates';
@@ -29,7 +30,10 @@ export function AdmRegister({branch}){
   const disputeM=useDisputeAdmMemo();
   const acceptM=useAcceptAdmMemo();
   const rejectM=useRejectAdmMemo();
-  const adms=(memosQ.data||[]).map(m=>({...m,id:m.memoNo,iataNum:m.iataNum||""}));
+  const reverseM=useReverseAdmMemo();
+  // Keep the DB _id as `rid` for id-addressed actions (accept/reject/dispute/reverse hit
+  // /api/adm-memos/:id which validates an ObjectId); `id` stays the memoNo for display/search.
+  const adms=(memosQ.data||[]).map(m=>({...m,rid:m.id,id:m.memoNo,iataNum:m.iataNum||""}));
 
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [disputeModal,setDisputeModal]=useState(null);
@@ -68,11 +72,19 @@ export function AdmRegister({branch}){
     });
   };
 
-  const acceptAdm=(m)=>acceptM.mutate({id:m.id},{
+  const acceptAdm=(m)=>acceptM.mutate({id:m.rid},{
     onSuccess:(r)=>toast(`ADM accepted — voucher ${(r&&(r.voucherVno||(r.voucher&&r.voucher.vno)))||""} created (pending approval)`),
     onError:(e)=>toast("Could not accept — "+e.message,"error"),
   });
-  const rejectAdm=(m)=>rejectM.mutate({id:m.id},{onSuccess:()=>toast("ADM rejected"),onError:(e)=>toast(e.message,"error")});
+  const rejectAdm=(m)=>rejectM.mutate({id:m.rid},{onSuccess:()=>toast("ADM rejected"),onError:(e)=>toast(e.message,"error")});
+  // Reverse (un-accept): a locked ADM leg can't be revoked/edited/deleted directly, so the
+  // memo drives the reverse-out — un-posts its voucher (viaMaster) and returns to Received.
+  // Requires a reason (it touches real books).
+  const reverseAdm=async(m)=>{
+    const {confirmed,reason}=await confirmDialog({title:`Reverse ${m.id}?`,message:`This un-accepts the memo and reverses its voucher ${m.voucherVno||""} out of the books (memo returns to Received; the voucher number is retired).`,danger:true,reasonRequired:true,reasonLabel:"Reason for reversal",confirmLabel:"Reverse"});
+    if(!confirmed)return;
+    reverseM.mutate({id:m.rid,reason},{onSuccess:()=>toast(`ADM ${m.id} reversed — voucher un-posted`),onError:(e)=>toast("Could not reverse — "+e.message,"error")});
+  };
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
@@ -215,6 +227,7 @@ export function AdmRegister({branch}){
                         )}
                         {a.status==="Disputed"&&<button onClick={()=>rejectAdm(a)} style={{...btnGh,padding:"2px 7px",fontSize:9,whiteSpace:"nowrap"}}>Reject</button>}
                         {a.status==="Accepted"&&a.voucherVno&&<span style={{fontSize:9,color:"#16a34a",fontWeight:700}}>→ {a.voucherVno}</span>}
+                        {a.status==="Accepted"&&<button onClick={()=>reverseAdm(a)} disabled={reverseM.isPending} title="Reverse (un-accept) → un-post the voucher, memo back to Received" style={{...btnGh,padding:"2px 7px",fontSize:9,color:"#dc2626",borderColor:"#dc2626",whiteSpace:"nowrap"}}>↺ Reverse</button>}
                       </div>
                     </td>
                   </tr>
@@ -309,7 +322,7 @@ export function AdmRegister({branch}){
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setDisputeModal(null)} style={btnGh}>Cancel</button>
               <button disabled={disputeM.isPending} onClick={()=>{
-                disputeM.mutate({id:disputeModal.id,note:disputeNote||"Dispute filed via BSP Link — awaiting airline response"},{
+                disputeM.mutate({id:disputeModal.rid,note:disputeNote||"Dispute filed via BSP Link — awaiting airline response"},{
                   onSuccess:()=>{setDisputeModal(null);toast("Dispute filed");},
                   onError:(e)=>toast("Could not file dispute — "+e.message,"error"),
                 });

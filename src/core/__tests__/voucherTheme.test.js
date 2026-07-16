@@ -85,9 +85,11 @@ describe('SO / PO / GP booking voucher (legacy.jsx)', () => {
   });
 
   test('each section renders a full coloured bar via its accent', () => {
-    expect(legacy).toMatch(/badge="SO"[^>]*accent=\{SO_BAR\}/);
-    expect(legacy).toMatch(/badge="PO"[^>]*accent=\{PO_BAR\}/);
-    expect(legacy).toMatch(/badge="GP"[^>]*accent=\{GP_BAR\}/);
+    // Badge is inter-branch aware — `badge={interBranch ? 'INSO' : 'SO'}` etc. — so match
+    // the SO/PO/GP token inside the badge expression, still anchored to its accent colour.
+    expect(legacy).toMatch(/badge=\{[^}]*'SO'\}[^>]*accent=\{SO_BAR\}/);
+    expect(legacy).toMatch(/badge=\{[^}]*'PO'\}[^>]*accent=\{PO_BAR\}/);
+    expect(legacy).toMatch(/badge=\{[^}]*'GP'\}[^>]*accent=\{GP_BAR\}/);
   });
 
   test('Section header bar paints the full accent background', () => {

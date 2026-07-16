@@ -11,8 +11,9 @@ import React, { useState } from 'react';
 import { Plus, Search, ChevronDown } from 'lucide-react';
 import { localeOf } from '../../../core/format';
 import { ACM_REASON_CODES } from '../../../core/helpers';
-import { useAdmMemos, useCreateAdmMemo, useAcceptAdmMemo, useRejectAdmMemo, useDisputeAdmMemo } from '../../../core/useAdmMemos';
+import { useAdmMemos, useCreateAdmMemo, useAcceptAdmMemo, useRejectAdmMemo, useDisputeAdmMemo, useReverseAdmMemo } from '../../../core/useAdmMemos';
 import { toast } from '../../../core/ux/toast';
+import { confirmDialog } from '../../../core/ux/confirm';
 import { Menu as StatusMenu } from '../../../core/ux/Menu';
 import { BRANCH_CODES, branchCurrencies, branchMainCurrency } from '../../../core/data';
 import { bc } from '../../../core/styles';
@@ -45,7 +46,10 @@ export function AcmRegister({ branch }) {
   const acceptM = useAcceptAdmMemo();
   const rejectM = useRejectAdmMemo();
   const disputeM = useDisputeAdmMemo();
-  const acms = (memosQ.data || []).map((m) => ({ ...m, id: m.memoNo, iataNum: m.iataNum || '', bspCreditDate: m.bspDebitDate || '' }));
+  const reverseM = useReverseAdmMemo();
+  // Keep the DB _id as `rid` for id-addressed actions (/api/adm-memos/:id validates an
+  // ObjectId); `id` stays the memoNo for display/search.
+  const acms = (memosQ.data || []).map((m) => ({ ...m, rid: m.id, id: m.memoNo, iataNum: m.iataNum || '', bspCreditDate: m.bspDebitDate || '' }));
 
   const [modal, setModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState('All');
@@ -70,11 +74,18 @@ export function AcmRegister({ branch }) {
       onError: (e) => toast('Could not record — ' + e.message, 'error'),
     });
   };
-  const acceptAcm = (m) => acceptM.mutate({ id: m.id }, {
+  const acceptAcm = (m) => acceptM.mutate({ id: m.rid }, {
     onSuccess: (r) => toast(`ACM accepted — voucher ${(r && (r.voucherVno || (r.voucher && r.voucher.vno))) || ''} created (pending approval)`),
     onError: (e) => toast('Could not accept — ' + e.message, 'error'),
   });
-  const rejectAcm = (m) => rejectM.mutate({ id: m.id }, { onSuccess: () => toast('ACM rejected'), onError: (e) => toast(e.message, 'error') });
+  const rejectAcm = (m) => rejectM.mutate({ id: m.rid }, { onSuccess: () => toast('ACM rejected'), onError: (e) => toast(e.message, 'error') });
+  // Reverse (un-accept): the memo drives the reverse-out of its locked voucher (viaMaster) →
+  // back to Received. Requires a reason (it un-posts real books).
+  const reverseAcm = async (m) => {
+    const { confirmed, reason } = await confirmDialog({ title: `Reverse ${m.id}?`, message: `This un-accepts the memo and reverses its voucher ${m.voucherVno || ''} out of the books (memo returns to Received; the voucher number is retired).`, danger: true, reasonRequired: true, reasonLabel: 'Reason for reversal', confirmLabel: 'Reverse' });
+    if (!confirmed) return;
+    reverseM.mutate({ id: m.rid, reason }, { onSuccess: () => toast(`ACM ${m.id} reversed — voucher un-posted`), onError: (e) => toast('Could not reverse — ' + e.message, 'error') });
+  };
 
   const columns = [
     { key: 'id', header: 'ACM Number', className: 'font-mono text-[10px]', render: (a) => <><p className="m-0 font-bold text-[#27500A]">{a.id}</p><p className="m-0 text-[8.5px] text-ink-muted">{a.date}</p></> },
@@ -90,9 +101,10 @@ export function AcmRegister({ branch }) {
       render: (a) => (
         <div className="flex flex-wrap gap-1">
           {['Received', 'Disputed'].includes(a.status) && <Button variant="success" size="xs" disabled={acceptM.isPending} onClick={() => acceptAcm(a)} title="Accept → create a pending ACM voucher">Accept → Voucher</Button>}
-          {a.status === 'Received' && <Button variant="secondary" size="xs" onClick={() => disputeM.mutate({ id: a.id, note: 'Query raised on credit' }, { onSuccess: () => toast('Query raised') })}>Query</Button>}
+          {a.status === 'Received' && <Button variant="secondary" size="xs" onClick={() => disputeM.mutate({ id: a.rid, note: 'Query raised on credit' }, { onSuccess: () => toast('Query raised') })}>Query</Button>}
           {a.status === 'Disputed' && <Button variant="secondary" size="xs" onClick={() => rejectAcm(a)}>Reject</Button>}
           {a.status === 'Accepted' && a.voucherVno && <span className="text-[9px] font-bold text-[#27500A]">→ {a.voucherVno}</span>}
+          {a.status === 'Accepted' && <Button variant="secondary" size="xs" disabled={reverseM.isPending} onClick={() => reverseAcm(a)} title="Reverse (un-accept) → un-post the voucher, memo back to Received">↺ Reverse</Button>}
         </div>
       ),
     },

@@ -40,4 +40,6 @@ export const useDisputeAdmMemo = () => useMemoMutation(({ id, note, by }) => api
 export const useRejectAdmMemo  = () => useMemoMutation(({ id, note }) => apiPost(`/api/adm-memos/${id}/reject`, { note }));
 // Accept → spawns the gated voucher → touches the voucher/accounting caches.
 export const useAcceptAdmMemo  = () => useMemoMutation(({ id, by }) => apiPost(`/api/adm-memos/${id}/accept`, { by }), { touchVouchers: true });
+// Reverse (un-accept) → reverses the spawned voucher out of the books, memo back to Received.
+export const useReverseAdmMemo = () => useMemoMutation(({ id, by, reason }) => apiPost(`/api/adm-memos/${id}/reverse`, { by, reason }), { touchVouchers: true });
 export const useDeleteAdmMemo  = () => useMemoMutation((id) => apiDelete(`/api/adm-memos/${id}`));
