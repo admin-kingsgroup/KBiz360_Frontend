@@ -955,6 +955,14 @@ function DefectRegister({ data, loading, error, onRetry, cur, onDrill }) {
         </div>
         <span className="rounded-full bg-surface-alt px-3 py-1 text-xs font-semibold text-ink-muted">{data?.offLedgers || 0} off ledgers</span>
       </div>
+      {/* Truncation notice — the register caps its payload at a ledger boundary on a very
+          large period. Say so plainly so a capped list is never mistaken for a clean one. */}
+      {data?.truncated && (
+        <div role="status" className="rounded-brand border border-warning/40 bg-warning/10 px-4 py-2 text-xs font-semibold text-warning">
+          Showing the first {data.ledgersShown} of {data.offLedgers} off ledgers ({data.shown} unmatched {data.shown === 1 ? 'entry' : 'entries'} loaded).
+          {data.ledgersRemaining > 0 ? ` ${data.ledgersRemaining} more off ledger${data.ledgersRemaining === 1 ? '' : 's'} still to load — clear these, then reload to continue.` : ''}
+        </div>
+      )}
       {/* Two sides always shown (so a clean side reads as clean); the amount band only when present. */}
       <div className="grid gap-4">
         <EntrySection section={ENTRY_SECTIONS[0]} rows={notInErp} cur={cur} onDrill={onDrill} />
