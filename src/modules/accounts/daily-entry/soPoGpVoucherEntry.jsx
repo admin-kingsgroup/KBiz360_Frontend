@@ -362,7 +362,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   };
   const handleToBranchChange = (tb) => {
     setToBranch(tb);
-    if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); setSaleGstMode(inbCrossBorder(brCode, tb) ? 'inter' : 'inter'); }
+    if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); setSaleGstMode('inter'); }
   };
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
@@ -429,9 +429,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Editing an INB deal preloads its counterparty branch; a fresh INB voucher starts empty.
   const [toBranch, setToBranch] = useState(editing && interBranch && editBooking.isInterBranch ? (editBooking.toBranch || '') : '');
   const inbBranches = INB_ALL.filter((b) => b !== brCode);
-  // BOM bills IGST on its service fee even to an African branch, so a BOM sale is never
-  // a zero-rated export — only other branches' cross-border legs are (seller-side only).
-  const inbExport = interBranch && toBranch && inbCrossBorder(brCode, toBranch) && brCode !== 'BOM';
+  // Whether a cross-border INB leg is zero-rated is now the SELLER'S CHOICE (the "Bill IGST/VAT"
+  // tick below), not a hardcoded BOM carve-out — see `billIgst`. The banner reads that flag so it
+  // can never contradict the tick. A same-country INB leg is always taxable.
   // ── Inter-branch cross-currency FX (manual, per deal — no daily rate) ─────────
   // India branches book ₹, Africa branches book $. When the two ends differ the deal is
   // CROSS-CURRENCY: the seller keys ONE frozen rate (1 USD = ₹x) on this INSO voucher; the
@@ -1034,7 +1034,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {interBranch && (
         <div style={{ ...card, background: '#EAF1FB', border: '1px solid #B9D6F2', color: '#185FA5', fontSize: 12, marginBottom: 14 }}>
           🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Fee</b> column. Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
-          {toBranch && <> Tax: <b>{inbExport ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})` : `IGST · ${inbCrossBorder(brCode, toBranch) ? 'inter-branch' : 'inter-state'} (18% on Service Fee)`}</b>.</>}
+          {toBranch && <> Tax: <b>{
+            !billIgst ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})`
+              /* VAT sellers are rated per branch (16/18/16) — never restate a flat % here. */
+              : isVatBranch(brCode) ? 'VAT · inter-branch (on Service Fee)'
+                : `IGST · ${inbCrossBorder(brCode, toBranch) ? 'inter-branch' : 'inter-state'} (18% on Service Fee)`
+          }</b>.</>}
           {' '}Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
         </div>
       )}

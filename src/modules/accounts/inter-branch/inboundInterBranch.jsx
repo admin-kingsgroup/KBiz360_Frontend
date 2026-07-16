@@ -28,7 +28,13 @@ const toBuyer = (amt, fx) => {
   return r2(amt);
 };
 
-export function InboundInterBranch({ branch, setRoute }) {
+// Mirrors the BE guard on DELETE /inb/deal/:linkNo (inb.controller ADMIN_DELETE) — deleting
+// reverses BOTH branches' posted vouchers, so it stays Super Admin / Director only. Keep the two
+// regexes in step: a looser FE gate just hands the user a 403 after they've typed a reason.
+const CAN_DELETE = /super.?admin|director/i;
+
+export function InboundInterBranch({ branch, setRoute, currentUser }) {
+  const canDelete = CAN_DELETE.test(String(currentUser?.role || ''));
   const q = useInbInbound(branch);
   const data = q.data || { rows: [], totals: { pending: 0, converted: 0 } };
   const rows = Array.isArray(data.rows) ? data.rows : [];
@@ -115,9 +121,9 @@ export function InboundInterBranch({ branch, setRoute }) {
                         ? <button type="button" onClick={() => setRoute && setRoute('/bookings/pending')}
                             style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: 'pointer', color: '#fff', background: C.green }}>Convert →</button>
                         : <span style={{ fontFamily: 'monospace', color: C.dark }}>{rw.buyerBookingNo || '—'}<div style={{ fontSize: 10.5, color: C.dim }}>{rw.buyerStatus || ''}</div></span>}
-                      <button type="button" onClick={() => onDelete(rw)} disabled={del.isPending}
+                      {canDelete && <button type="button" onClick={() => onDelete(rw)} disabled={del.isPending}
                         title="Delete this deal — reverses both sides (kept for audit); the selling branch re-raises a corrected one"
-                        style={{ padding: '5px 9px', fontSize: 11, fontWeight: 700, border: '1px solid #A32D2D', borderRadius: 6, cursor: del.isPending ? 'default' : 'pointer', color: '#A32D2D', background: '#fff', opacity: del.isPending ? 0.6 : 1 }}>Delete</button>
+                        style={{ padding: '5px 9px', fontSize: 11, fontWeight: 700, border: '1px solid #A32D2D', borderRadius: 6, cursor: del.isPending ? 'default' : 'pointer', color: '#A32D2D', background: '#fff', opacity: del.isPending ? 0.6 : 1 }}>Delete</button>}
                     </div>
                   </td>
                 </tr>
