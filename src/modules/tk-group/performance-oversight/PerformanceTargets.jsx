@@ -43,7 +43,7 @@ export function PerformanceTargets() {
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center gap-2.5">
         <label className="text-xs font-bold text-ink-muted">Metric</label>
-        <Select aria-label="Metric" value={metric} onChange={(e) => setMetric(e.target.value)} className="w-auto">
+        <Select aria-label="Metric" value={metric} onChange={(e) => setMetric(e.target.value)} className="!w-40">
           {PERF_METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
         </Select>
         <span className="text-xs text-ink-muted">FY {fy} · {isFocused(focus) ? <b>{focus} — focused</b> : <b>branchwise</b>}</span>
