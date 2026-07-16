@@ -534,14 +534,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // CROSS-CURRENCY: the seller keys ONE frozen rate (1 USD = ₹x) on this INSO voucher; the
   // buyer branch's converted INPO is derived from it on push. Same-currency deals never
   // see the field. The rate is frozen onto the deal on save (fx on the INB payload).
-  // The group settles inter-branch at ONE fixed internal rate — never a keyed/market rate — so
-  // both branches mirror permanently, a pair reconciles EXACTLY, and no FX gain/loss can arise.
-  // DISPLAY ONLY: the backend freezes the authoritative value (taxRegime.INB_INTERNAL_RATE) when
-  // the payload omits `fx`; this constant only drives the on-screen preview. Keep it in step.
-  // An EXISTING deal shows its OWN frozen historic rate — a frozen quote is immutable (a change
-  // needs revoke + re-raise), so an edit must never silently re-rate it.
-  const INB_INTERNAL_RATE = 95;   // ← KEEP IN STEP with taxRegime.INB_INTERNAL_RATE (backend authority)
-  const [fxRate] = useState(editing && editBooking.fx && editBooking.fx.rate ? String(editBooking.fx.rate) : String(INB_INTERNAL_RATE));
+  // The group's STANDARD internal inter-branch rate. It is a DEFAULT, not a market rate: a new
+  // deal is PREFILLED with it (so the standard is what normally gets frozen — the field used to
+  // open blank and merely hint a number, so every deal carried a hand-typed one) but stays
+  // EDITABLE, because a one-off deal may legitimately be raised at its own rate. Whatever is
+  // shown here is what the deal freezes — each voucher keeps its own immutable copy.
+  // Off-standard rates are SAFE for reconciliation: inter-branch recon translates each pair at
+  // the rate its own deals froze (interbranch.service ratesOf), never at an assumed standard.
+  // An EXISTING deal shows its OWN frozen historic rate — never silently re-rated to today's.
+  const INB_INTERNAL_RATE = 95;   // ← KEEP IN STEP with taxRegime.INB_INTERNAL_RATE (backend default)
+  const [fxRate, setFxRate] = useState(editing && editBooking.fx && editBooking.fx.rate ? String(editBooking.fx.rate) : String(INB_INTERNAL_RATE));
   const inbCcyOf = (code) => (((bc({ code }) || {}).cur) === '$' ? 'USD' : 'INR');
   const sellerCcy = inbCcyOf(brCode);
   const buyerCcy = interBranch && toBranch ? inbCcyOf(toBranch) : sellerCcy;
@@ -759,13 +761,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         purchases: (isNoSupp ? [] : extraPOs)
           .filter(legFilled)
           .map((leg) => legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name))),
-        // Freeze the manual FX quote onto a cross-currency deal (base USD, quote INR) so the
-        // buyer branch's converted INPO is derived from it; omitted for same-currency deals.
-        // `fx` is deliberately NOT sent: the backend freezes the group's fixed internal rate
-        // (taxRegime.INB_INTERNAL_RATE) as the single source of truth, and an EDIT preserves the
-        // deal's own immutable historic quote. Sending a keyed rate here is what let a deal
-        // freeze off-rate while reconciliation compared at the internal rate — an unclearable
-        // difference that blocked the pair's freeze/certify forever.
+        // Freeze the deal's FX quote (base USD, quote INR) so the buyer branch's converted INPO is
+        // derived from exactly the rate shown on screen; omitted for same-currency deals, where the
+        // backend needs none. The field is prefilled with the group's standard rate, so this is
+        // normally that — but a one-off deal may carry its own, and each voucher keeps an immutable
+        // copy. That is SAFE for reconciliation now: a pair is translated at the rate its own deals
+        // froze (interbranch.service ratesOf), so an off-standard deal reconciles at its own rate
+        // instead of being compared against an assumed standard it never used.
+        ...(crossCcy && fxRateNum > 0
+          ? { fx: { base: 'USD', quote: 'INR', rate: fxRateNum, date, fromCcy: sellerCcy, toCcy: buyerCcy, source: 'manual' } }
+          : {}),
       };
       // Editing an existing INB deal → rebuild BOTH pending legs as a unit (reason to the
       // audit trail); a fresh voucher raises a new deal. Same body either way.
@@ -1224,11 +1229,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 (different-country) deal (BOM→FBM/DAR/NBO); DISABLED for a same-currency one
                 (BOM→AMD) since no translation is needed. */}
             <FL label={<>Deal FX Rate — 1 USD = ₹ {crossCcy && <span style={{ color: '#dc2626' }}>*</span>}</>}>
-              {/* READ-ONLY: the rate is the group's fixed internal rate, never keyed per deal — a
-                  keyed rate would freeze the deal off-rate while inter-branch reconciliation
-                  compares at the internal rate, leaving a difference no journal can clear. */}
-              <input type="number" value={crossCcy ? fxRate : ''} readOnly disabled placeholder={crossCcy ? '' : '—'}
-                style={{ ...inp, background: '#eef1f5', color: '#4b5563', cursor: 'not-allowed' }} />
+              {/* Prefilled with the group's STANDARD rate and editable: a one-off deal may be
+                  raised at its own rate, and the deal freezes exactly what is shown here. Safe
+                  for reconciliation — the pair is translated at the rate its own deals froze
+                  (interbranch.service ratesOf), never at an assumed standard. */}
+              <input type="number" min="0" step="0.0001" value={crossCcy ? fxRate : ''} onChange={(e) => setFxRate(e.target.value)}
+                disabled={!crossCcy} placeholder={crossCcy ? '' : '—'}
+                style={{ ...inp, ...(crossCcy ? {} : { background: '#eef1f5', color: '#9197a3', cursor: 'not-allowed' }) }} />
               <p style={!crossCcy ? hintMuted : (fxRateNum > 0 ? hintOk : hintWarn)}>
                 {!crossCcy
                   ? (toBranch

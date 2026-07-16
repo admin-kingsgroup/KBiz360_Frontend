@@ -161,11 +161,12 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
               <button onClick={autoGst} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
             </div>
             {t.gstAmt > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#185FA5' }}>{isVat ? <>VAT <b>{money2(cur, t.gstAmt)}</b></> : (state.gstMode === 'inter' ? <>IGST <b>{money2(cur, igst)}</b></> : <>CGST <b>{money2(cur, cgst)}</b> · SGST <b>{money2(cur, sgst)}</b></>)} · Invoice total <b>{money2(cur, t.total)}</b></p>}
-            {/* The breakdown above is gated on an amount > 0, so it went silent EXACTLY when
-                the tax was unfilled. A VAT branch has no slab picker to auto-fill it (the rate
-                cell is read-only), so an untouched Africa purchase would post 0 input tax.
-                Say so instead of hiding it. */}
-            {t.taxable > 0 && !(t.gstAmt > 0) && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#A32D2D', fontWeight: 700 }}>{taxLabel} amount is 0 — click <b>Auto-calc</b> (or type it) so the input {taxLabel} posts.</p>}
+            {/* The breakdown above is gated on an amount > 0, so it went silent EXACTLY when the
+                tax was unfilled. VAT-branch ONLY: its rate cell is read-only, so there is no
+                slab-pick to auto-fill the amount (India's dropdown does that on select) — an
+                untouched Africa purchase would silently post 0 input VAT with no affordance to
+                hint otherwise. Kept off India so its entry flow stays byte-for-byte unchanged. */}
+            {isVat && t.taxable > 0 && !(t.gstAmt > 0) && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#A32D2D', fontWeight: 700 }}>{taxLabel} amount is 0 — click <b>Auto-calc</b> (or type it) so the input {taxLabel} posts.</p>}
           </>
         )}
       </div>
