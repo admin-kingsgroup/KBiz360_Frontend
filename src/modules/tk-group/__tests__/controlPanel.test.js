@@ -65,7 +65,7 @@ describe('Control Panel structure', () => {
     for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log']) expect(POWER_SCREEN_KEYS).toContain(k);
   });
   test('DEFAULT_RULES (always-on) carry name + description; include SoD + the DB-enforced invariants', () => {
-    expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(30);   // 16 base + 13 audited + 4 lifecycle invariants
+    expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(44);   // 16 base + 13 audited + 4 lifecycle + 12 authority gates
     expect(DEFAULT_RULES.every((r) => r.nm && r.ds)).toBe(true);
     expect(DEFAULT_RULES.some((r) => /Maker cannot approve their own routed/.test(r.nm))).toBe(true);
     expect(DEFAULT_RULES.some((r) => /Payment prepared/.test(r.nm))).toBe(true);
@@ -79,6 +79,15 @@ describe('Control Panel structure', () => {
     expect(DEFAULT_RULES.some((r) => /INB deal is controlled end-to-end/.test(r.nm))).toBe(true);
     expect(DEFAULT_RULES.some((r) => /Linked SO\/PO\/GP pair/.test(r.nm))).toBe(true);
     expect(DEFAULT_RULES.some((r) => /Login & password-change integrity/.test(r.nm))).toBe(true);
+    // the always-on AUTHORITY gates (who may act) — the list described mechanics only before
+    expect(DEFAULT_RULES.some((r) => /Deleting or reversing posted entries/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Revoke and inter-branch push are approver-only/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Control config is read by TK Group Central/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Rules Managers and delegation are the Owner/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Reconciliation authority follows the tier/.test(r.nm))).toBe(true);
+    expect(DEFAULT_RULES.some((r) => /Control-plane masters are admin-only/.test(r.nm))).toBe(true);
+    // the Super Admin chain override must be stated — the maker rule overstated without it
+    expect(DEFAULT_RULES.find((r) => /Maker cannot approve/.test(r.nm)).ds).toMatch(/Super Admin overrides/);
   });
   test('CONFIGURABLE_GROUPS: every item is a real flag switch; 21 flags across 5 groups', () => {
     expect(CONFIGURABLE_GROUPS.map((g) => g.group)).toEqual(['Approval & Verification', 'Segregation of Duties', 'Access & Export', 'Masters & Locks', 'Data-Entry & Close']);
