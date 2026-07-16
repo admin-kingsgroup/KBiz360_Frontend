@@ -16,6 +16,8 @@ const { RoundOffPanel } = require('../tie-out/RoundOffPanel');
 
 const FM = { role: 'FM', name: 'Faiz' };
 const AE = { role: 'AE', name: 'Sughra' };
+const OWNER = { role: 'Super Admin', name: 'Afshin' };
+const DIRECTOR = { role: 'Director', name: 'Farhan' };
 
 // A full sweep of BOM · Dec-2025: residues net to zero → no plug, period ties.
 const CLEARS = {
@@ -26,6 +28,7 @@ const CLEARS = {
     { ledger: 'Round Off', amt: 2.33, drCr: 'Cr' },
   ],
   plug: 0, total: 2, settles: [], skipped: [], existing: null,
+  currency: '₹', maxThreshold: 10, defaultThreshold: 0.5,
 };
 // A partial sweep: 10 rows clear, 5 real differences survive, remainder plugs to Round Off.
 const PARTIAL = {
@@ -37,11 +40,11 @@ const PARTIAL = {
   existing: null,
 };
 
-const mount = (user = FM) => {
+const mount = (user = FM, props = {}) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <RoundOffPanel branch="BOM" period="2025-12" tier="month" currentUser={user} />
+      <RoundOffPanel branch="BOM" period="2025-12" tier="month" currentUser={user} {...props} />
     </QueryClientProvider>,
   );
 };
@@ -103,6 +106,41 @@ test('an already-settled period offers reversal instead of a second posting', as
   expect(await screen.findByText(/Settled · JV\/BOM\/26\/1371/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /Reverse settlement/i })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Post settlement JV/i })).toBeNull();
+});
+
+// REGRESSION: the panel hardcoded ₹ and a ₹10 cap. NBO/DAR/FBM keep USD books, where
+// that cap would be ~₹950 of tolerance — loose enough to swallow a real defect.
+test('renders the BRANCH currency and cap, not a hardcoded ₹', async () => {
+  previewRoundOff.mockResolvedValue({ ...CLEARS, currency: '$', maxThreshold: 0.25, defaultThreshold: 0.05, plug: 0.03 });
+  mount(FM, { branch: 'NBO' });
+  expect(await screen.findByLabelText(/Rounding threshold \(\$\)/i)).toBeInTheDocument();
+  expect(screen.getByText(/Capped at \$0\.25/i)).toBeInTheDocument();
+  expect(screen.queryByText(/Capped at ₹10/i)).toBeNull();
+});
+
+// REGRESSION: the FE gate (isSettlerRole) allowed Owner/Director while the BE gate used
+// roleSatisfies(role,'FM') — an exact matcher that refuses both. Button on, then 403.
+test.each([[OWNER, 'Owner'], [DIRECTOR, 'Director'], [FM, 'FM']])('%#: a settler role can post (%s)', async (user) => {
+  previewRoundOff.mockResolvedValue(CLEARS);
+  mount(user);
+  await screen.findByText(/This makes every amount tie/i);
+  expect(screen.getByRole('button', { name: /Post settlement JV/i })).toBeEnabled();
+});
+
+// REGRESSION: the panel offered Post on a certified period; the BE 409s. A click that can
+// only produce an error is a worse answer than the sentence.
+test('a certified period disables posting and says why', async () => {
+  previewRoundOff.mockResolvedValue(CLEARS);
+  mount(OWNER, { certified: true });
+  expect(await screen.findByText(/certified — re-open the Tally certificate before settling/i)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Post settlement JV/i })).toBeDisabled();
+});
+
+test('a certified period does not offer reversal either', async () => {
+  previewRoundOff.mockResolvedValue({ ...CLEARS, existing: { vno: 'JV/BOM/26/1383', date: '2025-12-31', total: 0.42 } });
+  mount(OWNER, { certified: true });
+  expect(await screen.findByText(/certified — re-open the Tally certificate before reversing/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Reverse settlement/i })).toBeNull();
 });
 
 test('a period with no residue renders nothing at all', async () => {

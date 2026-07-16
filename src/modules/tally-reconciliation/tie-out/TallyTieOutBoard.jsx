@@ -757,7 +757,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       {/* Rounding settlement sits ABOVE the certificate: it's the last thing that can
           legitimately clear a residual gap, and it must be posted before the freeze. */}
       {!empty && !isLoading && imported.count
-        ? <RoundOffPanel branch={branch} period={period} tier={tier} currentUser={currentUser} />
+        ? <RoundOffPanel branch={branch} period={period} tier={tier} currentUser={currentUser} certified={periodCertified} />
         : null}
 
       {!empty && !isLoading && (imported.count

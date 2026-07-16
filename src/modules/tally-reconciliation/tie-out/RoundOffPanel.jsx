@@ -17,10 +17,12 @@ import { PageSection, Badge, Button } from '../../../shell/primitives';
 // consequence is not obvious — a PARTIAL sweep plugs its remainder to Round Off and
 // pushes that row FURTHER off, so only a sweep that clears every row certifies.
 
-export function RoundOffPanel({ branch, period, tier, currentUser }) {
+export function RoundOffPanel({ branch, period, tier, currentUser, certified = false }) {
   const qc = useQueryClient();
-  const [maxDiff, setMaxDiff] = useState('0.50');
-  const canSettle = isSettlerRole(currentUser?.role);
+  // '' = "use the branch's own default" — the BE decides it (₹0.50 on the India books,
+  // $0.05 on Africa's), so the panel never hardcodes an INR assumption.
+  const [maxDiff, setMaxDiff] = useState('');
+  const canSettle = isSettlerRole(currentUser?.role) && !certified;
 
   const { data, isError } = useQuery({
     queryKey: ['tally-tieout', 'roundoff', branch, tier, period, maxDiff],
@@ -43,6 +45,11 @@ export function RoundOffPanel({ branch, period, tier, currentUser }) {
   const skipped = data?.skipped || [];
   const after = data?.after || {};
   const before = data?.before || {};
+  // Branch currency + cap come from the BE (bookCurrencyOf) — NBO/DAR/FBM keep USD books,
+  // so a hardcoded ₹ would have been wrong on half the group. '₹' only until first load.
+  const cur = data?.currency || '₹';
+  const cap = data?.maxThreshold ?? 10;
+  const shownThreshold = Number(maxDiff === '' ? (data?.maxDiff ?? data?.defaultThreshold ?? 0) : maxDiff);
 
   // Nothing to show when the period has no residue at all and none was ever settled.
   if (!isError && !existing && !lines.length && !(before.off > 0)) return null;
@@ -64,24 +71,24 @@ export function RoundOffPanel({ branch, period, tier, currentUser }) {
               <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
               Settled by <b>{existing.vno}</b> dated {existing.date} — the rounding residue is posted to <b>Round Off</b>. Reverse it if you’d rather correct at source.
             </div>
-            {canSettle && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="ghost" icon={RotateCcw} loading={reverse.isPending} onClick={() => reverse.mutate()}>Reverse settlement</Button>
-                {reverse.isError && <span className="text-xs text-danger">{reverse.error?.message}</span>}
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {canSettle && <Button variant="ghost" icon={RotateCcw} loading={reverse.isPending} onClick={() => reverse.mutate()}>Reverse settlement</Button>}
+              {certified && <span className="text-xs text-ink-subtle">This period is certified — re-open the Tally certificate before reversing.</span>}
+              {reverse.isError && <span className="text-xs text-danger">{reverse.error?.message}</span>}
+            </div>
           </>
         ) : (
           <>
             <div className="flex flex-wrap items-end gap-3">
               <div className="grid gap-1">
-                <label className="text-xs font-semibold text-ink-muted" htmlFor="ro-threshold">Rounding threshold (₹)</label>
-                <input id="ro-threshold" type="number" step="0.01" min="0.01" max="10" value={maxDiff}
+                <label className="text-xs font-semibold text-ink-muted" htmlFor="ro-threshold">Rounding threshold ({cur})</label>
+                <input id="ro-threshold" type="number" step="0.01" min="0.01" max={cap} value={maxDiff}
+                  placeholder={String(data?.defaultThreshold ?? '')}
                   onChange={(e) => setMaxDiff(e.target.value)}
                   className="w-32 rounded-brand border border-surface-border bg-surface px-2 py-1.5 text-sm tabular-nums text-ink" />
               </div>
               <div className="text-xs text-ink-subtle">
-                Only ledgers off by <b>less than this</b> are settled. Capped at ₹10 — anything larger is a real
+                Only ledgers off by <b>less than this</b> are settled. Capped at {cur}{cap} — anything larger is a real
                 difference and must be corrected at source.
               </div>
             </div>
@@ -89,16 +96,16 @@ export function RoundOffPanel({ branch, period, tier, currentUser }) {
             {/* The consequence, stated plainly — this is the part that isn't obvious. */}
             <div className={`rounded-brand border px-4 py-3 text-sm text-ink ${after.tiesAfter ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'}`}>
               {lines.length === 0 ? (
-                <>No ledger is within ₹{Number(maxDiff || 0).toFixed(2)} of tying — nothing to settle at this threshold.</>
+                <>No ledger is within {cur}{shownThreshold.toFixed(2)} of tying — nothing to settle at this threshold.</>
               ) : after.tiesAfter ? (
                 <><b className="text-success">This makes every amount tie.</b> {lines.length} ledger{lines.length === 1 ? '' : 's'} settle
-                  {data?.plug ? <> (with a {fmt(data.plug, '₹')} plug to Round Off)</> : <> — the legs net to nil, so no plug is needed</>}.
+                  {data?.plug ? <> (with a {fmt(data.plug, cur)} plug to Round Off)</> : <> — the legs net to nil, so no plug is needed</>}.
                   The period can then be certified, once any name/group fixes owed in Tally are done.</>
               ) : (
                 <><b className="text-warning">This will not make the period tie.</b> {lines.length} ledger{lines.length === 1 ? '' : 's'} settle, but{' '}
                   <b>{after.offAfter}</b> would still be off{(after.onlyErpAfter + after.onlyTallyAfter) > 0 && <> and {after.onlyErpAfter + after.onlyTallyAfter} one-sided</>}{' '}
-                  (₹{Number(after.absDiffAfter || 0).toFixed(2)} remaining) — those are real differences, not rounding.
-                  {data?.plug ? <> The ₹{Math.abs(data.plug).toFixed(2)} remainder is plugged to <b>Round Off</b>, which moves that row further from Tally.</> : null}{' '}
+                  ({cur}{Number(after.absDiffAfter || 0).toFixed(2)} remaining) — those are real differences, not rounding.
+                  {data?.plug ? <> The {cur}{Math.abs(data.plug).toFixed(2)} remainder is plugged to <b>Round Off</b>, which moves that row further from Tally.</> : null}{' '}
                   Correct them at source, or raise the threshold only if you’ve satisfied yourself they’re immaterial.</>
               )}
             </div>
@@ -139,7 +146,10 @@ export function RoundOffPanel({ branch, period, tier, currentUser }) {
                 onClick={() => settle.mutate()}>
                 Post settlement JV{lines.length ? ` (${lines.length} leg${lines.length === 1 ? '' : 's'})` : ''}
               </Button>
-              {!canSettle && <span className="text-xs text-ink-subtle">Posting a settlement is FM, Director or Owner only.</span>}
+              {/* Say WHY it's disabled — the backend refuses both of these, and a click
+                  that only produces a 409/403 is a worse answer than the sentence. */}
+              {certified && <span className="text-xs text-ink-subtle">This period is certified — re-open the Tally certificate before settling.</span>}
+              {!certified && !canSettle && <span className="text-xs text-ink-subtle">Posting a settlement is FM, Director or Owner only.</span>}
               {settle.isError && <span className="text-xs text-danger">{settle.error?.message}</span>}
             </div>
           </>

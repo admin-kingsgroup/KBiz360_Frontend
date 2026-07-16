@@ -45,7 +45,11 @@ const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTR
 // so it books the tax-inclusive amount as COST (bookingOrders.buildInbBuyerBookingPayload). This
 // is the SELLER'S JURISDICTION, not one branch: BOM, AMD and BOMMB all bill. Mirrors the backend
 // fallback in inb.service.inbTaxTreatment — keep the two in step.
-const inbIndiaSeller = (from) => (INB_COUNTRY[from] || 'IN') === 'IN';
+// Resolved from the map, NOT via a defaulted 'IN': an unmapped/lowercase code must not default the
+// tick ON and make an Africa seller bill tax. Case-folded to match the backend (inbTaxTreatment),
+// which is authoritative — a tick defaulted ON is honoured verbatim there (billIgst===true wins over
+// the jurisdiction fallback), so an FE/BE disagreement here would bill real VAT on a real export.
+const inbIndiaSeller = (from) => INB_COUNTRY[String(from || '').toUpperCase().trim()] === 'IN';
 import { AuditTrail } from '../../../core/AuditTrail';
 import { useLedgerRegistry } from '../../../core/useReference';
 import { supplyTypeOf, stateNameOf, stateCodeOf, homeStateNameForBranch } from '../../../core/gstSupply';
