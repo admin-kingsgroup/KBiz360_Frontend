@@ -40,6 +40,12 @@ import { useVNo } from '../../../core/useNextNo';
 const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' };
 const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
 const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTRY[to] || 'IN');
+// An India-jurisdiction seller bills IGST on its inter-branch Service Fee even cross-border to
+// Africa (the India side's output tax must reconcile); the Africa buyer can't reclaim Indian GST,
+// so it books the tax-inclusive amount as COST (bookingOrders.buildInbBuyerBookingPayload). This
+// is the SELLER'S JURISDICTION, not one branch: BOM, AMD and BOMMB all bill. Mirrors the backend
+// fallback in inb.service.inbTaxTreatment — keep the two in step.
+const inbIndiaSeller = (from) => (INB_COUNTRY[from] || 'IN') === 'IN';
 import { AuditTrail } from '../../../core/AuditTrail';
 import { useLedgerRegistry } from '../../../core/useReference';
 import { supplyTypeOf, stateNameOf, stateCodeOf, homeStateNameForBranch } from '../../../core/gstSupply';
@@ -445,7 +451,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   };
   const handleToBranchChange = (tb) => {
     setToBranch(tb);
-    if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); setSaleGstMode('inter'); }
+    // No setSaleGstMode here: this handler is wired ONLY to the To Branch dropdown, which renders
+    // only in interBranch mode — and an INB deal's sale mode is the server's (inbTaxTreatment),
+    // never read off saleGstMode. Setting it was writing a value nothing on this path reads.
+    if (tb) { setCustomer((c) => ({ ...c, name: `Travkings Tours and Travels ${tb}`, ledgerName: `Travkings Tours and Travels ${tb}`, ledgerGroup: 'Sundry Debtors', group: 'Sundry Debtors' })); }
   };
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
@@ -478,12 +487,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     if (!key || key === lastCustApplied.current) return;
     if (custSupply === 'intra' || custSupply === 'inter') { setSaleGstMode(custSupply); lastCustApplied.current = key; }
   }, [customer.name, custSupply, interBranch]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The PURCHASE leg auto-derives on INB too. The sale-side bail-out above is right — an INB deal's
+  // sale tax is the server's to decide (inbTaxTreatment) — but the purchase leg is an ORDINARY
+  // supplier invoice: the airline has a real state and place-of-supply works exactly as it does on a
+  // customer booking. Bailing here left every INB purchase on the 'intra' default, so an out-of-state
+  // airline's input tax silently booked as CGST+SGST instead of one IGST Input leg — the same
+  // misfiling the deal-edit patch was fixed to stop persisting.
   useEffect(() => {
-    if (interBranch) return;
     const key = normName(supplier.name);
     if (!key || key === lastSuppApplied.current) return;
     if (suppSupply === 'intra' || suppSupply === 'inter') { setPurGstMode(suppSupply); lastSuppApplied.current = key; }
-  }, [supplier.name, suppSupply, interBranch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [supplier.name, suppSupply]); // eslint-disable-line react-hooks/exhaustive-deps
   // No silent default — the user MUST consciously pick International vs Domestic
   // (that choice IS the cost centre). A blank leaves it untagged: it still saves as
   // Pending but the approval gate refuses to post it until it's tagged.
@@ -537,10 +551,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // deal is always taxable (tick locked ON); a cross-border deal defaults OFF (zero-rated export)
   // and the seller ticks it to bill IGST (added to what the buyer branch pays).
   const crossBorderInb = interBranch && !!toBranch && inbCrossBorder(brCode, toBranch);
-  // BOM bills IGST on its Service Fee even cross-border (seller-side reconciliation rule), so its
-  // tick DEFAULTS ON; every other seller defaults to a zero-rated export (OFF). Edit preloads the
-  // saved choice. This keeps the tick consistent with the tax-treatment banner above the grid.
-  const [billIgstCB, setBillIgstCB] = useState(editing ? !!(editBooking.billIgst) : brCode === 'BOM');
+  // EVERY India seller (BOM/AMD/BOMMB) bills IGST on its Service Fee even cross-border to Africa
+  // (seller-side reconciliation rule), so the tick DEFAULTS ON for all of them; an Africa seller
+  // defaults to a zero-rated export (OFF). It stays a per-deal CHOICE — a genuine zero-rated export
+  // can still be booked by unticking. Was `brCode === 'BOM'`, which opened the tick OFF on an
+  // otherwise identical AMD→FBM / BOMMB→FBM deal and shipped it zero-rated unless someone noticed.
+  // Edit preloads the saved choice. Mirrors the backend fallback (inbTaxTreatment) exactly.
+  const [billIgstCB, setBillIgstCB] = useState(editing ? !!(editBooking.billIgst) : inbIndiaSeller(brCode));
   const billIgst = interBranch ? (crossBorderInb ? billIgstCB : true) : undefined;
 
   // Switching module reloads the seed grid for that module — never while editing
@@ -1290,8 +1307,15 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             ) : null)}
           </FL>}
           {!isNoSupp && <FL label={interBranch ? 'Supplier ledger (airline / cost) *' : 'Supplier ledger (Pay to) *'}>
+            {/* ledgerName MUST move with the picked supplier. The INB payload sends
+                `ledgerName: supplier.ledgerName || supplier.name`, and an EDIT seeds ledgerName from
+                the deal's original supplier — so leaving it behind here kept the OLD ledger name
+                truthy and winning, and the backend (`party: supplier.ledgerName || supplier.name`)
+                posted the cost to the PREVIOUS airline's account. Swapping the supplier on an INB
+                edit looked applied and silently paid the wrong creditor. Create was unaffected
+                (ledgerName starts undefined, so it fell through to name). */}
             <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
-              onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerGroup: v.group })} />
+              onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerName: v.ledgerName || v.name, ledgerGroup: v.group })} />
           </FL>}
           {!isNoSupp && !isVatBr && <FL label="Purchase GST mode">
             {suppForeign ? (
@@ -1317,7 +1341,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     </button>
                   )}
                 />
-                {!interBranch && (suppSupply === 'intra' || suppSupply === 'inter' ? (
+                {/* Shown on INB too: the supplier's state drives this leg either way, so the
+                    accountant must see the same "✓ Auto" / "⚠ Overridden" evidence. Suppressing it
+                    here meant an INB purchase got NO auto-pick AND no warning — silently wrong. */}
+                {(suppSupply === 'intra' || suppSupply === 'inter' ? (
                   <p style={purGstMode === suppSupply ? hintOk : hintWarn}>
                     {purGstMode === suppSupply ? '✓ Auto' : '⚠ Overridden — supplier state says'}: {suppRec.state || stateNameOf(stateCodeOf(suppRec))} → {suppSupply === 'intra' ? 'Intra (CGST+SGST)' : 'Inter (IGST)'}
                   </p>
