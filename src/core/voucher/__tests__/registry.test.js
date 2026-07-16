@@ -566,3 +566,23 @@ describe('payment → supplier + additive charge legs (bank charge etc.)', () =>
     expect(s.charges.map((l) => [l.ledger, l.amt])).toEqual([['Bank Charges', 50]]);
   });
 });
+
+// Africa (VAT) branches withhold WHT at a flat rate. `whtRate` is only a UI helper for
+// Auto-calc — the withheld AMOUNT is canonical and is what posts — so it is NOT persisted.
+// fromVoucher must therefore RE-DERIVE it from the saved withholding: otherwise a voucher
+// withheld at 5% reopens showing the 2% default beside its 5% amount, and one Auto-calc
+// click would silently under-withhold. `subtotal` is the taxable base (see toBody).
+describe('purchase-expense — WHT rate re-derived on edit, not reset to the 2% default', () => {
+  const PXP = VOUCHER_REGISTRY['purchase-expense'];
+
+  test('a voucher withheld at 5% reopens at 5% (amount preserved)', () => {
+    const s = PXP.fromVoucher({ subtotal: 1000, tdsAmt: 50, lines: [] });
+    expect(s.whtRate).toBe(5);
+    expect(s.tdsAmt).toBe(50);
+  });
+
+  test('2% is only a fallback — used when there is no withholding to derive from', () => {
+    expect(PXP.fromVoucher({ subtotal: 1000, tdsAmt: 0, lines: [] }).whtRate).toBe(2);
+    expect(PXP.fromVoucher({ subtotal: 0, tdsAmt: 0, lines: [] }).whtRate).toBe(2);
+  });
+});
