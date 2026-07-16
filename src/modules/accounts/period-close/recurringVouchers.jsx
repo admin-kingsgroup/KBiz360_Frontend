@@ -16,7 +16,8 @@ import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { todayISO } from '../../../core/dates';
 import { LedgerSelect } from '../../../core/helpers';
 import { triggerSaveRefresh, useMobile } from '../../../core/hooks';
-import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
+import { FL, btnG, btnGh, card, inp, bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 
 export function RecurringVouchers({branch}){
   const mob=useMobile();
@@ -33,7 +34,8 @@ export function RecurringVouchers({branch}){
   const ledgerNameOf=(id)=>((ledgerReg.find(l=>l.id===id)||{}).name)||id;
   const TODAY=todayISO();
   const due=templates.filter(t=>t.active&&t.nextRun<=TODAY);
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  const cur=(bc(branch)||{}).cur||"₹";
+  const f=n=>cur+Number(Math.round(n)).toLocaleString(localeOf(cur));
   const refresh=()=>qc.invalidateQueries({queryKey:['master','recurring-vouchers']});
   const run=async(id)=>{
     setPosting(true);

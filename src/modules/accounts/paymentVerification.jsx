@@ -17,8 +17,13 @@ import { useFinanceQueue, usePaymentActions } from '../../core/usePaymentVerific
 import { PageLayout } from '../../shell/PageLayout';
 import { Button, Select, Textarea, StatusPill, LoadingState, ErrorState, EmptyState } from '../../shell/primitives';
 import { confirmDialog } from '../../core/ux/confirm';
+import { localeOf } from '../../core/format';
+import { bc } from '../../core/styleTokens';
 
-const inr = (n) => (n != null ? '₹' + Number(n).toLocaleString('en-IN') : '₹0');
+// Branch-aware money: ₹ + Indian grouping for the India branches, $ + Western grouping
+// for the Africa/VAT branches (NBO/DAR/FBM). `cur` is threaded from the active branch;
+// defaults to ₹ so a consolidated / branch-less view is byte-identical to before.
+const inr = (n, cur = '₹') => (n != null ? cur + Number(n).toLocaleString(localeOf(cur)) : `${cur}0`);
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 const fmtTime = (d) => (d ? new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
 
@@ -34,7 +39,7 @@ const REJECTION_REASONS = [
 
 const partyName = (c) => c?.company_name || `${c?.first_name || ''} ${c?.last_name || ''}`.trim() || '—';
 
-function PaymentCard({ p, actions }) {
+function PaymentCard({ p, actions, cur = '₹' }) {
   const [mode, setMode] = useState(null); // 'reject' | 'clarify'
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
@@ -47,7 +52,7 @@ function PaymentCard({ p, actions }) {
     // undone from here, so confirm first (Reject/Clarify already require input).
     const { confirmed } = await confirmDialog({
       title: 'Verify this payment?',
-      message: `Verifying ${p.payment_number || ''} (${inr(p.amount)}) generates the tax invoice and cannot be undone.`,
+      message: `Verifying ${p.payment_number || ''} (${inr(p.amount, cur)}) generates the tax invoice and cannot be undone.`,
       confirmLabel: 'Verify payment',
     });
     if (!confirmed) return;
@@ -83,7 +88,7 @@ function PaymentCard({ p, actions }) {
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[20px] font-extrabold tabular-nums text-ink">{inr(p.amount)}</div>
+            <div className="text-[20px] font-extrabold tabular-nums text-ink">{inr(p.amount, cur)}</div>
             <div className="text-[11px] capitalize text-ink-muted">{p.payment_type}</div>
           </div>
         </div>
@@ -142,18 +147,20 @@ function PaymentCard({ p, actions }) {
   );
 }
 
-export function PaymentVerificationLive() {
+export function PaymentVerificationLive({ branch } = {}) {
   const q = useFinanceQueue();
   const actions = usePaymentActions();
   const data = q.data || {};
   const payments = useMemo(() => data.payments || (Array.isArray(data) ? data : []) || [], [data]);
   const total = data.summary?.total_amount ?? payments.reduce((s, p) => s + (p.amount || 0), 0);
+  // Active branch currency — ₹ for India, $ for the Africa/VAT branches.
+  const cur = (bc(branch) || {}).cur || '₹';
 
   return (
     <PageLayout
       maxWidth="max-w-4xl mx-auto"
       title="Payment Verification"
-      subtitle={`${payments.length} payment${payments.length === 1 ? '' : 's'} pending · ${inr(total)} · submitted from CRM by sales`}
+      subtitle={`${payments.length} payment${payments.length === 1 ? '' : 's'} pending · ${inr(total, cur)} · submitted from CRM by sales`}
       actions={<Button variant="secondary" size="sm" icon={RefreshCw} onClick={() => q.refetch()}>Refresh</Button>}
     >
       {q.isLoading && <LoadingState label="Loading queue…" />}
@@ -167,7 +174,7 @@ export function PaymentVerificationLive() {
       {!q.isLoading && !q.isError && payments.length === 0 && (
         <EmptyState icon={CheckCircle2} title="All payments verified" hint="New submissions from CRM sales will appear here." />
       )}
-      {payments.map((p) => <PaymentCard key={p._id} p={p} actions={actions} />)}
+      {payments.map((p) => <PaymentCard key={p._id} p={p} actions={actions} cur={cur} />)}
     </PageLayout>
   );
 }

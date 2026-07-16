@@ -13,6 +13,7 @@ import {
   CUST_TYPES, CUST_SOURCES, PAY_TERMS,
 } from '../../../core/partyEnums';
 import { branchCode } from '../../../core/useAccounting';
+import { isVatBranch } from '../../../core/voucherSpecs';
 import { MasterCrud } from '../shared/masterCrud';
 
 /* ── Parties (live, backend-connected) ──────────────────────────────────── */
@@ -41,12 +42,19 @@ export const CustomersMaster = ({ branch } = {}) => {
       // Branch must be a real code (not a free-text/blank field) — a blank branch creates
       // an unscoped party. Scoped to the top-bar branch when one is selected.
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
+      // India (GST) branches capture GSTIN + GST Treatment + TDS Section; a VAT branch
+      // (NBO/DAR/FBM) captures the VAT counterparts (VAT Registration No + WHT) instead.
       // GSTIN is only mandatory once the customer is GST-registered (Regular/Composition) —
       // an Unregistered/SEZ/Overseas customer may have no GSTIN at all.
-      { key: 'gstin', label: 'GSTIN', type: 'text', table: false, required: (f) => /^Registered/.test(f.gstTreatment || '') },
+      { key: 'gstin', label: 'GSTIN', type: 'text', table: false, show: (f) => !isVatBranch(f.branch), required: (f) => !isVatBranch(f.branch) && /^Registered/.test(f.gstTreatment || '') },
       { key: 'pan', label: 'PAN', type: 'text', table: false },
-      { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
-      { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
+      { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false, show: (f) => !isVatBranch(f.branch) },
+      { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false, show: (f) => !isVatBranch(f.branch) },
+      // VAT-branch tax identity (Africa) — shown only for a VAT branch, hidden for India.
+      // vatRegNo = VAT Registration No / TRN; whtSection/whtRate = Withholding Tax.
+      { key: 'vatRegNo', label: 'VAT Registration No', type: 'text', table: false, show: (f) => isVatBranch(f.branch) },
+      { key: 'whtSection', label: 'WHT Section', type: 'text', table: false, show: (f) => isVatBranch(f.branch) },
+      { key: 'whtRate', label: 'WHT Rate (%)', type: 'number', table: false, show: (f) => isVatBranch(f.branch) },
       // Some customers deduct TDS on what they pay us — flag it and capture the rate they
       // deduct at (applied per invoice); leave blank/hidden when the customer doesn't deduct.
       { key: 'isTdsDeducted', label: 'Is TDS Deducted (by Customer)', type: 'bool', default: false, table: false },

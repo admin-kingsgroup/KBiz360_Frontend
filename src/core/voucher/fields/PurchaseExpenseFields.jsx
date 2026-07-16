@@ -1,22 +1,28 @@
 import React, { useRef } from 'react';
 import { Plus, ChevronDown } from 'lucide-react';
 import { Menu as DropdownMenu } from '../../ux/Menu';
-import { FL, inp, btnGh, card } from '../../styles';
+import { FL, inp, btnGh, card, bc } from '../../styles';
 import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
 import { VPlaceOfSupply } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
+import { isVatBranch } from '../../voucherSpecs';
 import { V_DR, V_CR, DARK, DIM, money2, pxpTotals, r2 } from '../ui';
 
 /**
- * Purchase-Expense body — supplier expenses / asset purchases on credit, with GST
- * & TDS. Lines carry per-line Dr/Cr so a "Discount Received" credit line reduces
- * the payable (the case fixed in posting.builder). GST/TDS are amount-canonical:
- * the % dropdowns just auto-fill an editable amount, so edit round-trips exactly.
+ * Purchase-Expense body — supplier expenses / asset purchases on credit. India (GST)
+ * branches capture GST input credit (CGST/SGST/IGST + Place of Supply) + TDS section;
+ * Africa (VAT) branches capture a single VAT input + a flat WHT rate (no CGST/SGST split,
+ * no India TDS sections). GST/VAT/TDS/WHT are amount-canonical: the % just auto-fills an
+ * editable amount (posting routes it to VAT Input / WHT by regime), so edits round-trip.
  */
 export function PurchaseExpenseFields({ state, setState, ctx }) {
-  const { branch, cur } = ctx;
+  const { branch, cur, branchCode } = ctx;
+  const isVat = isVatBranch(branchCode);
+  const brVatRate = (bc({ code: branchCode }) || {}).vatRate;   // live VAT % (Africa), else null
+  const taxLabel = isVat ? 'VAT' : 'GST';
+  const whtLabel = isVat ? 'WHT' : 'TDS';
   const idRef = useRef(1000);
   const lines = state.lines || [];
   const patch = (p) => setState((s) => ({ ...s, ...p }));
@@ -30,8 +36,12 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
   });
 
   const t = pxpTotals(state);
-  const rate = (TDS_SECTIONS[state.tdsSection] || {}).rate || 0;
-  const autoGst = () => patch({ gstAmt: r2(t.taxable * (+state.gstPct || 0) / 100) });
+  // Withholding rate: India = the chosen TDS section's rate; Africa = a flat WHT rate
+  // (editable, defaults to the common 2%).
+  const rate = isVat ? (+state.whtRate || 2) : ((TDS_SECTIONS[state.tdsSection] || {}).rate || 0);
+  // Effective input-tax rate: India = the picked GST slab; Africa = the branch's single VAT rate.
+  const effGstRate = isVat ? (brVatRate != null ? brVatRate : 16) : (+state.gstPct || 0);
+  const autoGst = () => patch(isVat ? { gstPct: effGstRate, gstAmt: r2(t.taxable * effGstRate / 100) } : { gstAmt: r2(t.taxable * effGstRate / 100) });
   const autoTds = () => patch({ tdsAmt: r2(t.taxable * rate / 100) });
   const cgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt / 2);
   const sgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt - cgst);
@@ -46,7 +56,7 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FL label="Voucher date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Bill / Invoice no."><input value={state.billNo || ''} onChange={(e) => patch({ billNo: e.target.value })} style={inp} placeholder="VEND-4471" /></FL>
-        {state.gstApplicable ? <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} /> : <div />}
+        {!isVat && state.gstApplicable ? <VPlaceOfSupply mode={state.gstMode} onChange={(m) => patch({ gstMode: m })} /> : <div />}
       </div>
 
       <FL label="Supplier / Vendor (party ledger — Cr)">
@@ -108,55 +118,67 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
       <div style={{ padding: '10px 12px', borderRadius: 9, background: '#E6F1FB', border: '1px solid #B9D6F2', marginBottom: 10 }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: state.gstApplicable ? 8 : 0 }}>
           <input type="checkbox" checked={!!state.gstApplicable} onChange={(e) => patch({ gstApplicable: e.target.checked })} style={{ cursor: 'pointer', accentColor: '#185FA5' }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#185FA5' }}>GST applicable (input credit)</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#185FA5' }}>{taxLabel} applicable (input credit)</span>
         </label>
         {state.gstApplicable && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-              <FL label="GST rate">
-                <DropdownMenu
-                  ariaLabel="GST rate"
-                  menuRole="listbox"
-                  items={GST_SLABS.map((r) => ({ key: r, label: `${r}%`, selected: state.gstPct === r, onSelect: () => patch({ gstPct: r, gstAmt: r2(t.taxable * r / 100) }) }))}
-                  renderTrigger={({ ref, toggle, triggerProps }) => (
-                    <button ref={ref} {...triggerProps} onClick={toggle} type="button"
-                      style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{state.gstPct}%</span>
-                      <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
-                    </button>
-                  )}
-                />
+              <FL label={`${taxLabel} rate`}>
+                {isVat ? (
+                  <div style={{ ...inp, background: '#f9fafb', color: '#185FA5', fontWeight: 700, display: 'flex', alignItems: 'center' }}>{effGstRate}%</div>
+                ) : (
+                  <DropdownMenu
+                    ariaLabel={`${taxLabel} rate`}
+                    menuRole="listbox"
+                    items={GST_SLABS.map((r) => ({ key: r, label: `${r}%`, selected: state.gstPct === r, onSelect: () => patch({ gstPct: r, gstAmt: r2(t.taxable * r / 100) }) }))}
+                    renderTrigger={({ ref, toggle, triggerProps }) => (
+                      <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                        style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{state.gstPct}%</span>
+                        <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                      </button>
+                    )}
+                  />
+                )}
               </FL>
-              <FL label="GST amount"><input type="number" value={state.gstAmt || ''} onChange={(e) => patch({ gstAmt: +e.target.value || 0 })} style={inp} /></FL>
+              <FL label={`${taxLabel} amount`}><input type="number" value={state.gstAmt || ''} onChange={(e) => patch({ gstAmt: +e.target.value || 0 })} style={inp} /></FL>
               <button onClick={autoGst} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
             </div>
-            {t.gstAmt > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#185FA5' }}>{state.gstMode === 'inter' ? <>IGST <b>{money2(cur, igst)}</b></> : <>CGST <b>{money2(cur, cgst)}</b> · SGST <b>{money2(cur, sgst)}</b></>} · Invoice total <b>{money2(cur, t.total)}</b></p>}
+            {t.gstAmt > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#185FA5' }}>{isVat ? <>VAT <b>{money2(cur, t.gstAmt)}</b></> : (state.gstMode === 'inter' ? <>IGST <b>{money2(cur, igst)}</b></> : <>CGST <b>{money2(cur, cgst)}</b> · SGST <b>{money2(cur, sgst)}</b></>)} · Invoice total <b>{money2(cur, t.total)}</b></p>}
           </>
         )}
       </div>
 
-      {/* TDS */}
+      {/* Withholding — India TDS (section-driven) / Africa WHT (flat rate) */}
       <div style={{ padding: '10px 12px', borderRadius: 9, background: '#FAEEDA', border: '1px solid #FAC775', marginBottom: 12 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
-          <FL label="TDS Section">
-            <DropdownMenu
-              ariaLabel="TDS Section"
-              menuRole="listbox"
-              items={Object.entries(TDS_SECTIONS).map(([k, s]) => ({ key: k, label: s.label, selected: state.tdsSection === k, onSelect: () => patch({ tdsSection: k }) }))}
-              renderTrigger={({ ref, toggle, triggerProps }) => (
-                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
-                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{TDS_SECTIONS[state.tdsSection]?.label}</span>
-                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
-                </button>
-              )}
-            />
-          </FL>
-          <FL label="Rate"><div style={{ ...inp, background: '#f9fafb', color: '#854F0B', fontWeight: 700, display: 'flex', alignItems: 'center' }}>{rate}%</div></FL>
-          <FL label="TDS amount"><input type="number" value={state.tdsAmt || ''} onChange={(e) => patch({ tdsAmt: +e.target.value || 0 })} style={inp} /></FL>
-          <button onClick={autoTds} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
-        </div>
-        {t.tds > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#854F0B' }}>Supplier credited net of TDS · payable <b>{money2(cur, r2(t.total - t.tds))}</b></p>}
+        {isVat ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+            <FL label="WHT rate (%)"><input type="number" value={state.whtRate ?? 2} onChange={(e) => patch({ whtRate: +e.target.value || 0 })} style={inp} /></FL>
+            <FL label="WHT amount"><input type="number" value={state.tdsAmt || ''} onChange={(e) => patch({ tdsAmt: +e.target.value || 0 })} style={inp} /></FL>
+            <button onClick={autoTds} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+            <FL label="TDS Section">
+              <DropdownMenu
+                ariaLabel="TDS Section"
+                menuRole="listbox"
+                items={Object.entries(TDS_SECTIONS).map(([k, s]) => ({ key: k, label: s.label, selected: state.tdsSection === k, onSelect: () => patch({ tdsSection: k }) }))}
+                renderTrigger={({ ref, toggle, triggerProps }) => (
+                  <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                    style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{TDS_SECTIONS[state.tdsSection]?.label}</span>
+                    <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                  </button>
+                )}
+              />
+            </FL>
+            <FL label="Rate"><div style={{ ...inp, background: '#f9fafb', color: '#854F0B', fontWeight: 700, display: 'flex', alignItems: 'center' }}>{rate}%</div></FL>
+            <FL label="TDS amount"><input type="number" value={state.tdsAmt || ''} onChange={(e) => patch({ tdsAmt: +e.target.value || 0 })} style={inp} /></FL>
+            <button onClick={autoTds} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
+          </div>
+        )}
+        {t.tds > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#854F0B' }}>Supplier credited net of {whtLabel} · payable <b>{money2(cur, r2(t.total - t.tds))}</b></p>}
       </div>
 
       {/* Attachments */}

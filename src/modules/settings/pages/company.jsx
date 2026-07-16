@@ -167,7 +167,7 @@ export function SettingsCompany() {
 
   const bom = profiles.find((p) => p.code === 'BOM') || {};
   const amd = profiles.find((p) => p.code === 'AMD') || {};
-  const companies = [{
+  const india = {
     key: 'india', flag: '🇮🇳', label: 'India Entity',
     name: bom.entity || 'Travkings Tours & Travels', type: bom.entityType || 'Partnership Firm', cin: bom.cin,
     country: bom.country || 'India', pan: bom.pan,
@@ -179,7 +179,31 @@ export function SettingsCompany() {
     fy: fyRangeLabel(bom.fyStart),
     currency: [bom.currency, bom.cur_sym].filter(Boolean).join(' '),
     gst: gstLabel(bom),
-  }];
+  };
+  // Africa (VAT) legal entities — one per branch (Kenya/Tanzania/DR Congo). Each renders
+  // its own VAT-registration row (VAT PIN / TPIN / NIF), which was previously dead code
+  // because only the India entity was built. Tax authority shows in place of GST state.
+  const africaEntity = (key, flag, label, code, fallbackCountry) => {
+    const p = profiles.find((x) => x.code === code) || {};
+    return {
+      key, flag, label, code,
+      name: p.entity || 'Travkings Tours & Travels', type: p.entityType || '', cin: p.cin,
+      country: p.country || fallbackCountry, pan: p.pan,
+      gstin1: p.gstin, gstState1: p.state ? `${p.state} (${p.stateCode || ''})`.trim() : '',
+      tan: p.tan, addr1: p.operAddr,
+      addr2: [p.city && `${p.city} – ${p.pin || ''}`.trim(), p.state, p.country].filter(Boolean).join(', '),
+      phone: p.phone, email: p.email, web: p.website, iata: p.iataNo, bsp: p.bspParticipant,
+      fy: fyRangeLabel(p.fyStart),
+      currency: [p.currency, p.cur_sym].filter(Boolean).join(' '),
+      gst: gstLabel(p),
+    };
+  };
+  const companies = [
+    india,
+    africaEntity('kenya', '🇰🇪', 'Kenya Entity', 'NBO', 'Kenya'),
+    africaEntity('tanzania', '🇹🇿', 'Tanzania Entity', 'DAR', 'Tanzania'),
+    africaEntity('congo', '🇨🇩', 'DR Congo Entity', 'FBM', 'DR Congo'),
+  ];
   const co = companies.find((c) => c.key === tab) || companies[0];
   const isIndia = tab === 'india';
 

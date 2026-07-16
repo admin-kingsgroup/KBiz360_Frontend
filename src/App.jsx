@@ -602,7 +602,7 @@ export default function KB360App(){
     if(route==="/accounts/collections")   return <CollectionsFollowup branch={branch} setRoute={navigate}/>;
     // CRM payment-verification inbox — salespeople submit payments in the CRM;
     // finance verifies/rejects here (drives the CRM's own endpoints via SSO).
-    if(route==="/accounts/payment-verification") return <PaymentVerificationLive/>;
+    if(route==="/accounts/payment-verification") return <PaymentVerificationLive branch={branch}/>;
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/client-reco")   return <ClientReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/interbranch-reco") return <InterBranchReco branch={branch} setRoute={navigate}/>;

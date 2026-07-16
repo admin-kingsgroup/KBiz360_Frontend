@@ -46,6 +46,26 @@ export function fmt(n){
 // USD amount printed `$1,23,456` (Indian grouping) instead of `$123,456`.
 export const localeOf = (currency) => (currency === '₹' || currency === '₨' || currency === 'Rs' ? 'en-IN' : 'en-US');
 
+// ── D2 · Consolidated-view currency split ────────────────────────────────────
+// The consolidated (ALL / Consolidated branch) analytics responses carry an OPTIONAL
+// `byCurrency: [{ currency, symbol, ... }]` — India (₹/INR) and Africa ($/USD) subtotals
+// kept SEPARATE (no FX, no blended cross-currency total). It is present ONLY when the ALL
+// view actually mixes currencies; single-branch / single-currency responses omit it and
+// MUST render exactly as before. `currencySplit(data)` returns that array when non-empty,
+// else null — so `const split = currencySplit(data); if (split) …` is the whole gate.
+export const currencySplit = (data) => {
+  const arr = data && Array.isArray(data.byCurrency) ? data.byCurrency : null;
+  return arr && arr.length ? arr : null;
+};
+// Human region label for a currency-split section header — ₹ → India, $ → Africa, else
+// the raw currency code. Pair with the entry's own `symbol` (e.g. "₹ (India)").
+export const curRegion = (symbol, currency) => {
+  const s = String(symbol || '').trim();
+  if (s === '₹' || s === '₨' || currency === 'INR') return 'India';
+  if (s === '$' || s === 'US$' || currency === 'USD') return 'Africa';
+  return currency || s || '';
+};
+
 export function compactAmt(n, { currency = '₹', dash = false } = {}) {
   const v = Number(n);
   if (n == null || n === '' || isNaN(v) || v === 0) return dash ? '—' : `${currency}0`;

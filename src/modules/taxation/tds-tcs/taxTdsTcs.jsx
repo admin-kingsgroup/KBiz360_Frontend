@@ -7,7 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Calendar, ChevronDown, Download, Plus, Settings, Users } from 'lucide-react';
 import { Menu as DropdownMenu } from '../../../core/ux/Menu';
-import { useGpBills, useRcmLiability, useProfitAndLoss, useTaxSummary, useConfigValue, useSaveConfigValue } from '../../../core/useAccounting';
+import { useGpBills, useRcmLiability, useProfitAndLoss, useTaxSummary, useConfigValue, useSaveConfigValue, useWithholdingRegister } from '../../../core/useAccounting';
 import { useTaxCalendar } from '../../../core/useReference';
 import { useMasterMutations } from '../../../core/useMasters';
 import { toast } from '../../../core/ux/toast';
@@ -25,8 +25,17 @@ import { TDS_SECTIONS } from '../../../core/taxSections';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { SampleBanner } from '../../../core/ux/SampleBanner';
+import { isVatBranch } from '../../../core/voucherSpecs';
 
-export function TaxTdsTcs({branch}){
+// Regime wrapper: India (GST) branches get the TDS/TCS register; Africa (VAT) branches
+// get the Withholding Tax (WHT) register instead — same "Withholding Tax" menu entry
+// (/tax/tds), forked by branch so NBO/DAR/FBM never see India 194C / 26Q / 206C in ₹.
+export function TaxTdsTcs({ branch }) {
+  const brCode = branch === 'ALL' ? null : (branch?.code || null);
+  return isVatBranch(brCode) ? <WhtRegister branch={branch} /> : <TdsTcsIndia branch={branch} />;
+}
+
+function TdsTcsIndia({branch}){
   const mob=useMobile();
   const brCode=branch==="ALL"?null:(branch?.code||null);   // null = consolidated (all branches)
   const [tab,setTab]=useState("tds"); // tds | tcs | challan
@@ -220,6 +229,84 @@ export function TaxTdsTcs({branch}){
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
+   WITHHOLDING TAX (WHT) REGISTER — Africa (VAT) branches
+   The India-world TDS/TCS register has no meaning for NBO/DAR/FBM (no 194C /
+   26Q / 206C, and books are in USD). This is the regime-appropriate view they
+   get from the "Withholding Tax" menu: WHT deducted at source on supplier
+   payments / purchase-expense vouchers (→ WHT Payable) and WHT withheld from
+   our receipts (→ WHT Receivable), in the branch currency.
+   ════════════════════════════════════════════════════════════════ */
+function WhtRegister({ branch }) {
+  const brCode = branch === 'ALL' ? null : (branch?.code || null);
+  const cur = (bc({ code: brCode }) || {}).cur || '$';
+  const [period, setPeriod] = useState(CUR_MONTH);
+  const PERIODS = MONTH_OPTIONS;
+  // Live WHT register — postings to WHT Payable / WHT Receivable for this branch + period.
+  const { data, isLoading } = useWithholdingRegister(branch, period);
+  const rows = (data && data.rows) || [];
+  const totals = (data && data.totals) || { payable: 0, receivable: 0 };
+  const f = (n) => cur + Number(Math.round(n || 0)).toLocaleString('en-US');
+  return (
+    <div style={{ padding: '12px 10px', maxWidth: 1600, margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#EAF3F0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🧾</div>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0d1326' }}>Withholding Tax (WHT) Register</h2>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#5a6691' }}>{brCode || 'All branches'} · {PERIODS.find((p) => p.v === period)?.l} · WHT withheld on supplier payments</p>
+          </div>
+        </div>
+        <select value={period} onChange={(e) => setPeriod(e.target.value)} style={{ ...inp, width: 'auto', minHeight: 32, fontSize: 11 }}>
+          {PERIODS.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}
+        </select>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 14 }}>
+        {[{ l: 'WHT Payable (we withheld)', v: f(totals.payable), c: '#1a6b52', bg: '#EAF3F0' },
+          { l: 'WHT Receivable (withheld from us)', v: f(totals.receivable), c: '#185FA5', bg: '#E6F1FB' },
+          { l: 'WHT Entries', v: String(rows.length), c: '#384677', bg: '#f3f4f8' },
+        ].map((k, i) => (
+          <div key={i} style={{ ...card, borderTop: `3px solid ${k.c}`, padding: '11px 13px', background: k.bg }}>
+            <p style={{ margin: 0, fontSize: 9, fontWeight: 700, color: k.c, textTransform: 'uppercase' }}>{k.l}</p>
+            <p style={{ margin: '4px 0 0', fontSize: 21, fontWeight: 800, color: '#0d1326' }}>{k.v}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 9, background: '#EAF3F0', border: '1px solid #BFDDD3', fontSize: 10.5, color: '#1a6b52' }}>
+        Withholding Tax is deducted at source on supplier/vendor payments and purchase-expense vouchers for {brCode || 'this branch'}. Deducted WHT posts to <b>WHT Payable</b> and is remitted to the local revenue authority per the branch's WHT rules; WHT withheld from our own receipts posts to <b>WHT Receivable</b> (recoverable). Amounts are in {cur}.
+      </div>
+
+      <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead><tr style={{ background: '#0d1326' }}>
+            {['Date', 'Party', 'Voucher', 'Direction', 'Ledger', 'WHT Amt'].map((h, i) => (
+              <th key={i} style={{ padding: '8px 10px', textAlign: i === 5 ? 'right' : 'left', color: '#5fb89b', fontWeight: 700, fontSize: 9.5, whiteSpace: 'nowrap' }}>{h}</th>
+            ))}
+          </tr></thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: '26px 14px', textAlign: 'center', color: '#8b94b3', fontSize: 11 }}>
+                {isLoading ? 'Loading…' : <>No WHT entries for {PERIODS.find((p) => p.v === period)?.l}. WHT is captured on purchase-expense &amp; payment vouchers.</>}
+              </td></tr>
+            ) : rows.map((r, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #dfe2e7', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                <td style={{ padding: '7px 10px', color: '#5a6691', whiteSpace: 'nowrap' }}>{r.date}</td>
+                <td style={{ padding: '7px 10px', fontWeight: 600, color: '#0d1326' }}>{r.party || '—'}</td>
+                <td style={{ padding: '7px 10px', fontFamily: 'monospace', fontSize: 9.5, color: '#5a6691' }}>{r.voucherNo}</td>
+                <td style={{ padding: '7px 10px' }}><span style={{ fontSize: 9.5, padding: '2px 7px', borderRadius: 999, background: r.direction === 'payable' ? '#EAF3F0' : '#E6F1FB', color: r.direction === 'payable' ? '#1a6b52' : '#185FA5', fontWeight: 700 }}>{r.direction === 'payable' ? 'Payable' : 'Receivable'}</span></td>
+                <td style={{ padding: '7px 10px', fontSize: 10, color: '#384677' }}>{r.ledger}</td>
+                <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: r.direction === 'payable' ? '#1a6b52' : '#185FA5', fontVariantNumeric: 'tabular-nums' }}>{f(r.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

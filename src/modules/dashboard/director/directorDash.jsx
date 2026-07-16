@@ -25,11 +25,21 @@ import {
   useCashForecast, useCustomerLtv, useAbcAnalysis,
 } from '../../../core/useAccounting';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
+import { currencySplit, curRegion } from '../../../core/format';
 import { liquidityKind, isLiquidRow } from '../../../core/ledgerKind';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { PnlWaterfallPanel } from '../components/shared/PnlWaterfallPanel';
 import { TrendingUp, PieChart, Receipt, CircleDollarSign, ArrowRight } from 'lucide-react';
 import { C, REGION, curSym, branchList, r0, money, pct, pad2, iso, fyStr, MOD_OPTS, Toolbar, KPI, Card, th, td, num, usePeriod } from './shared';
+
+// D2 consolidated currency split — section header for one per-currency block. The ALL
+// view keeps India (₹) and Africa ($) subtotals SEPARATE (no FX, no blended total);
+// these headers label each block. Rendered only when a hook returns a `byCurrency` split.
+const CurHead = ({ symbol, currency }) => (
+  <div style={{ margin: '16px 0 2px', fontSize: 13, fontWeight: 800, color: C.dark }}>
+    {symbol} <span style={{ color: C.dim, fontWeight: 600 }}>({curRegion(symbol, currency)})</span>
+  </div>
+);
 
 export function ExecutiveOverview({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
@@ -691,34 +701,45 @@ export function VsTargetDash({ branch, metric = 'sales', go }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const d = useTargetsVsActual(branch, metric, { ...range, fy: fyStr() }).data || {};
   const t = d.totals || {}, rows = d.rows || [];
+  // Consolidated ALL view mixing currencies → render Target/Actual/Variance per currency.
+  const split = currencySplit(d);
   const title = { sales: 'Sales vs Target', gp: 'GP vs Target', collections: 'Collections vs Target' }[metric];
-  const ach = t.target ? Math.round((t.actual / t.target) * 100) : 0;
   // "Actual" drills into the live source that the achievement is measured against;
   // "Target" drills into the Sales Targets editor where the goal is set.
   const actualRoute = { sales: '/reports/sreg', gp: '/reports/gp', collections: '/reports/rec' }[metric];
   const toActual = go && (() => go(actualRoute));
   const toTarget = go && (() => go('/dashboards/sales-target'));
+  const block = (bcur, bt, brows) => {
+    const ach = bt.target ? Math.round((bt.actual / bt.target) * 100) : 0;
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Target" value={money(bcur, bt.target)} onClick={toTarget} />
+          <KPI label="Actual" value={money(bcur, bt.actual)} tone={(bt.actual || 0) >= (bt.target || 0) ? 'good' : undefined} onClick={toActual} />
+          <KPI label="Variance" value={money(bcur, bt.variance)} tone={(bt.variance || 0) >= 0 ? 'good' : 'bad'} onClick={toActual} />
+          <KPI label="Achievement" value={ach + '%'} tone={ach >= 100 ? 'good' : ach >= 90 ? undefined : 'bad'} sub={stLabel(bt.status)} onClick={toActual} />
+        </div>
+        <Card title="Achievement"><div style={{ padding: '14px 16px' }}>{gauge(ach, ach >= 100 ? C.green : ach >= 90 ? C.amber : C.red)}{!bt.target && <div style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>No target set. Set one in <b>Finance ▸ Sales Targets</b>.</div>}</div></Card>
+        {metric !== 'collections' && (
+          <Card title="By Module">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Target</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Ach %</th><th style={th}>Status</th></tr></thead>
+              <tbody>
+                {brows.map((r, i) => (<tr key={i} {...rowNav(go, actualRoute)}><td style={td}>{r.name}</td><td style={{ ...td, ...num }}>{money(bcur, r.target)}</td><td style={{ ...td, ...num }}>{money(bcur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(bcur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
+                {!brows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No module-level targets/actuals.</td></tr>}
+              </tbody>
+            </table>
+          </Card>
+        )}
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title={title} sub={`Achievement vs target · ${range.label}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Target" value={money(cur, t.target)} onClick={toTarget} />
-        <KPI label="Actual" value={money(cur, t.actual)} tone={(t.actual || 0) >= (t.target || 0) ? 'good' : undefined} onClick={toActual} />
-        <KPI label="Variance" value={money(cur, t.variance)} tone={(t.variance || 0) >= 0 ? 'good' : 'bad'} onClick={toActual} />
-        <KPI label="Achievement" value={ach + '%'} tone={ach >= 100 ? 'good' : ach >= 90 ? undefined : 'bad'} sub={stLabel(t.status)} onClick={toActual} />
-      </div>
-      <Card title="Achievement"><div style={{ padding: '14px 16px' }}>{gauge(ach, ach >= 100 ? C.green : ach >= 90 ? C.amber : C.red)}{!t.target && <div style={{ fontSize: 12, color: C.dim, marginTop: 8 }}>No target set. Set one in <b>Finance ▸ Sales Targets</b>.</div>}</div></Card>
-      {metric !== 'collections' && (
-        <Card title="By Module">
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Target</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Ach %</th><th style={th}>Status</th></tr></thead>
-            <tbody>
-              {rows.map((r, i) => (<tr key={i} {...rowNav(go, actualRoute)}><td style={td}>{r.name}</td><td style={{ ...td, ...num }}>{money(cur, r.target)}</td><td style={{ ...td, ...num }}>{money(cur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(cur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
-              {!rows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No module-level targets/actuals.</td></tr>}
-            </tbody>
-          </table>
-        </Card>
-      )}
+      {split
+        ? split.map((c) => (<div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{block(c.symbol, c.totals || {}, c.rows || [])}</div>))
+        : block(cur, t, rows)}
     </div>
   );
 }
@@ -729,26 +750,37 @@ export function BudgetVsExpenseDash({ branch, go }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const d = useBudgetVsActual(branch, { ...range, fy: fyStr() }).data || {};
   const t = d.totals || {}, rows = d.rows || [];
-  const over = rows.filter((r) => r.status === 'over').length;
+  // Consolidated ALL view mixing currencies → render budget/actual per currency.
+  const split = currencySplit(d);
   const toExp = go && (() => go('/reports/pnl'));
+  const block = (bcur, bt, brows) => {
+    const over = brows.filter((r) => r.status === 'over').length;
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Budget (to date)" value={money(bcur, bt.budget)} onClick={go && (() => go('/expense/budget'))} />
+          <KPI label="Actual Spend" value={money(bcur, bt.actual)} onClick={toExp} />
+          <KPI label="Variance" value={money(bcur, bt.variance)} tone={(bt.variance || 0) >= 0 ? 'good' : 'bad'} sub={(bt.variance || 0) >= 0 ? 'under budget' : 'over budget'} onClick={toExp} />
+          <KPI label="Heads Over Budget" value={String(over)} tone={over ? 'bad' : 'good'} onClick={toExp} />
+        </div>
+        <Card title="By Expense Head">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Head</th><th style={th}>Group</th><th style={{ ...th, ...num }}>Budget</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Used %</th><th style={th}>Status</th></tr></thead>
+            <tbody>
+              {brows.map((r, i) => (<tr key={i} {...rowNav(go, '/reports/pnl')}><td style={td}>{r.name}{r.unbudgeted && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: C.amber }}>· no budget</span>}</td><td style={{ ...td, color: C.dim }}>{r.group}</td><td style={{ ...td, ...num }}>{money(bcur, r.budget)}</td><td style={{ ...td, ...num }}>{money(bcur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(bcur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
+              {!brows.length && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No budgets set. Add them in <b>Finance ▸ Expense Budget</b>.</td></tr>}
+            </tbody>
+          </table>
+        </Card>
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Budget vs Expense" sub={`Indirect expense budget vs actual · ${d.months || ''} mo · ${range.label}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Budget (to date)" value={money(cur, t.budget)} onClick={go && (() => go('/expense/budget'))} />
-        <KPI label="Actual Spend" value={money(cur, t.actual)} onClick={toExp} />
-        <KPI label="Variance" value={money(cur, t.variance)} tone={(t.variance || 0) >= 0 ? 'good' : 'bad'} sub={(t.variance || 0) >= 0 ? 'under budget' : 'over budget'} onClick={toExp} />
-        <KPI label="Heads Over Budget" value={String(over)} tone={over ? 'bad' : 'good'} onClick={toExp} />
-      </div>
-      <Card title="By Expense Head">
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Head</th><th style={th}>Group</th><th style={{ ...th, ...num }}>Budget</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Used %</th><th style={th}>Status</th></tr></thead>
-          <tbody>
-            {rows.map((r, i) => (<tr key={i} {...rowNav(go, '/reports/pnl')}><td style={td}>{r.name}{r.unbudgeted && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: C.amber }}>· no budget</span>}</td><td style={{ ...td, color: C.dim }}>{r.group}</td><td style={{ ...td, ...num }}>{money(cur, r.budget)}</td><td style={{ ...td, ...num }}>{money(cur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(cur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
-            {!rows.length && <tr><td colSpan={7} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No budgets set. Add them in <b>Finance ▸ Expense Budget</b>.</td></tr>}
-          </tbody>
-        </table>
-      </Card>
+      {split
+        ? split.map((c) => (<div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{block(c.symbol, c.totals || {}, c.rows || [])}</div>))
+        : block(cur, t, rows)}
     </div>
   );
 }
@@ -769,12 +801,19 @@ export function PerformanceDash({ branch, go }) {
   const npQ    = useTargetsVsActual(branch, 'np',    { ...range, fy });
   const budQ   = useBudgetVsActual(branch, { ...range, fy });
   const ld = salesQ.isLoading || gpQ.isLoading || npQ.isLoading || budQ.isLoading; // don't paint ₹0 as real while loading
-  const sT = salesQ.data?.totals || {}, gT = gpQ.data?.totals || {}, nT = npQ.data?.totals || {}, bT = budQ.data?.totals || {};
+  const nT = npQ.data?.totals || {};
+
+  // Consolidated ALL view mixing currencies → India (₹) & Africa ($) kept separate across
+  // all four metrics. Build an ordered (INR-first) currency list from whichever hooks
+  // split, then pull each metric's matching per-currency entry for that block.
+  const salesSplit = currencySplit(salesQ.data), gpSplit = currencySplit(gpQ.data);
+  const npSplit = currencySplit(npQ.data), budSplit = currencySplit(budQ.data);
+  const anySplit = salesSplit || gpSplit || npSplit || budSplit;
+  const curList = [];
+  [salesSplit, gpSplit, npSplit, budSplit].forEach((sp) => (sp || []).forEach((e) => { if (!curList.some((x) => x.currency === e.currency)) curList.push({ currency: e.currency, symbol: e.symbol }); }));
+  const entryFor = (split, currency) => (split ? (split.find((x) => x.currency === currency) || {}) : {});
 
   const [tab, setTab] = useState('sales');            // module table toggle
-  const modRows = (tab === 'sales' ? salesQ.data : gpQ.data)?.rows || [];
-  const budRows = budQ.data?.rows || [];
-  const overHeads = budRows.filter((r) => r.status === 'over').length;
 
   const achOf  = (t) => (t.target ? Math.round((t.actual / t.target) * 100) : 0);
   const usedOf = (t) => (t.budget ? Math.round((t.actual / t.budget) * 100) : 0);
@@ -785,15 +824,15 @@ export function PerformanceDash({ branch, go }) {
     ? (t.ach <= 100 ? C.green : t.ach <= 110 ? C.amber : C.red)
     : (t.ach >= 100 ? C.green : t.ach >= 90 ? C.amber : C.red));
 
-  const tiles = [
+  const buildTiles = (sT, gT, npT, bT) => ([
     { key: 'sales', title: 'Sales vs Target',       ach: achOf(sT), actual: sT.actual, target: sT.target, variance: sT.variance, invert: false, route: '/dashboards/sales-target', aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
     { key: 'gp',    title: 'GP vs Target',          ach: achOf(gT), actual: gT.actual, target: gT.target, variance: gT.variance, invert: false, route: '/dashboards/gp-target',    aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
     { key: 'bud',   title: 'Budget vs Expense',     ach: usedOf(bT), actual: bT.actual, target: bT.budget, variance: bT.variance, invert: true,  route: '/dashboards/budget-expense', aLabel: 'Spent', tLabel: 'Budget', fav: 'under', unfav: 'over' },
-    { key: 'np',    title: 'Nett Profit vs Target', ach: achOf(nT), actual: nT.actual, target: nT.target, variance: nT.variance, invert: false, route: '/dashboards/profitability', aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
-  ];
+    { key: 'np',    title: 'Nett Profit vs Target', ach: achOf(npT), actual: npT.actual, target: npT.target, variance: npT.variance, invert: false, route: '/dashboards/profitability', aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
+  ]);
   const noNpTarget = !ld && !nT.target;
 
-  const Tile = ({ t }) => {
+  const Tile = ({ t, bcur }) => {
     const tone = toneOf(t);
     const favUp = (t.variance || 0) >= 0;               // positive variance is favourable for ALL four (budget's is budget−actual)
     const open = go && t.route ? () => go(t.route) : undefined;
@@ -806,12 +845,12 @@ export function PerformanceDash({ branch, go }) {
         <div className="text-[11px] font-bold uppercase tracking-wide text-ink-muted">{t.title}</div>
         <div style={{ marginTop: 10, marginBottom: 10 }}>{gauge(ld ? 0 : t.ach, tone)}{t.invert && <div className="mt-0.5 text-right text-[10px] text-ink-muted">of budget used</div>}</div>
         <div className="flex items-baseline justify-between">
-          <span className="text-[16px] font-black tabular-nums" style={{ color: C.dark }}>{ld ? '…' : money(cur, t.actual)}</span>
-          <span className="text-[12px] text-ink-muted tabular-nums">/ {ld ? '…' : money(cur, t.target)}</span>
+          <span className="text-[16px] font-black tabular-nums" style={{ color: C.dark }}>{ld ? '…' : money(bcur, t.actual)}</span>
+          <span className="text-[12px] text-ink-muted tabular-nums">/ {ld ? '…' : money(bcur, t.target)}</span>
         </div>
         <div className="mt-0.5 flex items-center justify-between">
           <span className="text-[10.5px] text-ink-muted">{t.aLabel} / {t.tLabel}</span>
-          {!ld && <span className="text-[11px] font-bold" style={{ color: favUp ? C.green : C.red }}>{favUp ? '▲' : '▼'} {money(cur, Math.abs(t.variance || 0))} {favUp ? t.fav : t.unfav}</span>}
+          {!ld && <span className="text-[11px] font-bold" style={{ color: favUp ? C.green : C.red }}>{favUp ? '▲' : '▼'} {money(bcur, Math.abs(t.variance || 0))} {favUp ? t.fav : t.unfav}</span>}
         </div>
       </div>
     );
@@ -822,27 +861,21 @@ export function PerformanceDash({ branch, go }) {
       color: tab === id ? '#fff' : C.dim, background: tab === id ? C.dark : '#fff', border: `1px solid ${tab === id ? C.dark : C.border}`, borderRadius: 6 }}>{label}</button>
   );
 
-  return (
-    <div style={{ margin: 12 }}>
-      <Toolbar title="TGT VS Sales/GP/EX/NP" sub={`Sales · GP · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {tiles.map((t) => <Tile key={t.key} t={t} />)}
-      </div>
-      <div className="mt-1.5 text-[11px] text-ink-muted">Green ≥100% · amber ≥90% · red &lt;90% (budget inverts: green = under budget).{noNpTarget && <> · <b>No Nett Profit target set</b> — add one in <b>Finance ▸ Sales Targets</b> (metric “Nett Profit”).</>}</div>
+  const tilesRow = (tls, bcur) => (
+    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>{tls.map((t) => <Tile key={t.key} t={t} bcur={bcur} />)}</div>
+  );
 
-      {/* PnlWaterfallPanel is a self-titled card ("📉 Profit Bridge") — render it
-          directly (NO wrapping Card) to avoid a card-in-card + duplicate title. */}
-      <div className="mt-3.5">
-        <PnlWaterfallPanel branch={branch} range={range} formatMoney={(n) => money(cur, n)} onViewFullReport={go && (() => go('/reports/pnl'))} />
-      </div>
-
+  const tablesRow = (bcur, salesRows, gpRows, budRows) => {
+    const modRows = tab === 'sales' ? salesRows : gpRows;
+    const overHeads = budRows.filter((r) => r.status === 'over').length;
+    return (
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 440 }}>
           <Card title={`${tab === 'sales' ? 'Sales' : 'GP'} vs Target — by Module`} right={<div style={{ display: 'flex', gap: 6 }}><TabBtn id="sales" label="Sales" /><TabBtn id="gp" label="GP" /></div>}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Target</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Ach %</th><th style={th}>Status</th></tr></thead>
               <tbody>
-                {modRows.map((r, i) => (<tr key={i} {...rowNav(go, tab === 'sales' ? '/reports/sreg' : '/reports/gp')}><td style={td}>{r.name}</td><td style={{ ...td, ...num }}>{money(cur, r.target)}</td><td style={{ ...td, ...num }}>{money(cur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(cur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
+                {modRows.map((r, i) => (<tr key={i} {...rowNav(go, tab === 'sales' ? '/reports/sreg' : '/reports/gp')}><td style={td}>{r.name}</td><td style={{ ...td, ...num }}>{money(bcur, r.target)}</td><td style={{ ...td, ...num }}>{money(bcur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(bcur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
                 {ld && Array.from({ length: 5 }).map((_, i) => (
                   <tr key={`sk-${i}`}><td colSpan={6} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
                 ))}
@@ -856,7 +889,7 @@ export function PerformanceDash({ branch, go }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr><th style={th}>Head</th><th style={{ ...th, ...num }}>Budget</th><th style={{ ...th, ...num }}>Actual</th><th style={{ ...th, ...num }}>Variance</th><th style={{ ...th, ...num }}>Used %</th><th style={th}>Status</th></tr></thead>
               <tbody>
-                {budRows.map((r, i) => (<tr key={i} {...rowNav(go, '/reports/pnl')}><td style={td}>{r.name}{r.unbudgeted && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: C.amber }}>· no budget</span>}</td><td style={{ ...td, ...num }}>{money(cur, r.budget)}</td><td style={{ ...td, ...num }}>{money(cur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(cur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
+                {budRows.map((r, i) => (<tr key={i} {...rowNav(go, '/reports/pnl')}><td style={td}>{r.name}{r.unbudgeted && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: C.amber }}>· no budget</span>}</td><td style={{ ...td, ...num }}>{money(bcur, r.budget)}</td><td style={{ ...td, ...num }}>{money(bcur, r.actual)}</td><td style={{ ...td, ...num, color: r.variance < 0 ? C.red : C.green }}>{money(bcur, r.variance)}</td><td style={{ ...td, ...num }}>{pct(r.pct)}</td><td style={{ ...td, color: stTone(r.status), fontWeight: 700 }}>{stLabel(r.status)}</td></tr>))}
                 {ld && Array.from({ length: 5 }).map((_, i) => (
                   <tr key={`sk-${i}`}><td colSpan={6} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
                 ))}
@@ -866,6 +899,26 @@ export function PerformanceDash({ branch, go }) {
           </Card>
         </div>
       </div>
+    );
+  };
+
+  return (
+    <div style={{ margin: 12 }}>
+      <Toolbar title="TGT VS Sales/GP/EX/NP" sub={`Sales · GP · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
+      {anySplit
+        ? curList.map((c) => <div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{tilesRow(buildTiles(entryFor(salesSplit, c.currency).totals || {}, entryFor(gpSplit, c.currency).totals || {}, entryFor(npSplit, c.currency).totals || {}, entryFor(budSplit, c.currency).totals || {}), c.symbol)}</div>)
+        : tilesRow(buildTiles(salesQ.data?.totals || {}, gpQ.data?.totals || {}, nT, budQ.data?.totals || {}), cur)}
+      <div className="mt-1.5 text-[11px] text-ink-muted">Green ≥100% · amber ≥90% · red &lt;90% (budget inverts: green = under budget).{noNpTarget && <> · <b>No Nett Profit target set</b> — add one in <b>Finance ▸ Sales Targets</b> (metric “Nett Profit”).</>}</div>
+
+      {/* PnlWaterfallPanel is a self-titled card ("📉 Profit Bridge") — render it
+          directly (NO wrapping Card) to avoid a card-in-card + duplicate title. */}
+      <div className="mt-3.5">
+        <PnlWaterfallPanel branch={branch} range={range} formatMoney={(n) => money(cur, n)} onViewFullReport={go && (() => go('/reports/pnl'))} />
+      </div>
+
+      {anySplit
+        ? curList.map((c) => <div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{tablesRow(c.symbol, entryFor(salesSplit, c.currency).rows || [], entryFor(gpSplit, c.currency).rows || [], entryFor(budSplit, c.currency).rows || [])}</div>)
+        : tablesRow(cur, salesQ.data?.rows || [], gpQ.data?.rows || [], budQ.data?.rows || [])}
     </div>
   );
 }
@@ -994,54 +1047,65 @@ export function CustomerValueDash({ branch, go }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const lq = useCustomerLtv(branch, range); const ltv = lq.data || {};
   const abc = useAbcAnalysis(branch, { ...range, by: 'customer' }).data || {};
-  const classOf = useMemo(() => { const m = {}; (abc.rows || []).forEach((r) => { m[r.name] = r.class; }); return m; }, [abc]);
-  const rows = (ltv.rows || []).slice(0, 25).map((r) => ({ ...r, class: classOf[r.name] || '—' }));
-  const t = ltv.totals || {};
-  const cls = abc.classes || {};
-  const clsChip = (k, c) => (
-    <span key={k} style={{ fontSize: 11.5, color: C.dim }}>
-      Class {k}: <b style={{ color: c }}>{(cls[k]?.count || 0)}</b> cust · {money(cur, cls[k]?.value || 0)} ({(cls[k]?.share || 0).toFixed(0)}%)
-    </span>
-  );
+  // Consolidated ALL view mixing currencies → India (₹) & Africa ($) kept separate. The
+  // ABC split is paired to the LTV split by currency so each block's class values match.
+  const split = currencySplit(ltv);
+  const abcByCur = {}; (currencySplit(abc) || []).forEach((e) => { abcByCur[e.currency] = e; });
   const clsColor = (c) => (c === 'A' ? C.green : c === 'B' ? C.amber : c === 'C' ? C.dim : C.dim);
+  const block = (bcur, t, cls, ltvRows, abcRows) => {
+    const classOf = {}; (abcRows || []).forEach((r) => { classOf[r.name] = r.class; });
+    const rows = (ltvRows || []).slice(0, 25).map((r) => ({ ...r, class: classOf[r.name] || '—' }));
+    const clsChip = (k, c) => (
+      <span key={k} style={{ fontSize: 11.5, color: C.dim }}>
+        Class {k}: <b style={{ color: c }}>{(cls[k]?.count || 0)}</b> cust · {money(bcur, cls[k]?.value || 0)} ({(cls[k]?.share || 0).toFixed(0)}%)
+      </span>
+    );
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Customers" value={String(t.customers || 0)} onClick={go && (() => go('/masters/customers'))} />
+          <KPI label="Total Revenue" value={money(bcur, t.ltv || 0)} tone="good" onClick={go && (() => go('/dashboards/sales'))} />
+          <KPI label="Bookings" value={String(t.bookings || 0)} />
+          <KPI label="Avg per Customer" value={money(bcur, (t.customers ? (t.ltv || 0) / t.customers : 0))} />
+        </div>
+        <Card title="ABC / Pareto split">
+          <div style={{ display: 'flex', gap: 16, padding: '10px 14px', flexWrap: 'wrap' }}>
+            {clsChip('A', C.green)}{clsChip('B', C.amber)}{clsChip('C', C.dim)}
+            <span style={{ fontSize: 11, color: C.dim, marginLeft: 'auto' }}>A = top ~80% of revenue · B = next ~15% · C = long tail</span>
+          </div>
+        </Card>
+        <Card title="Top Customers by Lifetime Value">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Customer</th><th style={{ ...th }}>Class</th><th style={{ ...th, ...num }}>Revenue</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>Bookings</th><th style={{ ...th, ...num }}>Avg Basket</th><th style={{ ...th, ...num }}>Last Seen</th></tr></thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} {...rowNav(go, '/masters/customers')}>
+                  <td style={td}>{r.name}</td>
+                  <td style={{ ...td, fontWeight: 800, color: clsColor(r.class) }}>{r.class}</td>
+                  <td style={{ ...td, ...num, fontWeight: 700 }}>{money(bcur, r.ltv)}</td>
+                  <td style={{ ...td, ...num, color: (r.gp || 0) < 0 ? C.red : C.green }}>{money(bcur, r.gp)}</td>
+                  <td style={{ ...td, ...num }}>{pct(r.gpPct)}</td>
+                  <td style={{ ...td, ...num }}>{r.totalBookings}</td>
+                  <td style={{ ...td, ...num }}>{money(bcur, r.avgBasket)}</td>
+                  <td style={{ ...td, ...num, color: r.recencyDays > 180 ? C.red : C.dim }}>{r.recencyDays != null ? `${r.recencyDays}d ago` : '—'}</td>
+                </tr>
+              ))}
+              {lq.isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <tr key={`sk-${i}`}><td colSpan={8} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+              ))}
+              {!lq.isLoading && !rows.length && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No customer activity for this period.</td></tr>}
+            </tbody>
+          </table>
+        </Card>
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Customer Value (LTV + ABC)" sub={`Who drives revenue · ${range.label} · top 25`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Customers" value={String(t.customers || 0)} onClick={go && (() => go('/masters/customers'))} />
-        <KPI label="Total Revenue" value={money(cur, t.ltv || 0)} tone="good" onClick={go && (() => go('/dashboards/sales'))} />
-        <KPI label="Bookings" value={String(t.bookings || 0)} />
-        <KPI label="Avg per Customer" value={money(cur, (t.customers ? (t.ltv || 0) / t.customers : 0))} />
-      </div>
-      <Card title="ABC / Pareto split">
-        <div style={{ display: 'flex', gap: 16, padding: '10px 14px', flexWrap: 'wrap' }}>
-          {clsChip('A', C.green)}{clsChip('B', C.amber)}{clsChip('C', C.dim)}
-          <span style={{ fontSize: 11, color: C.dim, marginLeft: 'auto' }}>A = top ~80% of revenue · B = next ~15% · C = long tail</span>
-        </div>
-      </Card>
-      <Card title="Top Customers by Lifetime Value">
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Customer</th><th style={{ ...th }}>Class</th><th style={{ ...th, ...num }}>Revenue</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>Bookings</th><th style={{ ...th, ...num }}>Avg Basket</th><th style={{ ...th, ...num }}>Last Seen</th></tr></thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} {...rowNav(go, '/masters/customers')}>
-                <td style={td}>{r.name}</td>
-                <td style={{ ...td, fontWeight: 800, color: clsColor(r.class) }}>{r.class}</td>
-                <td style={{ ...td, ...num, fontWeight: 700 }}>{money(cur, r.ltv)}</td>
-                <td style={{ ...td, ...num, color: (r.gp || 0) < 0 ? C.red : C.green }}>{money(cur, r.gp)}</td>
-                <td style={{ ...td, ...num }}>{pct(r.gpPct)}</td>
-                <td style={{ ...td, ...num }}>{r.totalBookings}</td>
-                <td style={{ ...td, ...num }}>{money(cur, r.avgBasket)}</td>
-                <td style={{ ...td, ...num, color: r.recencyDays > 180 ? C.red : C.dim }}>{r.recencyDays != null ? `${r.recencyDays}d ago` : '—'}</td>
-              </tr>
-            ))}
-            {lq.isLoading && Array.from({ length: 5 }).map((_, i) => (
-              <tr key={`sk-${i}`}><td colSpan={8} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
-            ))}
-            {!lq.isLoading && !rows.length && <tr><td colSpan={8} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No customer activity for this period.</td></tr>}
-          </tbody>
-        </table>
-      </Card>
+      {split
+        ? split.map((c) => { const a = abcByCur[c.currency] || {}; return (<div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{block(c.symbol, c.totals || {}, a.classes || {}, c.rows || [], a.rows || [])}</div>); })
+        : block(cur, ltv.totals || {}, abc.classes || {}, ltv.rows || [], abc.rows || [])}
     </div>
   );
 }

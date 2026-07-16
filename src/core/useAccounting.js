@@ -159,6 +159,21 @@ export function useRcmLiability(branch, { from, to } = {}) {
   });
 }
 
+// Withholding-tax (WHT) register — Africa (VAT) branches only. Lists every WHT Payable
+// (we withheld from a supplier payment) / WHT Receivable (a customer withheld from our
+// receipt) posting for a branch + period (YYYY-MM), with per-direction totals. Optional
+// `direction` ('payable' | 'receivable') restricts to one side. Read-only; India
+// branches (no WHT head) return an empty register. GET /api/accounting/withholding.
+export function useWithholdingRegister(branch, period, direction) {
+  const code = branchCode(branch);
+  return useQuery({
+    queryKey: ['accounting', 'withholding', code || 'all', period || '', direction || 'all'],
+    queryFn: () => apiGet('/api/accounting/withholding', { branch: code, period, ...(direction ? { direction } : {}) }),
+    enabled: enabled(),
+    staleTime: 30_000,
+  });
+}
+
 // Budget vs actual (indirect-expense heads) — Director "Budget vs Expense" dashboard.
 export function useBudgetVsActual(branch, { from, to, fy } = {}) {
   const code = branchCode(branch);

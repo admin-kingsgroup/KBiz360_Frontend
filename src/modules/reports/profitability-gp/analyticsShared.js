@@ -6,6 +6,11 @@ import { bc } from '../../../core/styleTokens';
 // hardcoded fmtINR so a USD branch no longer prints ₹ on $ figures.
 export const cmoney = (branch, n) => compactAmt(n, { currency: (bc(branch) || {}).cur || '₹' });
 
+// D2 consolidated split: compact money in an EXPLICIT currency symbol (from a byCurrency
+// entry's `symbol`) rather than the branch's — so ₹ (India) and $ (Africa) subtotals each
+// print in their own currency instead of one blended branch-currency figure.
+export const cmoneyOf = (symbol, n) => compactAmt(n, { currency: symbol || '₹' });
+
 // Row-drill props: make an analytics table row a keyboard-accessible link into the
 // source detail (e.g. a customer/supplier 360° via ?party=). Inert when no route.
 export const rrow = (setRoute, route) => (setRoute && route ? {

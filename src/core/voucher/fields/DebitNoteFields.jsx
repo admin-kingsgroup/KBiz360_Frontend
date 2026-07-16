@@ -4,6 +4,7 @@ import { FL, inp, btnGh, card } from '../../styles';
 import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
 import { LedgerPicker } from '../LedgerPicker';
+import { isVatBranch } from '../../voucherSpecs';
 import { V_DR, V_CR, DARK, DIM, money2, dnTotals } from '../ui';
 
 /**
@@ -23,7 +24,11 @@ import { V_DR, V_CR, DARK, DIM, money2, dnTotals } from '../ui';
  * shell renders the live JV effect below the form.
  */
 export function DebitNoteFields({ state, setState, ctx }) {
-  const { branch, cur } = ctx;
+  const { branch, branchCode, cur } = ctx;
+  // Regime-aware tax wording — India reverses GST/TDS, Africa reverses VAT/WHT.
+  const isVat = isVatBranch(branchCode);
+  const taxLabel = isVat ? 'VAT' : 'GST';
+  const whtLabel = isVat ? 'WHT' : 'TDS';
   const idRef = useRef(1000);
   const lines = state.lines || [];
   const patch = (p) => setState((s) => ({ ...s, ...p }));
@@ -41,7 +46,7 @@ export function DebitNoteFields({ state, setState, ctx }) {
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
         <FL label="Voucher date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
-        <FL label="Against purchase bill (optional)"><input value={state.billNo || ''} onChange={(e) => patch({ billNo: e.target.value })} style={inp} placeholder="PI/BOM/2026/0042" /></FL>
+        <FL label="Against purchase bill (optional)"><input value={state.billNo || ''} onChange={(e) => patch({ billNo: e.target.value })} style={inp} placeholder={`PI/${branchCode || 'BOM'}/2026/0042`} /></FL>
       </div>
 
       <FL label="Supplier / Vendor (party ledger — Dr, balancing leg · optional if Dr = Cr)">
@@ -49,7 +54,7 @@ export function DebitNoteFields({ state, setState, ctx }) {
       </FL>
 
       {/* Purchase-return lines — Cr (default) reverses cost / input GST · Dr books a retained charge or TDS */}
-      <p style={{ margin: '14px 0 6px', fontSize: 9, fontWeight: 700, color: '#A07828', textTransform: 'uppercase', letterSpacing: '1px' }}>Purchase Ledgers &amp; Input GST Returned (Cr) · Charges / TDS (Dr)</p>
+      <p style={{ margin: '14px 0 6px', fontSize: 9, fontWeight: 700, color: '#A07828', textTransform: 'uppercase', letterSpacing: '1px' }}>Purchase Ledgers &amp; Input {taxLabel} Returned (Cr) · Charges / {whtLabel} (Dr)</p>
       <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 12 }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 680 }}>
