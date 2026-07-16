@@ -447,7 +447,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // deal is always taxable (tick locked ON); a cross-border deal defaults OFF (zero-rated export)
   // and the seller ticks it to bill IGST (added to what the buyer branch pays).
   const crossBorderInb = interBranch && !!toBranch && inbCrossBorder(brCode, toBranch);
-  const [billIgstCB, setBillIgstCB] = useState(editing ? !!(editBooking.billIgst) : false);
+  // BOM bills IGST on its Service Fee even cross-border (seller-side reconciliation rule), so its
+  // tick DEFAULTS ON; every other seller defaults to a zero-rated export (OFF). Edit preloads the
+  // saved choice. This keeps the tick consistent with the tax-treatment banner above the grid.
+  const [billIgstCB, setBillIgstCB] = useState(editing ? !!(editBooking.billIgst) : brCode === 'BOM');
   const billIgst = interBranch ? (crossBorderInb ? billIgstCB : true) : undefined;
 
   // Switching module reloads the seed grid for that module — never while editing

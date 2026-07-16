@@ -47,7 +47,11 @@ export function InterBranchRegister({ branch }) {
         {tile('Total Legs', data.totals?.total || 0, C.dark)}
         {tile('Matched (booked)', data.totals?.booked || 0, C.green, 'both sides entered')}
         {tile('Open (unbooked)', data.totals?.open || 0, C.gold, 'awaiting buyer PO')}
-        {tile('Open Amount', money(CCY_SYM[data.totals?.openCcy] || cur, data.totals?.openAmount), C.red)}
+        {tile('Open Amount',
+          data.totals?.openCcy === 'mixed'
+            ? Math.round(Number(data.totals?.openAmount) || 0).toLocaleString(localeOf('₹'))
+            : money(CCY_SYM[data.totals?.openCcy] || cur, data.totals?.openAmount),
+          C.red, data.totals?.openCcy === 'mixed' ? 'spans ₹ and $ — see rows' : undefined)}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 2px 10px' }}>

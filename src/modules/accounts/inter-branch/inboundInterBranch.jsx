@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { useInbInbound, useDeleteInbDeal } from '../../../core/useInterBranchVoucher';
 import { localeOf } from '../../../core/format';
 import { toast } from '../../../core/ux/toast';
+import { confirmDialog } from '../../../core/ux/confirm';
 import { bc } from '../../../core/styles.jsx';
 
 // Book-currency symbol for a branch (₹ for India, $ for Africa) — used so a same-currency
@@ -36,10 +37,15 @@ export function InboundInterBranch({ branch, setRoute }) {
   const del = useDeleteInbDeal();
   // Cascade delete — reverses BOTH sides (kept for audit); the selling branch re-raises a fresh,
   // corrected deal. Used when the seller's cost was wrong after we converted (it can't be edited).
-  const onDelete = (rw) => {
-    const reason = window.prompt(`Delete inter-branch deal ${rw.inbLinkNo}?\n\nBoth sides are reversed and soft-deleted (kept for audit); ${rw.fromBranch} then re-raises a corrected deal. Reason:`);
-    if (!reason || !reason.trim()) return;
-    del.mutate({ linkNo: rw.inbLinkNo, reason: reason.trim() }, {
+  const onDelete = async (rw) => {
+    const { confirmed, reason } = await confirmDialog({
+      title: `Delete inter-branch deal ${rw.inbLinkNo}?`,
+      message: `Both sides are reversed and soft-deleted (kept for audit); ${rw.fromBranch} then re-raises a corrected deal. This reverses posted vouchers — Super Admin / Director only.`,
+      reasonRequired: true, reasonLabel: 'Reason for deleting (saved to the audit trail)',
+      confirmLabel: 'Delete deal', danger: true,
+    });
+    if (!confirmed) return;
+    del.mutate({ linkNo: rw.inbLinkNo, reason: (reason || '').trim() }, {
       onSuccess: () => toast(`Deal ${rw.inbLinkNo} deleted — ${rw.fromBranch} can re-raise a corrected deal`, 'success'),
       onError: (e) => toast(e?.message || 'Delete failed', 'error'),
     });
