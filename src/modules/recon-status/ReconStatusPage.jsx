@@ -54,7 +54,7 @@ export function ReconStatusPage() {
   ];
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
       <p className="text-sm text-ink-muted max-w-3xl">
         Mark each bank / client / supplier account <b>Reconciled</b> for the month once you've matched the physical statement to the ERP.
         The <b>Control Tower</b> reads this to show and gate what reconciliation is still pending — you keep reconciling exactly as you do now.
