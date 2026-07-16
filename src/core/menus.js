@@ -380,18 +380,23 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Cash Position Summary", href:"/reports/cash-position"},
   ]},
 
-  /* Inter-Branch (INB) — all the inter-branch reports in one place. The INB
-     Voucher itself stays under Daily Entry ▸ Sales & Inter-Branch (it's a daily
-     entry); these are the read-only analytics over the INB Link registry. */
+  /* Inter-Branch (INB) — TWO MIRROR PIPELINES + the reports over them.
+     Inter-branch trade is bidirectional: any branch sells to any other depending on where
+     the price is best, so AMD→BOM is as real as BOM→AMD. Every branch therefore owns BOTH
+     pipelines, and each self-scopes — Outgoing lists the deals WE sell (an INB deal's legs
+     post in the SELLER's branch), Incoming lists the deals pushed TO us (InbLink.toBranch).
+     One branch's Outgoing IS another's Incoming; neither screen can show the other side.
+     The INB Voucher (entry) stays under Daily Entry ▸ Sales & Inter-Branch — it's a daily
+     entry. Everything below the two pipelines is read-only analytics over the registry. */
   {label:"Inter Branch", children:[
-    {label:"Inbound · Convert",         href:"/accounts/inb-inbound"},
+    {label:"Outgoing · We Sell",        href:"/inb/outgoing"},
+    {label:"Incoming · Convert",        href:"/inb/incoming"},
     {label:"Trade Matrix & Margin",     href:"/accounts/inb-matrix"},
     {label:"Register & P&L Breakdown",  href:"/accounts/inb-register"},
     {label:"Counterparty Ledger",       href:"/accounts/inb-counterparty"},
     {label:"INB Sales Register",        href:"/reports/inb-sreg"},
     {label:"INB Purchase Register",     href:"/reports/inb-preg"},
     // Inter-branch RECONCILIATION moved to the top-level Reconciliation pill.
-    {label:"INB SPG Approvals",         href:"/transactions/inb-approvals"},
   ]},
 
   /* ── 5 · PERIOD CLOSE & MASTERS ──────────────────────────── */

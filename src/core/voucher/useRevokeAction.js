@@ -27,7 +27,7 @@ const PARENT_LABEL = {
 // to the parent ref so the user can revoke the whole file there).
 const PARENT_NAV = {
   booking: { route: '/transactions/approvals', domain: 'sopogp' },
-  inb: { route: '/transactions/inb-approvals', domain: 'inbspg' },
+  inb: { route: '/inb/outgoing', domain: 'inbspg' },   // INB ▸ Outgoing — the seller's own pipeline
 };
 export function voucherParent(v) {
   const label = v && v.locked ? PARENT_LABEL[v.source] : null;

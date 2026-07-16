@@ -133,6 +133,8 @@ export const APP_ROUTES = [
   "/hr/shifts",
   "/hr/skills",
   "/import",
+  "/inb/incoming",
+  "/inb/outgoing",
   "/journal",
   "/ledger",
   "/masters/accounts-tree",

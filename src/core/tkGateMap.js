@@ -44,10 +44,30 @@ const OVERRIDES = {
   '/bank-reco': SPLIT,
   '/finance/reco-queue': SPLIT,
 
-  // Approvals authority + INB approvals — central
+  // Approvals authority — central
   '/transactions/approvals': CENTRAL,
-  '/transactions/inb-approvals': CENTRAL,
   '/transactions/voucher-tabs': BRANCH,    // entry helper
+
+  // ── Inter-Branch (INB) — two mirror pipelines, BOTH live on every branch ────────────
+  // Inter-branch trade is bidirectional: any branch sells to any other depending on where
+  // the price is best (AMD→BOM is as real as BOM→AMD), so a branch must be able to see and
+  // work BOTH of its own pipelines. The screens self-scope — Outgoing reads the vouchers of
+  // the SELLING branch (INB legs post in `fromBranch`), Incoming reads links addressed to
+  // `toBranch` — so neither can show another branch's side.
+  //   Outgoing = SPLIT: the branch RAISES and monitors its own deals; Approve/Push/Revoke
+  //     stay approver-only (enforced server-side in inb.controller). That is precisely the
+  //     "doing in Branch, authority in Central" verdict.
+  //     It was CENTRAL + parked in PENDING_MIGRATION, which conflated "only central may
+  //     APPROVE" (true, and already role-gated) with "branches may not SEE it" (false).
+  //     Left as CENTRAL, the Phase-3 re-gate would have deleted a branch's own outgoing
+  //     pipeline off its menu and stopped it selling inter-branch at all.
+  //   Incoming = BRANCH: the buyer converts the offered deal into its own SO/PO/GP and
+  //     completes it through its own approval chain. Convert is branch-gated server-side
+  //     (only `toBranch` may accept).
+  '/inb/outgoing': SPLIT,
+  '/inb/incoming': BRANCH,
+  '/transactions/inb-approvals': SPLIT,    // legacy alias of /inb/outgoing
+  '/accounts/inb-inbound': BRANCH,         // legacy alias of /inb/incoming
 
   // Operational registers / Branch MIS — BRANCH even though under /reports/*
   '/reports/pnl': BRANCH,
@@ -171,5 +191,8 @@ export const PENDING_MIGRATION = new Set([
   '/accounts/payment-verification',
   // Approval authority currently exposed as a branch pill
   '/transactions/approvals',
-  '/transactions/inb-approvals',
+  // '/transactions/inb-approvals' — REMOVED from the allowlist: INB Outgoing is now SPLIT,
+  // not central-with-an-exception. A branch legitimately owns its own outgoing pipeline
+  // (inter-branch trade runs both ways); only the Approve/Push authority is central, and
+  // that is enforced by role in inb.controller, not by hiding the screen.
 ]);

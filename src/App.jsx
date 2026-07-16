@@ -60,7 +60,7 @@ const { PageAccessControl } = lazyModule(() => import('./modules/settings/pageAc
 const { EWayBill, Form16AGenerator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
 const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherCommentsDemo, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
-const { UnifiedApprovals } = lazyModule(() => import('./modules/approvals'));
+const { UnifiedApprovals, InbOutgoing } = lazyModule(() => import('./modules/approvals'));
 const { PaymentVerificationLive } = lazyModule(() => import('./modules/payments'));
 const { ModuleRegister } = lazyModule(() => import('./modules/reports/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/masters/chartBuilder'));
@@ -604,7 +604,10 @@ export default function KB360App(){
     if(route==="/accounts/supplier-reco") return <SupplierReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/client-reco")   return <ClientReco branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/interbranch-reco") return <InterBranchReco branch={branch} setRoute={navigate}/>;
-    if(route==="/accounts/inb-inbound")    return <InboundInterBranch branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    // ── Inter-Branch (INB) · the two mirror pipelines ──────────────────────────────
+    // INCOMING — deals another branch pushed TO us (InbLink.toBranch = me). '/accounts/
+    // inb-inbound' is the legacy path, kept working so existing links/bookmarks don't 404.
+    if(route==="/inb/incoming" || route==="/accounts/inb-inbound") return <InboundInterBranch branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     if(route==="/accounts/inb-register")   return <InterBranchRegister branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-matrix")     return <InterBranchMatrix branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-counterparty") return <InterBranchCounterpartyLedger branch={branch} setRoute={navigate}/>;
@@ -648,7 +651,9 @@ export default function KB360App(){
     // Unified Approvals — SO/PO/GP + Vouchers, each with Pending/Approved/Rejected/Deleted.
     if(route==="/transactions/approvals")          return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="sopogp"/>;
     if(route==="/transactions/voucher-approvals")  return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="vouchers"/>;
-    if(route==="/transactions/inb-approvals")       return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain="inbspg"/>;
+    // OUTGOING — deals THIS branch sells to another (its INB legs post in `branch`, so the
+    // queue self-scopes). '/transactions/inb-approvals' is the legacy path, kept working.
+    if(route==="/inb/outgoing" || route==="/transactions/inb-approvals") return <InbOutgoing branch={branch} setRoute={navigate} currentUser={currentUser}/>;
     // Per-type approval screens: /transactions/approvals/<category> opens the split
     // screen for one gated voucher type (Receipt / Payment / … / ACM), bookmarkable.
     if(/^\/transactions\/approvals\/(receipt|payment|contra|journal|purchase-expense|debit-note|adm|acm)$/.test(route)) return <UnifiedApprovals branch={branch} setRoute={navigate} currentUser={currentUser} initialDomain={route.split('/').pop()}/>;

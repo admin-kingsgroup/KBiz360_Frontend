@@ -99,7 +99,7 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
   return (
     <div style={{ margin: 12, maxWidth: 1200 }}>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>Inbound Inter-Branch · INSO / INPO / INGP</div>
+        <div style={{ fontSize: 17, fontWeight: 800, color: C.dark }}>INB · Incoming <span style={{ fontWeight: 700, fontSize: 12.5, color: C.dim }}>— deals another branch sells to us</span></div>
         <div style={{ fontSize: 12, color: C.dim }}>
           Deals pushed to <b>{typeof branch === 'string' ? branch : (branch?.code || '—')}</b> · Convert accepts one into a pending SO/PO/GP — until then it is not in your books or your approval queue. The purchase from the selling branch is locked.
         </div>

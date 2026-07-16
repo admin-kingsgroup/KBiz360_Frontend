@@ -70,3 +70,40 @@ describe('guard — no central route on the branch surface', () => {
     expect(stale).toEqual([]);
   });
 });
+
+// ─── INB · the two mirror pipelines must BOTH survive the Phase-3 re-gate ─────────────
+// Inter-branch trade is bidirectional — any branch sells to any other depending on where
+// the price is best (AMD→BOM is as real as BOM→AMD), so a branch must be able to work BOTH
+// of its own pipelines. Outgoing was classified CENTRAL and only reachable via the
+// PENDING_MIGRATION escape hatch, which conflated "only central may APPROVE" (true, and
+// role-gated in inb.controller) with "branches may not SEE it" (false). Left that way,
+// Phase 3 would have deleted a branch's own outgoing pipeline off its menu and stopped it
+// selling inter-branch at all. These pin the corrected model so that can't regress.
+describe('INB pipelines survive on the branch surface', () => {
+  const branchRoutes = new Set(hrefsOf(getMenu(BRANCH_OBJ, ACCOUNTANT)));
+
+  test('Outgoing is SPLIT — the branch raises/monitors, central holds Approve+Push authority', () => {
+    expect(verdictOf('/inb/outgoing')).toBe(SPLIT);
+  });
+
+  test('Incoming is BRANCH — the buyer converts and completes it in its own books', () => {
+    expect(verdictOf('/inb/incoming')).toBe(BRANCH);
+  });
+
+  test('BOTH pipelines are on the branch menu', () => {
+    expect(branchRoutes.has('/inb/outgoing')).toBe(true);
+    expect(branchRoutes.has('/inb/incoming')).toBe(true);
+  });
+
+  test('neither is central, so neither needs a PENDING_MIGRATION exemption to survive', () => {
+    expect(isCentral('/inb/outgoing')).toBe(false);
+    expect(isCentral('/inb/incoming')).toBe(false);
+    expect(PENDING_MIGRATION.has('/inb/outgoing')).toBe(false);
+    expect(PENDING_MIGRATION.has('/inb/incoming')).toBe(false);
+  });
+
+  test('the legacy aliases keep the same verdict as the routes they alias', () => {
+    expect(verdictOf('/transactions/inb-approvals')).toBe(SPLIT);   // → /inb/outgoing
+    expect(verdictOf('/accounts/inb-inbound')).toBe(BRANCH);        // → /inb/incoming
+  });
+});

@@ -1204,8 +1204,8 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 2px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 17, color: C.dark }}>INB SPG Approvals</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: C.dim }}><b>Approve</b> posts the deal to OUR (seller) books → <b>Approved</b> (revocable/editable). <b>Push</b> then locks it and hands it to the buyer branch → <b>Pushed</b> (read-only; the buyer fills their onward sale &amp; approves in their books). Each row is one inter-branch deal.</p>
+          <h2 style={{ margin: 0, fontSize: 17, color: C.dark }}>INB · Outgoing <span style={{ fontWeight: 700, fontSize: 12.5, color: C.dim }}>— deals we sell to another branch</span></h2>
+          <p style={{ margin: 0, fontSize: 11.5, color: C.dim }}><b>Approve</b> posts the deal to OUR (seller) books → <b>Approved</b> (revocable/editable). <b>Push</b> then locks it and offers it to the buyer branch → <b>Pushed</b>; they Convert it into their own SO/PO/GP, add their onward sale and approve it in their books. Each row is one inter-branch deal. Deals sold TO us are on <b>INB · Incoming</b>.</p>
         </div>
         {setRoute && <button onClick={() => setRoute('/bookings/inter-branch')} style={{ padding: '8px 14px', background: C.dark, color: C.gold, border: 'none', borderRadius: 7, fontWeight: 800, fontSize: 12.5, cursor: 'pointer' }}>+ New INB Voucher</button>}
       </div>
@@ -1299,7 +1299,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
             </table>
           )}
       </div>
-      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>INB SPG deals are two-step: <b>Approve</b> (Pending → Approved) posts the INB Sale + airline Purchase to OUR (seller) books; the deal stays <b>revocable + editable</b> (Revoke → un-post to Pending). <b>Push</b> (Approved → Pushed) <b>locks</b> the deal — no more revoke — and hands a pending INB voucher to the buyer branch, where their person fills the onward sale and approves it into their books. The <b>Edited</b> tab lists deals changed ≥ once. Click a row for the JV (Dr/Cr) of both legs.</div>
+      <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>Outgoing INB deals are three-step: <b>Approve</b> (Pending → Approved) posts the INB Sale + airline Purchase to OUR (seller) books; the deal stays <b>revocable + editable</b> (Revoke → un-post to Pending). <b>Push</b> (Approved → Pushed) <b>locks</b> the deal — no more revoke — and <b>offers</b> it to the buyer branch; nothing exists in their books yet. They then <b>Convert</b> it on their INB · Incoming screen, which creates their SO/PO/GP with our purchase locked in, and approve it through their own pipeline. The <b>Edited</b> tab lists deals changed ≥ once. Click a row for the JV (Dr/Cr) of both legs.</div>
 
       {/* INB Refunds — RF/RI vouchers that reverse an INB deal. Routed here (not the
           SO/PO/GP queue); each is a single voucher, approved/rejected on its own row.
@@ -1396,6 +1396,31 @@ const VOUCHER_TABS = [
   ['adm', 'ADM'], ['acm', 'ACM'],
 ];
 const VOUCHER_KEYS = new Set(VOUCHER_TABS.map(([k]) => k));
+/** INB ▸ OUTGOING — the deals THIS branch SELLS to another branch.
+ *
+ *  Self-scoping by construction: an INB deal's two legs post in the SELLER's branch
+ *  (inb.service stamps `branch: fromBranch` on both), so this queue can never show a deal
+ *  sold TO us — that is the mirror Incoming screen (/inb/incoming). Inter-branch trade runs
+ *  both ways (AMD→BOM is as real as BOM→AMD, depending on where the price is best), so every
+ *  branch has both pipelines and each shows only its own side.
+ *
+ *  Standalone on purpose: INB is its own pipeline, not a tab inside the SO/PO/GP approvals
+ *  shell, so it no longer inherits that shell's domain toggle. It still honours the file
+ *  deep-link (open a read-only INB leg → "revoke it here"), which UnifiedApprovals used to
+ *  wire in — dropping that would have silently broken the revoke deep-link. */
+export function InbOutgoing({ branch, setRoute, currentUser }) {
+  const navFocus = useNavFocusStore((s) => s.focus);
+  const fileFocus = navFocus && navFocus.params && navFocus.params.kind === 'file' && navFocus.params.domain === 'inbspg'
+    ? navFocus.params : null;
+  return (
+    <div style={{ margin: '12px 0' }}>
+      <FocusBanner />
+      <InbApprovals branch={branch} setRoute={setRoute} currentUser={currentUser}
+        initialSearch={fileFocus?.search || ''} initialStatus={fileFocus?.status || ''} />
+    </div>
+  );
+}
+
 export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain = 'sopogp' }) {
   // Opened from an Alert deep-link targeting a voucher → start on the combined Vouchers
   // queue (the deep-link auto-opens the flagged voucher's editor, which VoucherApprovals
@@ -1414,8 +1439,12 @@ export function UnifiedApprovals({ branch, setRoute, currentUser, initialDomain 
   return (
     <div style={{ margin: '12px 0' }}>
       <FocusBanner />
+      {/* INB is NOT a segment here any more — it is its own pipeline with its own two
+          screens (INB ▸ Outgoing / Incoming), because inter-branch runs both ways and each
+          branch owns both sides. The 'inbspg' render branch below is retained so a stale
+          file deep-link still lands on something sensible rather than the wrong queue. */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-        {seg('sopogp', 'SO / PO / GP')}{seg('inbspg', 'INB')}
+        {seg('sopogp', 'SO / PO / GP')}
         {VOUCHER_TABS.map(([k, l]) => seg(k, l))}
       </div>
       {domain === 'sopogp'

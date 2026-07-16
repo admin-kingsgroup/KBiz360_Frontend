@@ -42,7 +42,9 @@ const EXTRA = {
   '/accounts/interbranch-reco': ['Accounts', 'Reconciliation', 'Inter-branch Reconciliation'],
   '/accounts/inb-register': ['Accounts', 'Reconciliation', 'Inter-Branch Register'],
   '/accounts/inb-counterparty': ['Accounts', 'Inter Branch', 'Counterparty Ledger'],
-  '/transactions/inb-approvals': ['Finance', 'Approvals', 'INB SPG'],
+  '/inb/outgoing': ['Finance', 'Inter Branch', 'Outgoing · We Sell'],
+  '/inb/incoming': ['Finance', 'Inter Branch', 'Incoming · Convert'],
+  '/transactions/inb-approvals': ['Finance', 'Inter Branch', 'Outgoing · We Sell'],  // legacy alias
   '/transactions/approvals/receipt': ['Finance', 'Approvals', 'Receipt'],
   '/transactions/approvals/payment': ['Finance', 'Approvals', 'Payment'],
   '/transactions/approvals/contra': ['Finance', 'Approvals', 'Contra'],
