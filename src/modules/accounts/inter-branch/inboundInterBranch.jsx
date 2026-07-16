@@ -55,7 +55,7 @@ export function InboundInterBranch({ branch, setRoute }) {
   const th = { padding: '8px 12px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: C.dim, textAlign: 'left', background: C.bg, borderBottom: `1px solid ${C.border}` };
   const td = { padding: '9px 12px', fontSize: 12.5, borderBottom: `1px solid ${C.border}`, verticalAlign: 'top' };
   const tabBtn = (key, label, n) => (
-    <button type="button" onClick={() => setTab(key)}
+    <button type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}
       style={{ padding: '7px 15px', fontSize: 12.5, fontWeight: 700, border: 'none', borderRadius: 7, cursor: 'pointer',
         background: tab === key ? C.blue : 'transparent', color: tab === key ? '#fff' : C.dim }}>
       {label} <span style={{ opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>({n})</span>
@@ -71,13 +71,13 @@ export function InboundInterBranch({ branch, setRoute }) {
         </div>
       </div>
 
-      <div style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 9, background: '#eef1f5', border: `1px solid ${C.border}`, marginBottom: 12 }}>
+      <div role="tablist" aria-label="Inbound state" style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 9, background: '#eef1f5', border: `1px solid ${C.border}`, marginBottom: 12 }}>
         {tabBtn('pending', 'Pending Conversion', data.totals.pending || 0)}
         {tabBtn('converted', 'Converted', data.totals.converted || 0)}
       </div>
 
-      <div style={card}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div style={{ ...card, overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
           <thead><tr>
             <th style={th}>INB Link No</th><th style={th}>From</th><th style={th}>Date</th><th style={th}>Passenger</th>
             <th style={{ ...th, textAlign: 'right' }}>Purchase cost</th><th style={th}>Reference</th>

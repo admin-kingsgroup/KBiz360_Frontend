@@ -60,8 +60,8 @@ export function InterBranchRegister({ branch }) {
         </label>
       </div>
 
-      <div style={{ ...card, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <div style={{ ...card, overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
           <thead><tr>
             {['INB Link No', 'From', 'To', 'Date', 'Passenger', 'Total', 'Sale Vno', 'Purchase Vno', 'Status'].map((h, i) =>
               <th key={h} style={{ ...th, ...(i === 5 ? rnum : {}) }}>{h}</th>)}
