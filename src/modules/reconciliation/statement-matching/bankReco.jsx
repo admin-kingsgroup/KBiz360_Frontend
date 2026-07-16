@@ -19,6 +19,7 @@ import { PeriodBar } from '../../../core/period';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
 import { bc, btnG, btnGh, card, inp } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { useMobile } from '../../../core/hooks';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import ReconFreezePanel from './ReconFreezePanel';
@@ -236,7 +237,7 @@ export function BankReco({branch}){
   const PDC_CLR={Pending:"#185FA5",Deposited:"#27500A",Bounced:"#A32D2D"};
   const PDC_BG ={Pending:"#E6F1FB",Deposited:"#EAF3DE",Bounced:"#FCEBEB"};
 
-  const f=n=>(n==null||isNaN(n))?"—":(n<0?"-":"")+cur+Math.abs(Math.round(n)).toLocaleString("en-IN");
+  const f=n=>(n==null||isNaN(n))?"—":(n<0?"-":"")+cur+Math.abs(Math.round(n)).toLocaleString(localeOf(cur));
   const bankCcy=(bankLedgers.find(b=>b.name===ledger)||{}).currency||cfg.cur;
 
   const bookLines=book?.lines||[];

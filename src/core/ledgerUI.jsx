@@ -23,9 +23,10 @@ import { exportToExcel } from './exportExcel';
 import { toastSuccess, toastError } from './ux/toast';
 import { CONSOLIDATED_LABEL } from './data';
 import {
-  esc, fmt, fmtB, dmy, vtLabel, billwiseSide, isBillwiseLedger,
+  esc, fmt as fmtRaw, fmtB as fmtBRaw, dmy, vtLabel, billwiseSide, isBillwiseLedger,
   mapLedger, mapBills, groupByBranch, branchSeg, AGE_BUCKETS, AGE_COLORS, ageingOf, billwiseStatus,
 } from './ledgerMath';
+import { localeOf } from './format';   // digit-grouping per branch currency ($ → en-US, ₹ → en-IN)
 
 // A ledger row is a leg of an SO/PO/GP booking when it's a sale/purchase posting whose
 // voucher type is a forward booking module (mirror of the backend FORWARD_GP_TYPES).
@@ -365,6 +366,7 @@ export function LedgerAccountView({
 const SETTLE_RX = /receipt|payment|debit-note|refund|acm/i;
 
 function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, onPickInvoice, onPickFolder, maxHeight, party, branch, side }) {
+  const _loc = localeOf(cur); const fmt = (n) => fmtRaw(n, _loc); const fmtB = (n) => fmtBRaw(n, _loc);   // group digits by branch currency
   const opSigned = d.opening.side === 'Dr' ? d.opening.amt : -d.opening.amt;
   let bal = opSigned;
   const closing = d.closing;
@@ -555,6 +557,7 @@ function LedgerBody({ d, cur, segmented, showNarr, showDetail, onPickVoucher, on
    Themed sub-rows: Date · Type · Ref/Instrument · Amount Dr/Cr (+ narration), with a
    running pending. Lazy — fetched only when a row is exploded. Reused by both views. */
 function BillBreakup({ party, branch, billVno, side, cur, colSpan, ledgerRows }) {
+  const _loc = localeOf(cur); const fmt = (n) => fmtRaw(n, _loc); const fmtB = (n) => fmtBRaw(n, _loc);
   const q = useBillSettlements(party, branch, billVno, side);
   const raw = q.data;
   const rawSet = (raw && raw.settlements) || [];
@@ -640,6 +643,7 @@ function BillwiseBody({ side, bills, loading, hasBranch, group, name, branch, cu
 // Bill-wise table with keyboard cursor (↑/↓) + Shift+Enter / click drill into each
 // bill's settlement history. Hooks live here (after BillwiseBody's guards).
 function BillwiseTable({ side, bills: rawBills, name, branch, cur, maxHeight, ledgerRows }) {
+  const _loc = localeOf(cur); const fmt = (n) => fmtRaw(n, _loc); const fmtB = (n) => fmtBRaw(n, _loc);
   const [cursor, setCursor] = useState(-1);
   const [open, setOpen] = useState(() => new Set());
   const wrapRef = useRef(null);
@@ -789,6 +793,7 @@ function BillwiseTable({ side, bills: rawBills, name, branch, cur, maxHeight, le
 
 /* ── Cost-Centre / Components breakdown body (Dr/Cr table, cream-gold theme) ── */
 function BreakdownBody({ title, rows, loading, cur = '₹', maxHeight, hint }) {
+  const _loc = localeOf(cur); const fmt = (n) => fmtRaw(n, _loc); const fmtB = (n) => fmtBRaw(n, _loc);
   if (loading) return <SkeletonTable rows={5} cols={3} />;
   const list = rows || [];
   const grand = list.reduce((s, r) => s + (r.side === 'Cr' ? r.amount : -r.amount), 0);
@@ -833,6 +838,7 @@ function showPeriodBranchHint(branch) {
 }
 
 export function printLedgerUI({ d, bills = [], view = 'ledger', group, side, cur = '₹', branchLabel = '', from = '', to = '', showNarr = false, showDetail = false }) {
+  const _loc = localeOf(cur); const fmt = (n) => fmtRaw(n, _loc); const fmtB = (n) => fmtBRaw(n, _loc);   // group digits by branch currency
   if (!d) return;
   const m = mapLedger(d);
   const period = `From <b>${from ? dmy(from) : '…'}</b> to <b>${to ? dmy(to) : '…'}</b>`;
@@ -856,6 +862,7 @@ export function printLedgerUI({ d, bills = [], view = 'ledger', group, side, cur
 }
 
 function ledgerPrintHTML({ m, showNarr, showDetail, cur = '₹' }) {
+  const _loc = localeOf(cur); const fmt = (n) => fmtRaw(n, _loc); const fmtB = (n) => fmtBRaw(n, _loc);   // group digits by branch currency
   const opSigned = m.opening.side === 'Dr' ? m.opening.amt : -m.opening.amt;
   let bal = opSigned;
   const closing = m.closing;
@@ -938,6 +945,7 @@ function ledgerPrintHTML({ m, showNarr, showDetail, cur = '₹' }) {
 }
 
 function billwisePrintHTML({ side, bills, group, name, cur = '₹' }) {
+  const _loc = localeOf(cur); const fmt = (n) => fmtRaw(n, _loc); const fmtB = (n) => fmtBRaw(n, _loc);   // group digits by branch currency
   if (!side) return `<div class="tblwrap"><div class="notmaintained">This ledger (<b>${esc(name)}</b>, under ${esc(group || '—')}) is not maintained <b>bill-by-bill</b>.</div></div>`;
   let totAmt = 0, totSet = 0, totPend = 0;
   const rows = bills.map((b) => {

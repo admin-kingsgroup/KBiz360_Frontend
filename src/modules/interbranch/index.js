@@ -4,9 +4,11 @@
    (matching the nav menu's MENU_REPORTS ▸ Financial Statements and
    MENU_ACCOUNTS ▸ Inter Branch groups) — re-exported below under their
    original names so App.jsx's direct chunk import of this barrel needed
-   zero changes. isInterBranch/brName (shared utilities) stay in this folder;
-   interBranchVoucher.jsx is unreferenced dead code and is NOT re-exported (it would
-   otherwise drag a dead component into this lazy chunk). */
+   zero changes. isInterBranch/brName (shared utilities) stay in this folder.
+   (interBranchVoucher.jsx — an unreferenced parallel INB form that hand-mirrored the
+   backend's branch/tax constants — was DELETED: the live entry point is
+   accounts/daily-entry/soPoGpVoucherEntry.jsx, and keeping a second copy of those
+   constants only invited drift.) */
 export * from './interbranch';
 export { InterBranchRegister } from '../accounts/inter-branch/registerPl';
 export { InterBranchMatrix } from '../accounts/inter-branch/tradeMatrix';

@@ -372,7 +372,7 @@ export const RULE_BOOK = [
     { t: 'Future date is blocked on every voucher form via a date max=today wrapper (Receipt/Payment, Journal, Contra, Purchase-Expense, Debit Note, Refund/Reissue, Refund-Partial, ADM/ACM, legacy).', r: 'SmartDateInput.jsx:8 + all *Fields.jsx' },
     { t: 'Only full-scope roles (Super Admin, Director, Senior Finance Manager, Sr. Accounts Executive) see every branch and the "ALL" view; a non-full-scope user with no assigned branch resolves to NULL (no all-branch fallback).', r: 'branchScope.js:10,52' },
     { t: 'The branch switcher lists only the user\'s assigned branches; the "ALL" consolidated row is offered only to full-scope users with more than one branch.', r: 'BranchSwitcher.jsx:39,40' },
-    { t: 'The inter-branch destination list excludes the origin branch; an INB voucher is valid only with from-branch, to-branch, date and positive total.', r: 'interBranchVoucher.jsx:34,65' },
+    { t: 'The inter-branch destination list excludes the origin branch; an INB voucher is valid only with from-branch, to-branch, date and positive total.', r: 'soPoGpVoucherEntry.jsx:453,648' },
     { t: 'Save is disabled unless the form validates, a SPECIFIC branch is set (never "All"), it\'s not saving, and the account is not view-only.', r: 'VoucherShell.jsx:63,210' },
     { t: 'Approved/saved/posted vouchers are read-only in the drill-down; a parent-locked voucher can never be edited or revoked alone — act on the parent.', r: 'VoucherShell.jsx:228 · useRevokeAction.js:16' },
     { t: 'The live journal must balance — the shell shows "✓ Balanced" vs "✗ Out by <amt>" and flags missing/uncreated ledgers; a ledger not in the chart cannot be approved.', r: 'VoucherShell.jsx:146 · legacy.jsx:1106' },

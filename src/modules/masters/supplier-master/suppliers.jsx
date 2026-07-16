@@ -13,6 +13,7 @@ import {
   SETTLE_CYCLES, PAY_METHODS,
 } from '../../../core/partyEnums';
 import { branchCode } from '../../../core/useAccounting';
+import { isVatBranch } from '../../../core/voucherSpecs';
 import { MasterCrud } from '../shared/masterCrud';
 
 /* ── Parties (live, backend-connected) ──────────────────────────────────── */
@@ -37,7 +38,9 @@ export const SuppliersMaster = ({ branch } = {}) => {
       { key: 'category', label: 'Category', type: 'select', options: SUPPLIER_CATS },
       // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
-      { key: 'gstin', label: 'GSTIN', type: 'text', table: false },
+      // India (GST) branches capture GSTIN + GST Treatment + TDS Section; a VAT branch
+      // (NBO/DAR/FBM) captures the VAT counterparts (VAT Registration No + WHT) instead.
+      { key: 'gstin', label: 'GSTIN', type: 'text', table: false, show: (f) => !isVatBranch(f.branch) },
       // TDS is only actually deducted on some suppliers — flag it explicitly instead of
       // inferring from tdsSection, and only then does PAN become mandatory (needed to
       // deduct at the correct rate instead of the higher no-PAN default).
@@ -52,8 +55,13 @@ export const SuppliersMaster = ({ branch } = {}) => {
       { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false, required: true,
         onSet: (v, next) => { next.state = (v && v !== 'India') ? 'Others' : ''; } },
       { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false, required: true },
-      { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false },
-      { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false },
+      { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false, show: (f) => !isVatBranch(f.branch) },
+      { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false, show: (f) => !isVatBranch(f.branch) },
+      // VAT-branch tax identity (Africa) — shown only for a VAT branch, hidden for India.
+      // vatRegNo = VAT Registration No / TRN; whtSection/whtRate = Withholding Tax.
+      { key: 'vatRegNo', label: 'VAT Registration No', type: 'text', table: false, show: (f) => isVatBranch(f.branch) },
+      { key: 'whtSection', label: 'WHT Section', type: 'text', table: false, show: (f) => isVatBranch(f.branch) },
+      { key: 'whtRate', label: 'WHT Rate (%)', type: 'number', table: false, show: (f) => isVatBranch(f.branch) },
       { key: 'msmeStatus', label: 'MSME Status', type: 'select', options: MSME_STATUS, table: false },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text' },

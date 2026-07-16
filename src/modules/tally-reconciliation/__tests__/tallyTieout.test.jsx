@@ -637,6 +637,82 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.getByText('Net Δ')).toBeInTheDocument();
   });
 
+  test('Unmatched Entries — a truncated (very large period) register says so, with the shown/remaining ledger counts', async () => {
+    const { getDefects } = require('../api');
+    // A period so large the BE capped the payload at a ledger boundary: it reports how many
+    // off ledgers were shown vs remain, so a capped list is never mistaken for a clean one.
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'year', offLedgers: 120,
+      truncated: true, ledgersShown: 78, ledgersRemaining: 42, shown: 4001,
+      summary: { total: 1, byType: { 'missing-in-erp': 1 } },
+      defects: [{ ledger: 'Beta Ledger', date: '2026-07-02', ref: 'MP/2', desc: 'x', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 200, side: 'tally' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
+    // The notice names the shown/total ledgers and the remaining count with the reload cue.
+    // (Query by text, not role — the loading spinner also carries role="status".)
+    const notice = await screen.findByText(/Showing the first 78 of 120 off ledgers/);
+    expect(notice).toHaveTextContent('42 more off ledgers still to load');
+    expect(notice).toHaveTextContent(/reload to continue/);
+  });
+
+  test('Unmatched Entries — a TRUNCATED register whose loaded defects are all whole-ledger gaps STILL warns (a capped scan must never read as clean)', async () => {
+    const { getDefects } = require('../api');
+    // The hole this guards: every loaded defect is a master gap (its home is the Ledger Matcher
+    // tab), so no entry renders here and the empty-state early-return used to swallow the
+    // truncation notice — showing "No unmatched entries" over a scan that never finished.
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'year', offLedgers: 120,
+      truncated: true, ledgersShown: 78, ledgersRemaining: 42, shown: 4001,
+      summary: { total: 1, byType: { 'ledger-missing-tally': 1 } },
+      defects: [{ ledger: 'Gamma Ledger', type: 'ledger-missing-tally', label: 'Ledger not in Tally', amount: 900, side: 'erp' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
+    // The empty state still shows (nothing to list here) …
+    await screen.findByText('No unmatched entries');
+    // … but the capped-scan warning MUST ride alongside it.
+    const notice = await screen.findByText(/Showing the first 78 of 120 off ledgers/);
+    expect(notice).toHaveTextContent('42 more off ledgers still to load');
+    // Nothing rendered here → the parenthetical counts RENDERED entries (0), not the 4001 loaded rows.
+    expect(notice).toHaveTextContent('(0 unmatched entries loaded)');
+    // The "whole-ledger gaps" claim is hedged to what was actually reached.
+    expect(screen.getByText(/off ledgers scanned so far are whole-ledger gaps/)).toBeInTheDocument();
+  });
+
+  test('Unmatched Entries — truncation notice uses singular wording for a single entry / single remaining ledger', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'year', offLedgers: 80,
+      truncated: true, ledgersShown: 79, ledgersRemaining: 1, shown: 4001,
+      summary: { total: 1, byType: { 'missing-in-erp': 1 } },
+      defects: [{ ledger: 'Beta Ledger', date: '2026-07-02', ref: 'MP/2', desc: 'x', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 200, side: 'tally' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
+    const notice = await screen.findByText(/Showing the first 79 of 80 off ledgers/);
+    expect(notice).toHaveTextContent('(1 unmatched entry loaded)');      // singular
+    expect(notice).toHaveTextContent('1 more off ledger still to load');  // singular
+  });
+
+  test('Unmatched Entries — a normal (untruncated) register shows NO truncation notice', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 3, truncated: false, ledgersShown: 3, ledgersRemaining: 0, shown: 1,
+      summary: { total: 1, byType: { 'missing-in-erp': 1 } },
+      defects: [{ ledger: 'Beta Ledger', date: '2026-07-02', ref: 'MP/2', desc: 'x', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 200, side: 'tally' }],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
+    await screen.findByText('Not in ERP');
+    expect(screen.queryByText(/still to load/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Showing the first/)).not.toBeInTheDocument();
+  });
+
   test('tab badges — Unmatched Entries badges amount-off ledgers (counts.off); one-sided ledgers badge Ledger Matcher, no phantom Unmatched-Entries count', async () => {
     const { getTieOut, getDefects } = require('../api');
     // 0 amount-off, but 3 one-sided ledgers (2 ERP-only + 1 Tally-only) — all whole-ledger gaps.

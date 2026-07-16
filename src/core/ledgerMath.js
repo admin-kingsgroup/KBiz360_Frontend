@@ -5,8 +5,13 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 export const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-export const fmt = (n) => (n ? Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
-export const fmtB = (n) => Math.abs(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Digit-grouping locale is a parameter (default Indian lakh/crore) so a USD/VAT-branch
+// caller can pass `localeOf(cur)` (core/format) for Western thousands grouping. This is
+// a pure, branch-less helper — the branch-aware currency SYMBOL is prepended by the
+// caller; here we only control grouping. Default 'en-IN' keeps every existing call site
+// (fmt(n) / fmtB(n)) byte-identical.
+export const fmt = (n, locale = 'en-IN') => (n ? Number(n).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
+export const fmtB = (n, locale = 'en-IN') => Math.abs(Number(n) || 0).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const dmy = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('-') : '');
 
 export const VT_LABEL = {

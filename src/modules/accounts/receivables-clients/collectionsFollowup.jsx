@@ -95,7 +95,12 @@ export function CollectionsFollowup({ branch, setRoute }) {
     <Shell title="Collections Follow-up" sub={`${brLabel(branch)} · overdue customers (>30d) with promise-to-pay, contact log & dunning`}
       right={
         <>
-          <div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.red }}>Overdue {money(cur, t.overdue || 0)} · {t.customers || 0} customers</div>
+          {Array.isArray(board.byCurrency)
+            /* Consolidated view: ₹ (India) and $ (Africa) overdue kept separate — never one blended total. */
+            ? board.byCurrency.map((c) => (
+                <div key={c.currency} style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.red }}>Overdue {money(c.symbol, c.overdue || 0)} · {c.customers || 0} customers</div>
+              ))
+            : <div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.red }}>Overdue {money(cur, t.overdue || 0)} · {t.customers || 0} customers</div>}
           <button disabled={!rows.length || remind.isPending} onClick={() => remind.mutate({ branch: brCode, channel: 'whatsapp' })}
             style={{ ...aBtn(C.amber), opacity: !rows.length || remind.isPending ? 0.6 : 1 }}>
             <ReceiptText size={12} /> {remind.isPending ? 'Sending…' : 'Send reminders to all'}</button>

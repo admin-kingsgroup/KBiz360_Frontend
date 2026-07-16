@@ -22,6 +22,7 @@ import { useNavFocusStore, setNavFocus } from '../../core/ux/navFocus';
 import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { BRANCH_CODES, BRANCHES, CONSOLIDATED_LABEL } from '../../core/data';
+import { localeOf } from '../../core/format';
 
 const DARK = '#1a1c22', DIM = '#5b616e', BLUE = '#2563eb', GREEN = '#16a34a', GOLD = '#c2a04a', GREY = '#7b86a8';
 const TALLY_ORDER = [
@@ -835,7 +836,7 @@ function TravkingsGroupTableView({ setRoute, setBranch, shellBranch }) {
   if (q.isError) return <div style={{ padding: 16, fontSize: 12, color: RED }}>Couldn’t load the summary. Try again.</div>;
 
   const num = (n) => (n || 0).toLocaleString('en-IN');
-  const money = (v, br) => (P_CUR[br] || '') + Math.abs(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const money = (v, br) => (P_CUR[br] || '') + Math.abs(v || 0).toLocaleString(localeOf(P_CUR[br] || '₹'), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const chip = (txt, clr) => <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: 12, color: clr, background: clr + '18', padding: '1px 6px', borderRadius: 5 }}>{txt}</span>;
   const th = (extra) => ({ fontSize: 11, color: DIM, fontWeight: 700, padding: '8px 10px', borderBottom: '1.5px solid #cdd1d8', whiteSpace: 'nowrap', textAlign: 'right', ...extra });
   const sep = { borderLeft: '2px solid #e6f0ec' };

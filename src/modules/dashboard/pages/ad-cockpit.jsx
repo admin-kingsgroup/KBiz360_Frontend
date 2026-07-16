@@ -6,7 +6,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { BRANCHES, branchMainCurrency, currencySymbol } from '../../../core/data';
 import { periodRange } from '../../../core/period';
-import { compactAmt } from '../../../core/format';
+import { compactAmt, currencySplit } from '../../../core/format';
 import { CUR_FY } from '../../../core/dates';
 import { isLiquidRow } from '../../../core/ledgerKind';
 import { useModulePL, useBalanceSheet, useAgeing, useTrialBalance, useBudgetVsActual, useAlerts } from '../../../core/useAccounting';
@@ -352,15 +352,30 @@ export function AdCockpitPage({ setRoute, branch }) {
       {top.map((p, i) => (<div className="conc-row" key={i} onClick={() => openDrawer({ type: 'debtor', cur: R.cur, p })}><span>{p.name}</span><span className="conc-bar"><span style={{ width: '100%', background: '#ff6b6b' }} /></span><span className="mono conc-v">{money(R.cur, p.d90)}</span><span className="mono conc-s">90+</span></div>))}
     </div>);
   };
+  const budgetTable = (rb, curCode) => (
+    <table><thead><tr><th>Head</th><th>Budget</th><th>Actual</th><th>Used</th></tr></thead>
+      <tbody>{rb.slice().sort((a, b) => ((b.actual ?? b.spent ?? 0) - (b.budget ?? b.budgeted ?? 0)) - ((a.actual ?? a.spent ?? 0) - (a.budget ?? a.budgeted ?? 0))).slice(0, 8).map((x, i) => {
+        const budg = x.budget ?? x.budgeted ?? 0, act = x.actual ?? x.spent ?? 0, p = budg ? Math.round(act / budg * 100) : 0, over = act > budg;
+        return (<tr key={x.ledger || x.name || i}><td>{x.ledger || x.name || x.head}</td><td>{money(curCode, budg)}</td><td>{money(curCode, act)}</td><td className={over ? 'r' : p >= 90 ? 'amber' : 'g'}>{p}%</td></tr>);
+      })}</tbody></table>
+  );
   const expenseBudget = () => {
+    // Consolidated ALL view: split India (₹) & Africa ($) into separate tables (each in
+    // its own currency) rather than one blended "₹-equivalent" roll-up (there's no FX).
+    const split = currencySplit(bud);
+    if (split) {
+      return (<>{split.map((c) => {
+        const rb = Array.isArray(c.rows) ? c.rows : [];
+        const rm = REGION_META[c.currency] || {};
+        return (<div key={c.currency} style={{ marginBottom: 12 }}>
+          <div className="grphd"><b style={{ color: rm.accent }}>{rm.flag} {c.symbol} {rm.label || c.currency}</b> · top overspends first</div>
+          {rb.length ? budgetTable(rb, c.currency) : <div className="empty">No expense budget set for this period.</div>}
+        </div>);
+      })}</>);
+    }
     const rb = Array.isArray(bud.rows) ? bud.rows : (Array.isArray(bud.ledgers) ? bud.ledgers : []);
     if (!rb.length) return <div className="empty">No expense budget set for this period.</div>;
-    return (<><div className="note" style={{ marginTop: 0 }}>Consolidated ₹-equivalent · top overspends first.</div>
-      <table><thead><tr><th>Head</th><th>Budget</th><th>Actual</th><th>Used</th></tr></thead>
-        <tbody>{rb.slice().sort((a, b) => ((b.actual ?? b.spent ?? 0) - (b.budget ?? b.budgeted ?? 0)) - ((a.actual ?? a.spent ?? 0) - (a.budget ?? a.budgeted ?? 0))).slice(0, 8).map((x, i) => {
-          const budg = x.budget ?? x.budgeted ?? 0, act = x.actual ?? x.spent ?? 0, p = budg ? Math.round(act / budg * 100) : 0, over = act > budg;
-          return (<tr key={x.ledger || x.name || i}><td>{x.ledger || x.name || x.head}</td><td>{money('INR', budg)}</td><td>{money('INR', act)}</td><td className={over ? 'r' : p >= 90 ? 'amber' : 'g'}>{p}%</td></tr>);
-        })}</tbody></table></>);
+    return (<><div className="note" style={{ marginTop: 0 }}>Consolidated ₹-equivalent · top overspends first.</div>{budgetTable(rb, 'INR')}</>);
   };
   const drawerBody = () => {
     if (!drawer) return null;

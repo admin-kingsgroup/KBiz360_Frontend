@@ -838,6 +838,11 @@ function InbEditGate({ linkNo, branch, onDone }) {
     // here (not in fareLines) — without them the Edit grid opens blank on those fields
     // and the next save silently drops them from the rebuilt purchase leg.
     purchaseHeads: deal.purchaseHeads || [], purchase: deal.purchase || null,
+    // N-PO: the deal's EXTRA cost legs, so the editor opens showing them (legsFromEdit maps
+    // each leg's component heads onto its grid). Without this the editor opened with none and
+    // the save — which now carries `purchases` — would rebuild the deal without them, deleting
+    // legs the INB list itself advertises as "(+N legs)".
+    purchases: deal.purchases || [],
     supplier: deal.supplier
       ? { name: deal.supplier.name, ledgerName: deal.supplier.ledgerName, ledgerGroup: deal.supplier.ledgerGroup }
       : { name: '', ledgerName: '', ledgerGroup: '' },
@@ -878,7 +883,13 @@ function InbEditedList({ rows, isLoading, money }) {
 export function InbApprovals({ branch, setRoute, currentUser, initialSearch = '', initialStatus = '' }) {
   const brCode = branchCode(branch);
   const cur = (bc(branch) || {}).cur || '₹';
-  const money = (n) => fmtAmount(n, cur);
+  // An INB deal is priced in its SELLER branch's BOOK currency (Africa — FBM/NBO/DAR — keep
+  // books in USD; India in INR). This screen is CENTRAL-gated, so the page branch is normally
+  // 'ALL', whose fallback symbol is '₹' — printing FBM's dollars as rupees. Resolve the symbol
+  // per deal from its own branch instead; `cur` stays the fallback for non-deal amounts.
+  // Same formatting logic as BOM (fmtAmount, whole units) — only the currency is branch-aware.
+  const curOf = (brc) => (brc && (bc({ code: brc }) || {}).cur) || cur;
+  const money = (n, brc) => fmtAmount(n, brc ? curOf(brc) : cur);
   const isApprover = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test(currentUser?.role || '');
   const chainCfg = useApprovalChain(); // three-level chain assignees (Check → Verify → Approve)
 
@@ -1001,11 +1012,23 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     return out.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.linkNo).localeCompare(String(b.linkNo)));
   }, [rows]);
 
+  // Tab counts + value. The value is subtotalled PER CURRENCY: on the CENTRAL 'ALL' view the
+  // list mixes India (INR) and Africa (USD) deals, and a single figure literally added dollars
+  // to rupees — a wrong number, not just a wrong symbol. Keyed by symbol so each tab reads
+  // e.g. "3 · ₹30,551 · $488".
   const counts = useMemo(() => {
     const c = {};
-    for (const d of deals) { (c[d.status] = c[d.status] || { n: 0, amount: 0 }); c[d.status].n++; c[d.status].amount += d.saleTotal; }
+    for (const d of deals) {
+      (c[d.status] = c[d.status] || { n: 0, byCur: {} });
+      c[d.status].n++;
+      const k = curOf(d.from);
+      c[d.status].byCur[k] = (c[d.status].byCur[k] || 0) + d.saleTotal;
+    }
     return c;
   }, [deals]);
+  // Render a tab's value as one subtotal per currency (never a blended sum).
+  const countValue = (c) => Object.entries((c && c.byCur) || {})
+    .map(([sym, amt]) => fmtAmount(amt, sym)).join(' · ');
 
   // Search filters the visible list by INB Link / vno / branch / module / amount; the
   // tab counts stay unfiltered (mirrors SO/PO/GP).
@@ -1147,10 +1170,15 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   };
 
   const tab = (k, label) => {
-    const c = k === 'edited' ? { n: editedInb.length, amount: editedInb.reduce((s, r) => s + (Number(r.total) || 0), 0) } : counts[k];
+    // 'edited' has its own feed (INB legs, not deals) — subtotal it per currency the same way,
+    // off each leg's own branch, so a USD leg can't be added to (or printed as) rupees.
+    const c = k === 'edited'
+      ? { n: editedInb.length, byCur: editedInb.reduce((m, r) => { const s = curOf(r.branch); m[s] = (m[s] || 0) + (Number(r.total) || 0); return m; }, {}) }
+      : counts[k];
+    const val = countValue(c);
     return (
       <button key={k} onClick={() => { setStatus(k); setSel(new Set()); }} style={{ padding: '8px 16px', border: 'none', borderBottom: `3px solid ${status === k ? C.gold : 'transparent'}`, background: 'transparent', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: status === k ? C.dark : C.dim }}>
-        {label} <span style={{ fontSize: 11, color: C.dim }}>({(c && c.n) || 0}{c ? ` · ${money(c.amount)}` : ''})</span>
+        {label} <span style={{ fontSize: 11, color: C.dim }}>({(c && c.n) || 0}{val ? ` · ${val}` : ''})</span>
       </button>
     );
   };
@@ -1222,9 +1250,9 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{d.module}</td>
                       <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11 }}>{d.saleVno || '—'}</td>
                       <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11 }}>{d.purchaseVno || '—'}</td>
-                      <td style={{ padding: '7px 12px', ...num }}>{d.sale ? money(d.saleTotal) : '—'}</td>
-                      <td style={{ padding: '7px 12px', ...num }}>{d.purchase ? money(d.purTotal) : '—'}</td>
-                      <td style={{ padding: '7px 12px', ...num, color: C.green, fontWeight: 700 }}>{money(d.margin)}</td>
+                      <td style={{ padding: '7px 12px', ...num }}>{d.sale ? money(d.saleTotal, d.from) : '—'}</td>
+                      <td style={{ padding: '7px 12px', ...num }}>{d.purchase ? money(d.purTotal, d.from) : '—'}</td>
+                      <td style={{ padding: '7px 12px', ...num, color: C.green, fontWeight: 700 }}>{money(d.margin, d.from)}</td>
                       <td style={{ padding: '7px 12px', ...num, color: C.dim }}>{d.gpPct}%</td>
                       {actionTab
                         ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>

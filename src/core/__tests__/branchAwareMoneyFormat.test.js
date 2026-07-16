@@ -68,7 +68,6 @@ describe('guard — fixed screens stay branch-currency aware', () => {
     'modules/masters/pages/customer-360.jsx',
     'modules/masters/pages/supplier-360.jsx',
     'modules/masters/supplier-master/subAgents.jsx',
-    'modules/interbranch/interBranchVoucher.jsx',
     'modules/approvals/voucherApprovals.jsx',
     'modules/masters/mastersParties.jsx',
     'modules/reportsFinancial/notesEngine.js',

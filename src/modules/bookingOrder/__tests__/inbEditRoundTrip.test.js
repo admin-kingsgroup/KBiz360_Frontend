@@ -13,7 +13,7 @@ jest.mock('../../../core/ux/toast', () => ({ toast: jest.fn() }));
 jest.mock('../../../core/ux/confirm', () => ({ confirmDialog: jest.fn(() => Promise.resolve({ confirmed: false })) }));
 
 import { VSPECS, bookingTotals } from '../../../core/voucherSpecs.js';
-import { inbRowsFromDeal, rowsForEdit } from '../legacy';
+import { inbRowsFromDeal, rowsForEdit, legsFromEdit } from '../legacy';
 
 const CTX = { branch: 'BOM' };
 
@@ -30,6 +30,45 @@ function dealFromEntry(spec, line, { gstMode = 'inter' } = {}) {
     purchase: { gst: t.po.gst, incentiveAmt: t.po.incentiveAmt, incentiveTds: t.po.incentiveTds, gstMode },
   };
 }
+
+// N-PO: an INB deal's EXTRA cost legs arrive from getDeal as component `heads` off the
+// "<pfx>-<component> [IB-Pur]" ledgers — a booking leg carries a grid `rows`, an INB leg does
+// not. legsFromEdit must map those heads onto the grid, else the editor opens the leg BLANK and
+// the save (which now carries `purchases`) rebuilds the deal without it — deleting a leg the
+// INB list itself advertises as "(+N legs)".
+describe('INB deal edit — extra N-PO legs rehydrate from getDeal `heads`', () => {
+  test('a Misc cost leg maps its heads onto the grid line (fares, Supp SVCHG, incentive)', () => {
+    const legs = legsFromEdit({
+      purchases: [{
+        vno: 'INB/BOM/26/0551', module: 'SM', packageType: '',
+        supplier: { name: 'Seat Co', ledgerName: 'Seat Co', ledgerGroup: 'Sundry Creditors' },
+        costCenter: 'BOM-INB-MISC', purTallyRef: 'IP/229/26-27', gstMode: 'intra',
+        heads: [{ amt: 500, desc: 'Misc' }, { amt: 60, desc: 'Supp SVCHG' }],
+        purchase: { gst: 90, incentiveAmt: 25, incentiveTds: 0, gstMode: 'intra' },
+      }],
+    });
+    expect(legs).toHaveLength(1);
+    const [leg] = legs;
+    expect(leg.module).toBe('SM');
+    expect(leg.supplier).toEqual({ name: 'Seat Co', ledgerGroup: 'Sundry Creditors' });
+    expect(leg.purTallyRef).toBe('IP/229/26-27');
+    expect(leg.costCenter).toBe('BOM-INB-MISC');
+    expect(leg.line.psvc).toBe(60);        // 'Supp SVCHG' is the psvc column, not a fare column
+    expect(leg.line.incentive).toBe(25);   // rides on leg.purchase, not the heads
+  });
+
+  test('a booking-style leg with saved `rows` still wins over heads (unchanged path)', () => {
+    const [leg] = legsFromEdit({
+      purchases: [{ module: 'SM', supplier: { ledgerName: 'X' }, rows: [{ base: 777 }], heads: [{ amt: 1, desc: 'Misc' }] }],
+    });
+    expect(leg.line.base).toBe(777);
+  });
+
+  test('no purchases → no legs (an empty deal never fabricates one)', () => {
+    expect(legsFromEdit({})).toEqual([]);
+    expect(legsFromEdit({ purchases: [] })).toEqual([]);
+  });
+});
 
 describe('INB deal edit — purchase-side figures round-trip into the grid', () => {
   test('Flight: Supplier Service Charge (psvc) and incentive are restored', () => {
