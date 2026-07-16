@@ -1097,7 +1097,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const doPush = async (list) => {
     const targets = list.filter((d) => d.status === 'approved' && !d.pushed && /^INB\//.test(d.linkNo));
     if (!targets.length) { toast('Nothing to push — approve the deal first.', 'error'); return; }
-    const { confirmed } = await confirmDialog({ title: `Push ${targets.length} INB deal(s)?`, message: 'Locks each deal (no more revoke) and sends it to the buyer branch’s INB pipeline as a pending voucher for them to fill their onward sale and approve.', confirmLabel: 'Push' });
+    const { confirmed } = await confirmDialog({ title: `Push ${targets.length} INB deal(s)?`, message: 'Locks each deal (no more revoke) and offers it to the buyer branch’s INB pipeline. They Convert it into their own SO/PO/GP, add their onward sale and approve it — nothing is created in their books until they do.', confirmLabel: 'Push' });
     if (!confirmed) return;
     setBusy(true);
     let ok = 0, fail = 0;
@@ -1106,7 +1106,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       catch (e) { fail++; toast(`${d.linkNo}: ${(e && e.message) || 'push failed'}`, 'error'); }
     }
     setSel(new Set());
-    if (ok) toast(`Pushed ${ok} INB deal(s) → sent to buyer branch`, 'success');
+    if (ok) toast(`Pushed ${ok} INB deal(s) → awaiting conversion by the buyer branch`, 'success');
     qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['inb'] });
     setBusy(false);
   };

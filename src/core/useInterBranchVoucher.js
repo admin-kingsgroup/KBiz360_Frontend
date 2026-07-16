@@ -105,6 +105,21 @@ function useInbMutation(mutationFn) {
 export const useCreateInb = () => useInbMutation((body) => apiPost('/api/inter-branch', body));
 // Edit BOTH pending legs of an INB deal as a unit (SO/PO/GP-style unified edit).
 export const useUpdateInb = () => useInbMutation((body) => apiPut('/api/inter-branch/deal', body));
+// BUYER side: accept a pushed deal → seeds the pending SO/PO/GP (PO = purchase from the seller,
+// sale side blank) and moves the link 'open' → 'booked' (Pending Conversion → Converted). Until
+// this runs the deal exists ONLY in the buyer's INB worklist — nothing in their SO/PO/GP queue.
+// Invalidates 'booking-orders' too: the convert is what puts the new booking in that list, so
+// the buyer's SO/PO/GP pending queue must refetch or the freshly converted deal won't show.
+export const useConvertInb = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => apiPost('/api/inter-branch/convert', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inb'] });
+      qc.invalidateQueries({ queryKey: ['booking-orders'] });
+    },
+  });
+};
 export const useBookInb   = () => useInbMutation(({ id, ...body }) => apiPost(`/api/inter-branch/${id}/book`, body));
 export const useReopenInb = () => useInbMutation(({ id }) => apiPost(`/api/inter-branch/${id}/reopen`));
 // Cascade delete-and-recreate correction: soft-deletes BOTH sides of the deal (buyer SO/PO/GP
