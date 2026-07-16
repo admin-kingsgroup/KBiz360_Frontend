@@ -1081,4 +1081,31 @@ describe('Tally Reconciliation · Unmatched Entries — By-voucher sort (type / 
     fireEvent.click(within(section).getByRole('button', { name: /^Impact$/ }));
     expect(order()[0]).toBe('MP/2');
   });
+
+  test('every By-voucher row is labelled with its type — ERP vtype as-is, else the Tally ref prefix', async () => {
+    const { getDefects } = require('../api');
+    getDefects.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-07', tier: 'month', offLedgers: 3,
+      summary: { total: 3, byType: { 'missing-in-erp': 2, 'missing-in-tally': 1 } },
+      defects: [
+        // Tally-only (no vtype): the type is read off the ref prefix ("MP/10" → "MP").
+        { ledger: 'A', date: '2026-01-31', ref: 'MP/10', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 10, side: 'tally' },
+        // Tally-only with a genuinely typeless (blank) ref → NO chip, exactly as before.
+        { ledger: 'B', date: '2026-01-31', ref: '', type: 'missing-in-erp', label: 'In Tally, not ERP', amount: 20, side: 'tally' },
+        // ERP-only: the explicit vtype 'RF' is shown as-is (not re-derived from the ref).
+        { ledger: 'C', date: '2026-01-31', ref: 'RF/BOM/26/0039', type: 'missing-in-tally', label: 'In ERP, not Tally', amount: 30, side: 'erp', vtype: 'RF', voucherId: 'v1' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('HDFC Bank A/c');
+    fireEvent.click(screen.getByRole('button', { name: /Unmatched Entries/ }));
+    // Tally-only side: the derived 'MP' chip sits beside its ref; the blank-ref voucher shows no chip.
+    const notInErp = (await screen.findByText('Not in ERP')).closest('section');
+    expect(within(notInErp).getByText('MP')).toBeInTheDocument();
+    expect(within(notInErp).getByText('MP/10')).toBeInTheDocument();
+    expect(within(notInErp).getByText('(no voucher no)')).toBeInTheDocument();  // typeless → no chip, unchanged
+    // ERP side: the explicit vtype chip.
+    const notInTally = screen.getByText('Not in Tally').closest('section');
+    expect(within(notInTally).getByText('RF')).toBeInTheDocument();
+  });
 });

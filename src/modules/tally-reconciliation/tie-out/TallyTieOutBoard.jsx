@@ -1160,6 +1160,11 @@ function VoucherGroupedTable({ groups, cur, onDrill, valueMode = 'gross' }) {
 function VoucherGroupRow({ g, cur, onDrill, valueMode = 'gross' }) {
   const [open, setOpen] = useState(false);
   const types = [...g.types];
+  // Row type-label: the ERP voucher type shown as-is, else the type derived from the Tally
+  // voucher-no prefix (Tally-only legs carry no vtype) — so every Type cluster is legible on
+  // both sides. A genuinely typeless voucher (ZZZ) shows no chip, exactly as before.
+  const derivedType = voucherTypeOf(g);
+  const typeChip = g.vtype || (derivedType !== 'ZZZ' ? derivedType : '');
   const drill = () => onDrill({ ledger: g.primaryLedger, focusVoucherId: g.voucherId, focusRef: g.ref });
   const meta = [g.date, g.sourceRef && `link ${g.sourceRef}`, g.party].filter(Boolean).join(' · ');
   return (
@@ -1169,7 +1174,7 @@ function VoucherGroupRow({ g, cur, onDrill, valueMode = 'gross' }) {
         className="cursor-pointer border-b border-surface-border hover:bg-accent-soft focus:bg-accent-soft focus:outline-none focus:ring-2 focus:ring-accent">
         <td className="px-4 py-2 align-top">
           <span className="flex flex-wrap items-center gap-1.5">
-            {g.vtype ? <span className="rounded bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted">{g.vtype}</span> : null}
+            {typeChip ? <span className="rounded bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted">{typeChip}</span> : null}
             <span className="font-semibold text-ink">{g.ref || '(no voucher no)'}</span>
             {g.voucherId ? <span className="text-[10px] font-semibold text-accent" title="Opens the full voucher">↗ open</span> : null}
           </span>
