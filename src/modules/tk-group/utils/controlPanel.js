@@ -10,14 +10,17 @@ import { isFlagOn } from './flags';
 const DEFAULT_VERIFY = ['sughra@travkings.com'];   // AE — mirrors shared/approvalChain
 const DEFAULT_APPROVE = ['faiz@travkings.com'];    // FM
 
-// The five roles that can be individually switched "under control" (walk the approval
+// The seven roles that can be individually switched "under control" (walk the approval
 // chain) vs left "independent" — Enforcement-Matrix-style, independent of the master
 // guard. `flag` is the backing control.role.* flag (mirrors backend roles.ROLE_CONTROL_FLAG
-// + the flag catalogue). Order is top-to-bottom of the chain.
+// + the flag catalogue). Order is top-to-bottom of the chain (BM / GM sit outside the
+// chain levels — branch-side oversight roles with their own switches).
 export const ROLE_SWITCHES = [
   { key: 'branch_accountant', name: 'Branch Accountant', role: 'Branch Accountant', duty: 'Enters vouchers · Check (level 1)', flag: 'control.role.branch_accountant' },
   { key: 'ae', name: 'Sughra', role: 'Accounts Executive', duty: 'Verify (level 2)', flag: 'control.role.ae' },
-  { key: 'fm', name: 'Faiz', role: 'Finance Manager', duty: 'Approve & post (level 3)', flag: 'control.role.fm' },
+  { key: 'fm', name: 'Faiz', role: 'Senior Finance Manager', duty: 'Approve & post (level 3)', flag: 'control.role.fm' },
+  { key: 'branch_manager', name: 'Branch Manager', role: 'Branch Manager', duty: 'Branch operations oversight', flag: 'control.role.branch_manager' },
+  { key: 'general_manager', name: 'General Manager', role: 'General Manager', duty: 'General operations oversight', flag: 'control.role.general_manager' },
   { key: 'director', name: 'Farhan', role: 'Director', duty: 'Oversight · escalation sign-off', flag: 'control.role.director' },
   { key: 'owner', name: 'Afshin', role: 'Owner', duty: 'Final authority · sensitive co-sign', flag: 'control.role.owner' },
 ];
@@ -50,7 +53,7 @@ export function approvalChainView(cfg = {}) {
   const aeFlagOn = !!aeFlag && (aeFlag.foundation === true || aeFlag.enabled === true);
   const aeCanApprove = aeFlagOn || verify.some((e) => approve.includes(e));
 
-  // Per-role control state across all FIVE roles. With no master switch, a role is "under
+  // Per-role control state across all SEVEN roles. With no master switch, a role is "under
   // control" (walks the approval chain) ONLY when its own control.role.* switch is on;
   // otherwise it is INDEPENDENT — no approval required, acts on its own.
   const people = ROLE_SWITCHES.map((rs) => {
@@ -261,7 +264,9 @@ export const CONFIGURABLE_GROUPS = [
     { nm: 'Owner co-sign on sensitive types', ds: 'ON = a refund / reissue additionally needs the Owner (Afshin) to sign before final approval — routed through the chain, no self-clear. OFF = they approve like any other voucher.', flag: 'approval.owner_cosign_sensitive', crit: true },
     { nm: 'Branch Accountant under control', ds: "ON = a Branch Accountant's entries walk Check → Verify → Approve. OFF = acts independently, no approval required.", flag: 'control.role.branch_accountant' },
     { nm: 'Accounts Executive (Sughra) under control', ds: "ON = Sughra's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.ae' },
-    { nm: 'Finance Manager (Faiz) under control', ds: "ON = Faiz's entries walk the approval chain — FM can no longer single-step approve their own. OFF = acts independently.", flag: 'control.role.fm' },
+    { nm: 'Senior Finance Manager (Faiz) under control', ds: "ON = Faiz's entries walk the approval chain — FM can no longer single-step approve their own. OFF = acts independently.", flag: 'control.role.fm' },
+    { nm: 'Branch Manager under control', ds: "ON = a Branch Manager's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.branch_manager' },
+    { nm: 'General Manager under control', ds: "ON = a General Manager's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.general_manager' },
     { nm: 'Director (Farhan) under control', ds: "ON = Farhan's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.director' },
     { nm: 'Owner (Afshin) under control', ds: "ON = Afshin's entries walk the approval chain. OFF = acts independently. Note: a Super Admin can still override the chain.", flag: 'control.role.owner' },
   ] },

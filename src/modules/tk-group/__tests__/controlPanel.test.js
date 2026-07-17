@@ -89,15 +89,17 @@ describe('Control Panel structure', () => {
     // the Super Admin chain override must be stated — the maker rule overstated without it
     expect(DEFAULT_RULES.find((r) => /Maker cannot approve/.test(r.nm)).ds).toMatch(/Super Admin overrides/);
   });
-  test('CONFIGURABLE_GROUPS: every item is a real flag switch; 21 flags across 5 groups', () => {
+  test('CONFIGURABLE_GROUPS: every item is a real flag switch; 23 flags across 5 groups', () => {
     expect(CONFIGURABLE_GROUPS.map((g) => g.group)).toEqual(['Approval & Verification', 'Segregation of Duties', 'Access & Export', 'Masters & Locks', 'Data-Entry & Close']);
     CONFIGURABLE_GROUPS.forEach((g) => g.items.forEach((c) => { expect(c.nm && c.ds && c.flag).toBeTruthy(); }));
-    expect(CONFIGURABLE_FLAGS).toHaveLength(21);
-    expect(new Set(CONFIGURABLE_FLAGS).size).toBe(21);           // no duplicates
+    expect(CONFIGURABLE_FLAGS).toHaveLength(23);
+    expect(new Set(CONFIGURABLE_FLAGS).size).toBe(23);           // no duplicates
     // retired keys are gone; the new masters/sod switches are present
     expect(CONFIGURABLE_FLAGS).not.toContain('core.policy_guard');
     expect(CONFIGURABLE_FLAGS).not.toContain('approval.chain_branch_entries');
     expect(CONFIGURABLE_FLAGS).toEqual(expect.arrayContaining(['masters.creation_lock', 'masters.period_lock', 'sod.verifier_ne_approver']));
+    // the per-role switches cover all seven roles (BM / GM have their own — no BA fold-in)
+    expect(CONFIGURABLE_FLAGS).toEqual(expect.arrayContaining(['control.role.branch_manager', 'control.role.general_manager']));
   });
   test('DECLINED_RULES lists the four not-adopted controls', () => {
     expect(DECLINED_RULES.map((d) => d.nm)).toEqual(expect.arrayContaining([expect.stringMatching(/2-factor/), expect.stringMatching(/IP \/ location/)]));
@@ -131,18 +133,18 @@ describe('approvalChainView', () => {
     expect(v.aeCanApprove).toBe(true);
   });
 
-  test('no role switches => all five roles INDEPENDENT, no approval required', () => {
+  test('no role switches => all seven roles INDEPENDENT, no approval required', () => {
     const v = approvalChainView({ flags: { flags: {} } });
-    expect(v.people).toHaveLength(5);
-    expect(v.people.map((p) => p.key)).toEqual(['branch_accountant', 'ae', 'fm', 'director', 'owner']);
+    expect(v.people).toHaveLength(7);
+    expect(v.people.map((p) => p.key)).toEqual(['branch_accountant', 'ae', 'fm', 'branch_manager', 'general_manager', 'director', 'owner']);
     expect(v.people.every((p) => p.independent)).toBe(true);
     expect(v.people.find((p) => p.key === 'ae').status).toMatch(/Independent/);
     expect(v.people.find((p) => p.key === 'fm').status).toMatch(/Independent/);
   });
 
-  test('every role switched on => all five under control', () => {
+  test('every role switched on => all seven under control', () => {
     const flags = { flags: {} };
-    ['branch_accountant', 'ae', 'fm', 'director', 'owner'].forEach((k) => { flags.flags[`control.role.${k}`] = { enabled: true }; });
+    ['branch_accountant', 'ae', 'fm', 'branch_manager', 'general_manager', 'director', 'owner'].forEach((k) => { flags.flags[`control.role.${k}`] = { enabled: true }; });
     const v = approvalChainView({ flags });
     expect(v.people.every((p) => !p.independent)).toBe(true);
     expect(v.people.find((p) => p.key === 'fm').status).toBe('Under control');

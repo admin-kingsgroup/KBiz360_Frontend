@@ -39,6 +39,8 @@ jest.mock('../api/breakglass', () => ({ getBreakglass: jest.fn().mockResolvedVal
 jest.mock('../../../core/ux/confirm', () => ({ confirmDialog: jest.fn().mockResolvedValue({ confirmed: true }) }));
 // eslint-disable-next-line import/first
 import { ControlPanel } from '../control-configuration/ControlPanel';
+import { CONFIGURABLE_FLAGS } from '../utils/controlPanel';
+const N_FLAGS = CONFIGURABLE_FLAGS.length; // 23 — every configurable rule
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -127,7 +129,7 @@ describe('Control Panel · two-screen model', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Enable all' }));
     await waitFor(() => expect(setManyFlags).toHaveBeenCalledTimes(1));
     const changes = setManyFlags.mock.calls[0][0];
-    expect(changes).toHaveLength(21);                            // all configurable flags
+    expect(changes).toHaveLength(N_FLAGS);                            // all configurable flags
     expect(changes.every((c) => c.enabled === true && c.branch === 'default')).toBe(true);
     expect(confirmDialog).toHaveBeenCalledTimes(1);
   });
@@ -157,7 +159,7 @@ describe('Control Panel · two-screen model', () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     fireEvent.click(screen.getByText('Configurable Rules'));
     const buttons = await screen.findAllByRole('button', { name: /Preview impact/ });
-    expect(buttons.length).toBe(21);   // one per configurable rule
+    expect(buttons.length).toBe(N_FLAGS);   // one per configurable rule
     fireEvent.click(buttons[0]);
     await waitFor(() => expect(flagImpact).toHaveBeenCalled());
     expect(await screen.findByText(/12 vouchers/)).toBeInTheDocument();
@@ -185,7 +187,7 @@ describe('Control Panel · two-screen model', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Reset to inherit/ }));
     await waitFor(() => expect(setManyFlags).toHaveBeenCalledTimes(1));
     const changes = setManyFlags.mock.calls[0][0];
-    expect(changes).toHaveLength(21);
+    expect(changes).toHaveLength(N_FLAGS);
     expect(changes.every((c) => c.enabled === null && c.branch === 'BOM')).toBe(true);
   });
 
@@ -199,7 +201,7 @@ describe('Control Panel · two-screen model', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Standard' }));
     await waitFor(() => expect(setManyFlags).toHaveBeenCalledTimes(1));
     const changes = setManyFlags.mock.calls[0][0];
-    expect(changes).toHaveLength(21);
+    expect(changes).toHaveLength(N_FLAGS);
     expect(changes.find((c) => c.key === 'entry.mandatory_docs').enabled).toBe(true);   // Standard includes docs
   });
 
@@ -213,7 +215,7 @@ describe('Control Panel · two-screen model', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Copy to all other branches/ }));
     await waitFor(() => expect(setManyFlags).toHaveBeenCalledTimes(1));
     const changes = setManyFlags.mock.calls[0][0];
-    expect(changes.length).toBe(5 * 21);   // source is a real branch (default excluded) → 5 target branches × 21
+    expect(changes.length).toBe(5 * N_FLAGS);   // source is a real branch (default excluded) → 5 target branches × N_FLAGS
     expect(changes.every((c) => c.branch !== 'default' && typeof c.enabled === 'boolean')).toBe(true);
   });
 
