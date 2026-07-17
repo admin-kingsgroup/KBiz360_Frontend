@@ -97,6 +97,24 @@ const client = axios.create({ baseURL: BASE, timeout: 60_000 });
 client.interceptors.request.use((config) => {
   config.headers = config.headers || {};
   config.headers.Authorization = `Bearer ${getAuthToken()}`;
+  // A branch-scoped user with MORE THAN ONE branch must name a branch on every
+  // request — the server refuses a branch-less call outright ("Select a specific
+  // branch within your access", enforceBranchScope) because it can't pick one for
+  // them the way it coerces a single-branch user. Most callers don't pass ?branch=
+  // (masters, app-config, summaries), so inject the header-selected branch here,
+  // once, for every request. All-scope and single-branch users are untouched.
+  try {
+    const u = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+    if (u && u.allBranches === false && Array.isArray(u.branches) && u.branches.length > 1) {
+      const cur = String((config.params && config.params.branch) || '').trim();
+      if (!cur || cur === 'ALL') {
+        const sel = String(localStorage.getItem('kb360-branch') || '').trim();
+        if (sel && sel !== 'ALL' && u.branches.includes(sel)) {
+          config.params = { ...(config.params || {}), branch: sel };
+        }
+      }
+    }
+  } catch { /* ignore — worst case the server's own message guides the user */ }
   return config;
 });
 
