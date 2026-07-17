@@ -768,8 +768,40 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // rule exists to enable, on a document the server would have accepted.
   const originate = useCanOriginate(brCode, interBranch ? 'inb' : 'booking');
   const blockedNew = originate.blocked && !editing;
+  // EVERY entry field is mandatory (2026-07-17) — no voucher is created with a blank.
+  // The list below names exactly what's missing so the footer can say it next to the
+  // disabled Save button instead of leaving the user to hunt. Remarks + Tally Refs
+  // stay optional (they're cross-references, not voucher data).
+  const missingFields = (() => {
+    const miss = [];
+    if (!date) miss.push('SPG Date');
+    if (!travelDate) miss.push('Travel / Departure Date');
+    if (spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && !String(headerRef || '').trim()) miss.push(spec.headerLabel);
+    if (interBranch) {
+      if (!toBranch) miss.push('To Branch');
+      if (crossCcy && !(fxRateNum > 0)) miss.push('Deal FX Rate');
+    } else {
+      if (!clientType) miss.push('Client Type');
+      if (!hasCustLedger) miss.push('Client Ledger');
+      // isB2C is declared further down (render scope) — same test inlined here.
+      if (/b2c/i.test(customer.ledgerGroup || '') && !customer.name.trim()) miss.push('Customer (Bill to)');
+    }
+    if (!isNoSupp && !hasSuppLedger) miss.push(interBranch ? 'Supplier ledger (airline / cost)' : 'Supplier ledger (Pay to)');
+    if (needsScope) miss.push('Package type (International / Domestic)');
+    lines.forEach((l, i) => {
+      const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign });
+      const row = lines.length > 1 ? ` (line ${i + 1})` : '';
+      if (!String(l.fn || '').trim()) miss.push(`${spec.idCols[0].label}${row}`);
+      if (!String(l.sn || '').trim()) miss.push(`${spec.idCols[1].label}${row}`);
+      // Per-passenger sale value — every line must carry an amount. INB spreads the
+      // deal's fares/Service Fee across lines its own way, so the aggregate
+      // `totals.so.total > 0` gate below covers value there instead.
+      if (!interBranch && !(c.finalSales > 0)) miss.push(`Sale amount${row}`);
+    });
+    return miss;
+  })();
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
-  const canSave = !blockedNew && (interBranch
+  const canSave = !blockedNew && missingFields.length === 0 && (interBranch
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope && (!crossCcy || fxRateNum > 0))  // INB: counterparty + sale value + Int'l/Domestic for Flights/Holiday + FX rate on a cross-currency deal
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
       && (isNoSupp || (totals.po.total > 0 && hasSuppLedger))));
@@ -1023,12 +1055,89 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     );
   };
 
+  // Package type (International / Domestic) picker — rendered inside the PO section
+  // normally, but falls back to the header card on a no-supplier booking (the PO
+  // section is hidden there and the choice stays mandatory — it IS the cost centre).
+  const packageTypePicker = (
+    <DropdownMenu
+      ariaLabel="Package type"
+      menuRole="listbox"
+      width={260}
+      items={[
+        { key: '', label: 'Select International / Domestic', selected: packageType === '', onSelect: () => setPackageType('') },
+        { key: 'Domestic', label: 'Domestic', selected: packageType === 'Domestic', onSelect: () => setPackageType('Domestic') },
+        { key: 'International', label: 'International', selected: packageType === 'International', onSelect: () => setPackageType('International') },
+      ]}
+      renderTrigger={({ ref, toggle, triggerProps }) => (
+        <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+          style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{packageType || 'Select International / Domestic'}</span>
+          <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+        </button>
+      )}
+    />
+  );
+
   // The Purchase Order section — step ② of the full entry form.
   // The sub-caption's withholding name follows the BRANCH's regime (whtLabel), like the grid column
   // inside it — it read "2% TDS is added" on every branch, announcing Indian 194H withholding on an
   // FBM/NBO/DAR voucher whose own column header already said WHT.
   const poSection = !isNoSupp && (
     <Section n="2" badge={interBranch ? 'INPO' : 'PO'} name={interBranch ? 'Inter-Branch Purchase Order' : 'Purchase Order'} sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ` · overseas supplier — no ${whtLabel}` : `, 2% ${whtLabel} is added`}`} accent={PO_BAR}>
+      {/* Purchase-leg header fields — moved here from the top header card (2026-07-17):
+          they describe WHO is paid and HOW the purchase is taxed, so they live with
+          the Purchase Order they drive. (poSection is already gated on !isNoSupp.) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 11, marginBottom: 12 }}>
+        <FL label={interBranch ? 'Supplier ledger (airline / cost) *' : 'Supplier ledger (Pay to) *'}>
+          {/* ledgerName MUST move with the picked supplier. The INB payload sends
+              `ledgerName: supplier.ledgerName || supplier.name`, and an EDIT seeds ledgerName from
+              the deal's original supplier — so leaving it behind here kept the OLD ledger name
+              truthy and winning, and the backend (`party: supplier.ledgerName || supplier.name`)
+              posted the cost to the PREVIOUS airline's account. Swapping the supplier on an INB
+              edit looked applied and silently paid the wrong creditor. Create was unaffected
+              (ledgerName starts undefined, so it fell through to name). */}
+          <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
+            onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerName: v.ledgerName || v.name, ledgerGroup: v.group })} />
+        </FL>
+        {!isVatBr && <FL label="Purchase GST mode">
+          {suppForeign ? (
+            // Import of service — the vendor charges no Indian GST, so there is no
+            // intra/inter to pick; the PO grid drops its GST (and 194H TDS) to match.
+            <div style={{ ...inp, display: 'flex', alignItems: 'center', background: '#eef0f4', color: '#5b616e', fontWeight: 700, cursor: 'default' }}>
+              🌐 Overseas supplier — no GST (import of service)
+            </div>
+          ) : (
+            <>
+              <DropdownMenu
+                ariaLabel="Purchase GST mode"
+                menuRole="listbox"
+                items={[
+                  { key: 'intra', label: 'Intra-state (CGST+SGST)', selected: purGstMode === 'intra', onSelect: () => setPurGstMode('intra') },
+                  { key: 'inter', label: 'Inter-state (IGST)', selected: purGstMode === 'inter', onSelect: () => setPurGstMode('inter') },
+                ]}
+                renderTrigger={({ ref, toggle, triggerProps }) => (
+                  <button ref={ref} {...triggerProps} onClick={toggle} type="button"
+                    style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{purGstMode === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'}</span>
+                    <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
+                  </button>
+                )}
+              />
+              {/* Shown on INB too: the supplier's state drives this leg either way, so the
+                  accountant must see the same "✓ Auto" / "⚠ Overridden" evidence. Suppressing it
+                  here meant an INB purchase got NO auto-pick AND no warning — silently wrong. */}
+              {(suppSupply === 'intra' || suppSupply === 'inter' ? (
+                <p style={purGstMode === suppSupply ? hintOk : hintWarn}>
+                  {purGstMode === suppSupply ? '✓ Auto' : '⚠ Overridden — supplier state says'}: {suppRec.state || stateNameOf(stateCodeOf(suppRec))} → {suppSupply === 'intra' ? 'Intra (CGST+SGST)' : 'Inter (IGST)'}
+                </p>
+              ) : suppRec && !suppSupply ? (
+                <p style={hintWarn}>⚠ Supplier has no State in the Supplier Master — add it to auto-pick the mode</p>
+              ) : null)}
+            </>
+          )}
+        </FL>}
+        {hasPackage && <FL label="Package type *">{packageTypePicker}</FL>}
+      </div>
       <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960, tableLayout: 'fixed' }}>
           <thead><tr style={{ borderBottom: '2px solid ' + PO_BAR }}>
@@ -1219,8 +1328,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="SPG Date"><SmartDateInput value={date} onChange={setDate} style={inp} /></FL>
-          <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} style={inp} title="When the customer travels — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
+          <FL label="SPG Date *"><SmartDateInput value={date} onChange={setDate} style={inp} /></FL>
+          <FL label="Travel / Departure Date *"><SmartDateInput value={travelDate} onChange={setTravelDate} style={inp} title="When the customer travels — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
           {/* An INB deal's counterparty is ALWAYS the To Branch below, so Client Type has no filter
               target (the customer PartyPicker it narrows is replaced by that dropdown) and no
               payload destination (inbBody sends no clientType). Stated and locked rather than
@@ -1232,7 +1341,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               alone would leave the screen saying "Inter Branch" while the math billed TCS like a
               retail sale, so TCS is suppressed by the `interBranch` ctx flag instead — never by
               faking a clientType ('INTER BRANCH' is not 'B2B', so isB2B() would be false anyway). */}
-          <FL label="Client Type">
+          <FL label={interBranch ? 'Client Type' : 'Client Type *'}>
             {interBranch ? (
               <>
                 {/* readOnly as well as disabled: React warns on a `value` with no onChange unless
@@ -1258,7 +1367,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             )}
           </FL>
           {spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && (
-            <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
+            <FL label={spec.headerLabel + ' *'}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
           )}
           {interBranch ? (
             <>
@@ -1365,73 +1474,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               <p style={hintMuted}>ℹ B2C walk-in — not in the Customer Master. That’s fine for B2C; Sale mode stays as picked above. Add via “＋ New” (address + state) only if the sale is interstate, to auto-set IGST.</p>
             ) : null)}
           </FL>}
-          {!isNoSupp && <FL label={interBranch ? 'Supplier ledger (airline / cost) *' : 'Supplier ledger (Pay to) *'}>
-            {/* ledgerName MUST move with the picked supplier. The INB payload sends
-                `ledgerName: supplier.ledgerName || supplier.name`, and an EDIT seeds ledgerName from
-                the deal's original supplier — so leaving it behind here kept the OLD ledger name
-                truthy and winning, and the backend (`party: supplier.ledgerName || supplier.name`)
-                posted the cost to the PREVIOUS airline's account. Swapping the supplier on an INB
-                edit looked applied and silently paid the wrong creditor. Create was unaffected
-                (ledgerName starts undefined, so it fell through to name). */}
-            <PartyPicker branch={branch} kind="supplier" value={{ name: supplier.name, group: supplier.ledgerGroup }}
-              onChange={(v) => setSupplier({ ...supplier, name: v.name, ledgerName: v.ledgerName || v.name, ledgerGroup: v.group })} />
-          </FL>}
-          {!isNoSupp && !isVatBr && <FL label="Purchase GST mode">
-            {suppForeign ? (
-              // Import of service — the vendor charges no Indian GST, so there is no
-              // intra/inter to pick; the PO grid drops its GST (and 194H TDS) to match.
-              <div style={{ ...inp, display: 'flex', alignItems: 'center', background: '#eef0f4', color: '#5b616e', fontWeight: 700, cursor: 'default' }}>
-                🌐 Overseas supplier — no GST (import of service)
-              </div>
-            ) : (
-              <>
-                <DropdownMenu
-                  ariaLabel="Purchase GST mode"
-                  menuRole="listbox"
-                  items={[
-                    { key: 'intra', label: 'Intra-state (CGST+SGST)', selected: purGstMode === 'intra', onSelect: () => setPurGstMode('intra') },
-                    { key: 'inter', label: 'Inter-state (IGST)', selected: purGstMode === 'inter', onSelect: () => setPurGstMode('inter') },
-                  ]}
-                  renderTrigger={({ ref, toggle, triggerProps }) => (
-                    <button ref={ref} {...triggerProps} onClick={toggle} type="button"
-                      style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{purGstMode === 'inter' ? 'Inter-state (IGST)' : 'Intra-state (CGST+SGST)'}</span>
-                      <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
-                    </button>
-                  )}
-                />
-                {/* Shown on INB too: the supplier's state drives this leg either way, so the
-                    accountant must see the same "✓ Auto" / "⚠ Overridden" evidence. Suppressing it
-                    here meant an INB purchase got NO auto-pick AND no warning — silently wrong. */}
-                {(suppSupply === 'intra' || suppSupply === 'inter' ? (
-                  <p style={purGstMode === suppSupply ? hintOk : hintWarn}>
-                    {purGstMode === suppSupply ? '✓ Auto' : '⚠ Overridden — supplier state says'}: {suppRec.state || stateNameOf(stateCodeOf(suppRec))} → {suppSupply === 'intra' ? 'Intra (CGST+SGST)' : 'Inter (IGST)'}
-                  </p>
-                ) : suppRec && !suppSupply ? (
-                  <p style={hintWarn}>⚠ Supplier has no State in the Supplier Master — add it to auto-pick the mode</p>
-                ) : null)}
-              </>
-            )}
-          </FL>}
-          {hasPackage && <FL label="Package type *">
-            <DropdownMenu
-              ariaLabel="Package type"
-              menuRole="listbox"
-              width={260}
-              items={[
-                { key: '', label: 'Select International / Domestic', selected: packageType === '', onSelect: () => setPackageType('') },
-                { key: 'Domestic', label: 'Domestic', selected: packageType === 'Domestic', onSelect: () => setPackageType('Domestic') },
-                { key: 'International', label: 'International', selected: packageType === 'International', onSelect: () => setPackageType('International') },
-              ]}
-              renderTrigger={({ ref, toggle, triggerProps }) => (
-                <button ref={ref} {...triggerProps} onClick={toggle} type="button"
-                  style={{ ...inp, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{packageType || 'Select International / Domestic'}</span>
-                  <ChevronDown size={14} style={{ color: '#5b616e', flexShrink: 0 }} />
-                </button>
-              )}
-            />
-          </FL>}
+          {/* Supplier ledger (Pay to), Purchase GST mode & Package type moved INTO the
+              Purchase Order section (poSection) — they describe the purchase leg.
+              Package type falls back to here only when the PO section is hidden
+              (no-supplier booking), since it stays mandatory either way. */}
+          {isNoSupp && hasPackage && <FL label="Package type *">{packageTypePicker}</FL>}
         </div>
       </div>
 
@@ -1620,8 +1667,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
-        {interBranch && needsScope && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#b42318', alignSelf: 'center' }}>⚠ Pick International / Domestic to save this inter-branch {moduleCode === 'SH' ? 'Holiday' : 'Flight'} deal</span>
+        {/* Every field is mandatory — name exactly what's missing next to the disabled
+            Save button, instead of a dead grey button the user has to puzzle out. */}
+        {missingFields.length > 0 && !saving && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#b42318', alignSelf: 'center', maxWidth: 560, textAlign: 'right' }}>
+            ⚠ Required: {missingFields.slice(0, 6).join(' · ')}{missingFields.length > 6 ? ` · +${missingFields.length - 6} more` : ''}
+          </span>
         )}
         <button disabled={!canSave} onClick={() => save()} className="max-tablet:min-h-[44px]"
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
