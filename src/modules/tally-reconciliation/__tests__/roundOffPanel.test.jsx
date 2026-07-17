@@ -101,11 +101,57 @@ test('posting sends the chosen threshold, not the default', async () => {
 });
 
 test('an already-settled period offers reversal instead of a second posting', async () => {
+  // Back-compat: the OLD single-object `existing` shape must still render. During a deploy
+  // the panel can be served a response from the previous BE.
   previewRoundOff.mockResolvedValue({ ...CLEARS, existing: { vno: 'JV/BOM/26/1371', date: '2025-12-31', total: 2 } });
   mount();
   expect(await screen.findByText(/Settled · JV\/BOM\/26\/1371/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /Reverse settlement/i })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Post settlement JV/i })).toBeNull();
+});
+
+// A settlement is now one voucher PER COST CENTRE — the residue has to carry a real tag or
+// the tie-out can't attribute it to a module (a ₹0.02 crumb on IT-Taxes once presented as a
+// ₹3.34 lakh module gap). So the panel must never imply a settlement is a single JV.
+test('a multi-voucher settlement names EVERY vno — reversing must not look like it drops one', async () => {
+  previewRoundOff.mockResolvedValue({ ...CLEARS, existing: [
+    { vno: 'JV/BOM/26/1388', date: '2026-01-31', total: 0.02, costCenter: 'BOM-FLT-INT' },
+    { vno: 'JV/BOM/26/1389', date: '2026-01-31', total: 0.24, costCenter: 'BOM-INB-FLT-INT' },
+    { vno: 'JV/BOM/26/1390', date: '2026-01-31', total: 1.19, costCenter: '' },
+  ] });
+  mount();
+  expect(await screen.findByText(/Settled · 3 JVs/i)).toBeInTheDocument();
+  for (const vno of ['JV/BOM/26/1388', 'JV/BOM/26/1389', 'JV/BOM/26/1390']) {
+    expect(screen.getByText(vno)).toBeInTheDocument();
+  }
+  expect(screen.getByText(/BOM-FLT-INT/)).toBeInTheDocument();
+  // The untagged group must say so in words, never render a blank cell.
+  expect(screen.getByText(/no cost centre/i)).toBeInTheDocument();
+  // The button has to state the blast radius: it removes all three.
+  expect(screen.getByRole('button', { name: /Reverse all 3 JVs/i })).toBeInTheDocument();
+});
+
+test('the pre-post preview groups legs by cost centre and says how many JVs will post', async () => {
+  previewRoundOff.mockResolvedValue({ ...CLEARS, plug: 0.02, groups: [
+    { costCenter: 'BOM-FLT-INT', plug: -0.02, lines: [{ ledger: 'IT-Taxes', amt: 0.02, drCr: 'Dr' }, { ledger: 'Round Off', amt: 0.02, drCr: 'Cr' }] },
+    { costCenter: '', plug: 0.04, lines: [{ ledger: 'TRIP JACK', amt: 0.15, drCr: 'Dr' }, { ledger: 'Round Off', amt: 0.15, drCr: 'Cr' }] },
+  ] });
+  mount();
+  expect(await screen.findByText(/journal voucher/i)).toBeInTheDocument();
+  expect(screen.getByText('BOM-FLT-INT')).toBeInTheDocument();
+  expect(screen.getByText(/no cost centre/i)).toBeInTheDocument();
+  // Round Off carries a balancing leg in BOTH groups — it must render twice, not collapse.
+  expect(screen.getAllByText('Round Off')).toHaveLength(2);
+});
+
+// REGRESSION: the legs table was moved from the flat `lines` onto `groups`. A response
+// carrying only `lines` (the previous BE, mid-deploy) must still show what would post —
+// rendering nothing there would be a silent screen.
+test('falls back to the flat legs when the BE sends no groups', async () => {
+  previewRoundOff.mockResolvedValue({ ...CLEARS });          // lines only, no groups
+  mount();
+  expect(await screen.findByText('B2C Ref Farhan')).toBeInTheDocument();
+  expect(screen.getByText('Round Off')).toBeInTheDocument();
 });
 
 // REGRESSION: the panel hardcoded ₹ and a ₹10 cap. NBO/DAR/FBM keep USD books, where
