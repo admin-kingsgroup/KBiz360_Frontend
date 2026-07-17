@@ -518,7 +518,7 @@ export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
   );
 
   return (
-    <div style={embedded?undefined:{padding:"12px 10px",maxWidth:1300,margin:"0 auto"}}>
+    <div style={embedded?undefined:{padding:"16px 24px"}}>
       {!embedded&&(
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
