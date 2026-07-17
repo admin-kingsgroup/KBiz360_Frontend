@@ -432,6 +432,18 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   ]},
 ]};
 
+// The Branch-Accountant view of the Accounts pill: the central-finance heads —
+// Branch MIS (financial statements), Inter Branch, Period Close and Accounts
+// Master (Chart of Accounts) — are stripped from the accountant surface. Nav-only:
+// the routes stay reachable (they share segments with in-role pages, so the
+// route-lockout deny-list can't carry them); per-page hiding/granting remains
+// available via Page Visibility Control.
+const ACCOUNTANT_HIDDEN_ACCOUNTS_HEADS = new Set(['Branch MIS', 'Inter Branch', 'Period Close', 'Accounts Master']);
+export const MENU_ACCOUNTS_BRANCH_ACCOUNTANT = {
+  ...MENU_ACCOUNTS,
+  children: MENU_ACCOUNTS.children.filter((c) => !ACCOUNTANT_HIDDEN_ACCOUNTS_HEADS.has(c?.label)),
+};
+
 /* ── FINAL MENU ASSEMBLY ─────────────────────────────────────── */
 
 /* The old MENU_TRANSACTIONS pill was deleted: it was never assembled into
@@ -972,11 +984,16 @@ export function fullMenuRoots(branch, currentUser){
 export function roleMenuRoots(branch, currentUser){
   if (hasFullMenu(currentUser)) return fullMenuRoots(branch, currentUser);
   // Branch Accountant → their self-contained Accounts workspace PLUS Approvals,
-  // Decisions (they raise credit/funds/onboarding requests), Taxation and Support.
+  // Decisions (they raise credit/funds/onboarding requests) and Support. Taxation
+  // is central-finance work, so the pill is NOT on the accountant surface (and
+  // /tax routes are locked below); individual tax pages can still be granted back
+  // per-user via Page Visibility Control. The Accounts pill is the trimmed
+  // accountant variant (no Branch MIS / Inter Branch / Period Close / Accounts
+  // Master — see MENU_ACCOUNTS_BRANCH_ACCOUNTANT).
   // Branch scope is still enforced by the top-right switcher.
   // Reconciliation: the Branch Accountant PREPARES the weekly certificates, so
   // the module pill is part of their workspace too (AE/FM/Director sign above).
-  return [MENU_ACCOUNTS, MENU_RECONCILIATION_WEEKLY_ONLY, MENU_APPROVALS, MENU_DECISIONS, taxSectionFor(branch), MENU_SUPPORT];
+  return [MENU_ACCOUNTS_BRANCH_ACCOUNTANT, MENU_RECONCILIATION_WEEKLY_ONLY, MENU_APPROVALS, MENU_DECISIONS, MENU_SUPPORT];
 }
 
 // Keep ONLY the leaves whose href is in `keep`; drop everything else (containers with
@@ -1024,11 +1041,12 @@ export function getMenu(branch, currentUser){
 // direct URL — beyond the nav hiding. Deliberately a DENY-list of clearly out-of-scope
 // admin areas, NOT the inverse of their menu: menu leaves don't map 1:1 to routes, so
 // an allow-list wrongly blocks legit accounting sub-routes (trial-balance, approvals,
-// sales, assets…). Everything accounting/finance/reports/masters/tax stays reachable;
+// sales, assets…). Everything accounting/finance/reports/masters stays reachable;
 // per-PAGE control is the hidden deny-list (Page Visibility Control).
 //   hr → employees/payroll/salaries · settings → users & roles / company config ·
-//   group-dashboard → group-level dashboard.
-const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'group-dashboard']);
+//   group-dashboard → group-level dashboard · tax → the Taxation pill (central
+//   finance work, removed from the accountant surface; grant back per-page).
+const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'group-dashboard', 'tax']);
 
 // Hard route-level lockout used by App.jsx: can this user OPEN this route directly?
 // Full-menu roles (Super Admin / Director / everyone who isn't an accountant) reach

@@ -178,7 +178,20 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                     ) : mode === 'deleted' ? (
                       <span style={{ fontSize: 11, color: '#9197a3' }} title={b.deletedReason || ''}>{b.deletedBy || '—'}{b.deletedReason ? ` · ${b.deletedReason}` : ''}</span>
                     ) : (
-                      <span style={{ fontSize: 11, color: '#9197a3' }}>{b.rejectedReason || '—'}</span>
+                      // Rejected is a SEND-BACK, not a dead end: editing revives the booking to
+                      // Pending and re-enters the chain at Check (bookingOrders.service.update).
+                      // Without this the tab was terminal — the maker had to re-key the whole
+                      // booking under a new Link No. It is also where a Branch Accountant locked
+                      // out of a booking they Checked gets it back, which is exactly what the
+                      // lock's message tells them to ask the verifier for.
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: '#9197a3' }} title={b.rejectedReason || ''}>{b.rejectedReason || '—'}</span>
+                        <button disabled={busyId === b.id} onClick={() => onEdit(b)}
+                          title="Correct and resubmit — this returns the booking to Pending and re-enters the approval chain at Check. The Link No is kept."
+                          style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                          <Pencil size={12} /> Edit &amp; resubmit
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

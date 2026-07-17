@@ -89,18 +89,35 @@ describe('Control Panel structure', () => {
     // the Super Admin chain override must be stated — the maker rule overstated without it
     expect(DEFAULT_RULES.find((r) => /Maker cannot approve/.test(r.nm)).ds).toMatch(/Super Admin overrides/);
   });
-  test('CONFIGURABLE_GROUPS: every item is a real flag switch; 22 flags across 5 groups', () => {
+  test('CONFIGURABLE_GROUPS: every item is a real flag switch; 21 flags across 5 groups', () => {
     expect(CONFIGURABLE_GROUPS.map((g) => g.group)).toEqual(['Approval & Verification', 'Segregation of Duties', 'Access & Export', 'Masters & Locks', 'Data-Entry & Close']);
     CONFIGURABLE_GROUPS.forEach((g) => g.items.forEach((c) => { expect(c.nm && c.ds && c.flag).toBeTruthy(); }));
-    expect(CONFIGURABLE_FLAGS).toHaveLength(22);
-    expect(new Set(CONFIGURABLE_FLAGS).size).toBe(22);           // no duplicates
+    expect(CONFIGURABLE_FLAGS).toHaveLength(21);
+    expect(new Set(CONFIGURABLE_FLAGS).size).toBe(21);           // no duplicates
     // retired keys are gone; the new masters/sod switches are present
     expect(CONFIGURABLE_FLAGS).not.toContain('core.policy_guard');
     expect(CONFIGURABLE_FLAGS).not.toContain('approval.chain_branch_entries');
     expect(CONFIGURABLE_FLAGS).not.toContain('approval.owner_cosign_sensitive'); // retired 2026-07
+    // A key the BACKEND catalogue no longer knows would 422 every bulk write (set-many
+    // validates the whole batch up front), silently breaking Enable-all, every posture
+    // preset, copy-branch and reset-branch. Pin the retirement here.
+    expect(CONFIGURABLE_FLAGS).not.toContain('approval.ae_can_approve'); // retired 2026-07
     expect(CONFIGURABLE_FLAGS).toEqual(expect.arrayContaining(['masters.creation_lock', 'masters.period_lock', 'sod.verifier_ne_approver']));
     // the per-role switches cover all seven roles (BM / GM have their own — no BA fold-in)
     expect(CONFIGURABLE_FLAGS).toEqual(expect.arrayContaining(['control.role.branch_manager', 'control.role.general_manager']));
+  });
+
+  // The Branch Accountant switch does far more than route entries — it stops the accountant
+  // raising the four CRM-sourced documents. A card that only said "walks the approval chain"
+  // would understate what the Owner is turning on, and the refund gap must be stated: the
+  // CRM cannot raise refunds, so engaging this leaves them with no route in.
+  test('the Branch Accountant card states the creation block AND the refund caution', () => {
+    const card = CONFIGURABLE_GROUPS[0].items.find((i) => i.flag === 'control.role.branch_accountant');
+    expect(card.ds).toMatch(/no longer create an SO\/PO\/GP/i);
+    expect(card.ds).toMatch(/inter-branch deal, a refund or a reissue/i);
+    expect(card.ds).toMatch(/CAUTION/);
+    expect(card.ds).toMatch(/nobody in the branch can raise a refund/i);
+    expect(card.crit).toBe(true);   // money/critical accent — it can stop a branch working
   });
   test('DECLINED_RULES lists the four not-adopted controls', () => {
     expect(DECLINED_RULES.map((d) => d.nm)).toEqual(expect.arrayContaining([expect.stringMatching(/2-factor/), expect.stringMatching(/IP \/ location/)]));
@@ -129,9 +146,18 @@ describe('approvalChainView', () => {
     expect(v.levels.map((l) => l.name)).toEqual(['Check', 'Verify', 'Approve']);
   });
 
-  test('AE-can-approve toggle = Sughra also present in approvers', () => {
+  test('the AE approves only when EXPLICITLY named in the approver list', () => {
     const v = approvalChainView({ approveEmails: ['faiz@travkings.com', 'sughra@travkings.com'] });
     expect(v.aeCanApprove).toBe(true);
+  });
+
+  // The retired switch must not resurrect the elevation from a stale config value: the live
+  // 'tkflags' was left with this flag ON across every branch by the old
+  // set-ae-independent-approval script, and the backend now ignores it entirely.
+  test('a STALE approval.ae_can_approve flag no longer makes the AE an approver', () => {
+    const v = approvalChainView({ flags: { flags: { 'approval.ae_can_approve': { enabled: true } } } });
+    expect(v.aeCanApprove).toBe(false);
+    expect(v.people.find((p) => p.key === 'ae').extra).toBe('');
   });
 
   test('no role switches => all seven roles INDEPENDENT, no approval required', () => {
@@ -170,14 +196,16 @@ describe('verifyApproveOverlap (SoD conflict)', () => {
 });
 
 describe('roleControlWarning (deadlock guardrail)', () => {
-  const dflt = approvalChainView({}); // defaults: 1 verifier (Sughra), 1 approver (Faiz), AE-approve off
-  test('FM under control with a sole approver + no AE-approve → cautions', () => {
+  const dflt = approvalChainView({}); // defaults: 1 verifier (Sughra), 1 approver (Faiz)
+  test('FM under control with a sole approver → cautions', () => {
     expect(roleControlWarning('fm', dflt)).toMatch(/only approver/);
+    // The retired AE-approve switch must not be offered as the way out any more.
+    expect(roleControlWarning('fm', dflt)).not.toMatch(/Let Sughra also Approve/);
   });
   test('AE under control with a sole verifier → cautions', () => {
     expect(roleControlWarning('ae', dflt)).toMatch(/only verifier/);
   });
-  test('no caution once a second approver/verifier exists or AE-approve is on', () => {
+  test('no caution once a second approver/verifier exists, or the AE is named an approver', () => {
     expect(roleControlWarning('fm', { approve: ['faiz@x.com', 'x@x.com'], verify: ['s@x.com'], aeCanApprove: false })).toBeNull();
     expect(roleControlWarning('fm', { approve: ['faiz@x.com'], verify: ['s@x.com'], aeCanApprove: true })).toBeNull();
     expect(roleControlWarning('ae', { verify: ['s@x.com', 'y@x.com'], approve: ['f@x.com'] })).toBeNull();

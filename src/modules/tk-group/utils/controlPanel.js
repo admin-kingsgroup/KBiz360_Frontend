@@ -46,12 +46,12 @@ export function asEmailList(v, fallback = []) {
 export function approvalChainView(cfg = {}) {
   const verify = asEmailList(cfg.verifyEmails, DEFAULT_VERIFY);
   const approve = asEmailList(cfg.approveEmails, DEFAULT_APPROVE);
-  // AE-can-approve is on when either the control flag is engaged OR a verifier (Sughra)
-  // is already in the approver set — so she can give final approval, not just verify.
-  const flagsMap = (cfg.flags && cfg.flags.flags) || {};
-  const aeFlag = flagsMap['approval.ae_can_approve'];
-  const aeFlagOn = !!aeFlag && (aeFlag.foundation === true || aeFlag.enabled === true);
-  const aeCanApprove = aeFlagOn || verify.some((e) => approve.includes(e));
+  // Can the AE also give final approval? The approval.ae_can_approve switch was RETIRED
+  // (2026-07): it let the verifier approve what she had just verified, collapsing
+  // maker-checker, and it relaxed sod.verifier_ne_approver to do so. The only remaining way
+  // is the EXPLICIT one — her email sitting in the approver list — which is precisely the
+  // segregation-of-duties overlap this panel already reports (verifyApproveOverlap).
+  const aeCanApprove = verify.some((e) => approve.includes(e));
 
   // Per-role control state across all SEVEN roles. With no master switch, a role is "under
   // control" (walks the approval chain) ONLY when its own control.role.* switch is on;
@@ -94,7 +94,7 @@ export function verifyApproveOverlap(view = {}) {
  *  approvalChainView(). Only 'fm' (sole approver) and 'ae' (sole verifier) can hit it. */
 export function roleControlWarning(roleKey, view = {}) {
   if (roleKey === 'fm' && !view.aeCanApprove && (view.approve || []).length <= 1) {
-    return 'Faiz is the only approver — under control he can’t approve his own entries, so only the Owner could. Add a second approver or enable “Let Sughra also Approve”.';
+    return 'Faiz is the only approver — under control he can’t approve his own entries, so only the Owner could. Add a second approver.';
   }
   if (roleKey === 'ae' && (view.verify || []).length <= 1) {
     return 'Sughra is the only verifier — under control her own entries can’t be verified (only the Owner could clear them). Add a second verifier.';
@@ -257,8 +257,11 @@ export const DEFAULT_RULES = [
 // them generically and they are testable.
 export const CONFIGURABLE_GROUPS = [
   { group: 'Approval & Verification', items: [
-    { nm: 'Let Sughra also Approve (AE-approve)', ds: 'ON = the Accounts Executive (Sughra) may give final approval on a branch-accountant voucher, not just verify. OFF = Sughra verifies only; Faiz (FM) gives final approval.', flag: 'approval.ae_can_approve' },
-    { nm: 'Branch Accountant under control', ds: "ON = a Branch Accountant's entries walk Check → Verify → Approve. OFF = acts independently, no approval required.", flag: 'control.role.branch_accountant' },
+    // NOTE: 'Let Sughra also Approve (AE-approve)' was retired (2026-07) — the AE verifies
+    // and stops there; final approval is the FM's. Its flag is gone from the backend
+    // catalogue, so listing it here would 422 every bulk write (set-many validates the
+    // whole batch up front). Pinned absent by __tests__/controlPanel.test.js.
+    { nm: 'Branch Accountant under control', crit: true, ds: "ON = the Branch Accountant works CRM-sourced documents instead of raising them. They can no longer create an SO/PO/GP, an inter-branch deal, a refund or a reissue by hand — those arrive from the CRM; their job is to correct what arrives and Check it, which hands it to Sughra and locks it to them until she rejects it back. Their entries walk Check → Verify → Approve. OFF = acts independently, raises anything, no approval required. CAUTION: the CRM sends sale bookings only — it has no refund or reissue path — so while this is ON nobody in the branch can raise a refund. Preview impact before engaging.", flag: 'control.role.branch_accountant' },
     { nm: 'Accounts Executive (Sughra) under control', ds: "ON = Sughra's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.ae' },
     { nm: 'Senior Finance Manager (Faiz) under control', ds: "ON = Faiz's entries walk the approval chain — FM can no longer single-step approve their own. OFF = acts independently.", flag: 'control.role.fm' },
     { nm: 'Branch Manager under control', ds: "ON = a Branch Manager's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.branch_manager' },
@@ -267,7 +270,7 @@ export const CONFIGURABLE_GROUPS = [
     { nm: 'Owner (Afshin) under control', ds: "ON = Afshin's entries walk the approval chain. OFF = acts independently. Note: a Super Admin can still override the chain.", flag: 'control.role.owner' },
   ] },
   { group: 'Segregation of Duties', items: [
-    { nm: 'Verifier ≠ Approver on the same voucher', ds: 'ON = Check → Verify → Approve pass through different hands on the same voucher (relaxable via AE-approve). OFF = not separately enforced.', flag: 'sod.verifier_ne_approver' },
+    { nm: 'Verifier ≠ Approver on the same voucher', ds: 'ON = Check → Verify → Approve pass through different hands on the same voucher. Nothing relaxes it. OFF = not separately enforced.', flag: 'sod.verifier_ne_approver' },
     { nm: 'Large-voucher escalation sign-offs', ds: 'ON = over the escalate ceiling a voucher also needs a Director (Farhan) sign-off, and over the dual ceiling an Owner (Afshin) sign-off, before Faiz’s final approval posts. OFF = FM-approve alone is enough.', flag: 'approval.escalation_signoffs' },
   ] },
   { group: 'Access & Export', items: [
@@ -370,7 +373,12 @@ export const DECLINED_RULES = [
 // as the Role Capabilities screen. Pure data for the matrix.
 export const CAP_COLS = ['Enter', 'Verify', 'Approve', 'Post', 'Revoke', 'Masters', 'Config', 'Cross-branch'];
 export const ROLE_CAPS = [
-  { role: 'Branch Accountant', caps: ['full', 'none', 'none', 'none', 'none', 'none', 'none', 'none'] },
+  // Enter is CONDITIONAL for the Branch Accountant: under control they keep entering their own
+  // book-keeping (payments · receipts · journals · contras) but can no longer raise the four
+  // CRM-sourced documents (SO/PO/GP · inter-branch · refund · reissue).
+  { role: 'Branch Accountant', caps: ['cond', 'none', 'none', 'none', 'none', 'none', 'none', 'none'] },
+  // Approve stays CONDITIONAL for the AE only in the explicit sense: she approves nothing
+  // unless the Owner names her in approval.approveEmails (the AE-approve switch is retired).
   { role: 'Sughra · AE',       caps: ['cond', 'full', 'cond', 'none', 'none', 'none', 'none', 'full'] },
   { role: 'Faiz · FM',         caps: ['cond', 'full', 'full', 'full', 'full', 'full', 'cond', 'full'] },
   { role: 'Farhan · Director', caps: ['none', 'cond', 'none', 'none', 'none', 'none', 'cond', 'full'] },

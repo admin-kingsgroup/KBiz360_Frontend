@@ -28,11 +28,14 @@ const partyScope = (brc) => ({
 
 const FACILITY_TYPES = ['Supplier Trade Credit', 'BSP-BG', 'Bank Card', 'Bank OD'];
 export const CreditFacilitiesMaster = ({ branch } = {}) => {
-  const scope = partyScope(branchCode(branch));
+  const brc = branchCode(branch);
+  const scope = partyScope(brc);
   // Drawdown Ledgers must pick from REAL Sundry Creditors (supplier) ledgers, not
   // free-typed names — a facility can only ever roll up ledgers that actually exist,
   // so a typo can't silently leave a ledger's drawn balance out of the limit check.
-  const ledgersQ = useMasterList('ledgers');
+  // Branch-scoped on the server: vendors are per-branch, so the picker must offer
+  // THIS branch's creditor ledgers (+ 'ALL'), never another branch's.
+  const ledgersQ = useMasterList('ledgers', brc ? { branch: brc } : {});
   const supplierLedgerNames = (ledgersQ.data || [])
     .filter((l) => /sundry\s+creditors/i.test(l.group || '') && scope.rowFilter(l))
     .map((l) => l.name)

@@ -27,10 +27,23 @@ const partyScope = (brc) => ({
 });
 
 export const SuppliersMaster = ({ branch } = {}) => {
-  const scope = partyScope(branchCode(branch));
+  const brc = branchCode(branch);
+  const scope = partyScope(brc);
   return (
   <MasterCrud title="Suppliers" subtitle="Vendors (Sundry Creditors) — live from the backend" resource="suppliers"
+    // Scope on the SERVER (?branch → its vendors + Common 'ALL' ones), not just in the
+    // browser: fetching every branch's vendors and hiding rows client-side is exactly
+    // how one branch's parties leaked into another's view. rowFilter stays as a belt.
+    params={brc ? { branch: brc } : {}}
     rowFilter={scope.rowFilter}
+    // Vendors are PER-BRANCH (shared/constants/ledgerScope): each branch owns the
+    // vendors it buys from, so a branch with none is a legitimate empty — not a fault.
+    // Say so, and name where the other branches' vendors are: Chart of Accounts still
+    // lists BOM-cloned creditor heads under every branch, so a bare "No records yet"
+    // here reads as broken data next to a chart that is visibly full.
+    emptyMessage={({ total }) => (brc && total > 0
+      ? `No vendors onboarded for ${brc} yet. Vendors are per-branch — the ${total} vendor(s) on file belong to other branches and are never shared. Click “New” to add ${brc}’s first vendor, or switch branch from the top-right selector.`
+      : 'No vendors yet — click “New” to add one.')}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       // Category is the one picklist the backend validates (VALID_CATS) — a dropdown

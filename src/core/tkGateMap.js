@@ -170,24 +170,15 @@ export const isEveryone = (route) => verdictOf(route) === EVERYONE;
 // fails, while this set documents the precise Phase-3 work list. It must shrink to
 // an empty set when Phase 3 completes.
 export const PENDING_MIGRATION = new Set([
-  // Accounts Master (Chart of Accounts + costing + planning) — all move to Central
-  '/masters/groups',
-  '/masters/ledgers',
-  '/masters/accounts-tree',
-  '/masters/bank-accounts',
-  '/masters/currency',
-  '/masters/forex',
-  '/masters/cost-categories',
-  '/masters/cost-centers',
-  '/masters/budgets',
-  '/masters/scenarios',
-  // Money-out / period-close / control items under Accounts
+  // Accounts Master (Chart of Accounts + costing + planning) — MIGRATED 2026-07-17:
+  // the whole "Accounts Master" head was removed from the accountant Accounts pill
+  // (MENU_ACCOUNTS_BRANCH_ACCOUNTANT), so its /masters/* rows left this allowlist.
+  // Period Close — MIGRATED 2026-07-17 with the "Period Close" head
+  // (/accounts/suspense, /accounting/year-close, /accounting/recurring).
+  // Money-out / control items still under Accounts
   // ('/accounts/payment-run' removed from the branch surface — bulk-pay feature
   //  disabled by policy; its CENTRAL classification above is kept for re-enable)
   '/accounting/vendor-advances',
-  '/accounts/suspense',
-  '/accounting/year-close',
-  '/accounting/recurring',
   '/accounts/payment-verification',
   // Approval authority currently exposed as a branch pill
   '/transactions/approvals',

@@ -24,6 +24,7 @@ import { SkeletonTable, Skeleton } from '../../../shell/primitives';
 import { toastInfo } from '../../../core/ux/toast';
 import { clickable } from '../../../core/ux/clickable';
 import { JvBlock } from '../../../core/voucher/JvBlock';
+import { isVatBranch } from '../../../core/voucherSpecs.js';
 
 const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec', HEAD = '#2e323c';
 // Branch-statement number. Grouping locale follows the branch currency symbol
@@ -521,7 +522,13 @@ export function VoucherView({ id, cur }) {
   // add the CGST/SGST (or IGST) + TCS rows so the voucher foots to its total.
   if (!particulars.some((p) => p.tax) && VNUM(v.taxAmt) > 0.005) {
     const t = VNUM(v.taxAmt);
-    if (v.gstMode === 'inter') particulars.push({ label: 'IGST', amount: t, tax: true });
+    // Mirror posting.builder.taxPostings EXACTLY: the BRANCH's regime decides first, and only an
+    // India branch splits by gstMode. An Africa/VAT branch posts a single VAT leg regardless of
+    // gstMode — and an INB sale stores gstMode:'inter' for ANY taxable seller (buildInbVoucher),
+    // so testing gstMode first labelled an FBM voucher "IGST" while the journal beside it credits
+    // "VAT Output [FBM]" — the drawer contradicting the postings it sits next to.
+    if (isVatBranch(v.branch)) particulars.push({ label: 'VAT', amount: t, tax: true });
+    else if (v.gstMode === 'inter') particulars.push({ label: 'IGST', amount: t, tax: true });
     else { const half = Math.round((t / 2) * 100) / 100; particulars.push({ label: 'CGST', amount: half, tax: true }); particulars.push({ label: 'SGST', amount: Math.round((t - half) * 100) / 100, tax: true }); }
   }
   if (VNUM(v.tcsAmt) > 0.005) particulars.push({ label: 'TCS', amount: VNUM(v.tcsAmt), tax: true });

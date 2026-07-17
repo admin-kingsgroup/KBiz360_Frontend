@@ -127,7 +127,15 @@ function buildPlSide(items, kind, mapper, tbByGroup, notes) {
   const side = kind === 'income' ? 'Cr' : 'Dr';
   const section = kind === 'income' ? 'Income' : 'Expenses';
   for (const it of items || []) {
-    const { no, title } = mapper(it.group);
+    // Classify by the group's PRIMARY (system) head, not its leaf name. INCOME_NOTE /
+    // EXPENSE_NOTE test for 'Sales Accounts' / 'Direct Income' / 'Purchase Accounts' …,
+    // but the P&L payload is keyed by the POSTING's group — so every module leaf
+    // ('Insurance', 'Flights', 'Hotels', …) matched neither branch and silently fell
+    // through to "Other Income" / "Other Expenses". The backend already ships `primary`
+    // (= topSystemGroup) alongside `group` for exactly this, and the sibling statutory
+    // screens (taxAudit3cd, gstr9c) both read `(g.primary || g.group)` off the same
+    // payload. `it.group` stays the row LABEL below — only the note choice moves.
+    const { no, title } = mapper(it.primary || it.group);
     const note = noteOf(notes, no, title, section, side, 'Profit & Loss');
     const g = groupOf(note, it.group);
     const rows = tbByGroup.get(it.group) || [];

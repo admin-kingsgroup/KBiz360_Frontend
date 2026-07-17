@@ -23,8 +23,12 @@ configureExportGuard({
 // Pull the export policy from the flags. Refresh at boot (in case a session is
 // already live) and once when a user signs in — the policy changes rarely, so a
 // per-login snapshot is enough; anything unfetched stays OFF (dormant).
+// /effective, NOT /api/tk/flags. The central-only read 403s for every branch-scoped user —
+// i.e. exactly the people reports.restrict_export and reports.block_branch_group_export exist
+// to restrict — so the policy silently stayed dormant for them and the guard could never
+// bite. /effective serves the reports.* keys to any signed-in user, in the same shape.
 function refreshPolicy() {
-  apiGet('/api/tk/flags')
+  apiGet('/api/tk/flags/effective')
     .then((state) => setExportPolicy(readExportPolicy(state)))
     .catch(() => { /* not authed yet / offline → stays dormant */ });
 }

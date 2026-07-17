@@ -371,7 +371,23 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
       </>
     ) : status === 'deleted' ? (
       <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
-    ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>
+    ) : (
+      // Rejected is NOT terminal — it is the send-back. Editing a rejected voucher revives it
+      // to Pending and re-enters the chain at Check (vouchers.service.update forces
+      // status:'pending' + resetPatch). Without this button the tab was a dead end: the maker
+      // had to re-key the voucher and burn its number. It also closes the loop the Check
+      // hand-off lock promises — a Branch Accountant locked out of a checked entry is told to
+      // ask the verifier to reject it back, and THIS is where it lands.
+      <>
+        <span title={e.rejectedReason ? `Rejected — ${e.rejectedReason}` : 'Rejected'} style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected{e.rejectedBy ? ` · ${e.rejectedBy}` : ''}</span>
+        <button
+          onClick={() => setEditId(e.id)}
+          disabled={busy}
+          title="Correct and resubmit — this returns the voucher to Pending and re-enters the approval chain at Check (level 1). The number is kept."
+          style={{ ...ABTN(C.blue), marginLeft: 6 }}
+        >Edit &amp; resubmit</button>
+      </>
+    )
   );
   // "Revoked — was posted" chip: an entry that was approved then revoked back to Pending
   // (vs a freshly-entered one). Shows who/why on hover from the live revoke trail.
@@ -680,7 +696,18 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                                             </>
                                           ) : status === 'deleted' ? (
                                             <span title={e.deletedReason || ''} style={{ fontSize: 10, fontWeight: 700, color: C.dim }}>🗑 {e.deletedBy || 'deleted'}</span>
-                                          ) : <span style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected</span>}
+                                          ) : (
+                                            // Same send-back as the flat list above — this is the GROUPED
+                                            // (voucher-type-wise) view. Patching only one of the two render
+                                            // paths would leave the loop the Check hand-off lock promises
+                                            // dead in whichever view the user happened to be in.
+                                            <>
+                                              <span title={e.rejectedReason ? `Rejected — ${e.rejectedReason}` : 'Rejected'} style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected{e.rejectedBy ? ` · ${e.rejectedBy}` : ''}</span>
+                                              <button onClick={() => setEditId(e.id)} disabled={busy}
+                                                title="Correct and resubmit — this returns the voucher to Pending and re-enters the approval chain at Check (level 1). The number is kept."
+                                                style={{ marginLeft: 6, padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Edit &amp; resubmit</button>
+                                            </>
+                                          )}
                                         </td>
                                       </tr>
                                       );

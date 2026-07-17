@@ -22,9 +22,13 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
   // '' = "use the branch's own default" — the BE decides it (₹0.50 on the India books,
   // $0.05 on Africa's), so the panel never hardcodes an INR assumption.
   const [maxDiff, setMaxDiff] = useState('');
-  const canSettle = isSettlerRole(currentUser?.role) && !certified;
+  // Kept apart on purpose: `isSettler` is the ROLE test, `canSettle` folds in the period's
+  // certificate. A control that can't act must say WHICH of the two is stopping it — telling
+  // an AE to "re-open the certificate" sends them chasing something that wouldn't help.
+  const isSettler = isSettlerRole(currentUser?.role);
+  const canSettle = isSettler && !certified;
 
-  const { data, isError } = useQuery({
+  const { data, isError, error } = useQuery({
     queryKey: ['tally-tieout', 'roundoff', branch, tier, period, maxDiff],
     queryFn: () => previewRoundOff({ branch, period, tier, maxDiff }),
     // A bad threshold is a 400 the user is actively typing their way out of — don't
@@ -40,9 +44,24 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
   const settle = useMutation({ mutationFn: () => settleRoundOff({ branch, period, tier, maxDiff }), onSuccess: invalidate });
   const reverse = useMutation({ mutationFn: () => reverseRoundOff({ branch, period, tier }), onSuccess: invalidate });
 
-  const existing = data?.existing || null;
+  // A settlement is now one voucher PER COST CENTRE (the residue has to carry a real tag
+  // or the tie-out can't attribute it to a module), so `existing` is a LIST. Tolerate the
+  // old single-object shape so a cached/in-flight response from the previous BE can't
+  // blank the panel.
+  const existing = data?.existing ? (Array.isArray(data.existing) ? data.existing : [data.existing]) : null;
   const lines = data?.lines || [];
+  // The legs, grouped into the vouchers that will post (one per cost centre). Fall back to
+  // a single untagged group when the BE sends only the flat `lines` — during a deploy the
+  // panel can be served a response from the previous BE, and rendering NOTHING there would
+  // be a silent screen hiding what is about to post.
+  const groups = data?.groups?.length
+    ? data.groups
+    : (lines.length ? [{ costCenter: '', lines, plug: data?.plug ?? 0 }] : []);
+  // The LEDGERS actually settled. Not `lines`, which counts posting legs — Round Off now
+  // carries a balancing leg in every cost-centre group, so legs overstate the ledger count.
+  const settles = data?.settles || [];
   const skipped = data?.skipped || [];
+  const ccLabel = (cc) => cc || 'no cost centre';
   const after = data?.after || {};
   const before = data?.before || {};
   // Branch currency + cap come from the BE (bookCurrencyOf) — NBO/DAR/FBM keep USD books,
@@ -52,28 +71,53 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
   const shownThreshold = Number(maxDiff === '' ? (data?.maxDiff ?? data?.defaultThreshold ?? 0) : maxDiff);
 
   // Nothing to show when the period has no residue at all and none was ever settled.
-  if (!isError && !existing && !lines.length && !(before.off > 0)) return null;
+  if (!isError && !existing?.length && !lines.length && !(before.off > 0)) return null;
 
   return (
     <PageSection icon={Scale} title="Rounding settlement"
-      subtitle="Posts a real, reversible JV that moves ERP onto Tally for sub-rupee rounding residue — so the strict gate is met on merit, not waived."
-      actions={existing
-        ? <Badge tone="success" size="sm" dot>Settled · {existing.vno}</Badge>
+      subtitle="Posts real, reversible JVs — one per cost centre, so each residue stays attributable to its module — moving ERP onto Tally for sub-rupee rounding residue, so the strict gate is met on merit, not waived."
+      actions={existing?.length
+        ? <Badge tone="success" size="sm" dot>Settled · {existing.length === 1 ? existing[0].vno : `${existing.length} JVs`}</Badge>
         : <Badge tone={after.tiesAfter ? 'info' : 'warning'} size="sm" dot>{after.tiesAfter ? 'Would tie' : 'Residue open'}</Badge>}>
       <div className="grid gap-3">
         {isError ? (
           <div className="rounded-brand border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-ink">
-            Couldn’t work out the rounding position — the threshold may be out of range (it is capped, deliberately: this settles rounding, not real differences).
+            {/* Say WHAT failed and WHY — the BE's own message. The panel used to guess
+                "the threshold may be out of range" for every failure, so a 503 "no database
+                connection" sent the operator off editing a threshold that was never the
+                problem. Only fall back to the guess when the error carries no message. */}
+            Couldn’t work out the rounding position{error?.message ? <> — {error.message}</> : <> — the threshold may be out of range (it is capped, deliberately: this settles rounding, not real differences).</>}
           </div>
-        ) : existing ? (
+        ) : existing?.length ? (
           <>
-            <div className="flex items-center gap-2 rounded-brand border border-success/30 bg-success/5 px-4 py-3 text-sm text-ink">
-              <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
-              Settled by <b>{existing.vno}</b> dated {existing.date} — the rounding residue is posted to <b>Round Off</b>. Reverse it if you’d rather correct at source.
+            <div className="grid gap-2 rounded-brand border border-success/30 bg-success/5 px-4 py-3 text-sm text-ink">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
+                {existing.length === 1
+                  ? <span>Settled by <b>{existing[0].vno}</b> dated {existing[0].date} — the rounding residue is posted to <b>Round Off</b>. Reverse it if you’d rather correct at source.</span>
+                  : <span>Settled by <b>{existing.length} JVs</b> dated {existing[0].date} — one per cost centre, so each residue stays attributable to its module. The balancing legs post to <b>Round Off</b>. Reversing removes <b>all {existing.length}</b>.</span>}
+              </div>
+              {existing.length > 1 && (
+                <ul className="grid gap-0.5 pl-6">
+                  {existing.map((v) => (
+                    <li key={v.vno} className="flex flex-wrap items-baseline gap-x-2 text-xs text-ink-muted">
+                      <span className="font-mono tabular-nums text-ink">{v.vno}</span>
+                      <span>· {ccLabel(v.costCenter)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+            {/* Every branch of this must say something. Previously an AE on an UNCERTIFIED
+                settled period got an empty div: no button, no reason — while the text above
+                said "Reversing removes all 3", pointing at a control that wasn't on screen.
+                Mirror the settle branch, which states the role rule. Order matters: role is
+                named first for a non-settler, since a certificate re-open would not unblock
+                them anyway (re-open is Director/Owner, reversing is still FM+). */}
             <div className="flex flex-wrap items-center gap-2">
-              {canSettle && <Button variant="ghost" icon={RotateCcw} loading={reverse.isPending} onClick={() => reverse.mutate()}>Reverse settlement</Button>}
-              {certified && <span className="text-xs text-ink-subtle">This period is certified — re-open the Tally certificate before reversing.</span>}
+              {canSettle && <Button variant="ghost" icon={RotateCcw} loading={reverse.isPending} onClick={() => reverse.mutate()}>{existing.length === 1 ? 'Reverse settlement' : `Reverse all ${existing.length} JVs`}</Button>}
+              {!isSettler && <span className="text-xs text-ink-subtle">Reversing a settlement is FM, Director or Owner only — this is a record of what was posted.</span>}
+              {isSettler && certified && <span className="text-xs text-ink-subtle">This period is certified — re-open the Tally certificate before reversing.</span>}
               {reverse.isError && <span className="text-xs text-danger">{reverse.error?.message}</span>}
             </div>
           </>
@@ -98,11 +142,11 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
               {lines.length === 0 ? (
                 <>No ledger is within {cur}{shownThreshold.toFixed(2)} of tying — nothing to settle at this threshold.</>
               ) : after.tiesAfter ? (
-                <><b className="text-success">This makes every amount tie.</b> {lines.length} ledger{lines.length === 1 ? '' : 's'} settle
+                <><b className="text-success">This makes every amount tie.</b> {settles.length} ledger{settles.length === 1 ? '' : 's'} settle
                   {data?.plug ? <> (with a {fmt(data.plug, cur)} plug to Round Off)</> : <> — the legs net to nil, so no plug is needed</>}.
                   The period can then be certified, once any name/group fixes owed in Tally are done.</>
               ) : (
-                <><b className="text-warning">This will not make the period tie.</b> {lines.length} ledger{lines.length === 1 ? '' : 's'} settle, but{' '}
+                <><b className="text-warning">This will not make the period tie.</b> {settles.length} ledger{settles.length === 1 ? '' : 's'} settle, but{' '}
                   <b>{after.offAfter}</b> would still be off{(after.onlyErpAfter + after.onlyTallyAfter) > 0 && <> and {after.onlyErpAfter + after.onlyTallyAfter} one-sided</>}{' '}
                   ({cur}{Number(after.absDiffAfter || 0).toFixed(2)} remaining) — those are real differences, not rounding.
                   {data?.plug ? <> The {cur}{Math.abs(data.plug).toFixed(2)} remainder is plugged to <b>Round Off</b>, which moves that row further from Tally.</> : null}{' '}
@@ -110,25 +154,42 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
               )}
             </div>
 
-            {/* Exactly what would post. */}
-            {lines.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[420px] text-sm">
-                  <thead>
-                    <tr className="border-b border-surface-border text-left text-xs font-semibold uppercase text-ink-muted">
-                      <th className="py-1.5 pr-3">Ledger</th><th className="py-1.5 pr-3 text-right">Amount</th><th className="py-1.5">Dr/Cr</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lines.map((l) => (
-                      <tr key={l.ledger} className="border-b border-surface-divider last:border-0">
-                        <td className="py-1.5 pr-3">{l.ledger}</td>
-                        <td className="py-1.5 pr-3 text-right tabular-nums">{l.amt.toFixed(2)}</td>
-                        <td className="py-1.5"><Badge tone={l.drCr === 'Dr' ? 'info' : 'navy'} size="sm">{l.drCr}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Exactly what would post — grouped, because one JV posts PER COST CENTRE so
+                each residue stays attributable to its module. Keying by ledger alone would
+                also collide here: Round Off carries a balancing leg in every group. */}
+            {groups.length > 0 && (
+              <div className="grid gap-2">
+                <div className="text-xs text-ink-subtle">
+                  Posts <b>{groups.length}</b> journal voucher{groups.length === 1 ? '' : 's'} — one per cost centre, so each
+                  residue stays attributable to its module instead of falling into Unspecified.
+                </div>
+                {groups.map((g) => (
+                  <div key={g.costCenter || '__untagged'} className="overflow-x-auto rounded-brand border border-surface-border">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-surface-divider bg-surface-muted px-3 py-1.5">
+                      <span className="text-xs font-semibold text-ink">{ccLabel(g.costCenter)}</span>
+                      <span className="text-xs text-ink-subtle">
+                        {g.lines.length} leg{g.lines.length === 1 ? '' : 's'}
+                        {g.plug ? <> · {fmt(g.plug, cur)} to Round Off</> : <> · legs net to nil</>}
+                      </span>
+                    </div>
+                    <table className="w-full min-w-[420px] text-sm">
+                      <thead>
+                        <tr className="border-b border-surface-border text-left text-xs font-semibold uppercase text-ink-muted">
+                          <th className="py-1.5 pl-3 pr-3">Ledger</th><th className="py-1.5 pr-3 text-right">Amount</th><th className="py-1.5 pr-3">Dr/Cr</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.lines.map((l) => (
+                          <tr key={l.ledger} className="border-b border-surface-divider last:border-0">
+                            <td className="py-1.5 pl-3 pr-3">{l.ledger}</td>
+                            <td className="py-1.5 pr-3 text-right tabular-nums">{l.amt.toFixed(2)}</td>
+                            <td className="py-1.5 pr-3"><Badge tone={l.drCr === 'Dr' ? 'info' : 'navy'} size="sm">{l.drCr}</Badge></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -142,9 +203,15 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="primary" icon={Scale} loading={settle.isPending} disabled={!canSettle || !lines.length}
+              {/* Name what actually posts: N VOUCHERS, not one JV of N legs. The badge,
+                  subtitle and reverse button were all made N-aware; this button — the one
+                  the operator actually commits with — still said "Post settlement JV
+                  (12 legs)" twelve pixels under "Posts 3 journal vouchers". */}
+              <Button variant="primary" icon={Scale} loading={settle.isPending} disabled={!canSettle || !groups.length}
                 onClick={() => settle.mutate()}>
-                Post settlement JV{lines.length ? ` (${lines.length} leg${lines.length === 1 ? '' : 's'})` : ''}
+                {settle.isPending && groups.length > 1 ? `Posting ${groups.length} JVs…`
+                  : groups.length > 1 ? `Post ${groups.length} settlement JVs (one per cost centre)`
+                  : `Post settlement JV${lines.length ? ` (${lines.length} leg${lines.length === 1 ? '' : 's'})` : ''}`}
               </Button>
               {/* Say WHY it's disabled — the backend refuses both of these, and a click
                   that only produces a 409/403 is a worse answer than the sentence. */}

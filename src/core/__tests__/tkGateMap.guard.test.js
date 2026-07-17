@@ -71,15 +71,16 @@ describe('guard — no central route on the branch surface', () => {
   });
 });
 
-// ─── INB · the two mirror pipelines must BOTH survive the Phase-3 re-gate ─────────────
-// Inter-branch trade is bidirectional — any branch sells to any other depending on where
-// the price is best (AMD→BOM is as real as BOM→AMD), so a branch must be able to work BOTH
-// of its own pipelines. Outgoing was classified CENTRAL and only reachable via the
-// PENDING_MIGRATION escape hatch, which conflated "only central may APPROVE" (true, and
-// role-gated in inb.controller) with "branches may not SEE it" (false). Left that way,
-// Phase 3 would have deleted a branch's own outgoing pipeline off its menu and stopped it
-// selling inter-branch at all. These pin the corrected model so that can't regress.
-describe('INB pipelines survive on the branch surface', () => {
+// ─── INB · pipelines: verdicts unchanged, but OFF the accountant nav ──────────────────
+// Inter-branch trade is bidirectional, so the VERDICT model keeps Outgoing SPLIT (the
+// branch raises/monitors; central holds Approve+Push authority, role-gated in
+// inb.controller) and Incoming BRANCH — neither is central-with-an-exception.
+// 2026-07-17 decision: the whole "Inter Branch" head (pipelines + analytics) was
+// removed from the accountant Accounts pill along with Branch MIS / Period Close /
+// Accounts Master (MENU_ACCOUNTS_BRANCH_ACCOUNTANT). The screens stay reachable by
+// direct URL / per-user grant, the daily INB entry voucher stays under Daily Entry ▸
+// Sales & Inter-Branch, and full-menu roles keep the full head.
+describe('INB pipelines — verdicts stable, off the accountant nav', () => {
   const branchRoutes = new Set(hrefsOf(getMenu(BRANCH_OBJ, ACCOUNTANT)));
 
   test('Outgoing is SPLIT — the branch raises/monitors, central holds Approve+Push authority', () => {
@@ -90,9 +91,10 @@ describe('INB pipelines survive on the branch surface', () => {
     expect(verdictOf('/inb/incoming')).toBe(BRANCH);
   });
 
-  test('BOTH pipelines are on the branch menu', () => {
-    expect(branchRoutes.has('/inb/outgoing')).toBe(true);
-    expect(branchRoutes.has('/inb/incoming')).toBe(true);
+  test('the pipelines are OFF the accountant nav; the daily INB entry survives', () => {
+    expect(branchRoutes.has('/inb/outgoing')).toBe(false);
+    expect(branchRoutes.has('/inb/incoming')).toBe(false);
+    expect(branchRoutes.has('/bookings/inter-branch')).toBe(true); // Daily Entry ▸ Sales & Inter-Branch
   });
 
   test('neither is central, so neither needs a PENDING_MIGRATION exemption to survive', () => {
