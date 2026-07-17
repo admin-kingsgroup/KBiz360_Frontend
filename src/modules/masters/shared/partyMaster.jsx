@@ -75,8 +75,11 @@ function useOpenBills(party, side) {
 // One hook drives both masters: list + selection + editable form + save.
 // `brc` (a specific top-bar branch code) narrows the record list to that
 // branch's parties + the Common ('ALL') ones — never another branch's.
+// The narrowing happens on the SERVER (?branch) — fetching every branch's
+// parties and hiding rows client-side is how branches leaked into each other;
+// the local filter stays only as a belt over the already-scoped payload.
 export function usePartyMaster(resource, side, brc) {
-  const list = useMasterList(resource);
+  const list = useMasterList(resource, brc ? { branch: brc } : {});
   const { update, create } = useMasterMutations(resource);
   const rows = (list.data || []).filter((r) => !brc || !r.branch || r.branch === 'ALL' || r.branch === brc);
 

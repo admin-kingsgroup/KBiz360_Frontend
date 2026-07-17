@@ -425,7 +425,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Indian 194H TDS AND charges no Indian GST (import of service), so both are dropped
   // from the grid; an Indian vendor's STATE vs the branch's home state auto-picks the
   // Purchase GST mode. The CUSTOMER's record does the same for the Sale GST mode.
-  const supplierMaster = useQuery({ queryKey: ['suppliers'], queryFn: () => apiGet('/api/suppliers') }).data || [];
+  // Branch-scoped (?branch → this branch's parties + Common 'ALL' ones): parties are
+  // per-branch, so the resolver map and the B2C picker below must never see — or
+  // silently match on — another branch's masters.
+  const supplierMaster = useQuery({ queryKey: ['suppliers', brCode], queryFn: () => apiGet('/api/suppliers', brCode ? { branch: brCode } : {}) }).data || [];
   const supplierByName = useMemo(() => {
     const m = new Map();
     (supplierMaster || []).forEach((s) => { if (s && s.name) m.set(s.name.trim().toLowerCase(), s); });
@@ -445,7 +448,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Customer master (ERP-owned + transaction-derived rows). B2C end-customers are looked
   // up here by NAME — the pooled per-staff B2C ledger carries no state, the customer
   // record does (address + state are compulsory on creation).
-  const customerMaster = useQuery({ queryKey: ['customers'], queryFn: () => apiGet('/api/customers') }).data || [];
+  const customerMaster = useQuery({ queryKey: ['customers', brCode], queryFn: () => apiGet('/api/customers', brCode ? { branch: brCode } : {}) }).data || [];
   const customerByName = useMemo(() => {
     const m = new Map();
     (customerMaster || []).forEach((c) => { if (c && c.name) m.set(c.name.trim().toLowerCase(), c); });

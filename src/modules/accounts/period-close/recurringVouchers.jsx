@@ -120,19 +120,25 @@ export function RecurringVouchers({branch}){
                 <FL label="Day of month"><input type="number" min={1} max={31} value={form.day} onChange={e=>setForm(f=>({...f,day:+e.target.value}))} style={inp}/></FL>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:10}}>
-                <FL label="Debit ledger"><LedgerSelect value={form.dr} onChange={v=>setForm(f=>({...f,dr:v}))} placeholder="e.g. Office Rent"/></FL>
-                <FL label="Credit ledger"><LedgerSelect value={form.cr} onChange={v=>setForm(f=>({...f,cr:v}))} placeholder="e.g. HDFC Bank"/></FL>
+                {/* branch prop is load-bearing: without it LedgerSelect lists the ALL-branch
+                    chart, and a head picked from another branch won't resolve in ledgerNameOf
+                    (branch-scoped registry) — the template saves with a blank ledger name. */}
+                <FL label="Debit ledger"><LedgerSelect branch={branch} value={form.dr} onChange={v=>setForm(f=>({...f,dr:v}))} placeholder="e.g. Office Rent"/></FL>
+                <FL label="Credit ledger"><LedgerSelect branch={branch} value={form.cr} onChange={v=>setForm(f=>({...f,cr:v}))} placeholder="e.g. HDFC Bank"/></FL>
               </div>
               <FL label="Amount (₹)"><input type="number" value={form.amt} onChange={e=>setForm(f=>({...f,amt:+e.target.value}))} style={inp}/></FL>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button disabled={!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)||create.isPending}
+              {/* A template is branch-owned — no silent "BOM" fallback: on the group/ALL
+                  view, Focus a branch first so its rent/salary JV posts into ITS books. */}
+              {(branch==="ALL"||!branch?.code)&&<p style={{margin:0,fontSize:10.5,color:"#b3261e",alignSelf:"center"}}>Focus a branch to create a template</p>}
+              <button disabled={!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)||create.isPending||branch==="ALL"||!branch?.code}
                 onClick={()=>create.mutate(
                   {name:form.name.trim(),category:form.type.toLowerCase(),freq:form.freq,day:form.day,dr:ledgerNameOf(form.dr),cr:ledgerNameOf(form.cr),amt:form.amt,
-                   branch:branch&&branch!=="ALL"&&branch.code?branch.code:"BOM",active:true},
+                   branch:branch.code,active:true},
                   {onSuccess:()=>{setModal(false);setForm({name:"",type:"Journal",freq:"Monthly",day:1,dr:"",cr:"",amt:0});toast("Recurring template saved.");}})}
-                style={{...btnG,opacity:!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)?0.5:1}}>{create.isPending?"Saving…":"Create Template"}</button>
+                style={{...btnG,opacity:!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)||branch==="ALL"||!branch?.code?0.5:1}}>{create.isPending?"Saving…":"Create Template"}</button>
             </div>
           </div>
         </div>
