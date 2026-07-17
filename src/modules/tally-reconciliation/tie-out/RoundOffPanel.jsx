@@ -22,9 +22,13 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
   // '' = "use the branch's own default" — the BE decides it (₹0.50 on the India books,
   // $0.05 on Africa's), so the panel never hardcodes an INR assumption.
   const [maxDiff, setMaxDiff] = useState('');
-  const canSettle = isSettlerRole(currentUser?.role) && !certified;
+  // Kept apart on purpose: `isSettler` is the ROLE test, `canSettle` folds in the period's
+  // certificate. A control that can't act must say WHICH of the two is stopping it — telling
+  // an AE to "re-open the certificate" sends them chasing something that wouldn't help.
+  const isSettler = isSettlerRole(currentUser?.role);
+  const canSettle = isSettler && !certified;
 
-  const { data, isError } = useQuery({
+  const { data, isError, error } = useQuery({
     queryKey: ['tally-tieout', 'roundoff', branch, tier, period, maxDiff],
     queryFn: () => previewRoundOff({ branch, period, tier, maxDiff }),
     // A bad threshold is a 400 the user is actively typing their way out of — don't
@@ -78,7 +82,11 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
       <div className="grid gap-3">
         {isError ? (
           <div className="rounded-brand border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-ink">
-            Couldn’t work out the rounding position — the threshold may be out of range (it is capped, deliberately: this settles rounding, not real differences).
+            {/* Say WHAT failed and WHY — the BE's own message. The panel used to guess
+                "the threshold may be out of range" for every failure, so a 503 "no database
+                connection" sent the operator off editing a threshold that was never the
+                problem. Only fall back to the guess when the error carries no message. */}
+            Couldn’t work out the rounding position{error?.message ? <> — {error.message}</> : <> — the threshold may be out of range (it is capped, deliberately: this settles rounding, not real differences).</>}
           </div>
         ) : existing?.length ? (
           <>
@@ -100,9 +108,16 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
                 </ul>
               )}
             </div>
+            {/* Every branch of this must say something. Previously an AE on an UNCERTIFIED
+                settled period got an empty div: no button, no reason — while the text above
+                said "Reversing removes all 3", pointing at a control that wasn't on screen.
+                Mirror the settle branch, which states the role rule. Order matters: role is
+                named first for a non-settler, since a certificate re-open would not unblock
+                them anyway (re-open is Director/Owner, reversing is still FM+). */}
             <div className="flex flex-wrap items-center gap-2">
               {canSettle && <Button variant="ghost" icon={RotateCcw} loading={reverse.isPending} onClick={() => reverse.mutate()}>{existing.length === 1 ? 'Reverse settlement' : `Reverse all ${existing.length} JVs`}</Button>}
-              {certified && <span className="text-xs text-ink-subtle">This period is certified — re-open the Tally certificate before reversing.</span>}
+              {!isSettler && <span className="text-xs text-ink-subtle">Reversing a settlement is FM, Director or Owner only — this is a record of what was posted.</span>}
+              {isSettler && certified && <span className="text-xs text-ink-subtle">This period is certified — re-open the Tally certificate before reversing.</span>}
               {reverse.isError && <span className="text-xs text-danger">{reverse.error?.message}</span>}
             </div>
           </>
@@ -188,9 +203,15 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="primary" icon={Scale} loading={settle.isPending} disabled={!canSettle || !lines.length}
+              {/* Name what actually posts: N VOUCHERS, not one JV of N legs. The badge,
+                  subtitle and reverse button were all made N-aware; this button — the one
+                  the operator actually commits with — still said "Post settlement JV
+                  (12 legs)" twelve pixels under "Posts 3 journal vouchers". */}
+              <Button variant="primary" icon={Scale} loading={settle.isPending} disabled={!canSettle || !groups.length}
                 onClick={() => settle.mutate()}>
-                Post settlement JV{lines.length ? ` (${lines.length} leg${lines.length === 1 ? '' : 's'})` : ''}
+                {settle.isPending && groups.length > 1 ? `Posting ${groups.length} JVs…`
+                  : groups.length > 1 ? `Post ${groups.length} settlement JVs (one per cost centre)`
+                  : `Post settlement JV${lines.length ? ` (${lines.length} leg${lines.length === 1 ? '' : 's'})` : ''}`}
               </Button>
               {/* Say WHY it's disabled — the backend refuses both of these, and a click
                   that only produces a 409/403 is a worse answer than the sentence. */}
