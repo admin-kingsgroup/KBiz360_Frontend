@@ -229,3 +229,29 @@ describe('Revoke INB (return to seller)', () => {
     expect(screen.getByText('Convert →')).not.toBeDisabled();   // ours to take up again
   });
 });
+
+// ─── The auto-steer must never present history as work ────────────────────────────────
+// Caught on LIVE data: BOM has zero pending/converted/approved and one DELETED deal, and the
+// steer opened the screen straight into the Deleted archive — alarming, and not their work.
+// Deleted is history; Edited is a cross-cut whose rows already sit on their real tab. Only
+// Pending / Converted / Approved are queues, so only those may be steered to.
+test('does NOT steer to Deleted — an archive is not a to-do list', () => {
+  feed([{ ...ROW, state: 'deleted', buyerBookingNo: 'BKG/BOM/26/0001' }]);
+  render(<InboundInterBranch branch="BOM" setRoute={mockSetRoute} currentUser={{}} />);
+  // Stays on Pending, whose empty state explains that a deal appears only once a seller pushes.
+  expect(screen.getByText('Nothing awaiting conversion.')).toBeInTheDocument();
+  expect(screen.getByRole('tab', { name: /^Deleted/ }).textContent).toContain('(1)');   // findable
+});
+
+test('does NOT steer to Edited — a cross-cut, not a queue', () => {
+  // The row is BOTH deleted and edited; neither may pull the user off Pending.
+  feed([{ ...ROW, state: 'deleted', edited: true }]);
+  render(<InboundInterBranch branch="BOM" setRoute={mockSetRoute} currentUser={{}} />);
+  expect(screen.getByText('Nothing awaiting conversion.')).toBeInTheDocument();
+});
+
+test('DOES steer to Approved when that is the only real work', () => {
+  feed([{ ...ROW, state: 'approved', buyerBookingNo: 'BKG/AMD/26/0108', saleDone: true }]);
+  render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+  expect(screen.getByText('BKG/AMD/26/0108')).toBeInTheDocument();
+});

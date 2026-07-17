@@ -30,9 +30,10 @@ const toBuyer = (amt, fx) => {
   return r2(amt);
 };
 
-// Mirrors the BE guard on DELETE /inb/deal/:linkNo (inb.controller ADMIN_DELETE) — deleting
-// reverses BOTH branches' posted vouchers, so it stays Super Admin / Director only. Keep the two
-// regexes in step: a looser FE gate just hands the user a 403 after they've typed a reason.
+// Mirrors the BE guard on POST /api/inter-branch/delete (inb.controller ADMIN_DELETE) —
+// deleting reverses BOTH branches' posted vouchers, so it stays Super Admin / Director only.
+// Keep the two regexes in step: a looser FE gate just hands the user a 403 after they've typed
+// a reason. (Not a REST DELETE and not :linkNo-addressed — an INB link no contains slashes.)
 const CAN_DELETE = /super.?admin|director/i;
 
 export function InboundInterBranch({ branch, setRoute, currentUser }) {
@@ -50,9 +51,14 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
   const [tabSteered, setTabSteered] = useState(false);
   useEffect(() => {
     if (tabSteered || q.isLoading) return;
-    // Land on the first tab that actually has something, in lifecycle order.
+    // Land on the first tab with actual WORK on it, in lifecycle order. Deliberately only
+    // these three: Deleted is an archive and Edited is a cross-cut (its rows already sit on
+    // their real tab), so steering to either presents history as a to-do list. A branch whose
+    // only row is a deleted deal opened straight into it — alarming, and not their work.
+    // Falling through to Pending is right: its empty state explains that a deal appears only
+    // once the selling branch pushes one.
     if (!data.totals.pending) {
-      const first = ['converted', 'approved', 'edited', 'deleted'].find((k) => data.totals[k] > 0);
+      const first = ['converted', 'approved'].find((k) => data.totals[k] > 0);
       if (first) setTab(first);
     }
     setTabSteered(true);

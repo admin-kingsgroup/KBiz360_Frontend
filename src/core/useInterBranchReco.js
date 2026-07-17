@@ -17,7 +17,12 @@ export function useInterBranchReco({ from, to } = {}) {
 // missing voucher behind a pair mismatch, from the INB Link registry.
 export function useInterBranchLinks({ branch } = {}) {
   return useQuery({
-    queryKey: ['interbranch-links', branch || ''],
+    // Keyed under 'inb' on purpose: this is the SAME /reconcile feed the INB screens read, so
+    // it must share their cache namespace. Every INB mutation (convert / return / delete /
+    // book) invalidates ['inb'] — under its own 'interbranch-links' key this query missed all
+    // of them and served link data up to its 30s staleTime out of date, so a deal converted
+    // on one screen still read 'open' here.
+    queryKey: ['inb', 'reconcile-links', branch || ''],
     queryFn: () => apiGet('/api/inter-branch/reconcile', { branch }),
     enabled: !!getAuthToken(),
     staleTime: 30_000,

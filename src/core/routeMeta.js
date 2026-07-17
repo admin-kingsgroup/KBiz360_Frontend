@@ -45,6 +45,7 @@ const EXTRA = {
   '/inb/outgoing': ['Finance', 'Inter Branch', 'Outgoing · We Sell'],
   '/inb/incoming': ['Finance', 'Inter Branch', 'Incoming · Convert'],
   '/transactions/inb-approvals': ['Finance', 'Inter Branch', 'Outgoing · We Sell'],  // legacy alias
+  '/accounts/inb-inbound': ['Finance', 'Inter Branch', 'Incoming · Convert'],        // legacy alias
   '/transactions/approvals/receipt': ['Finance', 'Approvals', 'Receipt'],
   '/transactions/approvals/payment': ['Finance', 'Approvals', 'Payment'],
   '/transactions/approvals/contra': ['Finance', 'Approvals', 'Contra'],

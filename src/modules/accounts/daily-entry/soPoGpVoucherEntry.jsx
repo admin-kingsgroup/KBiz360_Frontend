@@ -30,7 +30,7 @@ import { PeriodBar, periodRange } from '../../../core/period';
 import { printBookingInvoice } from '../../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../../core/api';
 import { useApprovalChain, nextActionFor, StageChip } from '../../../core/approvalChain';
-import { useOpenInb, useBookInb, useCreateInb, useUpdateInb } from '../../../core/useInterBranchVoucher';
+import { useCreateInb, useUpdateInb } from '../../../core/useInterBranchVoucher';
 import { useVNo } from '../../../core/useNextNo';
 
 // Inter-branch jurisdiction (mirror of backend inb.service.COUNTRY): same country (India) = IGST;
@@ -486,7 +486,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const lastCustApplied = useRef(normName(editing ? editBooking.customer?.name : ''));
   const lastSuppApplied = useRef(normName(editing ? (editBooking.supplier?.ledgerName || editBooking.supplier?.name) : ''));
   useEffect(() => {
-    if (interBranch) return; // INB fixes its own modes (seller IGST / buyer via fetchInb)
+    if (interBranch) return; // INB fixes its own modes (seller bills IGST per the tick)
     const key = normName(customer.name);
     if (!key || key === lastCustApplied.current) return;
     if (custSupply === 'intra' || custSupply === 'inter') { setSaleGstMode(custSupply); lastCustApplied.current = key; }
@@ -515,13 +515,6 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  // Inter-branch (INB): the PO can fetch an open INB leg sent to this branch — it
-  // pre-fills the supplier (the selling branch) + fares + Service Fee, and on save
-  // the link is marked booked (consumed). inbLinkNo holds the fetched link.
-  const [inbLinkNo, setInbLinkNo] = useState(''); // display (INB Link No)
-  const [inbId, setInbId] = useState('');         // the InbLink _id (API target)
-  const openInbQ = useOpenInb(branch);
-  const bookInb = useBookInb();
   // Inter-branch SALE mode: the customer is a counterparty branch; the SO grid's
   // fares pass through to Inter-Branch Sales and the Service Charge becomes the
   // Service Fee (margin). Posts via the INB engine (not the booking pipeline).
@@ -832,36 +825,24 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       qc.invalidateQueries({ queryKey: ['booking-orders'] });
       if (editing) invalidateBooks(qc); // an edit reverses the prior posting → refresh every books cache
       toast(`Voucher ${booking.bookingNo || ''} saved — pending approval`);
-      // If this PO was fetched from an open inter-branch leg, consume it (mark the
-      // INB link booked). Non-fatal: a miss leaves the link open to retry.
-      if (inbId && booking?.bookingNo) {
-        try { await bookInb.mutateAsync({ id: inbId, purchaseVno: booking.bookingNo }); setInbLinkNo(''); setInbId(''); }
-        catch (_) { /* link stays open; surfaced in the INB reconciliation */ }
-      }
       setResult({ ...booking, _approved: false, _edited: editing });
     } catch (e) { setError(e.message || 'Failed to save voucher'); toast(`Could not save — ${e.message || 'failed'}`, 'error'); }
     finally { setSaving(false); }
   };
-  // Pull an open inter-branch leg into the PO: supplier = the selling branch, each
-  // fare mapped to its matching fare column, Service Fee → Supplier Service, GST →
-  // inter (IGST). Stamps inbLinkNo so the link is consumed on save.
-  const fetchInb = (link) => {
-    if (!link) return;
-    setSupplier({ name: `Travkings Tours and Travels ${link.fromBranch}`, gstin: '', address: '', email: '', contact: '', ledgerGroup: '' });
-    setPurGstMode('inter');
-    if (link.packageType) setPackageType(link.packageType);
-    const parts = String(link.passenger || '').trim().split(/\s+/);
-    const ln = { ...blankLine(spec), fn: parts[0] || '', sn: parts.slice(1).join(' ') };
-    for (const rl of (link.lines || [])) {
-      const col = (spec.fareCols || []).find((c) => c.label.toLowerCase() === String(rl.desc || '').toLowerCase());
-      if (col) ln[col.key] = num(rl.amt);
-    }
-    ln.psvc = num(link.serviceFee);
-    setLines([ln]);
-    setInbLinkNo(link.inbLinkNo);
-    setInbId(link._id || link.id || '');
-    toast(`Fetched ${link.inbLinkNo} from ${link.fromBranch} — review & save`);
-  };
+  // ── The legacy "Fetch open INB" picker is GONE (2026-07-17) ─────────────────────────
+  // It let a buyer pull an 'open' INB leg straight into an ordinary SO/PO/GP PO. That was a
+  // pre-Convert fallback, and it was effectively dead while push() seeded the buyer booking
+  // itself — a link only rested at 'open' if that seed threw. Now push() OFFERS a deal and
+  // rests at 'open' until the buyer Converts, so this picker became live for every pushed
+  // deal — a second, unguarded door into the buyer's books. It skipped everything convert()
+  // enforces: the returnedToSeller race guard, the deleted/unpushed checks, assertInbFxQuoted
+  // (so a cross-currency deal booked the seller's rupees AS dollars, ~95x) and the
+  // findActiveByLinkNo idempotency. Worse, its save called markBooked with the BUYER's booking
+  // number, overwriting link.purchaseVno — the seller's INB purchase leg, which drives the
+  // refund lookup — and the booking it made carried no linkNo, so it was invisible to
+  // findActiveByLinkNo/findByLink and silently defeated returnToSeller's live-buyer gate,
+  // deleteDeal's buyer cascade and reopenInbForBooking.
+  // INB · Incoming → Convert is the ONE door. Do not reintroduce a second.
 
   // Tally-style keys across the whole entry screen: Enter advances between data
   // fields (skipping action buttons), Enter on the last field / Ctrl+Cmd+Enter saves.
@@ -993,17 +974,6 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // The Purchase Order section — step ② of the full entry form.
   const poSection = !isNoSupp && (
     <Section n="2" badge={interBranch ? 'INPO' : 'PO'} name={interBranch ? 'Inter-Branch Purchase Order' : 'Purchase Order'} sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
-      {!editing && (openInbQ.data || []).length > 0 && (
-        <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: CR }}>Fetch open INB:</span>
-          <select value="" onChange={(e) => { const l = (openInbQ.data || []).find((x) => x.inbLinkNo === e.target.value); if (l) fetchInb(l); }}
-            style={{ padding: '5px 8px', border: '1px solid #cdd1d8', borderRadius: 6, fontSize: 12, minWidth: 340 }}>
-            <option value="">Inter-branch legs sent to {brCode}…</option>
-            {(openInbQ.data || []).map((l) => <option key={l.inbLinkNo} value={l.inbLinkNo}>{l.inbLinkNo} · from {l.fromBranch} · {l.passenger || '—'} · {fmt(l.total)}</option>)}
-          </select>
-          {inbLinkNo && <span style={{ fontSize: 11, fontWeight: 700, color: '#27500A' }}>✓ {inbLinkNo} — fares & Service Fee pre-filled (IGST)</span>}
-        </div>
-      )}
       <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960, tableLayout: 'fixed' }}>
           <thead><tr style={{ borderBottom: '2px solid ' + PO_BAR }}>
