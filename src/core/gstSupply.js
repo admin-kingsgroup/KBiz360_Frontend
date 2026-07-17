@@ -8,15 +8,52 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { IN_STATES } from './partyEnums';
 
-// GST registration state of each Indian branch (its place of business).
-export const HOME_STATE_BY_BRANCH = { BOM: '27', AMD: '24' }; // Maharashtra, Gujarat
+// GST registration state of each INDIA branch (its place of business). India-only by nature —
+// a GST state is meaningless for NBO/DAR/FBM, and supplyTypeOf now returns before reaching this
+// for a non-India branch. BOMMB is listed explicitly rather than riding the default: it is
+// Mumbai, so it was right only by luck.
+export const HOME_STATE_BY_BRANCH = { BOM: '27', AMD: '24', BOMMB: '27' }; // Maharashtra, Gujarat, Maharashtra
 const DEFAULT_HOME_STATE = '27';                              // HO — Maharashtra
 export const homeStateForBranch = (branch) =>
   HOME_STATE_BY_BRANCH[String(branch || '').trim().toUpperCase()] || DEFAULT_HOME_STATE;
 export const homeStateNameForBranch = (branch) => stateNameOf(homeStateForBranch(branch));
 
-// Blank country is treated as India (the overwhelming default for this book), so
-// legacy rows without a country still classify.
+// ── Branch → country (ISO 3166-1 alpha-2) ────────────────────────────────────
+// A branch operates in ONE country and taxes/withholds under THAT country's law. Mirror of
+// the backend's taxRegime.BRANCH_COUNTRY and of inb.service.COUNTRY (the INB jurisdiction
+// map, which had this right all along) — keep the three in step. The FE/BE pair MUST agree:
+// approvalChecks recomputes foreignSupplier server-side and rejects a booking whose purchase
+// GST disagrees with its own recompute.
+export const BRANCH_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' };
+export const homeCountryOf = (branch) => BRANCH_COUNTRY[String(branch || '').trim().toUpperCase()] || 'IN';
+
+// Free-text country NAME/alias → ISO code; '' when unmapped (→ treated as foreign, fail safe).
+const COUNTRY_CODE = {
+  india: 'IN', in: 'IN', bharat: 'IN',
+  kenya: 'KE', ke: 'KE',
+  tanzania: 'TZ', tz: 'TZ',
+  'dr congo': 'CD', drc: 'CD', congo: 'CD', cd: 'CD',
+  'democratic republic of congo': 'CD', 'democratic republic of the congo': 'CD',
+};
+export const countryCodeOf = (c) => COUNTRY_CODE[String(c || '').trim().toLowerCase()] || '';
+
+/**
+ * Is this party DOMESTIC to the given branch — in the same country the branch operates in?
+ * This is the question `isIndiaCountry` was standing in for, and getting wrong off India.
+ *   blank   → YES (a legacy/derived row is local to its own branch; blank on FBM = Congolese)
+ *   known   → its code === the branch's country
+ *   unknown → NO ('Singapore', 'Other') — fail safe, never invent a domestic credit
+ */
+export const isDomesticFor = (country, branch) => {
+  const c = String(country || '').trim();
+  if (!c) return true;
+  const code = countryCodeOf(c);
+  return code ? code === homeCountryOf(branch) : false;
+};
+
+// DEPRECATED for the "does our tax apply?" question — use isDomesticFor(country, branch).
+// Correct ONLY for an India branch. Kept for needsState-style checks that genuinely mean India.
+// Blank country is treated as India, so legacy rows without a country still classify.
 export const isIndiaCountry = (c) => {
   const x = String(c || '').trim().toLowerCase();
   return x === '' || x === 'india' || x === 'in' || x === 'bharat';
@@ -40,10 +77,18 @@ export const stateNameOf = (code) => {
   return row ? row[1] : '';
 };
 
-// 'foreign' | 'intra' | 'inter' | '' (India but state not yet captured).
+// 'foreign' | 'intra' | 'inter' | '' (domestic, but no Indian state split applies/captured).
+//
+// FOREIGN is relative to the BRANCH's country, not to India — it was `!isIndiaCountry(...)`,
+// which inverted on every Africa branch (a Congolese vendor on FBM read 'foreign'; an Indian
+// vendor on FBM read domestic). Mirrors the backend's resolveSupplyType exactly.
 export function supplyTypeOf(party = {}, branchCode) {
-  if (!isIndiaCountry(party.country)) return 'foreign';
+  const branch = branchCode || party.branch;
+  if (!isDomesticFor(party.country, branch)) return 'foreign';
+  // The intra/inter split is an INDIAN place-of-supply concept; a VAT branch has none, so
+  // return '' (the existing "no split" value) rather than comparing against an Indian state.
+  if (homeCountryOf(branch) !== 'IN') return '';
   const sc = stateCodeOf(party);
   if (!sc) return '';
-  return sc === homeStateForBranch(branchCode || party.branch) ? 'intra' : 'inter';
+  return sc === homeStateForBranch(branch) ? 'intra' : 'inter';
 }

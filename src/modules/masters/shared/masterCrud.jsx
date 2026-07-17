@@ -189,7 +189,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   );
 }
 
-export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows, rowStyle, initialEditKey }) {
+export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows, rowStyle, initialEditKey, emptyMessage }) {
   const list = useMasterList(resource, params);
   const { create, update, remove } = useMasterMutations(resource);
   const [editing, setEditing] = useState(null); // record being edited, or {} for new
@@ -205,6 +205,14 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   const pg = usePager(rows);
   const cols = fields.filter((f) => f.table !== false);
   const isDerivedRow = (r) => !r.id || String(r.id).startsWith('derived:');
+  // An empty list must say WHY it is empty, not just that it is. "No records yet" is a
+  // lie when rowFilter hid every row — the records exist, they're just out of scope
+  // (e.g. a per-branch master viewed from a branch that owns none). `emptyMessage` may
+  // be a string, or a fn given { total, hidden } so the view can name the real reason.
+  const total = (list.data || []).length;
+  const emptyText = (typeof emptyMessage === 'function'
+    ? emptyMessage({ total, hidden: total - rows.length })
+    : emptyMessage) || 'No records yet — click “New” to add one.';
 
   const openNew = () => { setErr(''); setEditing({ __new: true, ...blankFromFields(fields) }); };
   const openEdit = (r) => { setErr(''); setEditing({ ...blankFromFields(fields), ...r }); };
@@ -368,7 +376,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
               <th style={{ width: 84, padding: '10px 13px', borderBottom: '1px solid #cdd1d8' }} />
             </tr></thead>
             <tbody>
-              {rows.length === 0 && <tr><td colSpan={cols.length + 1} style={{ padding: 28, textAlign: 'center', color: DIM }}>No records yet — click “New” to add one.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={cols.length + 1} style={{ padding: 28, textAlign: 'center', color: DIM }}>{emptyText}</td></tr>}
               {pg.pageRows.map((r) => (
                 // rowStyle lets a view emphasize certain rows (e.g. a tinted,
                 // bold band on each primary Tally group). Cell weight inherits

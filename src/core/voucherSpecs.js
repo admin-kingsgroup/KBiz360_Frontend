@@ -295,6 +295,23 @@ const svcRateOf = (ctx) => { if (ctx && (ctx.noVat || ctx.saleZeroRated)) return
 const purRateOf = (spec, ctx) => { if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); if (ctx && ctx.noVat) return 0; return moduleRate(spec); };
 const pkgRateOf = (spec, ctx) => { if (ctx && (ctx.noVat || ctx.saleZeroRated)) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return spec.gstRate || PKG_GST; };
 export { isVatBranch };
+// Withholding on the supplier incentive/commission — the RATE follows the BRANCH's own
+// country, because a branch withholds under the law of where it operates.
+//   • India (BOM/AMD/BOMMB) → 194H at the statutory 2%.
+//   • Africa (NBO/DAR/FBM)  → that country's WHT, which is per-supplier and already has a
+//     home on the supplier master: `whtRate` / `whtSection` (added as "the VAT-world
+//     counterparts of gstin/tdsSection") — fields that were built for exactly this and
+//     never read by the calc.
+// Unset rate → 0 → nothing withheld. That is the SAFE default and strictly better than the
+// old behaviour, which applied India's 2% in Kenya/Tanzania/DR Congo: a real WHT-receivable
+// asset and a supplier payable overstated by 2% of commission, at a foreign statutory rate.
+// It also needs no data migration — populate whtRate per supplier and it starts working.
+// NB: `foreignSupplier` still zeroes it entirely (an overseas vendor withholds nothing for
+// us either way); this decides the rate only when a withholding does apply.
+export const INCENTIVE_TDS_RATE = 0.02;
+const whtRateOf = (ctx) => (isVatBranch(ctx && ctx.branch)
+  ? num(ctx && ctx.supplierWhtRate) / 100
+  : INCENTIVE_TDS_RATE);
 // The branch's VAT rate as a PERCENT (16 / 18) rather than the fraction every rate helper above
 // returns — for UI captions that STATE the rate. Reads the same live-then-static source as the
 // math (vatRateOf), so a caption can't drift from the amount it labels. Africa branches only.
@@ -342,8 +359,9 @@ export function lineCalcPackage(spec, l, ctx) {
   const markup = num(l.markup);            // net markup (agency margin = SVC2)
   const incentive = num(l.incentive);
   // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
-  // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.
-  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * 0.02);
+  // withhold Indian 194H TDS — drop it so the grid matches what the books post. The RATE
+  // itself follows the branch's country (whtRateOf), not a hardcoded Indian 2%.
+  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * whtRateOf(ctx));
   // Taxable SALES value = Base Fare + SVC2 only. The supplier service charge (psvc)
   // is a purchase-side cost we absorb — never billed to the customer, never in the
   // GST base. The supplier's GST is recovered as Input credit (ITC), not re-billed.
@@ -382,8 +400,9 @@ export function lineCalc(spec, l, ctx) {
   const gPur = (ctx && ctx.foreignSupplier) ? 0 : (isInputTaxable(ctx) ? gstPur(spec, l, pr) : 0);
   const incentive = num(l.incentive);
   // A FOREIGN supplier (master country ≠ India, e.g. IATA-BSP / Singapore) cannot
-  // withhold Indian 194H TDS — drop the 2% so the grid matches what the books post.
-  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * 0.02);
+  // withhold Indian 194H TDS — drop it so the grid matches what the books post. The RATE
+  // itself follows the branch's country (whtRateOf), not a hardcoded Indian 2%.
+  const tds = (ctx && ctx.foreignSupplier) ? 0 : r2(incentive * whtRateOf(ctx));
   const fSales = r2(fareSum(spec, l) + num(l.markup) + num(l.ssvc) + gSvc);
   const fPur   = r2(fareSum(spec, l) + num(l.psvc) + gPur); // GROSS cost; incentive netted via incentivePostings on post
   const sGST = r2(gSvc + gMk);
@@ -403,8 +422,11 @@ export function lineCalc(spec, l, ctx) {
 // po/so carry { lineTotal (net, ex tax), serviceCharge, gst, tcs, total, lines }.
 // gp = sales net − purchase net (= net markup + service charge). The per-line
 // `lines` detail is preserved for the read-only voucher view + voucher meta.
-export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, saleZeroRated = false, availItc = false, foreignSupplier = false, clientType = '', date = '', vatRate = null } = {}) {
-  const ctx = { branch, noVat: !!noVat, saleZeroRated: !!saleZeroRated, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType, vatRate };
+// NB: the options are destructured to named params and `ctx` below is rebuilt from that whitelist
+// — a key not named here is SILENTLY DROPPED before any rate/gate helper sees it. Add new ctx
+// inputs in BOTH places.
+export function bookingTotals(spec, lines, { packageType = '', noSupplier = false, branch = '', noVat = false, saleZeroRated = false, availItc = false, foreignSupplier = false, clientType = '', interBranch = false, date = '', vatRate = null, supplierWhtRate = 0 } = {}) {
+  const ctx = { branch, noVat: !!noVat, saleZeroRated: !!saleZeroRated, availItc: !!availItc, foreignSupplier: !!foreignSupplier, clientType, interBranch: !!interBranch, vatRate, supplierWhtRate };
   // A USD-book (Africa/VAT) branch bills to the cent → no whole-unit round-off snap.
   const bookCcy = isVatBranch(branch) ? 'USD' : 'INR';
   const po = { lineTotal: 0, serviceCharge: 0, gst: 0, tcs: 0, incentiveAmt: 0, incentiveGst: 0, incentiveTds: 0, total: 0, lines: [] };

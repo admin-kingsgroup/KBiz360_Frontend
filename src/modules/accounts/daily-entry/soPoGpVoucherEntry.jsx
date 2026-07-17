@@ -59,7 +59,7 @@ const inbCrossBorder = (from, to) => (inbCty(from) || 'IN') !== (inbCty(to) || '
 const inbIndiaSeller = (from) => INB_COUNTRY[String(from || '').toUpperCase().trim()] === 'IN';
 import { AuditTrail } from '../../../core/AuditTrail';
 import { useLedgerRegistry } from '../../../core/useReference';
-import { supplyTypeOf, stateNameOf, stateCodeOf, homeStateNameForBranch } from '../../../core/gstSupply';
+import { supplyTypeOf, stateNameOf, stateCodeOf, homeStateNameForBranch, isDomesticFor, homeCountryOf } from '../../../core/gstSupply';
 import { STATE_NAMES } from '../../../core/partyEnums';
 import { useFormKeys } from '../../../core/ux/forms';
 import { toast } from '../../../core/ux/toast';
@@ -96,10 +96,13 @@ const isReversalModule = (m) => m === 'RF' || m === 'RI';
 // (the rule sheet stores 'Flight'/'Hotel'/…/'Misc' or 'ALL').
 const MARKUP_RULE_MODULE = { SF: 'Flight', SH: 'Holiday', SHT: 'Hotel', SV: 'Visa', SI: 'Insurance', SC: 'Car', SM: 'Misc' };
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
-// A supplier attracts Indian 194H TDS only when it is an Indian vendor (blank country =
-// India default). Mirrors the backend isIndia() in shared/util/gstSupplyType so the live
-// PO grid drops the 2% TDS for a foreign supplier exactly as the posted journal does.
-const isIndiaCountry = (c) => { const s = String(c || '').trim().toLowerCase(); return s === '' || s === 'india' || s === 'in' || s === 'bharat'; };
+// A supplier attracts the BRANCH's domestic tax + withholding only when it sits in the same
+// country the branch operates in (blank country = domestic to that branch). Mirrors the backend
+// isDomesticFor() in shared/util/gstSupplyType so the live PO grid drops the tax for a foreign
+// supplier exactly as the posted journal does — and so approvalChecks, which recomputes this
+// server-side, agrees with what the screen sent.
+// This was a LOCAL copy of isIndiaCountry: "foreign" meant "not Indian", which inverted on the
+// Africa branches (a Congolese vendor on FBM lost its input VAT; an Indian vendor fabricated it).
 const today = () => new Date().toISOString().slice(0, 10);
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
@@ -430,8 +433,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   }, [supplierMaster]);
   const supplierOf = (name) => supplierByName.get(String(name || '').trim().toLowerCase()) || null;
   const countryOfSupplier = (name) => (supplierOf(name) || {}).country || '';
-  const isForeignSupplier = (name) => !isIndiaCountry(countryOfSupplier(name));
+  const isForeignSupplier = (name) => !isDomesticFor(countryOfSupplier(name), brCode);
   const suppForeign = isForeignSupplier(supplier.name);
+  // Africa (VAT) branches withhold their OWN country's WHT, whose rate is per-supplier and
+  // lives on the supplier master. No master row (a transaction-derived vendor) → 0 → nothing
+  // withheld, which is correct-by-default: the alternative was India's 194H 2% in DR Congo.
+  // India branches ignore this — 194H is the statutory 2% (whtRateOf).
+  const whtRateOfSupplier = (name) => num((supplierOf(name) || {}).whtRate);
+  const suppWhtRate = whtRateOfSupplier(supplier.name);
   const supplySupplierOf = (name) => { const r = supplierOf(name); return r ? supplyTypeOf(r, brCode) : ''; };
   // Customer master (ERP-owned + transaction-derived rows). B2C end-customers are looked
   // up here by NAME — the pooled per-staff B2C ledger carries no state, the customer
@@ -580,6 +589,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const isVatBr = isVatBranch(brCode);
   // Tax label drives every "GST" caption on the grid: Africa shows VAT, India GST.
   const taxLabel = isVatBr ? 'VAT' : 'GST';
+  // Withholding on the supplier incentive: India withholds 194H TDS, an Africa branch WHT. Mirrors
+  // the grid column header (isVatBr ? 'WHT' : 'TDS (2%)') and the backend's whtLabel — the section
+  // sub-caption used to hardcode "TDS", announcing Indian withholding on a Lubumbashi voucher.
+  const whtLabel = isVatBr ? 'WHT' : 'TDS';
   // A zero-rated inter-branch EXPORT bills no tax on the Service Fee — the banner says so and the
   // server posts taxAmt 0 (inbTaxTreatment: cross-border + tick off ⇒ rate 0, for ANY seller).
   // `billIgst === false` is exactly that case: a same-country INB pins it true, a non-INB voucher
@@ -599,9 +612,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const taxCtx = { branch: brCode, vatRate: liveVatRate };
   // `interBranch` rides the ctx so the SCREEN suppresses TCS exactly as the server does on an INB
   // leg (tcsAmt 0). It cannot be inferred from clientType — see the TCS gate in voucherSpecs.
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, clientType, interBranch, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, inbZeroRated, suppForeign, clientType, interBranch, date, liveVatRate]);
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, supplierWhtRate: suppWhtRate, clientType, interBranch, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, inbZeroRated, suppForeign, suppWhtRate, clientType, interBranch, date, liveVatRate]);
   // Effective TCS 206C(1G) rate for this booking's date (5% up to 31-03-2026, else 2%).
   const tcsRate = spec.tcs ? tcs206cRate(spec, date) : 0;
+  // The TCS COLUMN itself is hidden on an inter-branch deal — not just zeroed. 206C(1G) can never
+  // apply there (the counterparty is our own branch; the server pins tcsAmt 0), so the column could
+  // only ever render zeros while implying the charge exists. The per-line/footer/banner readouts
+  // already gate on `totals.so.tcs > 0` and went silent on their own; these three gate on spec.tcs.
+  // NOT folded into spec.tcs: a DOMESTIC package legitimately shows a 0 column that turns non-zero
+  // the moment the scope flips to International — that one must stay.
+  const showTcsCol = !!spec.tcs && !interBranch;
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
   // The SALE-side rate — drives the "{taxLabel}/Service Fee ({activeRate}%)" captions. Mirrors
   // svcRateOf: zero when the fee isn't billed, whether that's the Africa Without-VAT toggle or a
@@ -1001,8 +1021,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   };
 
   // The Purchase Order section — step ② of the full entry form.
+  // The sub-caption's withholding name follows the BRANCH's regime (whtLabel), like the grid column
+  // inside it — it read "2% TDS is added" on every branch, announcing Indian 194H withholding on an
+  // FBM/NBO/DAR voucher whose own column header already said WHT.
   const poSection = !isNoSupp && (
-    <Section n="2" badge={interBranch ? 'INPO' : 'PO'} name={interBranch ? 'Inter-Branch Purchase Order' : 'Purchase Order'} sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ' · foreign supplier — no Indian TDS' : ', 2% TDS is added'}`} accent={PO_BAR}>
+    <Section n="2" badge={interBranch ? 'INPO' : 'PO'} name={interBranch ? 'Inter-Branch Purchase Order' : 'Purchase Order'} sub={`what you pay the airline / supplier · supplier incentive is automatically subtracted${suppForeign ? ` · overseas supplier — no ${whtLabel}` : `, 2% ${whtLabel} is added`}`} accent={PO_BAR}>
       <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960, tableLayout: 'fixed' }}>
           <thead><tr style={{ borderBottom: '2px solid ' + PO_BAR }}>
@@ -1417,14 +1440,28 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       </div>
 
       {/* ① Sales Order */}
-      <Section n="1" badge={interBranch ? 'INSO' : 'SO'} name={interBranch ? 'Inter-Branch Sales Order' : 'Sales Order'} sub={pkg ? 'what the customer pays · 5% GST on the package + 2% TCS (Intl)' : 'what the customer pays · Service Charge - 2 is GST-inclusive'} accent={SO_BAR}>
+      {/* Derived like the legend above it. This bar was hardcoded to India — "5% GST on the package
+          + 2% TCS (Intl)" / "Service Charge - 2 is GST-inclusive" — so an FBM/NBO/DAR branch was
+          told it charges Indian GST at an Indian rate, and TCS, on the one line that says what the
+          section bills. On FBM it is VAT at 16%, and TCS never applies to a VAT branch at all.
+          The 2%/5% TCS split is date-based (tcsRate), so the flat "2%" was also wrong for a booking
+          dated on or before 31-03-2026.
+          INB names no margin field: Service Charge - 2 is hidden there, and for a package module the
+          Service Fee is hidden too — so it states only what is true (fares pass at cost). */}
+      <Section n="1" badge={interBranch ? 'INSO' : 'SO'} name={interBranch ? 'Inter-Branch Sales Order' : 'Sales Order'}
+        sub={interBranch
+          ? `what ${toBranch || 'the buying branch'} pays · fares pass through at cost${pkg ? '' : ' · your margin is the Service Fee'}`
+          : pkg
+            ? `what the customer pays · ${activeRate}% ${taxLabel} on the package${isVatBr ? '' : ` + ${tcsRate}% TCS (Intl)`}`
+            : `what the customer pays · Service Charge - 2 is ${taxLabel}-inclusive`}
+        accent={SO_BAR}>
         <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #d8e0ea' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
             <thead><tr style={{ borderBottom: '2px solid ' + SO_BAR }}>
               {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
               {!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
-              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{pkg ? `${taxLabel} (5%)` : `${taxLabel}/Service Charge - 2 (${activeRate}%)`}</th>}{spec.tcs && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>TCS ({tcsRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
+              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{pkg ? `${taxLabel} (5%)` : `${taxLabel}/Service Charge - 2 (${activeRate}%)`}</th>}{showTcsCol && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>TCS ({tcsRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -1449,7 +1486,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     {!pkg && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
                     {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(pkg ? c.salesGST : c.gstMk)}</td>}
-                    {spec.tcs && <td style={{ ...tdAuto, width: 95 }}>{fmt(lineTcs)}</td>}
+                    {showTcsCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(lineTcs)}</td>}
                     <td style={{ ...tdC, fontWeight: 800, color: DR, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales + lineTcs)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
                   </tr>
@@ -1465,7 +1502,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {!interBranch && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
               {!pkg && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
               {!pkg && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={soTf}>{fmt(pkg ? totals.so.gst + totals.so.otherTaxesGst : totals.so.otherTaxesGst)}</td>}
-              {spec.tcs && <td style={soTf}>{fmt(totals.so.tcs)}</td>}
+              {showTcsCol && <td style={soTf}>{fmt(totals.so.tcs)}</td>}
               <td style={{ ...soTf, color: DR }}>{fmt(totals.so.total)}{num(totals.so.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.so.roundOff > 0 ? '+' : ''}{fmt(totals.so.roundOff)}</span> : null}</td><td style={soTf} />
             </tr></tfoot>
           </table>
@@ -1887,8 +1924,13 @@ function QuickCreateCustomer({ initialName, brCode, onClose, onCreated }) {
     if (!canSave) return;
     setSaving(true); setErr('');
     try {
+      // Country is left BLANK, not stamped 'India'. Blank reads as domestic to whichever
+      // branch owns the row (isDomesticFor), which is right on all six; hardcoding 'India'
+      // wrote a false country into the FBM/NBO/DAR masters permanently — and once the
+      // country test became branch-relative, that lie would classify a local walk-in as a
+      // foreign import. The quick-create form captures no country field to fill it from.
       const rec = await apiPost('/api/customers', {
-        name: f.name.trim(), branch: brCode || '', country: 'India',
+        name: f.name.trim(), branch: brCode || '', country: '',
         address: f.address.trim(), city: f.city.trim(), state: f.state,
         phone: f.phone.trim(), email: f.email.trim(),
       });

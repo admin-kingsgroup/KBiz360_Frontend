@@ -14,8 +14,14 @@ export const SUPPLIER_CATS = ['Airline', 'DMC', 'Hotel', 'Visa', 'Insurance', 'C
 // GST registration treatment (drives invoice/tax behaviour). '' = not yet classified.
 export const GST_TREATMENTS = ['', 'Registered — Regular', 'Registered — Composition', 'Unregistered', 'SEZ', 'Overseas'];
 
-// Country list (mirrors backend gstSupplyType: only India attracts Indian GST/TDS).
-export const COUNTRIES = ['India', 'United Arab Emirates', 'Singapore', 'Thailand', 'United Kingdom', 'United States', 'Sri Lanka', 'Nepal', 'Maldives', 'Other'];
+// Country list. A party is DOMESTIC when its country matches the BRANCH's country
+// (gstSupply.isDomesticFor / backend taxRegime.BRANCH_COUNTRY) — so every country the group
+// OPERATES in must be selectable, or an Africa branch has no correct value to record and its
+// local vendors end up as 'Other' (→ foreign → input VAT silently dropped).
+// Kenya / Tanzania / DR Congo are the NBO / DAR / FBM home countries; the rest are India's
+// trading partners. Spellings must stay in step with COUNTRY_CODE in gstSupply.js — a value
+// that doesn't map there is treated as foreign to every branch.
+export const COUNTRIES = ['India', 'Kenya', 'Tanzania', 'DR Congo', 'United Arab Emirates', 'Singapore', 'Thailand', 'United Kingdom', 'United States', 'Sri Lanka', 'Nepal', 'Maldives', 'Other'];
 
 // GST state codes (first two digits of a GSTIN) → state name. Mirrors backend IN_STATES.
 export const IN_STATES = [

@@ -90,6 +90,78 @@ describe('INB tax tick — the label states the SELLER regime, not a hardcoded I
   });
 });
 
+// A VAT (Africa) branch must not have Indian tax words ANYWHERE on the screen. The first pass at
+// this fixed only the INB tax tick and missed the section sub-captions, which were hardcoded
+// ("5% GST on the package + 2% TCS (Intl)", "Service Charge - 2 is GST-inclusive", "2% TDS is
+// added") — so FBM still announced Indian GST/TCS/TDS on the very lines that say what each section
+// charges, right beside a legend and column headers that correctly said VAT and WHT.
+//
+// This sweeps the whole rendered document instead of naming individual strings, so the next
+// hardcoded caption fails here rather than reaching Lubumbashi.
+describe('FBM (VAT branch) — no Indian tax vocabulary anywhere on the screen', () => {
+  const indiaWords = [/\bIGST\b/, /\bCGST\b/, /\bSGST\b/, /\bTCS\b/, /\bTDS\b/, /206C/, /194H/];
+
+  test('INB voucher on FBM shows no IGST / CGST / SGST / TCS / TDS', () => {
+    const { container } = renderInb('FBM', inbDeal({ branch: 'FBM', toBranch: 'BOM' }));
+    indiaWords.forEach((w) => expect(container.textContent).not.toMatch(w));
+    expect(container.textContent).toMatch(/\bVAT\b/);   // and it does say VAT
+  });
+
+  test('INB Holiday on FBM: the section bar quotes VAT at 16%, not "5% GST … + 2% TCS"', () => {
+    const { container } = renderInb('FBM', inbDeal({ branch: 'FBM', toBranch: 'BOM', module: 'SH', packageType: 'International' }));
+    indiaWords.forEach((w) => expect(container.textContent).not.toMatch(w));
+    expect(container.textContent).not.toMatch(/5% GST/);
+  });
+
+  test('a NORMAL (non-INB) FBM voucher is also free of Indian tax words', () => {
+    // The section bars render on the ordinary Africa voucher too — that is where "Service Charge - 2
+    // is GST-inclusive" and "2% TDS is added" were showing on every FBM sale.
+    const { container } = wrap(<SoPoGpVoucherEntry branch={{ code: 'FBM' }} setRoute={() => {}} editBooking={{
+      id: 'f1', branch: 'FBM', date: '2026-06-01', module: 'SF',
+      customer: { name: 'ACME', ledgerName: 'ACME' }, supplier: { name: 'Kenya Air', ledgerName: 'Kenya Air' },
+      so: { total: 1000 }, po: { total: 800 }, gp: { total: 200, pct: 20 }, rows: [], status: 'pending',
+    }} />);
+    indiaWords.forEach((w) => expect(container.textContent).not.toMatch(w));
+  });
+
+  test('an India branch KEEPS its GST/TDS vocabulary — the sweep is regime-scoped, not a purge', () => {
+    // The control: if this goes silent, the captions were emptied rather than made regime-aware.
+    const { container } = wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{
+      id: 'b9', branch: 'BOM', date: '2026-06-01', module: 'SF',
+      customer: { name: 'ACME', ledgerName: 'ACME' }, supplier: { name: 'TBO', ledgerName: 'TBO' },
+      so: { total: 1000 }, po: { total: 800 }, gp: { total: 200, pct: 20 }, rows: [], status: 'pending',
+    }} />);
+    expect(container.textContent).toMatch(/\bGST\b/);
+    expect(container.textContent).toMatch(/\bTDS\b/);
+  });
+});
+
+// The screen must not quote a TCS the server will never post. inbNoTcs.test.js pins the pure gate;
+// this pins that the INB SCREEN renders none of its furniture — column, banner, or inflated total.
+describe('INB Holiday (International) — no TCS on screen, because none is posted', () => {
+  const shDeal = (over = {}) => inbDeal({ module: 'SH', packageType: 'International', ...over });
+
+  test('India seller, INB International Holiday: no TCS column and no TCS banner', () => {
+    renderInb('BOM', shDeal({ branch: 'BOM', toBranch: 'AMD' }));
+    // The amber banner claimed TCS was "collected from the customer" — on a deal billed to our
+    // own branch, for tax the books never post.
+    expect(screen.queryByText(/collected from the customer/i)).toBeNull();
+    expect(screen.queryByText(/206C\(1G\)/i)).toBeNull();
+    expect(screen.queryByText(/TCS \(\d+%\)/i)).toBeNull();
+  });
+
+  test('a NORMAL International Holiday still shows TCS (the fix is INB-scoped)', () => {
+    // The control: if this ever goes silent, TCS was killed for real bookings too.
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} editBooking={{
+      id: 'b3', branch: 'BOM', date: '2026-06-01', module: 'SH', packageType: 'International',
+      customer: { name: 'ACME', ledgerName: 'ACME' }, supplier: { name: 'TBO', ledgerName: 'TBO' },
+      so: { total: 1000 }, po: { total: 800 }, gp: { total: 200, pct: 20 },
+      rows: [{ fn: 'A', sn: 'B', base: 100000 }], status: 'pending',
+    }} />);
+    expect(screen.getByText(/206C\(1G\)/i)).toBeInTheDocument();
+  });
+});
+
 describe('Client Type on an INB voucher — stated and locked, not a live no-op', () => {
   test('reads "Inter Branch", is disabled, and says why', () => {
     renderInb('FBM', inbDeal({ branch: 'FBM', toBranch: 'BOM' }));
