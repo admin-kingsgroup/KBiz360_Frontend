@@ -432,7 +432,11 @@ export function bookingTotals(spec, lines, { packageType = '', noSupplier = fals
     }
     // NOTE: supplier incentive + 2% TDS are NOT posted as cost heads — they ride on
     // po.incentiveAmt / po.incentiveTds and post via the engine's incentivePostings
-    // (Cr Commission / Incentive A/c., Dr TDS Receivable, supplier payable netted).
+    // (Cr the commission income head, Dr TDS Receivable, supplier payable netted).
+    // The income head is module-resolved BACKEND-side (posting.builder.commissionHead):
+    // Insurance → "IN-Commission" (Sales Accounts · Insurance), every other module →
+    // the shared "Commission / Incentive A/c.". Nothing to mirror here — the FE never
+    // names that ledger, it only carries the scalars.
   });
   ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'incentiveAmt', 'incentiveGst', 'incentiveTds', 'total'].forEach((k) => { po[k] = r2(po[k]); });
   ['lineTotal', 'serviceCharge', 'gst', 'tcs', 'total'].forEach((k) => { so[k] = r2(so[k]); });

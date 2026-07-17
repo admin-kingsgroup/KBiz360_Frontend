@@ -149,6 +149,37 @@ describe('splitRefundJv — sale-side / purchase-side T-blocks', () => {
     expect(sale.some((p) => /commission|tds/i.test(p.ledger))).toBe(false);
   });
 
+  // Insurance books its supplier commission to its OWN module head ("IN-Commission",
+  // Sales Accounts · Insurance) rather than the shared Direct-Income head. The leg is
+  // still a PURCHASE-side reversal (we earned it on the purchase), so it must render on
+  // the purchase T-block exactly like the shared head does.
+  //
+  // This is load-bearing and fragile: the split rules test `/sales account/` on the
+  // GROUP *before* they test `/commission/` on the LEDGER. It works only because the
+  // posting carries the LEAF group ('Insurance'), not the primary ('Sales Accounts') —
+  // if the engine ever stamped the primary instead, the commission would silently jump
+  // to the sale side and both T-blocks would stop balancing.
+  test('the Insurance module commission head (IN-Commission) also lands on the purchase side', () => {
+    const withModuleCommission = [
+      ...LEGS,
+      { ledger: 'IN-Commission', group: 'Insurance', debit: 1476.9, credit: 0 },
+      { ledger: 'TDS Receivable [BOM]', group: 'Current Assets', debit: 0, credit: 29.54 },
+    ];
+    const { sale, purchase } = splitRefundJv(withModuleCommission, { party: P, counterParty: S });
+    expect(purchase.some((p) => p.ledger === 'IN-Commission')).toBe(true);
+    expect(sale.some((p) => p.ledger === 'IN-Commission')).toBe(false);
+  });
+
+  test('regression: a commission head stamped with the PRIMARY group would misroute — pin the leaf-group contract', () => {
+    // Documents the trap above. If this ever flips to 'sale', the engine started
+    // stamping 'Sales Accounts' on the commission leg and commissionHead must be fixed.
+    const { purchase } = splitRefundJv(
+      [{ ledger: 'IN-Commission', group: 'Insurance', debit: 1476.9, credit: 0 }],
+      { party: P, counterParty: S },
+    );
+    expect(purchase.length).toBe(1);
+  });
+
   test('GST output → sale, input credit → purchase', () => {
     const { sale, purchase } = splitRefundJv([
       { ledger: 'IGST Output [BOM]', group: 'Duties & Taxes', debit: 0, credit: 45 },
