@@ -770,8 +770,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const blockedNew = originate.blocked && !editing;
   // EVERY entry field is mandatory (2026-07-17) — no voucher is created with a blank.
   // The list below names exactly what's missing so the footer can say it next to the
-  // disabled Save button instead of leaving the user to hunt. Remarks + Tally Refs
-  // stay optional (they're cross-references, not voucher data).
+  // disabled Save button instead of leaving the user to hunt. That includes Remarks +
+  // Tally Refs — required wherever the save path persists them (the INB payload keeps
+  // only saleTallyRef, as `reference`, so remarks/purTallyRef stay optional there).
   const missingFields = (() => {
     const miss = [];
     if (!date) miss.push('SPG Date');
@@ -793,11 +794,26 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       const row = lines.length > 1 ? ` (line ${i + 1})` : '';
       if (!String(l.fn || '').trim()) miss.push(`${spec.idCols[0].label}${row}`);
       if (!String(l.sn || '').trim()) miss.push(`${spec.idCols[1].label}${row}`);
+      if (spec.sectors) {
+        // Flight: the line's refs sync FROM its sector rows, so require the rows
+        // themselves — every segment fully described (incl. its travel date).
+        (l.sectors || []).forEach((s, j) => {
+          const seg = (l.sectors.length > 1 || lines.length > 1) ? ` (line ${i + 1} · segment ${j + 1})` : '';
+          spec.sectorCols.forEach((col) => { if (!String(s[col.key] || '').trim()) miss.push(`${col.label}${seg}`); });
+        });
+      } else {
+        // Module reference fields (Package/Ref, Hotel/Conf No, Country/Passport…) —
+        // typed on the Sales grid, echoed read-only on the Purchase grid.
+        spec.idCols.slice(2).forEach((col) => { if (!String(l[col.key] || '').trim()) miss.push(`${col.label}${row}`); });
+      }
       // Per-passenger sale value — every line must carry an amount. INB spreads the
       // deal's fares/Service Fee across lines its own way, so the aggregate
       // `totals.so.total > 0` gate below covers value there instead.
       if (!interBranch && !(c.finalSales > 0)) miss.push(`Sale amount${row}`);
     });
+    if (!interBranch && !remarks.trim()) miss.push('Remarks');
+    if (!saleTallyRef.trim()) miss.push('Sales Tally Ref');
+    if (!interBranch && !isNoSupp && !purTallyRef.trim()) miss.push('Purchase Tally Ref');
     return miss;
   })();
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
@@ -1661,9 +1677,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
-        <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
-        <FL label="Sales Tally Ref"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>
-        {!isNoSupp && <FL label="Purchase Tally Ref"><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>}
+        {/* Required wherever the save path persists them; the INB payload carries only
+            saleTallyRef (as `reference`), so remarks/purTallyRef stay optional there. */}
+        <FL label={interBranch ? 'Remarks' : 'Remarks *'}><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder={interBranch ? 'optional' : 'required'} /></FL>
+        <FL label="Sales Tally Ref *"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="required" /></FL>
+        {!isNoSupp && <FL label={interBranch ? 'Purchase Tally Ref' : 'Purchase Tally Ref *'}><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder={interBranch ? 'optional' : 'required'} /></FL>}
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
