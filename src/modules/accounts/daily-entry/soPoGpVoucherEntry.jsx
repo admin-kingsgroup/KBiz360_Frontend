@@ -22,6 +22,7 @@ import {
   XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCanOriginate } from '../../tk-group/useCanOriginate';
 import { inp, card, btnG, btnGh, FL, bc } from '../../../core/styles.jsx';
 import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
@@ -39,7 +40,13 @@ import { useVNo } from '../../../core/useNextNo';
 // 'CD' (it read 'FB', which is not a country, and the banner showed "zero-rated (IN→FB)").
 const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' };
 const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
-const inbCrossBorder = (from, to) => (INB_COUNTRY[from] || 'IN') !== (INB_COUNTRY[to] || 'IN');
+// Case-folded like inbIndiaSeller below and the backend's cc() — this was the ONE branch lookup
+// here that wasn't. A lowercase/padded code (inb.updateDeal persists fromBranch unguarded, and
+// getDeal feeds it straight back as editBooking.branch) missed the map, defaulted BOTH sides to
+// 'IN', and reported a cross-border export as same-country: the "Bill …" tick then never rendered,
+// so the seller could not zero-rate the deal at all.
+const inbCty = (b) => INB_COUNTRY[String(b || '').trim().toUpperCase()];
+const inbCrossBorder = (from, to) => (inbCty(from) || 'IN') !== (inbCty(to) || 'IN');
 // An India-jurisdiction seller bills IGST on its inter-branch Service Fee even cross-border to
 // Africa (the India side's output tax must reconcile); the Africa buyer can't reclaim Indian GST,
 // so it books the tax-inclusive amount as COST (bookingOrders.buildInbBuyerBookingPayload). This
@@ -63,7 +70,7 @@ import { usePager, Pager } from '../../../core/ux/pager';
 import { SmartDateInput } from '../../../core/ux/SmartDateInput';
 import { JvBlock } from '../../../core/voucher/JvBlock';
 import {
-  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, tcs206cRate, lineCalc, isVatBranch, rowsFromSnapshots, fareSum,
+  VSPECS, VMODULE_LIST, blankLine, blankSector, normalizeLine, syncLineRefs, bookingTotals, tcs206cRate, lineCalc, isVatBranch, vatPctOf, inbTaxOf, rowsFromSnapshots, fareSum,
 } from '../../../core/voucherSpecs.js';
 import { useMasterList } from '../../../core/useMasters';
 import { RefundReissueFields } from '../../../core/voucher/fields/RefundReissueFields';
@@ -586,7 +593,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // Live VAT % from the branch config / VAT master (null → voucherSpecs static fallback),
   // so a Super-Admin rate amendment flows into the on-screen math and the saved booking.
   const liveVatRate = (bc({ code: brCode }) || {}).vatRate;
-  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, clientType, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, inbZeroRated, suppForeign, clientType, date, liveVatRate]);
+  // Tax ctx for the caption helpers — the SAME live-then-static rate source bookingTotals reads,
+  // so a stated % can't drift from the amount it labels (it was a hand-rolled copy of the branch
+  // table, a fourth alongside voucherSpecs / backend taxRegime / the inline fallback here).
+  const taxCtx = { branch: brCode, vatRate: liveVatRate };
+  // `interBranch` rides the ctx so the SCREEN suppresses TCS exactly as the server does on an INB
+  // leg (tcsAmt 0). It cannot be inferred from clientType — see the TCS gate in voucherSpecs.
+  const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, clientType, interBranch, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, inbZeroRated, suppForeign, clientType, interBranch, date, liveVatRate]);
   // Effective TCS 206C(1G) rate for this booking's date (5% up to 31-03-2026, else 2%).
   const tcsRate = spec.tcs ? tcs206cRate(spec, date) : 0;
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
@@ -595,13 +608,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // zero-rated inter-branch export (which applies to an India seller too).
   const getGstRate = () => {
     if (effNoVat || inbZeroRated) return 0;
-    if (isVatBr) {
-      return liveVatRate != null ? liveVatRate : (brCode === 'NBO' ? 16 : brCode === 'DAR' ? 18 : brCode === 'FBM' ? 16 : 18);
-    }
+    if (isVatBr) return vatPctOf(taxCtx);
     if (spec.model === 'package') return spec.gstRate ? spec.gstRate * 100 : 5;
     return spec.tax && spec.tax.rate != null ? spec.tax.rate : 18;
   };
   const activeRate = getGstRate();
+  // The tax the SELLER's regime bills on an inter-branch Service Fee WHEN it is billed — an FBM
+  // seller bills VAT 16%, not IGST 18%. Deliberately NOT activeRate: that reads 0 while the deal
+  // is zero-rated, but the tick's label must state the rate ticking it WOULD apply. Nor taxLabel,
+  // which says "GST" — an inter-branch India supply is IGST. Both name and rate were hardcoded
+  // "IGST"/"18%", so an FBM seller was told it was about to bill IGST 18% while the server would
+  // post VAT 16%.
+  const { name: inbTaxName, rate: inbTaxRate } = inbTaxOf(taxCtx);
 
   // N-PO: fold the ADDITIONAL purchase legs into the headline Gross Profit so the entry
   // screen shows the same folder GP the booking saves with (backend gpForMulti), not the
@@ -716,11 +734,22 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // path is caught by the approval gate, the inter-branch (INB) path had no such gate, so we
   // require it here at entry (the INB deal posts on approval with no second Int'l/Dom prompt).
   const needsScope = hasPackage && !packageType;
+  // Branch Accountant control (dormant unless the Owner engages it): an SO/PO/GP and an
+  // inter-branch deal come from the CRM and can't be RAISED here by a Branch Accountant. The
+  // server 403s — gate the button too, or they'd key the whole booking before finding out.
+  //
+  // ORIGINATION ONLY — never an edit. The rule stops them creating these documents; CORRECTING
+  // one that arrived is the whole job it leaves them (the banner literally says "correct it if
+  // it is wrong, then Check it"). The backend agrees: assertMayOriginate guards POST only, and
+  // PUT /:id has no such gate. Blocking Save while `editing` would disable the one action the
+  // rule exists to enable, on a document the server would have accepted.
+  const originate = useCanOriginate(brCode, interBranch ? 'inb' : 'booking');
+  const blockedNew = originate.blocked && !editing;
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
-  const canSave = interBranch
+  const canSave = !blockedNew && (interBranch
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope && (!crossCcy || fxRateNum > 0))  // INB: counterparty + sale value + Int'l/Domestic for Flights/Holiday + FX rate on a cross-currency deal
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
-      && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)));
+      && (isNoSupp || (totals.po.total > 0 && hasSuppLedger))));
 
   // Saving ALWAYS lands the booking in Pending — there is no save-and-approve from
   // entry (for ANY user, Super Admin included). Approval happens only from the
@@ -1151,9 +1180,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           🔁 <b>Inter-Branch sale.</b> Enter the fares in the Purchase Order grid (pass-through at cost) and your margin in the Sales <b>Service Fee</b> column. Fares post to <b>Inter-Branch Sales</b>, the Service Fee to <b>Service Fee Income</b>.
           {toBranch && <> Tax: <b>{
             !billIgst ? `Export · zero-rated (${INB_COUNTRY[brCode]}→${INB_COUNTRY[toBranch]})`
-              /* VAT sellers are rated per branch (16/18/16) — never restate a flat % here. */
-              : isVatBranch(brCode) ? 'VAT · inter-branch (on Service Fee)'
-                : `IGST · ${inbCrossBorder(brCode, toBranch) ? 'inter-branch' : 'inter-state'} (18% on Service Fee)`
+              /* Name AND rate both follow the SELLER's regime — an FBM seller bills VAT 16%, not
+                 IGST 18%. Never hardcode either: inbTaxName/inbTaxRate mirror the server's pick,
+                 and VAT sellers are rated per branch (16/18/16). Same shape as the backend's own
+                 label (inb.service.inbTaxTreatment) so screen and posting read identically. */
+              : `${inbTaxName} · ${inbCrossBorder(brCode, toBranch) ? 'inter-branch' : 'inter-state'} (${inbTaxRate}% on Service Fee)`
           }</b>.</>}
           {' '}Creates an INB Link No the {toBranch || 'buying'} branch fetches on its SO/PO/GP.
         </div>
@@ -1164,7 +1195,27 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
           <FL label="SPG Date"><SmartDateInput value={date} onChange={setDate} style={inp} /></FL>
           <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} style={inp} title="When the customer travels — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
+          {/* An INB deal's counterparty is ALWAYS the To Branch below, so Client Type has no filter
+              target (the customer PartyPicker it narrows is replaced by that dropdown) and no
+              payload destination (inbBody sends no clientType). Stated and locked rather than
+              hidden: the field tells the user what kind of deal this is instead of going quietly
+              inert. Contrast the Without-VAT toggle, which IS hidden on INB — that one doesn't
+              apply at all, this one has exactly one possible value.
+              CAUTION — "no payload destination" does NOT make `clientType` inert: it still reaches
+              bookingTotals, where '' reads as "not B2B" and switches TCS ON. Locking the DISPLAY
+              alone would leave the screen saying "Inter Branch" while the math billed TCS like a
+              retail sale, so TCS is suppressed by the `interBranch` ctx flag instead — never by
+              faking a clientType ('INTER BRANCH' is not 'B2B', so isB2B() would be false anyway). */}
           <FL label="Client Type">
+            {interBranch ? (
+              <>
+                {/* readOnly as well as disabled: React warns on a `value` with no onChange unless
+                    one of the two is set, and `disabled` alone does not satisfy it. */}
+                <input value="Inter Branch" disabled readOnly
+                  style={{ ...inp, background: '#eef1f5', color: '#9197a3', cursor: 'not-allowed' }} />
+                <p style={hintMuted}>Fixed for an inter-branch deal — the counterparty is the To Branch.</p>
+              </>
+            ) : (
             <DropdownMenu
               ariaLabel="Client Type"
               menuRole="listbox"
@@ -1178,6 +1229,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 </button>
               )}
             />
+            )}
           </FL>
           {spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && (
             <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
@@ -1221,12 +1273,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               </p>
             </FL>
             {crossBorderInb && (
-              <FL label="IGST on Service Fee">
+              <FL label={`${inbTaxName} on Service Fee`}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer', fontSize: 12.5, color: '#1F2328' }}>
                   <input type="checkbox" checked={billIgst} onChange={(e) => setBillIgstCB(e.target.checked)} />
-                  <span>Bill IGST 18% even cross-border</span>
+                  <span>Bill {inbTaxName} {inbTaxRate}% even cross-border</span>
                 </label>
-                <p style={billIgst ? hintOk : hintMuted}>{billIgst ? `✓ Billed — added to what ${toBranch} pays` : 'Zero-rated export — no IGST on the Service Fee'}</p>
+                <p style={billIgst ? hintOk : hintMuted}>{billIgst ? `✓ Billed — added to what ${toBranch} pays` : `Zero-rated export — no ${inbTaxName} on the Service Fee`}</p>
               </FL>
             )}
             </>
@@ -1498,6 +1550,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {error && <div style={{ ...card, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#dc2626', fontSize: 12, marginBottom: 14 }}>{error}</div>}
 
+      {/* Branch Accountant control is engaged — this document comes from the CRM and Save is
+          blocked. Stated HERE, next to the footer button it disables, so it is read before the
+          booking is keyed rather than discovered by a 403 afterwards. Never shown while
+          EDITING: correcting an arrived document is exactly what the rule leaves them to do. */}
+      {blockedNew && (
+        <div style={{ ...card, background: '#fef3e2', border: '1px solid #f0cc8a', color: '#8a5a12', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <Lock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{originate.reason}</span>
+        </div>
+      )}
+
       {/* Inter-branch parties belong on the INB Voucher screen — Save is blocked here. */}
       {interBranchParty && (
         <div style={{ ...card, background: '#fef3e2', border: '1px solid #f0cc8a', color: '#8a5a12', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -1561,7 +1624,13 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
-  const ready = !!brCode && !!state.againstInvoice && !!state.party && !!state.counterParty && (+state.supplierAmt > 0) && !saving;
+  // Branch Accountant control: a refund / reissue is a CRM-sourced document too, so the same
+  // origination block applies (the server 403s). Gate the button so the accountant isn't
+  // asked to key a whole reversal they were never allowed to raise. ORIGINATION ONLY — an
+  // edit of one that already exists is their job, and the server permits it (PUT is ungated).
+  const originate = useCanOriginate(brCode, 'reversal');
+  const blockedNew = originate.blocked && !editing;
+  const ready = !blockedNew && !!brCode && !!state.againstInvoice && !!state.party && !!state.counterParty && (+state.supplierAmt > 0) && !saving;
 
   // Saving always lands the RF/RI booking in Pending — no save-and-approve from entry
   // (any user). It posts only when approved from the Pending queue.
@@ -1653,6 +1722,15 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
 
       <div style={{ ...card, padding: 18 }}>
         <RefundReissueFields state={state} setState={setState} ctx={{ branch: brCode, cur }} kind={kind} />
+        {/* Branch Accountant control is engaged — a refund/reissue is CRM-sourced too, so Save
+            is blocked. Say so next to the button rather than 403 after the reversal is keyed.
+            Never while EDITING — correcting an arrived reversal is their job, not origination. */}
+        {blockedNew && (
+          <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: '#fef3e2', border: '1px solid #f0cc8a', color: '#8a5a12', fontSize: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <Lock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>{originate.reason}</span>
+          </div>
+        )}
         {error && <p style={{ margin: '8px 0 0', fontSize: 12, color: CR, fontWeight: 600 }}>⚠ {error}</p>}
         <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center' }}>
           {editing && (

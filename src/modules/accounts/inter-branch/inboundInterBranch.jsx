@@ -12,6 +12,7 @@ import { localeOf } from '../../../core/format';
 import { toast } from '../../../core/ux/toast';
 import { confirmDialog } from '../../../core/ux/confirm';
 import { bc } from '../../../core/styles.jsx';
+import { inbTaxOf } from '../../../core/voucherSpecs.js';
 
 // Book-currency symbol for a branch (₹ for India, $ for Africa) — used so a same-currency
 // deal with no fx (e.g. Africa↔Africa USD) still shows the right symbol, not a hardcoded ₹.
@@ -220,7 +221,11 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
                     {sSym}{r2(rw.total).toLocaleString(localeOf(sSym))}
                     {fx && <> @ 1 USD = ₹{Number(fx.rate).toLocaleString(localeOf('₹'))}</>}
                     <div style={{ fontSize: 10.5, color: '#8a94a3' }}>
-                      fares {sSym}{r2(rw.fares).toLocaleString(localeOf(sSym))} · fee {sSym}{r2(rw.serviceFee).toLocaleString(localeOf(sSym))}{num(rw.taxAmt) > 0 ? ` · IGST ${sSym}${r2(rw.taxAmt).toLocaleString(localeOf(sSym))}` : ''}
+                      {/* The tax NAME follows the SELLER's regime, not ours: an FBM/NBO seller billed
+                          VAT (16%), a DAR one VAT 18%, an India one IGST — this row shows the seller's
+                          frozen figure, so relabelling it as IGST misnames the tax on the very screen
+                          the buyer decides to Convert from. rw.fromBranch is the seller. */}
+                      fares {sSym}{r2(rw.fares).toLocaleString(localeOf(sSym))} · fee {sSym}{r2(rw.serviceFee).toLocaleString(localeOf(sSym))}{num(rw.taxAmt) > 0 ? ` · ${inbTaxOf({ branch: rw.fromBranch }).name} ${sSym}${r2(rw.taxAmt).toLocaleString(localeOf(sSym))}` : ''}
                     </div>
                   </td>
                   <td style={td}>

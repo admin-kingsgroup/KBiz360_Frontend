@@ -28,26 +28,50 @@ export function chainUser() {
   } catch { return { email: '', role: '' }; }
 }
 
+// Branch-wise flag read — mirrors backend flags.isEnabled: an explicit per-branch override
+// wins over the global value; unknown flag → OFF (dormant).
+export function flagOn(flags, key, branch) {
+  const f = (flags || {})[key];
+  if (!f) return false;
+  if (f.foundation === true) return true;
+  if (branch && f.branches && Object.prototype.hasOwnProperty.call(f.branches, branch)) return f.branches[branch] === true;
+  return f.enabled === true;
+}
+
+const BA_CONTROL_FLAG = 'control.role.branch_accountant';
+// Who may give the Check when Branch Accountant control is engaged — mirrors
+// approvalChain.canCheck (BranchAccountant + Owner, plus the Super Admin override).
+const CHECK_ROLE = /branch\s*accountant|^\s*owner\s*$/i;
+
+const CHAIN_FALLBACK = { verify: DEFAULT_VERIFY, approve: DEFAULT_APPROVE, director: DEFAULT_DIRECTOR, owner: DEFAULT_OWNER, flags: {} };
+
 // Live config (cached 5 min); safe fallback to the defaults when the key is absent.
+// `flags` rides along so nextActionFor can mirror the backend's Check gate — without it the
+// Check button would render enabled for everyone and then 403 at the server.
 export function useApprovalChain() {
   const q = useQuery({
     queryKey: ['app-config', 'approval-chain'],
     queryFn: async () => {
-      const [v, a, d, o] = await Promise.all([
+      const [v, a, d, o, f] = await Promise.all([
         apiGet('/api/app-config/approval.verifyEmails').catch(() => null),
         apiGet('/api/app-config/approval.approveEmails').catch(() => null),
         apiGet('/api/app-config/approval.directorEmails').catch(() => null),
         apiGet('/api/app-config/approval.ownerEmails').catch(() => null),
+        // /effective, NOT /api/tk/flags: the latter is central-roles-only, so a Branch
+        // Accountant / BM / GM would 403 here, fall back to {}, and be shown a Check button
+        // the server refuses. /effective serves the affordance flags to any signed-in user.
+        apiGet('/api/tk/flags/effective').catch(() => null),
       ]);
       return {
         verify: asList(v && v.value, DEFAULT_VERIFY), approve: asList(a && a.value, DEFAULT_APPROVE),
         director: asList(d && d.value, DEFAULT_DIRECTOR), owner: asList(o && o.value, DEFAULT_OWNER),
+        flags: (f && f.flags) || {},
       };
     },
     staleTime: 5 * 60_000,
     enabled: !!getAuthToken(),
   });
-  return q.data || { verify: DEFAULT_VERIFY, approve: DEFAULT_APPROVE, director: DEFAULT_DIRECTOR, owner: DEFAULT_OWNER };
+  return q.data || CHAIN_FALLBACK;
 }
 
 export const stageOf = (e) => (e && e.reviewStage) || (!e?.checkedBy ? 'check' : (!e?.verifiedBy ? 'verify' : 'approve'));
@@ -60,7 +84,19 @@ export function nextActionFor(e, cfg, user = chainUser()) {
   if (!e || !e.reviewStage) return { stage: '', action: 'approve', label: 'Approve', allowed: true, hint: '' };
   const stage = stageOf(e);
   const su = SUPER.test(user.role);
-  if (stage === 'check') return { stage, action: 'check', label: 'Check', allowed: true, hint: 'Level 1 · branch accountant' };
+  // Check is open to anyone with branch access UNTIL the Owner engages Branch Accountant
+  // control — then it is the accountant's step alone (Owner / Super Admin override). Mirrors
+  // approvalChain.canCheck; without this the button would render live and 403 on click.
+  if (stage === 'check') {
+    const baOn = flagOn(cfg && cfg.flags, BA_CONTROL_FLAG, e.branch);
+    const may = !baOn || su || CHECK_ROLE.test(user.role);
+    return {
+      stage, action: 'check', label: 'Check', allowed: may,
+      hint: baOn
+        ? (may ? 'Level 1 · your step as Branch Accountant' : 'Level 1 · the Branch Accountant’s step — only they (or the Owner) can Check while Branch Accountant control is engaged')
+        : 'Level 1 · branch accountant',
+    };
+  }
   if (stage === 'verify') {
     return { stage, action: 'verify', label: 'Verify', allowed: su || cfg.verify.includes(user.email), hint: `Level 2 · ${cfg.verify.join(', ')}` };
   }
@@ -113,9 +149,12 @@ export function StageTracker({ e }) {
     staleTime: 5 * 60_000,
     enabled: !!getAuthToken(),
   });
+  // /effective, not /api/tk/flags — the central-only read 403s for exactly the branch users
+  // who work this queue, which silently hid the Director/Owner beads from them even when
+  // escalation was engaged. Same shape, so the resolution below is unchanged.
   const fq = useQuery({
-    queryKey: ['tk', 'flags'],
-    queryFn: () => apiGet('/api/tk/flags').catch(() => ({})),
+    queryKey: ['tk', 'flags', 'effective'],
+    queryFn: () => apiGet('/api/tk/flags/effective').catch(() => ({})),
     staleTime: 5 * 60_000,
     enabled: !!getAuthToken(),
   });
