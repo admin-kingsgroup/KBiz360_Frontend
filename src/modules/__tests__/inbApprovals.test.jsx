@@ -43,6 +43,7 @@ jest.mock('../../core/useInterBranchVoucher', () => ({
   useInbInbound: jest.fn(() => ({ isLoading: false, data: { rows: [], totals: { pending: 0, converted: 0, approved: 0, deleted: 0, edited: 0 } } })),
   useConvertInb: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   useDeleteInbDeal: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
+  useReturnInb: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
 }));
 jest.mock('../../core/styles', () => ({ bc: () => ({ cur: '₹' }) }));
 jest.mock('../../core/data', () => ({ CONSOLIDATED_LABEL: 'TK Head Office Group' }));
@@ -320,6 +321,53 @@ describe('InbPipelines — Outgoing | Incoming', () => {
     await screen.findByText(LINK, { exact: false });
     fireEvent.click(screen.getByRole('tab', { name: 'INB Incoming' }));
     expect(screen.getByText(/deals another branch sells to us/i)).toBeInTheDocument();
+    expect(screen.queryByText(LINK, { exact: false })).toBeNull();
+  });
+});
+
+// ─── The seller cannot pull a pushed deal back — the BUYER hands it over ──────────────
+// Control sits with the receiving branch. A pushed deal is theirs until they revoke + delete
+// their SO/PO/GP and RETURN it. So the Pushed tab has two very different rows, and the screen
+// must never render a Revoke that can only 409.
+describe('Pushed — who holds the deal', () => {
+  const pushedLink = (over) => [{ inbLinkNo: LINK, saleVno: 'INB/BOM/26/0003', status: 'open', buyerBookingNo: '', ...over }];
+
+  test('NOT returned → no Revoke; the row says who holds it and how to get it back', async () => {
+    mockInbLinks.mockReturnValue(pushedLink({ returnedToSeller: false }));
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
+    expect(screen.getByText(/AMD holds it — ask them to return it to edit/i)).toBeInTheDocument();
+    // A control that can only fail must not be offered — even to an approver.
+    expect(screen.queryByRole('button', { name: /Revoke/ })).toBeNull();
+  });
+
+  test('RETURNED → Revoke appears, with the buyer\'s reason as the brief', async () => {
+    mockInbLinks.mockReturnValue(pushedLink({ returnedToSeller: true, returnedReason: 'Base fare is ₹500 short' }));
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
+    expect(screen.getByRole('button', { name: /Revoke to edit/i })).toBeInTheDocument();
+    expect(screen.getByText(/returned by AMD — revoke to edit/i)).toBeInTheDocument();
+    expect(screen.getByText(/Base fare is ₹500 short/)).toBeInTheDocument();
+  });
+
+  test('RETURNED but not an approver → told an approver must do it, no dead button', async () => {
+    mockInbLinks.mockReturnValue(pushedLink({ returnedToSeller: true, returnedReason: 'wrong cost' }));
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Accounts Executive' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Pushed/ }));
+    expect(screen.getByText(/an approver must revoke it/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Revoke to edit/i })).toBeNull();
+  });
+
+  // A returned deal is still 'open' — it must NOT fall into Locked, which means "the buyer
+  // converted it and it is live in their books".
+  test('a returned deal stays in Pushed, not Locked', async () => {
+    mockInbLinks.mockReturnValue(pushedLink({ returnedToSeller: true }));
+    mockApiGet.mockResolvedValue(mkLegs('approved', true));
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Locked/ }));
     expect(screen.queryByText(LINK, { exact: false })).toBeNull();
   });
 });

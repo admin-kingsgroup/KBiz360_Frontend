@@ -7,7 +7,8 @@
 const mockConvert = jest.fn((_b, opts) => opts && opts.onSuccess && opts.onSuccess({ buyerBookingNo: 'BKG/AMD/26/0107', duplicate: false }));
 const mockDelete = jest.fn();
 const mockInbound = jest.fn();
-const mockConfirm = jest.fn(() => Promise.resolve({ confirmed: true }));
+const mockReturn = jest.fn();
+const mockConfirm = jest.fn(() => Promise.resolve({ confirmed: true, reason: 'Base fare is short' }));
 const mockToast = jest.fn();
 const mockSetRoute = jest.fn();
 
@@ -19,6 +20,7 @@ jest.mock('../../../../core/useInterBranchVoucher', () => ({
   useInbInbound: (...a) => mockInbound(...a),
   useConvertInb: () => ({ mutate: (...a) => mockConvert(...a), isPending: false }),
   useDeleteInbDeal: () => ({ mutate: (...a) => mockDelete(...a), isPending: false }),
+  useReturnInb: () => ({ mutate: (...a) => mockReturn(...a), isPending: false }),
 }));
 jest.mock('../../../../core/ux/confirm', () => ({ confirmDialog: (...a) => mockConfirm(...a) }));
 jest.mock('../../../../core/ux/toast', () => ({ toast: (...a) => mockToast(...a) }));
@@ -183,4 +185,47 @@ test('every empty tab explains itself — never a bare "nothing here"', () => {
   expect(screen.getByText(/cascade Delete/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('tab', { name: /^Edited/ }));
   expect(screen.getByText(/changed after raising them/i)).toBeInTheDocument();
+});
+
+// ─── Revoke INB — the key the BUYER holds ─────────────────────────────────────────────
+// A pushed deal is ours; the seller cannot pull it back. To get it corrected we clear our own
+// books first (revoke + delete our SO/PO/GP — which is what puts the row back in Pending) and
+// then RETURN it. That unlocks the seller's Revoke and freezes our Convert until they re-push.
+describe('Revoke INB (return to seller)', () => {
+  test('offered on a Pending row and sends the reason — the seller acts on it', async () => {
+    feed([ROW]);
+    render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+    fireEvent.click(screen.getByText('↩ Revoke INB'));
+    await waitFor(() => expect(mockReturn).toHaveBeenCalled());
+    expect(mockReturn.mock.calls[0][0]).toEqual({ linkNo: 'INB/BOM-AMD/26/0227', reason: 'Base fare is short' });
+  });
+
+  test('the reason is required — confirm is asked before anything is sent', async () => {
+    feed([ROW]);
+    mockConfirm.mockResolvedValueOnce({ confirmed: false });
+    render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+    fireEvent.click(screen.getByText('↩ Revoke INB'));
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalled());
+    expect(mockConfirm.mock.calls[0][0]).toMatchObject({ reasonRequired: true });
+    expect(mockReturn).not.toHaveBeenCalled();
+  });
+
+  // THE RACE GUARD, on screen. The seller is un-posting these very legs, and the figures shown
+  // are the OLD ones we already asked them to change. A live Convert here would 409 at best and
+  // book a cost off an un-posted deal at worst — so it is disabled, with the reason visible.
+  test('a RETURNED row disables Convert, shows why, and offers no second return', () => {
+    feed([{ ...ROW, returned: true, returnedReason: 'Base fare is ₹500 short' }]);
+    render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+    expect(screen.getByText('Convert →')).toBeDisabled();
+    expect(screen.getByText(/returned to BOM — awaiting their re-push/i)).toBeInTheDocument();
+    expect(screen.getByText(/Base fare is ₹500 short/)).toBeInTheDocument();
+    expect(screen.queryByText('↩ Revoke INB')).toBeNull();
+  });
+
+  test('a re-pushed row says the figures were revised', () => {
+    feed([{ ...ROW, rePushed: true, returned: false }]);
+    render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+    expect(screen.getByText(/re-pushed · figures revised/i)).toBeInTheDocument();
+    expect(screen.getByText('Convert →')).not.toBeDisabled();   // ours to take up again
+  });
 });

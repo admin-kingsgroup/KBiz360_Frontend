@@ -1014,6 +1014,9 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
       return {
         key: (sale && sale.vno) || (purchase && purchase.vno), linkNo: dealRef,
         link: lk, buyerBookingNo: (lk && lk.buyerBookingNo) || '',
+        // The buyer cleared their books and handed this back for correction — that, and only
+        // that, is what lets us revoke a pushed deal. Their reason is the brief.
+        returned: !!(lk && lk.returnedToSeller), returnedReason: (lk && lk.returnedReason) || '',
         sale, purchase, extras: [], status: st, rawStatus: raw, pushed, from: lead.branch, to: toOf((sale || lead).party), date: lead.date,
         module: inbModuleOf(sale || purchase), saleVno: (sale && sale.vno) || '', purchaseVno: (purchase && purchase.vno) || '',
         approvedAt: (sale && (sale.approvedAt || sale.updatedAt)) || '',
@@ -1296,7 +1299,11 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                       <td {...clickable(() => setOpen((o) => (o === d.key ? null : d.key)))} title="Show JV details" style={{ padding: '7px 12px', fontFamily: 'monospace', color: C.blue, cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap' }}>{open === d.key ? '▾ ' : '▸ '}{d.linkNo}
                         {/* The tab already says which bucket this is; the badge says WHY, on the
                             row, so a deal read in isolation still explains itself. */}
-                        {pushedTab && <span title={`Offered to ${d.to} — it sits in their INB · Incoming worklist, not yet accepted. Nothing exists in their books until they Convert, and we can no longer revoke it.`} style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#fdf3e0', color: '#8a6d00', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>⇪ awaiting {d.to} convert</span>}
+                        {pushedTab && !d.returned && <span title={`Offered to ${d.to} — it sits in their INB · Incoming worklist, not yet accepted. Nothing exists in their books until they Convert. The deal is theirs now: to change it, ask ${d.to} to return it.`} style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#fdf3e0', color: '#8a6d00', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>⇪ awaiting {d.to} convert</span>}
+                        {/* RETURNED — the buyer cleared their books and handed it back. This is
+                            the only state in which a pushed deal is ours to revoke and edit, so
+                            it must be loud, and it must carry their reason: that is the brief. */}
+                        {pushedTab && d.returned && <span title={`${d.to} revoked and deleted their SO/PO/GP and returned this deal${d.returnedReason ? `: “${d.returnedReason}”` : ''}. Revoke it to un-post both legs, edit, re-approve and re-push.`} style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#fdecec', color: '#A32D2D', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>↩ returned by {d.to} — revoke to edit</span>}
                         {lockedTab && <span title={`${d.to} converted it into ${d.buyerBookingNo || 'their SO/PO/GP'} — it is reflected in their books for further process. Locked on both sides; a correction is a cascade Delete + re-raise.`} style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#e7f3e7', color: C.green, fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>🔒 locked · {d.to}</span>}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{fmtDate(d.date)}</td>
                       <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>{d.from} → {d.to}</td>
@@ -1333,7 +1340,21 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                             </>}
                           </td>
                         : <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: C.dim }}>{pushedTab
-                            ? <span title="Pushed to the buyer branch — locked (no revoke). It moves to the Locked tab once they Convert it.">Pushed {fmtDate((d.sale && d.sale.pushedAt) || (d.purchase && d.purchase.pushedAt)) || ''} · awaiting {d.to}</span>
+                            ? d.returned
+                              /* The one pushed state we can act on. Revoke → Pending → edit →
+                                 approve → re-push, which refreshes their row. */
+                              ? <span style={{ whiteSpace: 'normal', display: 'inline-block', maxWidth: 260 }}>
+                                  {isApprover
+                                    ? <button disabled={busy} onClick={() => doRevoke(d)} style={{ padding: '5px 10px', background: '#fff', color: '#A32D2D', border: '1px solid #A32D2D', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>⟲ Revoke to edit</button>
+                                    : <span style={{ fontSize: 11 }}>Returned — an approver must revoke it</span>}
+                                  {d.returnedReason && <div style={{ marginTop: 3, fontSize: 10.5, color: C.dim }}>“{d.returnedReason}”</div>}
+                                </span>
+                              /* Not returned: the deal is the buyer's. Say who holds it and what
+                                 unblocks it — never a Revoke button that can only 409. */
+                              : <span style={{ whiteSpace: 'normal', display: 'inline-block', maxWidth: 260 }} title={`${d.to} holds this deal. Ask them to revoke and delete their SO/PO/GP and return it — then it can be revoked and edited here.`}>
+                                  Pushed {fmtDate((d.sale && d.sale.pushedAt) || (d.purchase && d.purchase.pushedAt)) || ''}
+                                  <div style={{ fontSize: 10.5 }}>{d.to} holds it — ask them to return it to edit</div>
+                                </span>
                             : lockedTab
                               ? <span style={{ fontFamily: 'monospace', color: C.dark }} title={`${d.to} converted this deal into ${d.buyerBookingNo || 'their SO/PO/GP'}`}>{d.buyerBookingNo || '—'}</span>
                               : (d.rawStatus || d.status)}</td>}

@@ -120,6 +120,11 @@ export const useConvertInb = () => {
     },
   });
 };
+// BUYER side: RETURN a pushed deal to the seller for correction — the key the buyer holds.
+// Only reachable once their own SO/PO/GP is revoked AND deleted (the backend refuses while a
+// live booking exists). It unlocks the SELLER's Revoke and freezes our Convert until they
+// re-push. `reason` is required — it is the whole message to the seller.
+export const useReturnInb = () => useInbMutation((body) => apiPost('/api/inter-branch/return', body));
 export const useBookInb   = () => useInbMutation(({ id, ...body }) => apiPost(`/api/inter-branch/${id}/book`, body));
 export const useReopenInb = () => useInbMutation(({ id }) => apiPost(`/api/inter-branch/${id}/reopen`));
 // Cascade delete-and-recreate correction: soft-deletes BOTH sides of the deal (buyer SO/PO/GP

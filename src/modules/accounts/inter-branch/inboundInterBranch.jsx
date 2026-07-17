@@ -7,7 +7,7 @@
 // The purchase cost is the SELLING branch's frozen figure, shown in OUR book currency with
 // the seller's breakdown for reference.
 import React, { useState, useEffect } from 'react';
-import { useInbInbound, useDeleteInbDeal, useConvertInb } from '../../../core/useInterBranchVoucher';
+import { useInbInbound, useDeleteInbDeal, useConvertInb, useReturnInb } from '../../../core/useInterBranchVoucher';
 import { localeOf } from '../../../core/format';
 import { toast } from '../../../core/ux/toast';
 import { confirmDialog } from '../../../core/ux/confirm';
@@ -62,7 +62,25 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
   const shown = tab === 'edited' ? rows.filter((r) => r.edited) : rows.filter((r) => r.state === tab);
   const del = useDeleteInbDeal();
   const conv = useConvertInb();
+  const ret = useReturnInb();
   const [converting, setConverting] = useState('');
+  // RETURN the deal to the seller for correction — the key WE hold. Only offered once our own
+  // SO/PO/GP is gone (the row is back in Pending), because clearing our books is what frees
+  // the deal. The reason is the entire message to the seller: without it they get a deal back
+  // and no idea what to fix, and the round trip runs again.
+  const onReturn = async (rw) => {
+    const { confirmed, reason } = await confirmDialog({
+      title: `Return ${rw.inbLinkNo} to ${rw.fromBranch} for correction?`,
+      message: `${rw.fromBranch} will be able to revoke, edit and re-push it. Until they do, this deal cannot be converted — they are about to un-post the very legs it is built on. It stays in your Pending list and refreshes automatically when they re-push.`,
+      reasonRequired: true, reasonLabel: `What needs correcting? (${rw.fromBranch} acts on this)`,
+      confirmLabel: 'Return to ' + rw.fromBranch,
+    });
+    if (!confirmed) return;
+    ret.mutate({ linkNo: rw.inbLinkNo, reason: (reason || '').trim() }, {
+      onSuccess: () => toast(`${rw.inbLinkNo} returned to ${rw.fromBranch} — they can now revoke and correct it`, 'success'),
+      onError: (e) => toast(e?.message || 'Return failed', 'error'),
+    });
+  };
   // ACCEPT the offered deal: creates the pending SO/PO/GP carrying the seller's purchase (the
   // sale side blank for us to fill) and moves the row to Converted. Confirmed because it is the
   // point of no return for the buyer — once converted the deal is live in our pipeline and the
@@ -176,7 +194,16 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
               const buyerCost = toBuyer(rw.total, fx);
               return (
                 <tr key={rw.inbLinkNo}>
-                  <td style={{ ...td, fontFamily: 'monospace', color: C.blue }}>{rw.inbLinkNo}</td>
+                  <td style={{ ...td, fontFamily: 'monospace', color: C.blue }}>
+                    {rw.inbLinkNo}
+                    {/* Say the state on the row, not just in a tooltip — this is why Convert
+                        is greyed, and it is the thing the user is waiting on. */}
+                    {rw.returned && <div style={{ marginTop: 3, fontFamily: 'system-ui', fontSize: 10.5, fontWeight: 700, color: C.amber }}>
+                      ↩ returned to {rw.fromBranch} — awaiting their re-push
+                      {rw.returnedReason && <div style={{ fontWeight: 400, color: C.dim }}>“{rw.returnedReason}”</div>}
+                    </div>}
+                    {rw.rePushed && !rw.returned && <div style={{ marginTop: 3, fontFamily: 'system-ui', fontSize: 10, fontWeight: 700, color: C.green }} title={`${rw.fromBranch} corrected and re-pushed this deal — the figures below are the revised ones`}>✓ re-pushed · figures revised</div>}
+                  </td>
                   <td style={td}>{rw.fromBranch}</td>
                   <td style={td}>{rw.date}</td>
                   <td style={td}>{rw.passenger || '—'}</td>
@@ -195,11 +222,25 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
                       {/* Convert is the ACCEPT action and only exists while the deal is still
                           only offered. Every later state shows what it became instead. */}
                       {rw.state === 'pending'
-                        ? <button type="button" onClick={() => onConvert(rw)} disabled={!!converting}
-                            title={`Accept this deal — creates a pending SO/PO/GP with ${rw.fromBranch}'s purchase locked in`}
-                            style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: converting ? 'default' : 'pointer', color: '#fff', background: C.green, opacity: converting ? 0.6 : 1 }}>
-                            {converting === rw.inbLinkNo ? 'Converting…' : 'Convert →'}
-                          </button>
+                        ? <>
+                            {/* RETURNED: the seller is un-posting these very legs right now, so
+                                converting would book a cost off an un-posted deal — and off the
+                                OLD figures we already asked them to change. Disabled with the
+                                reason showing, never a live button that 409s. */}
+                            <button type="button" onClick={() => onConvert(rw)} disabled={!!converting || rw.returned}
+                              title={rw.returned
+                                ? `Returned to ${rw.fromBranch} for correction${rw.returnedReason ? ` — “${rw.returnedReason}”` : ''}. Wait for their re-push; this row refreshes with the corrected figures.`
+                                : `Accept this deal — creates a pending SO/PO/GP with ${rw.fromBranch}'s purchase locked in`}
+                              style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, cursor: (converting || rw.returned) ? 'default' : 'pointer', color: '#fff', background: rw.returned ? '#9aa3b2' : C.green, opacity: converting ? 0.6 : 1 }}>
+                              {converting === rw.inbLinkNo ? 'Converting…' : 'Convert →'}
+                            </button>
+                            {/* The key we hold. Reachable only here — the row is only in Pending
+                                once our own SO/PO/GP is revoked AND deleted, which is exactly the
+                                precondition, enforced by the backend too. */}
+                            {!rw.returned && <button type="button" onClick={() => onReturn(rw)} disabled={ret.isPending}
+                              title={`Send this deal back to ${rw.fromBranch} to correct — unlocks their Revoke. Do this only after revoking and deleting your own SO/PO/GP.`}
+                              style={{ padding: '5px 9px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.amber}`, borderRadius: 6, cursor: ret.isPending ? 'default' : 'pointer', color: C.amber, background: '#fff', opacity: ret.isPending ? 0.6 : 1 }}>↩ Revoke INB</button>}
+                          </>
                         : <span style={{ fontFamily: 'monospace', color: C.dark }}>
                             {rw.buyerBookingNo || '—'}
                             <div style={{ fontSize: 10.5, color: C.dim }}>
