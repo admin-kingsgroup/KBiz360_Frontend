@@ -8,7 +8,7 @@ import { ROLE_SWITCHES, policyTest } from './utils/controlPanel';
 // ─── Control Panel · Policy Tester ───────────────────────────────────────────
 // "For a voucher of THIS type / amount / branch, entered by THIS role — would it post
 // straight to the books, or route through Check → Verify → Approve, and WHY." Read-only:
-// it mirrors the live create() guard (Enforcement Matrix + per-role switches + owner co-sign
+// it mirrors the live create() guard (Enforcement Matrix + per-role switches
 // + branch-entry chain) so you can see the effect of a control BEFORE relying on it, and
 // answer "why is this voucher stuck in Pending?" without reading code.
 const SEL = 'rounded-md border border-surface-border bg-surface px-2.5 py-1.5 text-[12.5px] text-ink';
@@ -81,7 +81,7 @@ export function PolicyTester({ branch = 'default' }) {
 
       <div className="mt-[16px] flex items-start gap-2.5 rounded-[9px] border border-surface-border bg-surface-alt px-[15px] py-3 text-[12px] text-ink-muted">
         <span>ℹ️</span>
-        <span>This mirrors the live entry guard: the <b>Enforcement Matrix</b> row for the type, the per-<b>role</b> control switch, and <b>Owner co-sign</b> on refund/reissue. A booking-folder or INB deal keeps its own approval flow regardless.</span>
+        <span>This mirrors the live entry guard: the <b>Enforcement Matrix</b> row for the type and the per-<b>role</b> control switch. A booking-folder or INB deal keeps its own approval flow regardless.</span>
       </div>
     </div>
   );

@@ -16,7 +16,7 @@ import { BranchLoadNotice } from '../BranchLoadNotice';
 // over the SAME per-branch counts the branch approval screen returns — respects Focus
 // (all branches, or one). Amounts are summed only within a currency, never blended.
 //
-// The per-stage pipeline (Sughra verify → Faiz approve → Owner co-sign, "pending under
+// The per-stage pipeline (Sughra verify → Faiz approve → Owner sign-off, "pending under
 // whom") arrives with the approval verify sub-state; this is the branch-level backlog
 // view that stands on today's data.
 const curSym = (b) => b.cur || ((b.currency === 'USD' || b.curCode === 'USD') ? '$' : '₹');
@@ -85,7 +85,7 @@ export function ApprovalsOverview() {
           zebra
         />
       </div>
-      <p className="text-xs text-ink-subtle">One central queue across all branches (Model B). The per-stage pipeline — Sughra verify → Faiz approve → Owner co-sign — arrives with the approval verify sub-state.</p>
+      <p className="text-xs text-ink-subtle">One central queue across all branches (Model B). The per-stage pipeline — Sughra verify → Faiz approve → Owner sign-off — arrives with the approval verify sub-state.</p>
     </div>
   );
 }

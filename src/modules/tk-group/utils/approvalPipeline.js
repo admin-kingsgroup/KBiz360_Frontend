@@ -9,7 +9,7 @@
 // group total. Pure & testable; the central Approvals page consumes it (and filters
 // to a single branch under Focus).
 //
-// NOTE: the per-stage pipeline (Sughra verify → Faiz approve → Owner co-sign, "pending
+// NOTE: the per-stage pipeline (Sughra verify → Faiz approve → Owner sign-off, "pending
 // under whom") needs a verify sub-state on the voucher flow that does not exist yet —
 // that is a deliberate backend change to the live approval path, tracked separately so
 // it isn't rushed during the go-live migration. This util is the branch-level summary

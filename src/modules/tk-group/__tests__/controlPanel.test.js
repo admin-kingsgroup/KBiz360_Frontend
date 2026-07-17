@@ -89,14 +89,15 @@ describe('Control Panel structure', () => {
     // the Super Admin chain override must be stated — the maker rule overstated without it
     expect(DEFAULT_RULES.find((r) => /Maker cannot approve/.test(r.nm)).ds).toMatch(/Super Admin overrides/);
   });
-  test('CONFIGURABLE_GROUPS: every item is a real flag switch; 23 flags across 5 groups', () => {
+  test('CONFIGURABLE_GROUPS: every item is a real flag switch; 22 flags across 5 groups', () => {
     expect(CONFIGURABLE_GROUPS.map((g) => g.group)).toEqual(['Approval & Verification', 'Segregation of Duties', 'Access & Export', 'Masters & Locks', 'Data-Entry & Close']);
     CONFIGURABLE_GROUPS.forEach((g) => g.items.forEach((c) => { expect(c.nm && c.ds && c.flag).toBeTruthy(); }));
-    expect(CONFIGURABLE_FLAGS).toHaveLength(23);
-    expect(new Set(CONFIGURABLE_FLAGS).size).toBe(23);           // no duplicates
+    expect(CONFIGURABLE_FLAGS).toHaveLength(22);
+    expect(new Set(CONFIGURABLE_FLAGS).size).toBe(22);           // no duplicates
     // retired keys are gone; the new masters/sod switches are present
     expect(CONFIGURABLE_FLAGS).not.toContain('core.policy_guard');
     expect(CONFIGURABLE_FLAGS).not.toContain('approval.chain_branch_entries');
+    expect(CONFIGURABLE_FLAGS).not.toContain('approval.owner_cosign_sensitive'); // retired 2026-07
     expect(CONFIGURABLE_FLAGS).toEqual(expect.arrayContaining(['masters.creation_lock', 'masters.period_lock', 'sod.verifier_ne_approver']));
     // the per-role switches cover all seven roles (BM / GM have their own — no BA fold-in)
     expect(CONFIGURABLE_FLAGS).toEqual(expect.arrayContaining(['control.role.branch_manager', 'control.role.general_manager']));
@@ -201,11 +202,6 @@ describe('policyTest (Policy Tester)', () => {
   test('a per-role switch routes that role regardless of amount', () => {
     const r = policyTest({ store: { default: {}, branches: {} }, flags: { flags: { 'control.role.fm': { enabled: true } } }, branch: 'BOM', rowKey: 'receipt', amount: 1, role: 'fm' });
     expect(r.reasons.some((x) => x.rule === 'Role control')).toBe(true);
-  });
-  test('owner co-sign routes a refund; a payment is untouched', () => {
-    const flags = { flags: { 'approval.owner_cosign_sensitive': { enabled: true } } };
-    expect(policyTest({ store: { default: {}, branches: {} }, flags, branch: 'BOM', rowKey: 'refund', amount: 1, role: 'ae' }).reasons.some((x) => x.rule === 'Owner co-sign')).toBe(true);
-    expect(policyTest({ store: { default: {}, branches: {} }, flags, branch: 'BOM', rowKey: 'payment', amount: 1, role: 'ae' }).routed).toBe(false);
   });
 });
 

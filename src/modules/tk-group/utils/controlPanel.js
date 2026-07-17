@@ -22,7 +22,7 @@ export const ROLE_SWITCHES = [
   { key: 'branch_manager', name: 'Branch Manager', role: 'Branch Manager', duty: 'Branch operations oversight', flag: 'control.role.branch_manager' },
   { key: 'general_manager', name: 'General Manager', role: 'General Manager', duty: 'General operations oversight', flag: 'control.role.general_manager' },
   { key: 'director', name: 'Farhan', role: 'Director', duty: 'Oversight · escalation sign-off', flag: 'control.role.director' },
-  { key: 'owner', name: 'Afshin', role: 'Owner', duty: 'Final authority · sensitive co-sign', flag: 'control.role.owner' },
+  { key: 'owner', name: 'Afshin', role: 'Owner', duty: 'Final authority', flag: 'control.role.owner' },
 ];
 
 /** Is a flag ON in a raw flag-state payload ({ flags: { <key>: {enabled|foundation} } })? */
@@ -104,7 +104,7 @@ export function roleControlWarning(roleKey, view = {}) {
 
 /** Policy Tester — given the live config + a hypothetical voucher, does it POST DIRECTLY or
  *  ROUTE to Check → Verify → Approve, and WHY. Mirrors the BE create() guard (Enforcement
- *  Matrix + per-role switches + owner-cosign + branch-entry chain). `store` = voucher-policy
+ *  Matrix + per-role switches + branch-entry chain). `store` = voucher-policy
  *  store; `flags` = flag-state payload; `rowKey` = a Matrix row (booking/inb/receipt/…);
  *  `role` = a ROLE_SWITCHES key. Returns { routed, reasons:[{rule,detail}] }. Pure. */
 export function policyTest({ store, flags, branch, rowKey, amount, role } = {}) {
@@ -117,9 +117,6 @@ export function policyTest({ store, flags, branch, rowKey, amount, role } = {}) 
   const rs = ROLE_SWITCHES.find((r) => r.key === role);
   if (rs && isFlagOn(flags, rs.flag, branch)) {
     reasons.push({ rule: 'Role control', detail: `${rs.name} (${rs.role}) is switched under control.` });
-  }
-  if ((rowKey === 'refund' || rowKey === 'reissue') && isFlagOn(flags, 'approval.owner_cosign_sensitive', branch)) {
-    reasons.push({ rule: 'Owner co-sign', detail: 'a refund / reissue additionally needs the Owner to sign.' });
   }
   // Branch-accountant routing is covered by the Role control check above
   // (control.role.branch_accountant); the old approval.chain_branch_entries flag is retired.
@@ -261,7 +258,6 @@ export const DEFAULT_RULES = [
 export const CONFIGURABLE_GROUPS = [
   { group: 'Approval & Verification', items: [
     { nm: 'Let Sughra also Approve (AE-approve)', ds: 'ON = the Accounts Executive (Sughra) may give final approval on a branch-accountant voucher, not just verify. OFF = Sughra verifies only; Faiz (FM) gives final approval.', flag: 'approval.ae_can_approve' },
-    { nm: 'Owner co-sign on sensitive types', ds: 'ON = a refund / reissue additionally needs the Owner (Afshin) to sign before final approval — routed through the chain, no self-clear. OFF = they approve like any other voucher.', flag: 'approval.owner_cosign_sensitive', crit: true },
     { nm: 'Branch Accountant under control', ds: "ON = a Branch Accountant's entries walk Check → Verify → Approve. OFF = acts independently, no approval required.", flag: 'control.role.branch_accountant' },
     { nm: 'Accounts Executive (Sughra) under control', ds: "ON = Sughra's entries walk the approval chain. OFF = acts independently.", flag: 'control.role.ae' },
     { nm: 'Senior Finance Manager (Faiz) under control', ds: "ON = Faiz's entries walk the approval chain — FM can no longer single-step approve their own. OFF = acts independently.", flag: 'control.role.fm' },
@@ -326,10 +322,10 @@ export function postureGrid(flagState, branchCodes = []) {
 // configurable flag OFF for the scope. Applied via the bulk set-many endpoint. Order = the
 // escalation from lightest to full control.
 export const POSTURE_PRESETS = [
-  { key: 'conservative', label: 'Conservative', desc: 'Approval basics: branch-accountant routing + Owner co-sign on refunds / reissues.',
-    flags: ['control.role.branch_accountant', 'approval.owner_cosign_sensitive'] },
+  { key: 'conservative', label: 'Conservative', desc: 'Approval basics: branch-accountant routing.',
+    flags: ['control.role.branch_accountant'] },
   { key: 'standard', label: 'Standard', desc: 'Conservative + verifier≠approver, large-voucher escalation, mandatory documents, export logging and the period lock.',
-    flags: ['control.role.branch_accountant', 'approval.owner_cosign_sensitive', 'sod.verifier_ne_approver', 'approval.escalation_signoffs', 'entry.mandatory_docs', 'reports.log_exports', 'masters.period_lock'] },
+    flags: ['control.role.branch_accountant', 'sod.verifier_ne_approver', 'approval.escalation_signoffs', 'entry.mandatory_docs', 'reports.log_exports', 'masters.period_lock'] },
   { key: 'strict', label: 'Strict', desc: 'Every configurable rule on — the full control layer.',
     flags: CONFIGURABLE_FLAGS },
 ];

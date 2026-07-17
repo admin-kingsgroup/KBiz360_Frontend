@@ -40,7 +40,7 @@ jest.mock('../../../core/ux/confirm', () => ({ confirmDialog: jest.fn().mockReso
 // eslint-disable-next-line import/first
 import { ControlPanel } from '../control-configuration/ControlPanel';
 import { CONFIGURABLE_FLAGS } from '../utils/controlPanel';
-const N_FLAGS = CONFIGURABLE_FLAGS.length; // 23 — every configurable rule
+const N_FLAGS = CONFIGURABLE_FLAGS.length; // every configurable rule
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
