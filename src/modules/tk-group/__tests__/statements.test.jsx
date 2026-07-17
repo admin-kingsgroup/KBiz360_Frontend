@@ -49,9 +49,16 @@ describe('getVisibleMenu — hide-statements integration', () => {
     expect(hrefs).toContain('/ledger');
   });
 
-  test('without the control the same user keeps the statements (dormant default)', () => {
+  test('the statements are off the accountant menu even without the control', () => {
+    // 2026-07-17: the whole Branch MIS head (P&L / BS / Cash Position) left the
+    // accountant Accounts pill (MENU_ACCOUNTS_BRANCH_ACCOUNTANT), so the statements
+    // are gone at ROLE level — the hideStatements control is now a no-op for this
+    // role (it still guards full-menu roles a Director restricts).
     const hrefs = hrefsOf(getVisibleMenu({ code: 'BOM' }, { role: 'Branch Accountant' }));
-    expect(hrefs).toContain('/reports/pnl');
-    expect(hrefs).toContain('/reports/bs');
+    expect(hrefs).not.toContain('/reports/pnl');
+    expect(hrefs).not.toContain('/reports/bs');
+    // the rest of the workspace is untouched
+    expect(hrefs).toContain('/reports/sreg');
+    expect(hrefs).toContain('/ledger');
   });
 });
