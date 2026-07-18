@@ -328,6 +328,71 @@ export function CapitalVsInvestmentLive({ branch }) {
 
   const jump = (id) => { const el = document.getElementById('cvd-' + id); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); setActive(id); };
 
+  // ── Group / ALL scope: per-branch summary, never a blended ₹+$ statement ──────
+  // A consolidated capital statement would sum ₹ India + $ Africa into one meaningless total,
+  // so in ALL scope show each branch's headline capital figures SEPARATELY in its own currency
+  // (backend `byBranch`), and point to single-branch for the full drill-down statement.
+  const isAll = brCodeOf(branch) === 'ALL';
+  if (isAll) {
+    const branches = Array.isArray(data?.byBranch) ? data.byBranch.slice().sort((a, b) => (a.branch || '').localeCompare(b.branch || '')) : [];
+    return (
+      <div className="cvd">
+        <style>{CSS}</style>
+        <div className="main">
+          <div className="topbar">
+            <div>
+              <div className="crumb">Dashboards › AD Dashboards › <b>Capital vs Investment</b> · Live from Balance Sheet + P&amp;L</div>
+              <div className="h1">Capital vs Investment · Group (per branch)</div>
+            </div>
+            <div className="controls">
+              <div className="presets" role="group" aria-label="Period">
+                {PRESETS.map(([k, label]) => (<button key={k} type="button" className={preset === k ? 'on' : ''} onClick={() => setPreset(k)}>{label}</button>))}
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: '14px 22px' }}>
+            <div style={{ fontSize: 12.5, color: '#6b7488', marginBottom: 12 }}>
+              Each branch shown separately in its own currency — capital is never summed across currencies (₹ / $). Pick a branch (top-right) for its full capital statement.
+            </div>
+            {isLoading && <SkeletonText lines={4} />}
+            {!isLoading && error && <div style={{ fontSize: 13, color: '#dc2626' }}>Couldn’t load the capital analysis — try refreshing. (This is a load error, not an empty result.)</div>}
+            {!isLoading && !error && !branches.length && <div style={{ fontSize: 13, color: '#6b7488' }}>No capital, asset or trading entries for any branch in this period.</div>}
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              {branches.map((e) => {
+                const bt = e.totals || {};
+                const bcur = (bc({ code: e.branch }) || {}).cur || '₹';
+                const emp = (bt.capitalEmployed != null ? bt.capitalEmployed : bt.capitalInvested) || 0;
+                const f = (n) => fmtAmt(bcur, n);
+                const yield_ = bt.gpYield || 0;
+                const kpi = (label, val, bad) => (
+                  <div style={{ minWidth: 140, flex: '1 1 140px' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#6b7488', letterSpacing: '.03em' }}>{label}</div>
+                    <div className="num" style={{ fontSize: 15.5, fontWeight: 800, color: bad ? '#dc2626' : '#151b28' }}>{f(val)}</div>
+                  </div>
+                );
+                return (
+                  <div key={e.branch} style={{ flex: '1 1 320px', border: '1px solid #e3e7ef', borderRadius: 10, background: '#fff', padding: '12px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, borderBottom: '2px solid #0d9488', paddingBottom: 6, marginBottom: 10 }}>
+                      <span style={{ fontWeight: 800, fontSize: 14 }}>{e.branch}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#6b7488' }}>· {bcur}</span>
+                      <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 700, color: yield_ >= hurdle ? '#16a34a' : '#d97706' }}>GP Yield {yield_.toFixed(1)}% {yield_ >= hurdle ? '≥' : '<'} {hurdle}%</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                      {kpi('Capital Invested', bt.capitalInvested || 0)}
+                      {kpi('Capital Employed', emp)}
+                      {kpi('In-Flow Capital', bt.inflowCapital || 0)}
+                      {kpi('Gross Profit', bt.grossProfit || 0, (bt.grossProfit || 0) < 0)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="cvd">
       <style>{CSS}</style>

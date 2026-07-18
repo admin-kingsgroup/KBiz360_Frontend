@@ -1082,54 +1082,63 @@ export function PerformanceDash({ branch, go }) {
 // closing balance. The lowest projected closing is the liquidity risk to watch.
 export function CashForecastDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;       // period sets the opening cash cut-off (as-of date)
-  const cur = (bc(branch) || {}).cur || '₹';
   const q = useCashForecast(branch, range); const d = q.data || {};
-  const rows = d.rows || [];
-  const opening = d.opening || 0;
-  const totalIn = rows.reduce((s, r) => s + (r.inflow || 0), 0);
-  const totalOut = rows.reduce((s, r) => s + (r.outflow || 0), 0);
-  const closing = rows.length ? rows[rows.length - 1].closing : opening;
-  const low = rows.reduce((m, r) => (r.closing < m.closing ? r : m), { closing: opening, week: 'now' });
-  const maxFlow = Math.max(1, ...rows.map((r) => Math.max(r.inflow || 0, r.outflow || 0)));
   const ld = q.isLoading; // don't paint computed-from-empty ₹0 while the forecast loads
-  const mv = (n) => (ld ? '…' : money(cur, n));
+  // Group/ALL: a 13-week forecast PER BRANCH in its own currency (backend byBranch) — never a
+  // ₹+$ merged opening/closing. Single-branch: that one branch's forecast.
+  const renderOne = (data, cur) => {
+    const rows = data?.rows || [];
+    const opening = data?.opening || 0;
+    const totalIn = rows.reduce((s, r) => s + (r.inflow || 0), 0);
+    const totalOut = rows.reduce((s, r) => s + (r.outflow || 0), 0);
+    const closing = rows.length ? rows[rows.length - 1].closing : opening;
+    const low = rows.reduce((m, r) => (r.closing < m.closing ? r : m), { closing: opening, week: 'now' });
+    const maxFlow = Math.max(1, ...rows.map((r) => Math.max(r.inflow || 0, r.outflow || 0)));
+    const mv = (n) => (ld ? '…' : money(cur, n));
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Opening Cash & Bank" value={mv(opening)} tone={ld ? undefined : (opening < 0 ? 'bad' : undefined)} onClick={go && (() => go('/dashboards/cash'))} />
+          <KPI label="Expected Inflow (13w)" value={mv(totalIn)} tone={ld ? undefined : 'good'} onClick={go && (() => go('/dashboards/arap'))} />
+          <KPI label="Expected Outflow (13w)" value={mv(totalOut)} onClick={go && (() => go('/dashboards/arap'))} />
+          <KPI label="Projected Closing" value={mv(closing)} tone={ld ? undefined : (closing < 0 ? 'bad' : 'good')} />
+          <KPI label="Lowest Point" value={ld ? '…' : money(cur, low.closing)} sub={low.closing < 0 ? `cash gap at ${low.week}` : `at ${low.week}`} tone={low.closing < 0 ? 'bad' : undefined} />
+        </div>
+        <Card title="Weekly Projection">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Week</th><th style={{ ...th }}>Flow</th><th style={{ ...th, ...num }}>Inflow</th><th style={{ ...th, ...num }}>Outflow</th><th style={{ ...th, ...num }}>Net</th><th style={{ ...th, ...num }}>Closing</th></tr></thead>
+            <tbody>
+              {rows.map((r) => {
+                const net = (r.inflow || 0) - (r.outflow || 0);
+                return (
+                  <tr key={r.week}>
+                    <td style={{ ...td, fontWeight: 700 }}>{r.week}</td>
+                    <td style={{ ...td, width: 220 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <div style={{ background: '#eaf4ee', borderRadius: 3, height: 7 }}><div style={{ width: `${(r.inflow || 0) / maxFlow * 100}%`, background: C.green, height: '100%', borderRadius: 3 }} /></div>
+                        <div style={{ background: '#fbecec', borderRadius: 3, height: 7 }}><div style={{ width: `${(r.outflow || 0) / maxFlow * 100}%`, background: C.red, height: '100%', borderRadius: 3 }} /></div>
+                      </div>
+                    </td>
+                    <td style={{ ...td, ...num, color: C.green }}>{money(cur, r.inflow)}</td>
+                    <td style={{ ...td, ...num, color: C.red }}>{money(cur, r.outflow)}</td>
+                    <td style={{ ...td, ...num, fontWeight: 700, color: net < 0 ? C.red : C.dark }}>{money(cur, net)}</td>
+                    <td style={{ ...td, ...num, fontWeight: 700, color: (r.closing || 0) < 0 ? C.red : C.dark }}>{money(cur, r.closing)}</td>
+                  </tr>
+                );
+              })}
+              {!rows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{ld ? 'Building forecast…' : 'No open invoices to project.'}</td></tr>}
+            </tbody>
+          </table>
+          <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Inflows = open sales due (by credit days), outflows = open purchases due. Overdue items land in W1; anything beyond 13 weeks rolls into W13.</div>
+        </Card>
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Cash Forecast (13-week)" sub={`Projected liquidity from due-dated invoices · opening as of ${range.to}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Opening Cash & Bank" value={mv(opening)} tone={ld ? undefined : (opening < 0 ? 'bad' : undefined)} onClick={go && (() => go('/dashboards/cash'))} />
-        <KPI label="Expected Inflow (13w)" value={mv(totalIn)} tone={ld ? undefined : 'good'} onClick={go && (() => go('/dashboards/arap'))} />
-        <KPI label="Expected Outflow (13w)" value={mv(totalOut)} onClick={go && (() => go('/dashboards/arap'))} />
-        <KPI label="Projected Closing" value={mv(closing)} tone={ld ? undefined : (closing < 0 ? 'bad' : 'good')} />
-        <KPI label="Lowest Point" value={q.isLoading ? '…' : money(cur, low.closing)} sub={low.closing < 0 ? `cash gap at ${low.week}` : `at ${low.week}`} tone={low.closing < 0 ? 'bad' : undefined} />
-      </div>
-      <Card title="Weekly Projection">
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Week</th><th style={{ ...th }}>Flow</th><th style={{ ...th, ...num }}>Inflow</th><th style={{ ...th, ...num }}>Outflow</th><th style={{ ...th, ...num }}>Net</th><th style={{ ...th, ...num }}>Closing</th></tr></thead>
-          <tbody>
-            {rows.map((r) => {
-              const net = (r.inflow || 0) - (r.outflow || 0);
-              return (
-                <tr key={r.week}>
-                  <td style={{ ...td, fontWeight: 700 }}>{r.week}</td>
-                  <td style={{ ...td, width: 220 }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <div style={{ background: '#eaf4ee', borderRadius: 3, height: 7 }}><div style={{ width: `${(r.inflow || 0) / maxFlow * 100}%`, background: C.green, height: '100%', borderRadius: 3 }} /></div>
-                      <div style={{ background: '#fbecec', borderRadius: 3, height: 7 }}><div style={{ width: `${(r.outflow || 0) / maxFlow * 100}%`, background: C.red, height: '100%', borderRadius: 3 }} /></div>
-                    </div>
-                  </td>
-                  <td style={{ ...td, ...num, color: C.green }}>{money(cur, r.inflow)}</td>
-                  <td style={{ ...td, ...num, color: C.red }}>{money(cur, r.outflow)}</td>
-                  <td style={{ ...td, ...num, fontWeight: 700, color: net < 0 ? C.red : C.dark }}>{money(cur, net)}</td>
-                  <td style={{ ...td, ...num, fontWeight: 700, color: (r.closing || 0) < 0 ? C.red : C.dark }}>{money(cur, r.closing)}</td>
-                </tr>
-              );
-            })}
-            {!rows.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>{q.isLoading ? 'Building forecast…' : 'No open invoices to project.'}</td></tr>}
-          </tbody>
-        </table>
-        <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Inflows = open sales due (by credit days), outflows = open purchases due. Overdue items land in W1; anything beyond 13 weeks rolls into W13.</div>
-      </Card>
+      <BranchSplit branch={branch} byBranch={d.byBranch} single={d} renderOne={renderOne}
+        emptyMsg="No cash forecast for any branch this period." />
     </div>
   );
 }
@@ -1140,52 +1149,60 @@ export function CashForecastDash({ branch, go }) {
 // bad on Cost lines — colour follows the line's `group`.
 export function YoYGrowthDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
   const yq = useYearOverYear(branch, range); const d = yq.data || {};
-  const rows = d.rows || [];
-  const find = (q) => rows.find((r) => (r.line || '').toLowerCase().includes(q)) || { cy: 0, ly: 0, group: 'Income' };
-  const rev = find('revenue'), gpRow = find('gross profit'), netRow = find('net profit');
   const growthTone = (r) => { const g = deltaPct(r.cy, r.ly); if (g == null) return undefined; const good = r.group === 'Costs' ? g < 0 : g >= 0; return good ? 'good' : 'bad'; };
   const dlt = (r) => deltaPct(r.cy, r.ly);
-  // Don't paint ₹0 / ▲0% as if real while loading or when the window has no data —
-  // the table already shows a "no data"/loading message; the KPI cards must too.
-  const noData = yq.isLoading || !rows.length;
-  const kv = (r) => (noData ? '…' : money(cur, r.cy));
-  const ks = (r) => (noData ? '' : `prev ${money(cur, r.ly)}`);
+  // Group/ALL: YoY P&L PER BRANCH in its own currency (backend byBranch) — never a ₹+$ merged
+  // cy/ly. Single-branch: that one branch's comparison.
+  const renderOne = (data, cur) => {
+    const rows = data?.rows || [];
+    const find = (q) => rows.find((r) => (r.line || '').toLowerCase().includes(q)) || { cy: 0, ly: 0, group: 'Income' };
+    const rev = find('revenue'), gpRow = find('gross profit'), netRow = find('net profit');
+    // Don't paint ₹0 / ▲0% as if real while loading or when the window has no data.
+    const noData = yq.isLoading || !rows.length;
+    const kv = (r) => (noData ? '…' : money(cur, r.cy));
+    const ks = (r) => (noData ? '' : `prev ${money(cur, r.ly)}`);
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Revenue" value={kv(rev)} sub={ks(rev)} delta={noData ? null : dlt(rev)} tone={noData ? undefined : growthTone(rev)} onClick={go && (() => go('/dashboards/sales'))} />
+          <KPI label="Gross Profit" value={kv(gpRow)} sub={ks(gpRow)} delta={noData ? null : dlt(gpRow)} tone={noData ? undefined : growthTone(gpRow)} onClick={go && (() => go('/dashboards/module-gp'))} />
+          <KPI label="Net Profit" value={kv(netRow)} sub={ks(netRow)} delta={noData ? null : dlt(netRow)} tone={noData ? undefined : growthTone(netRow)} onClick={go && (() => go('/dashboards/profitability'))} />
+        </div>
+        <Card title="P&L — This Year vs Last Year">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Line</th><th style={{ ...th, ...num }}>{data?.current?.label || 'Current'}</th><th style={{ ...th, ...num }}>{data?.prior?.label || 'Prior'}</th><th style={{ ...th, ...num }}>Change</th><th style={{ ...th, ...num }}>Growth %</th></tr></thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const change = (r.cy || 0) - (r.ly || 0);
+                const g = dlt(r); const tone = growthTone(r);
+                const col = tone === 'good' ? C.green : tone === 'bad' ? C.red : C.dim;
+                return (
+                  <tr key={i} style={{ background: r.bold ? C.bg : undefined }} {...rowNav(go, '/reports/pnl')}>
+                    <td style={{ ...td, fontWeight: r.bold ? 800 : 400 }}>{r.line}</td>
+                    <td style={{ ...td, ...num, fontWeight: r.bold ? 800 : 400 }}>{money(cur, r.cy)}</td>
+                    <td style={{ ...td, ...num, color: C.dim }}>{money(cur, r.ly)}</td>
+                    <td style={{ ...td, ...num, color: change >= 0 ? C.dark : C.red }}>{money(cur, change)}</td>
+                    <td style={{ ...td, ...num, fontWeight: 700, color: col }}>{g == null ? '—' : (g >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(g))}</td>
+                  </tr>
+                );
+              })}
+              {yq.isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <tr key={`sk-${i}`}><td colSpan={5} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
+              ))}
+              {!yq.isLoading && !rows.length && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No comparison data for this window.</td></tr>}
+            </tbody>
+          </table>
+          <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Compared against the matching span of the previous financial year. On cost lines a fall (▼) is the favourable move.</div>
+        </Card>
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="YoY Growth" sub={`${d.current?.label || 'This year'} vs ${d.prior?.label || 'last year'}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Revenue" value={kv(rev)} sub={ks(rev)} delta={noData ? null : dlt(rev)} tone={noData ? undefined : growthTone(rev)} onClick={go && (() => go('/dashboards/sales'))} />
-        <KPI label="Gross Profit" value={kv(gpRow)} sub={ks(gpRow)} delta={noData ? null : dlt(gpRow)} tone={noData ? undefined : growthTone(gpRow)} onClick={go && (() => go('/dashboards/module-gp'))} />
-        <KPI label="Net Profit" value={kv(netRow)} sub={ks(netRow)} delta={noData ? null : dlt(netRow)} tone={noData ? undefined : growthTone(netRow)} onClick={go && (() => go('/dashboards/profitability'))} />
-      </div>
-      <Card title="P&L — This Year vs Last Year">
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Line</th><th style={{ ...th, ...num }}>{d.current?.label || 'Current'}</th><th style={{ ...th, ...num }}>{d.prior?.label || 'Prior'}</th><th style={{ ...th, ...num }}>Change</th><th style={{ ...th, ...num }}>Growth %</th></tr></thead>
-          <tbody>
-            {rows.map((r, i) => {
-              const change = (r.cy || 0) - (r.ly || 0);
-              const g = dlt(r); const tone = growthTone(r);
-              const col = tone === 'good' ? C.green : tone === 'bad' ? C.red : C.dim;
-              return (
-                <tr key={i} style={{ background: r.bold ? C.bg : undefined }} {...rowNav(go, '/reports/pnl')}>
-                  <td style={{ ...td, fontWeight: r.bold ? 800 : 400 }}>{r.line}</td>
-                  <td style={{ ...td, ...num, fontWeight: r.bold ? 800 : 400 }}>{money(cur, r.cy)}</td>
-                  <td style={{ ...td, ...num, color: C.dim }}>{money(cur, r.ly)}</td>
-                  <td style={{ ...td, ...num, color: change >= 0 ? C.dark : C.red }}>{money(cur, change)}</td>
-                  <td style={{ ...td, ...num, fontWeight: 700, color: col }}>{g == null ? '—' : (g >= 0 ? '▲ ' : '▼ ') + pct(Math.abs(g))}</td>
-                </tr>
-              );
-            })}
-            {yq.isLoading && Array.from({ length: 5 }).map((_, i) => (
-              <tr key={`sk-${i}`}><td colSpan={5} style={{ ...td, padding: 10 }}><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
-            ))}
-            {!yq.isLoading && !rows.length && <tr><td colSpan={5} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No comparison data for this window.</td></tr>}
-          </tbody>
-        </table>
-        <div style={{ padding: '8px 14px', fontSize: 11, color: C.dim }}>Compared against the matching span of the previous financial year. On cost lines a fall (▼) is the favourable move.</div>
-      </Card>
+      <BranchSplit branch={branch} byBranch={d.byBranch} single={d} renderOne={renderOne}
+        emptyMsg="No YoY data for any branch this period." />
     </div>
   );
 }

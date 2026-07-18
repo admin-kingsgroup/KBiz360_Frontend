@@ -22,7 +22,14 @@ jest.mock('../../core/useAccounting', () => ({
   useTaxSummary: () => ({ data: { byBranch: [{ branch: 'BOM', netPayable: 10 }, { branch: 'NBO', netPayable: 2 }] } }),
   useInvoiceGP: () => ({ data: { rows: [] } }),
   useVoucherApprovals: () => ({ data: {} }),
-  useYearOverYear: () => ({ data: {} }),
+  useYearOverYear: () => ({ data: { byBranch: [
+    { branch: 'BOM', current: { label: 'FY25' }, prior: { label: 'FY24' }, rows: [{ line: 'Revenue', cy: 1000, ly: 800, group: 'Income' }] },
+    { branch: 'NBO', current: { label: 'FY25' }, prior: { label: 'FY24' }, rows: [{ line: 'Revenue', cy: 40, ly: 30, group: 'Income' }] },
+  ] } }),
+  useCashForecast: () => ({ data: { byBranch: [
+    { branch: 'BOM', opening: 500, rows: [{ week: 'W1', inflow: 10, outflow: 5, closing: 505 }] },
+    { branch: 'NBO', opening: 20, rows: [{ week: 'W1', inflow: 1, outflow: 0, closing: 21 }] },
+  ] } }),
 }));
 jest.mock('../../core/period', () => ({ PeriodBar: () => null, periodRange: () => ({ from: '2026-04-01', to: '2026-06-20', label: 'CFY' }) }));
 // Per-branch currency: NBO is USD, everything else ₹ — so a merge would be a bug.
@@ -31,7 +38,8 @@ jest.mock('../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})),
 
 import { render, screen } from '@testing-library/react';
 import { CashLiquidityDash, ReceivablesPayablesDash, BalanceSheetDash, ModuleGpDash, ExpensesDash,
-  TaxComplianceDash, SalesBookingsDash, SupplierPurchaseDash, ProfitabilityDash } from '../directorDashboards';
+  TaxComplianceDash, SalesBookingsDash, SupplierPurchaseDash, ProfitabilityDash,
+  CashForecastDash, YoYGrowthDash } from '../directorDashboards';
 
 const BOARDS = [
   ['Cash & Liquidity', CashLiquidityDash],
@@ -43,6 +51,9 @@ const BOARDS = [
   ['Sales & Bookings', SalesBookingsDash],
   ['Supplier / Purchase', SupplierPurchaseDash],
   ['Profitability (P&L)', ProfitabilityDash],
+  // Phase A (backend byBranch newly added):
+  ['Cash Forecast (13-week)', CashForecastDash],
+  ['YoY Growth', YoYGrowthDash],
 ];
 
 describe('Phase B — consolidated (ALL) view renders per-branch, not a merged block', () => {

@@ -58,7 +58,9 @@ describe('KPI drill-through', () => {
 
 describe('New owner dashboards render live', () => {
   test('Cash Forecast shows projected closing from the weekly rows', () => {
-    render(<CashForecastDash branch={'ALL'} />);
+    // Single-branch scope exercises the render off top-level {opening,rows}; ALL scope now
+    // renders per-branch off `byBranch` (covered in directorDashboards.branchSplit.test.jsx).
+    render(<CashForecastDash branch={{ code: 'BOM' }} />);
     expect(screen.getByText('Cash Forecast (13-week)')).toBeInTheDocument();
     expect(screen.getByText(/Projected Closing/i)).toBeInTheDocument();
     // lowest point = W2 closing 500 (below opening 1000)
