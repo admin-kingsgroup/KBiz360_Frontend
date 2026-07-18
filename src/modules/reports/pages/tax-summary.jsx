@@ -71,7 +71,7 @@ export function RPT_TaxSummary({ branch }) {
       { l: (isVat ? 'WHT' : 'TDS') + ' Receivable', v: f(wh.receivable), c: '#3fb7a3' },
       ...(!isVat ? [{ l: 'TCS Payable', v: f(tcs.payable), c: '#7F77DD' }] : []),
     ];
-    return { cfg, cur, regime, isVat, f, out, input, wh, tcs, net, kpis };
+    return { cfg, cur, regime, isVat, f, out, input, wh, tcs, net, kpis, hasData: !!(out.total || input.total || wh.payable || wh.receivable || tcs.payable || tcs.receivable) };
   };
 
   // ── One scope's KPIs + net banner + four ledger sections, in its own currency. Reused
@@ -156,17 +156,22 @@ export function RPT_TaxSummary({ branch }) {
               <div className="mb-4 rounded-brand border-l-4 border-navy bg-surface-alt px-3.5 py-2.5 text-[12px] font-semibold text-navy">
                 Consolidated — each branch in its own currency. No cross-currency total is shown.
               </div>
-              {byBranch.map((b) => (
+              {byBranch.map((b) => {
+                const m = b._error ? null : buildModel(b, { code: b.branch });
+                return (
                 <div key={b.branch} className="mb-7">
                   <div className="mb-2.5 flex items-baseline gap-2 border-b-2 border-navy pb-1">
-                    <span className="text-[15px] font-extrabold text-navy">{branchLabel(b.branch)}</span>
+                    <span className="text-[15px] font-extrabold text-navy">{b.branch || '—'}</span>
                     <span className="text-[12px] font-bold text-ink-muted">· {curOf(b.branch)}</span>
                   </div>
                   {b._error
                     ? <div className="rounded-brand border-l-4 border-[#dc2626] bg-[#FBEAEA] px-3.5 py-3 text-[12px] font-semibold text-maroon">Could not load tax summary for {branchLabel(b.branch)} — {b._error}</div>
-                    : renderBody(buildModel(b, { code: b.branch }))}
+                    : m.hasData
+                      ? renderBody(m)
+                      : <div className="rounded-brand border-l-4 border-[#94a3b8] bg-[#f1f5f9] px-3.5 py-3 text-[12px] font-semibold text-ink-muted">No {m.isVat ? 'VAT' : 'GST'} movement for {b.branch || 'this branch'} this period.</div>}
                 </div>
-              ))}
+                );
+              })}
             </>
           )
       )}
