@@ -29,7 +29,7 @@ jest.mock('../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})),
 
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ExecutiveOverview, TaxComplianceDash, CashForecastDash, YoYGrowthDash, CustomerValueDash,
-  CashLiquidityDash, ModuleGpDash, SalesBookingsDash, SupplierPurchaseDash, ExpensesDash, BalanceSheetDash, VsTargetDash, PerformanceDash } from '../directorDashboards';
+  CashLiquidityDash, ModuleGpDash, SalesBookingsDash, SupplierPurchaseDash, ExpensesDash, BalanceSheetDash, VsTargetDash, PerformanceDash, DirectorDash } from '../directorDashboards';
 
 afterEach(() => jest.clearAllMocks());
 
@@ -122,22 +122,25 @@ describe('Previously drill-dead dashboards now navigate', () => {
 
 // Consolidated "Performance vs Target" — Sales/GP/Budget/Nett Profit on ONE page.
 describe('Performance vs Target — consolidated dashboard', () => {
-  test('renders all four target tiles under one header', () => {
+  test('renders all five target tiles under one header (Collections folded in from the retired Targets menu group)', () => {
     render(<PerformanceDash branch={'BOM'} go={jest.fn()} />);
     expect(screen.getByText('TGT VS Sales/GP/EX/NP')).toBeInTheDocument();
     expect(screen.getByText('Sales vs Target')).toBeInTheDocument();
     expect(screen.getByText('GP vs Target')).toBeInTheDocument();
+    expect(screen.getByText('Collections vs Target')).toBeInTheDocument();
     expect(screen.getByText('Budget vs Expense')).toBeInTheDocument();
     expect(screen.getByText('Nett Profit vs Target')).toBeInTheDocument();
   });
 
-  test('each tile drills into its standalone dashboard', () => {
+  test('each tile drills into its standalone dashboard (kept alive as deep-dive drill targets after the menu fold)', () => {
     const go = jest.fn();
     render(<PerformanceDash branch={'BOM'} go={go} />);
     fireEvent.click(screen.getByRole('button', { name: /Sales vs Target/i }));
     expect(go).toHaveBeenCalledWith('/dashboards/sales-target');
     fireEvent.click(screen.getByRole('button', { name: /GP vs Target/i }));
     expect(go).toHaveBeenCalledWith('/dashboards/gp-target');
+    fireEvent.click(screen.getByRole('button', { name: /Collections vs Target/i }));
+    expect(go).toHaveBeenCalledWith('/dashboards/collections-target');
     fireEvent.click(screen.getByRole('button', { name: /Budget vs Expense/i }));
     expect(go).toHaveBeenCalledWith('/dashboards/budget-expense');
     fireEvent.click(screen.getByRole('button', { name: /Nett Profit vs Target/i }));
@@ -154,6 +157,87 @@ describe('Performance vs Target — consolidated dashboard', () => {
     expect(screen.getByText(/Sales vs Target — by Module/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^GP$/ }));
     expect(screen.getByText(/GP vs Target — by Module/i)).toBeInTheDocument();
+  });
+});
+
+// Increment 3: Profitability (P&L) folds YoY Growth + Expenses in as tabs. All three
+// share the P&L board; each tab navigates to its own /dashboards/* route (kept alive as
+// tab targets + deep-links) so URLs match the view and existing drill-ins still resolve.
+describe('P&L board — YoY + Expenses folded in as tabs', () => {
+  test('the P&L route shows all three tabs', () => {
+    render(<DirectorDash which="profitability" branch={'BOM'} setRoute={jest.fn()} />);
+    expect(screen.getByRole('tab', { name: /^P&L$/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /YoY Growth/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Expenses/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^P&L$/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('tabs navigate to their own deep-linkable routes', () => {
+    const setRoute = jest.fn();
+    render(<DirectorDash which="profitability" branch={'BOM'} setRoute={setRoute} />);
+    fireEvent.click(screen.getByRole('tab', { name: /YoY Growth/i }));
+    expect(setRoute).toHaveBeenCalledWith('/dashboards/yoy');
+    fireEvent.click(screen.getByRole('tab', { name: /Expenses/i }));
+    expect(setRoute).toHaveBeenCalledWith('/dashboards/expenses');
+  });
+
+  test('which="yoy" and which="expenses" render their view under the same board (tab selected)', () => {
+    const { rerender } = render(<DirectorDash which="yoy" branch={'BOM'} setRoute={jest.fn()} />);
+    expect(screen.getByRole('tab', { name: /YoY Growth/i })).toHaveAttribute('aria-selected', 'true');
+    rerender(<DirectorDash which="expenses" branch={'BOM'} setRoute={jest.fn()} />);
+    expect(screen.getByRole('tab', { name: /Expenses/i })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+// Increment 4: Cash & Liquidity folds the 13-week Cash Forecast in as a tab. Both share
+// the Cash board; /dashboards/cash-forecast stays live as the tab target + deep-link.
+describe('Cash board — Cash Forecast folded in as a tab', () => {
+  test('the Cash route shows both tabs (Cash & Liquidity selected)', () => {
+    render(<DirectorDash which="cash" branch={'BOM'} setRoute={jest.fn()} />);
+    expect(screen.getByRole('tab', { name: /Cash & Liquidity/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Cash Forecast/i })).toBeInTheDocument();
+  });
+
+  test('Cash Forecast tab navigates to its deep-linkable route', () => {
+    const setRoute = jest.fn();
+    render(<DirectorDash which="cash" branch={'BOM'} setRoute={setRoute} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Cash Forecast/i }));
+    expect(setRoute).toHaveBeenCalledWith('/dashboards/cash-forecast');
+  });
+
+  test('which="cash-forecast" renders the forecast view under the same board (tab selected)', () => {
+    render(<DirectorDash which="cash-forecast" branch={'BOM'} setRoute={jest.fn()} />);
+    expect(screen.getByRole('tab', { name: /Cash Forecast/i })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+// Increment 5: Sales & Bookings + Module/Product GP become tabs of one "Sales & GP" board.
+describe('Sales & GP board — Module/Product GP folded in as a tab', () => {
+  test('the Sales route shows both tabs (Sales & Bookings selected)', () => {
+    render(<DirectorDash which="sales" branch={'BOM'} setRoute={jest.fn()} />);
+    expect(screen.getByRole('tab', { name: /Sales & Bookings/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Module . Product GP/i })).toBeInTheDocument();
+  });
+  test('Module GP tab navigates to its deep-linkable route', () => {
+    const setRoute = jest.fn();
+    render(<DirectorDash which="sales" branch={'BOM'} setRoute={setRoute} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Module . Product GP/i }));
+    expect(setRoute).toHaveBeenCalledWith('/dashboards/module-gp');
+  });
+});
+
+// Increment 6: Customer Value + Supplier/Purchase become tabs of one "Customers & Suppliers" board.
+describe('Customers & Suppliers board — Supplier folded in as a tab', () => {
+  test('the Customer route shows both tabs (Customer Value selected)', () => {
+    render(<DirectorDash which="customer-value" branch={'BOM'} setRoute={jest.fn()} />);
+    expect(screen.getByRole('tab', { name: /Customer Value/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Supplier . Purchase/i })).toBeInTheDocument();
+  });
+  test('Supplier tab navigates to its deep-linkable route', () => {
+    const setRoute = jest.fn();
+    render(<DirectorDash which="customer-value" branch={'BOM'} setRoute={setRoute} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Supplier . Purchase/i }));
+    expect(setRoute).toHaveBeenCalledWith('/dashboards/supplier');
   });
 });
 

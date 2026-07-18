@@ -31,7 +31,7 @@ const { RPT_ABCAnalysis, RPT_Attrition, RPT_AuditTrail, RPT_BirthdayCalendar, RP
 const { RPT_InterbranchElim, InterBranchRegister, InterBranchMatrix, InterBranchCounterpartyLedger, InboundInterBranch } = lazyModule(() => import('./modules/interbranch'));
 const { SalesGpAnalytics } = lazyModule(() => import('./modules/reports/salesGpAnalytics'));
 const { AcmRegister, AssetDepreciation, AssetDisposal, BlockOfAssets, FixedAssetRegister } = lazyModule(() => import('./modules/assets'));
-const { Dashboard, AlertsDashboard, OwnerDashboard, AdCockpit, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
+const { Dashboard, AlertsDashboard, OwnerCockpit, GovernanceBoard, ReceivablesAgeingSettlementPage, PayablesAgeingSettlementPage } = lazyModule(() => import('./modules/dashboard'));
 const { DirectorDash, TargetsMaster } = lazyModule(() => import('./modules/directorDashboards'));
 const { BankBalanceDashboard, BankReco, CashFlowDirect, CashFlowForecast, InterestCalculator, InvestmentDeclaration, InvestmentRegister, LoanAmortization, LoanEmiRegister, ReconciliationQueue, TDSCalculator, WorkingCapitalDashboard, YearEndClose } = lazyModule(() => import('./modules/finance'));
 
@@ -620,13 +620,13 @@ export default function KB360App(){
     // them (its widgets now live on the Owner Dashboard), so /dashboard renders the Owner
     // Dashboard directly. Every other role keeps the role-routed DashboardRouter.
     if(route==="/dashboard")          return isOwnerDashboardUser(currentUser)
-      ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
+      ? <OwnerCockpit branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser} view="overview"/>
       : <DashboardRouter branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>;
     // Owner Dashboard — consolidated whole-company view. Restricted to the group
     // owner: the Super Admin whose email is afshin.dhanani@kingsgroupco.com (BOTH
     // role + email required). Non-owners hitting the URL get a "not available" card.
     if(route==="/dashboard/cockpit") return isOwnerDashboardUser(currentUser)
-      ? <AdCockpit setRoute={navigate} branch={branch}/>
+      ? <OwnerCockpit branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser} view="cockpit"/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>AD Cockpit</h2>
@@ -634,17 +634,22 @@ export default function KB360App(){
           <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
         </div>;
     if(route==="/dashboard/owner")    return isOwnerDashboardUser(currentUser)
-      ? <OwnerDashboard branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser}/>
+      ? <OwnerCockpit branch={branch} setBranch={setBranch} setRoute={navigate} currentUser={currentUser} view="overview"/>
       : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
           <div style={{fontSize:42,marginBottom:14}}>🔒</div>
           <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>AD Dashboard (All)</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This consolidated all-branch dashboard is restricted to the group owner.</p>
           <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
         </div>;
-    if(route==="/dashboard/alerts")   return <AlertsDashboard branch={branch} setRoute={navigate}/>;
+    // Governance & Exceptions — Approvals & Audit + Alerts as one owner board (two views).
+    // Non-owners keep the plain Alerts board (no central audit tab); alerts stays reachable.
+    if(route==="/dashboard/alerts")   return isOwnerDashboardUser(currentUser)
+      ? <GovernanceBoard view="alerts" branch={branch} setRoute={navigate}/>
+      : <AlertsDashboard branch={branch} setRoute={navigate}/>;
+    if(route==="/dashboards/audit")   return <GovernanceBoard view="approvals" branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/capital") return <CapitalVsInvestmentLive branch={branch}/>; // Capital vs Investment (live from BS + P&L)
     // Director/Super-Admin dashboard suite (menu is role-gated in getMenu).
-    if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|audit|performance|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
+    if(/^\/dashboards\/(exec|profitability|cash|cash-forecast|arap|branch|balance-sheet|module-gp|sales|supplier|tax|expenses|performance|sales-target|gp-target|collections-target|budget-expense|yoy|customer-value)$/.test(route)) return <DirectorDash which={route.split('/')[2]} branch={branch} setRoute={navigate}/>;
     if(route==="/finance/targets") return <TargetsMaster branch={branch}/>;
     if(route==="/bookings/new")       return <SoPoGpVoucherEntry branch={branch} setRoute={navigate}/>;
     if(route==="/bookings/inter-branch") return <SoPoGpVoucherEntry branch={branch} setRoute={navigate} interBranch/>;

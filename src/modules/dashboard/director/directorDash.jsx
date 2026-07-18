@@ -812,19 +812,21 @@ export function PerformanceDash({ branch, go }) {
   const fy = fyStr();
   const salesQ = useTargetsVsActual(branch, 'sales', { ...range, fy });
   const gpQ    = useTargetsVsActual(branch, 'gp',    { ...range, fy });
+  const collQ  = useTargetsVsActual(branch, 'collections', { ...range, fy });
   const npQ    = useTargetsVsActual(branch, 'np',    { ...range, fy });
   const budQ   = useBudgetVsActual(branch, { ...range, fy });
-  const ld = salesQ.isLoading || gpQ.isLoading || npQ.isLoading || budQ.isLoading; // don't paint ₹0 as real while loading
+  const ld = salesQ.isLoading || gpQ.isLoading || collQ.isLoading || npQ.isLoading || budQ.isLoading; // don't paint ₹0 as real while loading
   const nT = npQ.data?.totals || {};
 
   // Consolidated ALL view mixing currencies → India (₹) & Africa ($) kept separate across
-  // all four metrics. Build an ordered (INR-first) currency list from whichever hooks
+  // all five metrics. Build an ordered (INR-first) currency list from whichever hooks
   // split, then pull each metric's matching per-currency entry for that block.
   const salesSplit = currencySplit(salesQ.data), gpSplit = currencySplit(gpQ.data);
+  const collSplit = currencySplit(collQ.data);
   const npSplit = currencySplit(npQ.data), budSplit = currencySplit(budQ.data);
-  const anySplit = salesSplit || gpSplit || npSplit || budSplit;
+  const anySplit = salesSplit || gpSplit || collSplit || npSplit || budSplit;
   const curList = [];
-  [salesSplit, gpSplit, npSplit, budSplit].forEach((sp) => (sp || []).forEach((e) => { if (!curList.some((x) => x.currency === e.currency)) curList.push({ currency: e.currency, symbol: e.symbol }); }));
+  [salesSplit, gpSplit, collSplit, npSplit, budSplit].forEach((sp) => (sp || []).forEach((e) => { if (!curList.some((x) => x.currency === e.currency)) curList.push({ currency: e.currency, symbol: e.symbol }); }));
   const entryFor = (split, currency) => (split ? (split.find((x) => x.currency === currency) || {}) : {});
 
   const [tab, setTab] = useState('sales');            // module table toggle
@@ -838,9 +840,10 @@ export function PerformanceDash({ branch, go }) {
     ? (t.ach <= 100 ? C.green : t.ach <= 110 ? C.amber : C.red)
     : (t.ach >= 100 ? C.green : t.ach >= 90 ? C.amber : C.red));
 
-  const buildTiles = (sT, gT, npT, bT) => ([
+  const buildTiles = (sT, gT, npT, bT, cT) => ([
     { key: 'sales', title: 'Sales vs Target',       ach: achOf(sT), actual: sT.actual, target: sT.target, variance: sT.variance, invert: false, route: '/dashboards/sales-target', aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
     { key: 'gp',    title: 'GP vs Target',          ach: achOf(gT), actual: gT.actual, target: gT.target, variance: gT.variance, invert: false, route: '/dashboards/gp-target',    aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
+    { key: 'coll',  title: 'Collections vs Target', ach: achOf(cT), actual: cT.actual, target: cT.target, variance: cT.variance, invert: false, route: '/dashboards/collections-target', aLabel: 'Collected', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
     { key: 'bud',   title: 'Budget vs Expense',     ach: usedOf(bT), actual: bT.actual, target: bT.budget, variance: bT.variance, invert: true,  route: '/dashboards/budget-expense', aLabel: 'Spent', tLabel: 'Budget', fav: 'under', unfav: 'over' },
     { key: 'np',    title: 'Nett Profit vs Target', ach: achOf(npT), actual: npT.actual, target: npT.target, variance: npT.variance, invert: false, route: '/dashboards/profitability', aLabel: 'Actual', tLabel: 'Target', fav: 'ahead', unfav: 'short' },
   ]);
@@ -918,10 +921,10 @@ export function PerformanceDash({ branch, go }) {
 
   return (
     <div style={{ margin: 12 }}>
-      <Toolbar title="TGT VS Sales/GP/EX/NP" sub={`Sales · GP · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
+      <Toolbar title="TGT VS Sales/GP/EX/NP" sub={`Sales · GP · Collections · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
       {anySplit
-        ? curList.map((c) => <div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{tilesRow(buildTiles(entryFor(salesSplit, c.currency).totals || {}, entryFor(gpSplit, c.currency).totals || {}, entryFor(npSplit, c.currency).totals || {}, entryFor(budSplit, c.currency).totals || {}), c.symbol)}</div>)
-        : tilesRow(buildTiles(salesQ.data?.totals || {}, gpQ.data?.totals || {}, nT, budQ.data?.totals || {}), cur)}
+        ? curList.map((c) => <div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{tilesRow(buildTiles(entryFor(salesSplit, c.currency).totals || {}, entryFor(gpSplit, c.currency).totals || {}, entryFor(npSplit, c.currency).totals || {}, entryFor(budSplit, c.currency).totals || {}, entryFor(collSplit, c.currency).totals || {}), c.symbol)}</div>)
+        : tilesRow(buildTiles(salesQ.data?.totals || {}, gpQ.data?.totals || {}, nT, budQ.data?.totals || {}, collQ.data?.totals || {}), cur)}
       <div className="mt-1.5 text-[11px] text-ink-muted">Green ≥100% · amber ≥90% · red &lt;90% (budget inverts: green = under budget).{noNpTarget && <> · <b>No Nett Profit target set</b> — add one in <b>Finance ▸ Sales Targets</b> (metric “Nett Profit”).</>}</div>
 
       {/* PnlWaterfallPanel is a self-titled card ("📉 Profit Bridge") — render it
@@ -1129,6 +1132,84 @@ export function CustomerValueDash({ branch, go }) {
   );
 }
 
+// ── Consolidated multi-view boards — shared tab strip ─────────────────────────
+// Several former standalone dashboards are folded into a parent board as tabs (e.g.
+// P&L ▸ P&L | YoY | Expenses). Each tab navigates to its OWN /dashboards/* route so the
+// URL matches the visible view (deep-linkable, active-nav highlight works) and every
+// existing drill-in / deep-link keeps resolving. `active` is the current route string.
+function DashTabs({ tabs, active, go, label = 'Board views' }) {
+  return (
+    <div role="tablist" aria-label={label} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '12px 12px 0' }}>
+      {tabs.map(([route, tabLabel]) => {
+        const on = active === route;
+        return (
+          <button key={route} role="tab" aria-selected={on} onClick={() => { if (!on) go(route); }}
+            style={{ padding: '5px 14px', fontSize: 12.5, fontWeight: 700, cursor: on ? 'default' : 'pointer', borderRadius: 6,
+              color: on ? '#fff' : C.dim, background: on ? C.dark : '#fff', border: `1px solid ${on ? C.dark : C.border}` }}>
+            {tabLabel}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Profitability (P&L) board — folds in YoY Growth + Expenses as tabs (both retired as
+// standalone menu entries; their /dashboards/{yoy,expenses} routes stay alive as the tab
+// targets + deep-links). `which` selects the active tab.
+const PL_TABS = [['/dashboards/profitability', 'P&L'], ['/dashboards/yoy', 'YoY Growth'], ['/dashboards/expenses', 'Expenses']];
+export function ProfitAndLossBoard({ which, branch, go }) {
+  const active = which === 'yoy' ? '/dashboards/yoy' : which === 'expenses' ? '/dashboards/expenses' : '/dashboards/profitability';
+  return (
+    <>
+      <DashTabs tabs={PL_TABS} active={active} go={go} label="P&L views" />
+      {which === 'yoy' ? <YoYGrowthDash branch={branch} go={go} />
+        : which === 'expenses' ? <ExpensesDash branch={branch} go={go} />
+          : <ProfitabilityDash branch={branch} go={go} />}
+    </>
+  );
+}
+
+// Cash & Liquidity board — folds in the 13-week Cash Forecast as a tab (retired as a
+// standalone menu entry; /dashboards/cash-forecast stays live as the tab target +
+// deep-link, incl. the Owner Dashboard's "Cash Forecast" drill). `which` selects the tab.
+const CASH_TABS = [['/dashboards/cash', 'Cash & Liquidity'], ['/dashboards/cash-forecast', 'Cash Forecast (13-week)']];
+export function CashBoard({ which, branch, go }) {
+  const active = which === 'cash-forecast' ? '/dashboards/cash-forecast' : '/dashboards/cash';
+  return (
+    <>
+      <DashTabs tabs={CASH_TABS} active={active} go={go} label="Cash views" />
+      {which === 'cash-forecast' ? <CashForecastDash branch={branch} go={go} /> : <CashLiquidityDash branch={branch} go={go} />}
+    </>
+  );
+}
+
+// Sales & GP board — folds Module/Product GP in as a tab beside Sales & Bookings
+// (/dashboards/module-gp stays live as the tab target + deep-link). `which` selects the tab.
+const SALES_TABS = [['/dashboards/sales', 'Sales & Bookings'], ['/dashboards/module-gp', 'Module / Product GP']];
+export function SalesGpBoard({ which, branch, go }) {
+  const active = which === 'module-gp' ? '/dashboards/module-gp' : '/dashboards/sales';
+  return (
+    <>
+      <DashTabs tabs={SALES_TABS} active={active} go={go} label="Sales & GP views" />
+      {which === 'module-gp' ? <ModuleGpDash branch={branch} go={go} /> : <SalesBookingsDash branch={branch} go={go} />}
+    </>
+  );
+}
+
+// Customers & Suppliers board — the two counterparty-analytics views (customer LTV/ABC and
+// supplier/purchase) as tabs (/dashboards/supplier stays live as the tab target + deep-link).
+const CUSTSUP_TABS = [['/dashboards/customer-value', 'Customer Value (LTV + ABC)'], ['/dashboards/supplier', 'Supplier / Purchase']];
+export function CustomersSuppliersBoard({ which, branch, go }) {
+  const active = which === 'supplier' ? '/dashboards/supplier' : '/dashboards/customer-value';
+  return (
+    <>
+      <DashTabs tabs={CUSTSUP_TABS} active={active} go={go} label="Customers & Suppliers views" />
+      {which === 'supplier' ? <SupplierPurchaseDash branch={branch} go={go} /> : <CustomerValueDash branch={branch} go={go} />}
+    </>
+  );
+}
+
 // Router for the Director dropdown routes. `setRoute` (App's navigate) lets the
 // KPI tiles drill into the matching register/report.
 export function DirectorDash({ which, branch, setRoute }) {
@@ -1136,24 +1217,23 @@ export function DirectorDash({ which, branch, setRoute }) {
   // Every dashboard receives `go` so its money KPIs drill into the matching
   // register/report. (Previously only a handful were passed `go`, leaving most
   // dashboards' amounts non-clickable.)
-  if (which === 'profitability') return <ProfitabilityDash branch={branch} go={go} />;
-  if (which === 'cash') return <CashLiquidityDash branch={branch} go={go} />;
+  // P&L board folds YoY + Expenses in as tabs (all three share /dashboards/{profitability,yoy,expenses}).
+  if (which === 'profitability' || which === 'yoy' || which === 'expenses') return <ProfitAndLossBoard which={which} branch={branch} go={go} />;
+  // Cash board folds the 13-week Cash Forecast in as a tab (shares /dashboards/{cash,cash-forecast}).
+  if (which === 'cash' || which === 'cash-forecast') return <CashBoard which={which} branch={branch} go={go} />;
   if (which === 'arap') return <ReceivablesPayablesDash branch={branch} go={go} />;
   if (which === 'branch') return <BranchPerformanceDash go={go} branch={branch} />;
   if (which === 'balance-sheet') return <BalanceSheetDash branch={branch} go={go} />;
-  if (which === 'module-gp') return <ModuleGpDash branch={branch} go={go} />;
-  if (which === 'sales') return <SalesBookingsDash branch={branch} go={go} />;
-  if (which === 'supplier') return <SupplierPurchaseDash branch={branch} go={go} />;
+  // Sales & GP board folds Module/Product GP in as a tab (shares /dashboards/{sales,module-gp}).
+  if (which === 'sales' || which === 'module-gp') return <SalesGpBoard which={which} branch={branch} go={go} />;
   if (which === 'tax') return <TaxComplianceDash branch={branch} go={go} />;
-  if (which === 'expenses') return <ExpensesDash branch={branch} go={go} />;
   if (which === 'audit') return <ApprovalsAuditDash branch={branch} go={go} />;
   if (which === 'sales-target') return <VsTargetDash branch={branch} metric="sales" go={go} />;
   if (which === 'gp-target') return <VsTargetDash branch={branch} metric="gp" go={go} />;
   if (which === 'collections-target') return <VsTargetDash branch={branch} metric="collections" go={go} />;
   if (which === 'budget-expense') return <BudgetVsExpenseDash branch={branch} go={go} />;
   if (which === 'performance') return <PerformanceDash branch={branch} go={go} />;
-  if (which === 'cash-forecast') return <CashForecastDash branch={branch} go={go} />;
-  if (which === 'yoy') return <YoYGrowthDash branch={branch} go={go} />;
-  if (which === 'customer-value') return <CustomerValueDash branch={branch} go={go} />;
+  // Customers & Suppliers board folds Supplier/Purchase in as a tab (shares /dashboards/{customer-value,supplier}).
+  if (which === 'customer-value' || which === 'supplier') return <CustomersSuppliersBoard which={which} branch={branch} go={go} />;
   return <ExecutiveOverview branch={branch} go={go} />;
 }

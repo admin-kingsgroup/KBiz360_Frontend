@@ -783,39 +783,41 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
   // "AD Dashboards" (formerly "Overview") is Super-Admin-only — dashboardsFor()
   // strips this group for every other role (e.g. Director). superAdminOnly flags it.
   {label:"AD Dashboards", superAdminOnly:true, children:[
+    // Alerts folded into the "Governance & Exceptions" board (Control group) as its Alerts
+    // tab; /dashboard/alerts stays live as the tab target + deep-link (e.g. Key Alerts drill).
     {label:"My Dashboard", href:"/dashboard"},
-    {label:"Alerts Dashboard", href:"/dashboard/alerts"},
     {label:"Capital vs Investment", href:"/dashboards/capital"},
     {label:"TGT VS Sales/GP/EX/NP", href:"/dashboards/performance"},
   ]},
   {label:"Financials", children:[
     {divider:true, label:"P&L & Growth"},
+    // Profitability (P&L) folds in YoY Growth + Expenses as in-page tabs (both retired as
+    // standalone entries; /dashboards/{yoy,expenses} stay live as tab targets + deep-links).
     {label:"Profitability (P&L)", href:"/dashboards/profitability"},
-    {label:"YoY Growth", href:"/dashboards/yoy"},
     {divider:true, label:"Balance & Cash"},
     {label:"Balance Sheet", href:"/dashboards/balance-sheet"},
+    // Cash & Liquidity folds in the 13-week Cash Forecast as an in-page tab
+    // (/dashboards/cash-forecast stays live as the tab target + deep-link).
     {label:"Cash & Liquidity", href:"/dashboards/cash"},
-    {label:"Cash Forecast (13-week)", href:"/dashboards/cash-forecast"},
     {divider:true, label:"Working Capital & Tax"},
     {label:"Receivables & Payables", href:"/dashboards/arap"},
-    {label:"Expenses", href:"/dashboards/expenses"},
     {label:"Tax & Compliance", href:"/dashboards/tax"},
   ]},
   {label:"Business", children:[
-    {label:"Sales & Bookings", href:"/dashboards/sales"},
-    {label:"Module / Product GP", href:"/dashboards/module-gp"},
-    {label:"Customer Value (LTV + ABC)", href:"/dashboards/customer-value"},
+    // Sales & GP folds in Module/Product GP as a tab; Customers & Suppliers folds in
+    // Supplier/Purchase as a tab. The /dashboards/{module-gp,supplier} routes stay live as
+    // tab targets + deep-links.
+    {label:"Sales & GP", href:"/dashboards/sales"},
+    {label:"Customers & Suppliers", href:"/dashboards/customer-value"},
     {label:"Branch & Group Performance", href:"/dashboards/branch"},
-    {label:"Supplier / Purchase", href:"/dashboards/supplier"},
   ]},
-  {label:"Targets", children:[
-    {label:"Sales vs Target", href:"/dashboards/sales-target"},
-    {label:"GP vs Target", href:"/dashboards/gp-target"},
-    {label:"Collections vs Target", href:"/dashboards/collections-target"},
-    {label:"Budget vs Expense", href:"/dashboards/budget-expense"},
-  ]},
+  // "Targets" group folded into the consolidated "TGT VS Sales/GP/EX/NP" board
+  // (/dashboards/performance): its five tiles — Sales, GP, Collections, Budget,
+  // Nett Profit — each drill into the standalone /dashboards/*-target routes, which
+  // stay alive as deep-dive views (see PerformanceDash). No separate menu group needed.
   {label:"Control", children:[
-    {label:"Approvals & Audit", href:"/dashboards/audit"},
+    // Governance & Exceptions = Approvals & Audit + Alerts (two tabs, one board).
+    {label:"Governance & Exceptions", href:"/dashboards/audit"},
   ]},
 ]};
 
@@ -827,8 +829,10 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
 function withOwnerDashboard(menu){
   const overview = menu.children[0];
   const newOverview = {...overview, children:[
+    // One Owner Cockpit destination: /dashboard/owner opens the Overview view; the dark
+    // region "Cockpit" view (formerly a separate /dashboard/cockpit menu entry) is now
+    // reached by the in-page Overview/Cockpit toggle. /dashboard/cockpit still deep-links there.
     {label:"AD Dashboard (All)", href:"/dashboard/owner"},   // replaces "My Dashboard" for the owner
-    {label:"AD Cockpit", href:"/dashboard/cockpit"},  // sectioned dark cockpit — additive, owner-only
     ...overview.children.slice(1),                                        // Alerts, Capital, … (My Dashboard dropped)
   ]};
   return {...menu, children:[newOverview, ...menu.children.slice(1)]};

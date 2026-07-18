@@ -14,6 +14,10 @@ export { BranchDashboardPage as Dashboard, BranchDashboardPage } from './pages/b
 export { DirectorDashboardPage as DirectorDashboard, DirectorDashboardPage } from './pages/director-dashboard';
 export { OwnerDashboardPage as OwnerDashboard, OwnerDashboardPage } from './pages/owner-dashboard';
 export { AdCockpitPage as AdCockpit, AdCockpitPage } from './pages/ad-cockpit';
+// Owner Cockpit — one destination wrapping Owner Dashboard (Overview) + AD Cockpit (Cockpit).
+export { OwnerCockpitPage as OwnerCockpit, OwnerCockpitPage } from './pages/owner-cockpit';
+// Governance & Exceptions — one destination wrapping Approvals & Audit + Alerts.
+export { GovernanceBoard } from './pages/governance';
 export { SrFmDashboardPage as SrFmDashboard, SrFmDashboardPage } from './pages/sr-fm-dashboard';
 export { SrAeDashboardPage as SrAeDashboard, SrAeDashboardPage } from './pages/sr-ae-dashboard';
 export { AcctsExecDashboardPage as AcctsExecDashboard, AcctsExecDashboardPage } from './pages/accts-exec-dashboard';

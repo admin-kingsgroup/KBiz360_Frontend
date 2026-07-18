@@ -22,7 +22,10 @@ describe('AD Dashboards group — Super-Admin only', () => {
     expect(groupLabels(pill)).toContain('AD Dashboards');
     const ad = pill.children.find((c) => c.label === 'AD Dashboards');
     const hrefs = ad.children.map((c) => c.href);
-    expect(hrefs).toEqual(expect.arrayContaining(['/dashboard', '/dashboard/alerts', '/dashboards/capital']));
+    // Alerts folded into the "Governance & Exceptions" board (Control group) as a tab, so it's
+    // no longer a direct AD Dashboards link. The group keeps My Dashboard / Capital / TGT.
+    expect(hrefs).toEqual(expect.arrayContaining(['/dashboard', '/dashboards/capital', '/dashboards/performance']));
+    expect(hrefs).not.toContain('/dashboard/alerts');
   });
 
   test('Director does NOT see the AD Dashboards group, but keeps the rest of the dropdown', () => {

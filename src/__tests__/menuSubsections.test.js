@@ -12,7 +12,8 @@ const CASES = [
   [MENU_REPORTS,    'Profitability & GP',             ['Gross Profit', 'Yield', 'Customer & Product', 'Comparative & Group'], 11],
   [MENU_HR,         'Self-Service',                   ['Portal', 'Requests', 'Pay & Tax', 'Performance'],                     9],
   [MENU_SETTINGS,   'Admin Power',                    ['Templates & Branding', 'Approvals & Access', 'Data & Users'],         8],
-  [MENU_DASHBOARDS, 'Financials',                     ['P&L & Growth', 'Balance & Cash', 'Working Capital & Tax'],            8],
+  // 5 (was 8): YoY Growth + Expenses folded into Profitability (P&L); Cash Forecast folded into Cash & Liquidity — all as tabs.
+  [MENU_DASHBOARDS, 'Financials',                     ['P&L & Growth', 'Balance & Cash', 'Working Capital & Tax'],            5],
   // 5 (was 6): FX Revaluation removed — the group never revalues foreign balances.
   [MENU_FINANCE,    'Period-End, Targets & Accruals', ['Period-End', 'Targets & Budgets', 'Registers'],                       5],
   [MENU_MASTERS,    'Inventory & Catalog Master',     ['Travel Inventory', 'Codes & Rates'],                                  6],
