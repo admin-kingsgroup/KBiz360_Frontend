@@ -22,7 +22,7 @@ function computeCF({ pl, closing, opening }) {
   const g = (m, k) => m[k] || 0;
   const cashOf = (m) => g(m, 'Bank Accounts') + g(m, 'Cash-in-Hand');
 
-  const netProfit = pl ? pl.bridge.netProfit || 0 : 0;
+  const netProfit = pl && pl.bridge ? pl.bridge.netProfit || 0 : 0;
   const depn = pl ? (((pl.indirect && pl.indirect.groups) || []).filter((x) => /deprec|amortis|amortiz/i.test(x.name)).reduce((s, x) => s + (x.amount || 0), 0)) : 0;
   const dRecv = g(C, 'Sundry Debtors') - g(O, 'Sundry Debtors');
   const dPay = g(C, 'Sundry Creditors') - g(O, 'Sundry Creditors');

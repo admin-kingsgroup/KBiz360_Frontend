@@ -60,7 +60,9 @@ const BTN_SIZE = {
 // low-level primitive — rendered by nearly every screen and test — never pulls core/api's
 // `import.meta.env` into every component's (and test's) module graph. Mirrors core/api.isViewOnly.
 export const VIEW_ONLY_REASON = 'View only — this account can review but cannot make changes.';
-function isViewOnly() {
+// Exported so non-Button write controls (e.g. a <Select> that mutates on change) can gate on the
+// same leaf, test-safe read — without importing core/api (which carries import.meta).
+export function isViewOnly() {
   try {
     const raw = (typeof localStorage !== 'undefined' && localStorage.getItem('kb360-user')) || 'null';
     const u = JSON.parse(raw);

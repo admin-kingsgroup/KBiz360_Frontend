@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, AlertTriangle, SearchCheck, RefreshCcw, ClipboardCopy } from 'lucide-react';
 import { scrutinyEntryAction, scrutinyBulkAction, rerunScrutiny } from '../api';
 import { fmtAmt, classifyOptionsFor, classificationLabel, MATCH_TYPE_LABELS } from '../utils';
-import { Drawer, Badge, Button, Select, Checkbox } from '../../../shell/primitives';
+import { Drawer, Badge, Button, Select, Checkbox, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 // ─── Statement Scrutiny — entry-to-entry report (v2) ─────────────────────────
 // v2 adds: bulk classify (select-all in one write), auto-SUGGESTED classifications
@@ -214,8 +214,9 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
                                 ✓ {classificationLabel(e.suggested)}
                               </Button>
                             )}
-                            <Select aria-label="Classify reconciling item" defaultValue=""
-                              onChange={(ev) => ev.target.value && act.mutate({ entryId: e._id, action: 'classify', classification: ev.target.value })}>
+                            <Select aria-label="Classify reconciling item" defaultValue="" disabled={isViewOnly()}
+                              title={isViewOnly() ? VIEW_ONLY_REASON : undefined}
+                              onChange={(ev) => !isViewOnly() && ev.target.value && act.mutate({ entryId: e._id, action: 'classify', classification: ev.target.value })}>
                               <option value="" disabled>{e.suggested ? 'or classify as…' : 'Classify…'}</option>
                               {classify.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                             </Select>

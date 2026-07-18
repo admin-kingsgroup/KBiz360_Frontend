@@ -19,6 +19,8 @@ jest.mock('../../core/api', () => ({
   apiGet: (url, ...a) => (url === '/api/vouchers/edited' ? mockEditedGet(url, ...a) : mockApiGet(url, ...a)),
   apiPost: (...a) => mockApiPost(...a),
   getAuthToken: jest.fn(() => 'open'),
+  isViewOnly: () => false,
+  VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.',
 }));
 jest.mock('../../core/useAccounting', () => ({
   useVoucherApprovals: jest.fn(() => ({ data: {} })),

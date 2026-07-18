@@ -5,7 +5,7 @@
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost, isViewOnly } from '../../core/api';
+import { apiGet, apiPost, isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 import { AuditTrail } from '../../core/AuditTrail';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { VoucherView } from '../reportsFinancial/pnlTally';
@@ -88,7 +88,9 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // Owner escalation sign-off, which a view-only Director IS allowed to give (mirrors the server's
   // read-only exemption for those review actions).
   const vo = isViewOnly();
-  const VO_REASON = 'View only — this account can review vouchers but cannot change them.';
+  // App-wide view-only wording (shared with every other screen) — kept under the local
+  // name VO_REASON so existing usages below are unchanged.
+  const VO_REASON = VIEW_ONLY_REASON;
   // Three-level chain (Check → Verify → Approve): live assignee config + cache handle
   // for refreshing the queue after a Check/Verify (which don't go through the hooks).
   const chainCfg = useApprovalChain();
@@ -954,6 +956,13 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
   const money = (n, brc) => fmtAmount(n, brc ? curOf(brc) : cur);
   const isApprover = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test(currentUser?.role || '');
   const chainCfg = useApprovalChain(); // three-level chain assignees (Check → Verify → Approve)
+  // View-only accounts (e.g. a view-only Director) may browse the INB pipeline but not act. Every
+  // INB write button below is pre-DISABLED with a reason (never a live button that only 403s — the
+  // team's "never leave a screen silent / disable-with-reason" rule). The ONE exception is the
+  // Director/Owner escalation sign-off, which a view-only Director IS allowed to give (mirrors
+  // VoucherApprovals.voAction and the server's read-only exemption for those review actions).
+  const vo = isViewOnly();
+  const VO_REASON = VIEW_ONLY_REASON;
   // The other half of the deal's story. The voucher legs know they were pushed; only the
   // InbLink registry knows what the BUYER then did with it. Without this a Pushed row said
   // "🔒 pushed" and nothing more — we hand a deal over and never learn whether it was taken
@@ -1300,6 +1309,31 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     : ['INB Link No', 'Date', 'From → To', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'Margin (SVF)', 'GP %', lockedTab ? 'Buyer booking' : pushedTab ? 'Pushed' : 'Status'];
   const colSpan = COLS.length;
 
+  // View-only action cells for the INB pipeline — a disabled "👁 View only" indicator (reason on
+  // hover) in place of every write button, EXCEPT the Director/Owner escalation sign-off, which a
+  // view-only Director may still give. Mirrors VoucherApprovals.voAction; shared by the deal rows
+  // and the INB-refund rows. INB uses the SAME nextActionFor(…, chainCfg) chain, so the same
+  // director/owner exception applies here.
+  const voIndicator = () => <span title={VO_REASON} aria-label={VO_REASON} style={{ fontSize: 10, fontWeight: 700, color: C.dim, cursor: 'not-allowed' }}>👁 View only</span>;
+  const voDealAction = (d) => {
+    if (pendingTab) {
+      const na = nextActionFor(d.sale || d.purchase || {}, chainCfg);
+      if (na.action === 'director' || na.action === 'owner') {
+        return <><StageTracker e={d.sale || d.purchase || {}} /><button disabled={busy || !na.allowed} onClick={() => doReviewDeal(d, na.action)} title={na.hint} aria-label={na.hint} style={{ margin: '0 6px', padding: '5px 10px', background: na.allowed ? C.gold : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button></>;
+      }
+    }
+    return voIndicator();
+  };
+  const voRefundAction = (e) => {
+    if (pendingTab) {
+      const na = nextActionFor(e, chainCfg);
+      if (na.action === 'director' || na.action === 'owner') {
+        return <button disabled={busy || !na.allowed} onClick={() => doReviewRefund(e, na.action)} title={na.hint} aria-label={na.hint} style={{ marginRight: 6, padding: '5px 10px', background: na.allowed ? C.gold : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+      }
+    }
+    return voIndicator();
+  };
+
   // Editing a whole INB deal takes over the screen with the unified SPG editor (both
   // legs), exactly like SO/PO/GP. Placed after every hook so hook order never changes.
   if (editLink) {
@@ -1335,8 +1369,8 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
         {actionTab && shown.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAll} style={{ padding: '5px 11px', fontSize: 11, color: C.blue, background: '#fff', border: '1px solid #bcd4ee', borderRadius: 6, cursor: 'pointer' }}>{sel.size === allKeys.length && allKeys.length ? '☑ Clear' : `☐ Select all (${allKeys.length})`}</button>
-            {sel.size > 0 && isApprover && pendingTab && <button disabled={busy} onClick={() => doApprove(shown.filter((d) => sel.has(d.key)))} style={{ padding: '5px 13px', fontSize: 11.5, background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Approve selected ({sel.size})</button>}
-            {sel.size > 0 && isApprover && approvedTab && <button disabled={busy} onClick={() => doPush(shown.filter((d) => sel.has(d.key)))} style={{ padding: '5px 13px', fontSize: 11.5, background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Push selected ({sel.size})</button>}
+            {sel.size > 0 && isApprover && pendingTab && !vo && <button disabled={busy} onClick={() => doApprove(shown.filter((d) => sel.has(d.key)))} style={{ padding: '5px 13px', fontSize: 11.5, background: C.green, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Approve selected ({sel.size})</button>}
+            {sel.size > 0 && isApprover && approvedTab && !vo && <button disabled={busy} onClick={() => doPush(shown.filter((d) => sel.has(d.key)))} style={{ padding: '5px 13px', fontSize: 11.5, background: C.blue, color: '#fff', border: 'none', borderRadius: 6, fontWeight: 800, cursor: 'pointer' }}>Push selected ({sel.size})</button>}
           </span>
         )}
       </div>
@@ -1386,6 +1420,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                       {actionTab
                         ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                             {!isApprover ? <span style={{ fontSize: 11, color: C.dim }}>Approver only</span>
+                              : vo ? voDealAction(d)
                               : pendingTab ? <>{/* Pending: Edit / Approve (posts to our books) / Reject */}
                               {/* One unified edit — opens the SAME SO/PO/GP booking screen with BOTH legs
                                   loaded (interBranch mode). Falls back to per-leg edit only for a rare
@@ -1414,7 +1449,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                                  approve → re-push, which refreshes their row. */
                               ? <span style={{ whiteSpace: 'normal', display: 'inline-block', maxWidth: 260 }}>
                                   {isApprover
-                                    ? <button disabled={busy} onClick={() => doRevoke(d)} style={{ padding: '5px 10px', background: '#fff', color: '#A32D2D', border: '1px solid #A32D2D', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>⟲ Revoke to edit</button>
+                                    ? (vo ? voIndicator() : <button disabled={busy} onClick={() => doRevoke(d)} style={{ padding: '5px 10px', background: '#fff', color: '#A32D2D', border: '1px solid #A32D2D', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>⟲ Revoke to edit</button>)
                                     : <span style={{ fontSize: 11 }}>Returned — an approver must revoke it</span>}
                                   {d.returnedReason && <div style={{ marginTop: 3, fontSize: 10.5, color: C.dim }}>“{d.returnedReason}”</div>}
                                 </span>
@@ -1475,6 +1510,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                     {pendingTab
                       ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
                           <StageTracker e={e} />
+                          {vo ? voRefundAction(e) : <>
                           {isApprover && <>
                             {/* Single voucher (RF/RI) — edit it in place via the shared voucher
                                 editor (saving reverts it to Pending), then re-enter the chain. */}
@@ -1492,6 +1528,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                           })()}
                           {isApprover && <button disabled={busy} onClick={() => doRejectRefund(e)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
                           {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: C.red }}>blocked</span>}
+                          </>}
                         </td>
                       : <td style={{ padding: '7px 12px', color: C.dim, whiteSpace: 'nowrap' }}>
                           {/* Approved: our books are reversed — Push hands the refund to the buyer
@@ -1499,10 +1536,12 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                           {e.status === 'approved' && e.pushed
                             ? <span title={`Pushed to ${e.pushedTo || 'the buyer branch'} — they raise the matching refund against their own SO/PO/GP`}>⇪ Pushed → {e.pushedTo || 'buyer'} {fmtDate(e.pushedAt) || ''}</span>
                             : e.status === 'approved' && isApprover
-                              ? <>
+                              ? (vo
+                                ? <>{voIndicator()} <span style={{ fontSize: 11 }}>approved — in our books only</span></>
+                                : <>
                                   <button disabled={busy} onClick={() => doPushRefund(e)} title="Push → offer this refund to the buyer branch so they reverse their side too" style={{ marginRight: 8, padding: '5px 12px', background: C.blue, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 800, cursor: 'pointer' }}>⇪ Push</button>
                                   <span style={{ fontSize: 11 }}>approved — in our books only</span>
-                                </>
+                                </>)
                               : e.status}
                         </td>}
                   </tr>
