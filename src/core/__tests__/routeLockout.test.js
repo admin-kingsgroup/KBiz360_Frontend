@@ -10,7 +10,7 @@ const ACCT = { role: 'Branch Accountant', email: 'accounts.bom@travkings.com' };
 
 describe('canReachRoute — hard route-level lockout', () => {
   test('full-menu roles reach everything, including the locked areas', () => {
-    for (const r of ['/hr/employees', '/settings/users', '/group-dashboard', '/finance/receipts']) {
+    for (const r of ['/hr/employees', '/settings/users', '/group-dashboard', '/finance/receipts', '/dashboards/capital', '/dashboards/branch']) {
       expect(canReachRoute(r, ADMIN)).toBe(true);
       expect(canReachRoute(r, EXEC)).toBe(true);
     }
@@ -20,6 +20,21 @@ describe('canReachRoute — hard route-level lockout', () => {
     for (const r of ['/hr/employees', '/hr/payroll', '/settings/users', '/settings/company', '/group-dashboard', '/tax/gstr1', '/tax/tds']) {
       expect(canReachRoute(r, ACCT)).toBe(false);
     }
+  });
+
+  test('a Branch Accountant is blocked from the central Director/Owner dashboard suite by direct URL', () => {
+    // /dashboards/* is nav-hidden from accountants; this pins the route-level lockout so a
+    // direct URL (e.g. /dashboards/capital) can't open group-wide financials. /dashboard,
+    // /dashboard/alerts (singular segment) stay reachable — see the "keeps" test below.
+    for (const r of ['/dashboards/capital', '/dashboards/branch', '/dashboards/profitability', '/dashboards/audit', '/dashboards/module-gp', '/dashboards/customer-value']) {
+      expect(canReachRoute(r, ACCT)).toBe(false);
+    }
+  });
+
+  test('an explicit per-page grant overrides the /dashboards/* lockout', () => {
+    const granted = { ...ACCT, granted: ['/dashboards/branch'] };
+    expect(canReachRoute('/dashboards/branch', granted)).toBe(true);   // the granted page opens
+    expect(canReachRoute('/dashboards/capital', granted)).toBe(false); // others stay locked
   });
 
   test('a Branch Accountant keeps every accounting route (no false lockouts)', () => {

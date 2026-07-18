@@ -1051,9 +1051,12 @@ export function getMenu(branch, currentUser){
 // sales, assets…). Everything accounting/finance/reports/masters stays reachable;
 // per-PAGE control is the hidden deny-list (Page Visibility Control).
 //   hr → employees/payroll/salaries · settings → users & roles / company config ·
-//   group-dashboard → group-level dashboard · tax → the Taxation pill (central
-//   finance work, removed from the accountant surface; grant back per-page).
-const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'group-dashboard', 'tax']);
+//   group-dashboard → group-level dashboard · dashboards → the central Director/Owner
+//   dashboard suite (/dashboards/*: Capital, Branch & Group Performance, P&L, etc.),
+//   nav-hidden from accountants but must ALSO be blocked by direct URL (an accountant has
+//   no in-role /dashboards/* page) · tax → the Taxation pill (central finance work,
+//   removed from the accountant surface). Any of these can be granted back per-page.
+const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'group-dashboard', 'dashboards', 'tax']);
 
 // Hard route-level lockout used by App.jsx: can this user OPEN this route directly?
 // Full-menu roles (Super Admin / Director / everyone who isn't an accountant) reach
