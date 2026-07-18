@@ -27,7 +27,9 @@ export function BankAccountMaster({ branch, setRoute }) {
   useEffect(() => { setFilterBranch(branch === 'ALL' ? 'ALL' : branch?.code || 'ALL'); }, [branch]);
   // Bank accounts ARE ledgers under the Bank Accounts / Cash-in-Hand groups — fetch
   // them live and map the ledger's bank fields onto the register's columns.
-  const { data: ledgers = [] } = useMasterList('ledgers');
+  // Banks are branch-owned: fetch only the filtered branch's chart (+ 'ALL' heads)
+  // instead of pulling every branch's bank ledgers and hiding rows in the browser.
+  const { data: ledgers = [] } = useMasterList('ledgers', filterBranch !== 'ALL' ? { branch: filterBranch } : {});
   const bankRows = useMemo(() => (ledgers || [])
     .filter((l) => ['Bank Accounts', 'Cash-in-Hand'].includes(l.group))
     .map((l) => ({

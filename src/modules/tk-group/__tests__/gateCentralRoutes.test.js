@@ -50,7 +50,10 @@ describe('gateCentralRoutes — enabled', () => {
 
   test('branch operational routes are UNTOUCHED (no over-strip)', () => {
     // The accountant keeps daily entry, own-branch registers, books, reconciliation.
-    for (const r of ['/journal', '/receipts', '/payments', '/day-book', '/ledger', '/reports/pnl', '/reports/sreg', '/bank-reco']) {
+    // (/reports/pnl left this list 2026-07-17 — the whole Branch MIS head was removed
+    // from the accountant Accounts pill, so the statement is no longer on the menu
+    // this gate filters.)
+    for (const r of ['/journal', '/receipts', '/payments', '/day-book', '/ledger', '/reports/sreg', '/bank-reco']) {
       expect(gatedRoutes).toContain(r);
     }
   });

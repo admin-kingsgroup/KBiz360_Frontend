@@ -39,13 +39,16 @@ describe('Tax & Statutory → Taxation header', () => {
     });
   });
 
-  test('Branch Accountant gets Accounts + Taxation pills, with tax links reachable', () => {
+  test('Branch Accountant keeps Accounts but NOT the Taxation pill (removed 2026-07-17)', () => {
+    // Taxation is central-finance work — the pill left the accountant surface
+    // entirely (see core/menus.js roleMenuRoots); full-menu roles still get it,
+    // which the test.each above already covers via the TAX_* pill contents.
     const user = { role: 'Branch Accountant' };
     const menu = getMenu({ code: 'BOM' }, user); // Indian branch → GST regime
     const labels = menu.map(m => m.label);
     expect(labels).toContain('Accounts');
-    expect(labels).toContain('Taxation — GST');
+    expect(labels).not.toContain('Taxation — GST');
     const allHrefs = menu.flatMap(m => hrefs(m));
-    TAX_HREFS.forEach(h => expect(allHrefs).toContain(h));
+    TAX_HREFS.forEach(h => expect(allHrefs).not.toContain(h));
   });
 });

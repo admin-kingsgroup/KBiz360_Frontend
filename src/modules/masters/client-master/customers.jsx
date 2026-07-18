@@ -27,9 +27,14 @@ const partyScope = (brc) => ({
 });
 
 export const CustomersMaster = ({ branch } = {}) => {
-  const scope = partyScope(branchCode(branch));
+  const brc = branchCode(branch);
+  const scope = partyScope(brc);
   return (
   <MasterCrud title="Customers" subtitle="Clients (Sundry Debtors) — live from the backend" resource="customers"
+    // Scope on the SERVER (?branch → its customers + Common 'ALL' ones), not just in
+    // the browser: fetching every branch's customers and hiding rows client-side is
+    // exactly how one branch's parties leaked into another's view. rowFilter = belt.
+    params={brc ? { branch: brc } : {}}
     rowFilter={scope.rowFilter}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },

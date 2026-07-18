@@ -38,10 +38,22 @@ describe('per-user grant (allow-list)', () => {
     expect(hrefs(after)).not.toContain('/hr/employees');
   });
 
+  test('the accountant Accounts pill drops the central-finance heads', () => {
+    const menu = getMenu('ALL', acct());
+    const accounts = menu.find((m) => m.label === 'Accounts');
+    const heads = (accounts?.children || []).map((c) => c.label);
+    for (const gone of ['Branch MIS', 'Inter Branch', 'Period Close', 'Accounts Master']) {
+      expect(heads).not.toContain(gone);
+    }
+    expect(heads).toContain('Daily Entry'); // the workspace itself is intact
+    expect(heads).toContain('Books & Scrutiny');
+  });
+
   test('granting does not leak the accountant into unrelated pills', () => {
     const after = getMenu('ALL', acct({ granted: ['/hr/employees'] }));
-    // only Accounts/Approvals/Taxation/Support (role) + HR (granted) — no Masters/Reports/Admin
+    // only Accounts/Approvals/Support (role) + HR (granted) — no Masters/Reports/Admin/Taxation
     expect(labels(after)).not.toContain('Masters');
     expect(labels(after)).not.toContain('Admin');
+    expect(labels(after)).not.toContain('Taxation'); // removed from the accountant surface
   });
 });

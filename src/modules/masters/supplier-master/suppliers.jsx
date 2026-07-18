@@ -31,6 +31,10 @@ export const SuppliersMaster = ({ branch } = {}) => {
   const scope = partyScope(brc);
   return (
   <MasterCrud title="Suppliers" subtitle="Vendors (Sundry Creditors) — live from the backend" resource="suppliers"
+    // Scope on the SERVER (?branch → its vendors + Common 'ALL' ones), not just in the
+    // browser: fetching every branch's vendors and hiding rows client-side is exactly
+    // how one branch's parties leaked into another's view. rowFilter stays as a belt.
+    params={brc ? { branch: brc } : {}}
     rowFilter={scope.rowFilter}
     // Vendors are PER-BRANCH (shared/constants/ledgerScope): each branch owns the
     // vendors it buys from, so a branch with none is a legitimate empty — not a fault.
