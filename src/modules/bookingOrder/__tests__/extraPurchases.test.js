@@ -19,8 +19,8 @@ const legOf = (module, over = {}) => ({
 });
 
 describe('ALLOWED_LEG_MODULES', () => {
-  test('Flight→Misc; Holiday→any; Visa→2nd-visa/Misc/Insurance', () => {
-    expect(ALLOWED_LEG_MODULES.SF).toEqual(['SM']);
+  test('Flight→2nd-flight/Misc; Holiday→any; Visa→2nd-visa/Misc/Insurance', () => {
+    expect(ALLOWED_LEG_MODULES.SF).toEqual(['SF', 'SM']);
     expect(ALLOWED_LEG_MODULES.SH).toEqual(['SF', 'SHT', 'SC', 'SV', 'SI', 'SM']);
     expect(ALLOWED_LEG_MODULES.SV).toEqual(['SV', 'SM', 'SI']); // multi-country visa + add-ons
     expect(ALLOWED_LEG_MODULES.SHT).toBeUndefined();            // hotel/car/insurance/misc stay single-PO
@@ -28,6 +28,9 @@ describe('ALLOWED_LEG_MODULES', () => {
   });
   test('Visa allows a SAME-MODULE (2nd visa) leg', () => {
     expect(ALLOWED_LEG_MODULES.SV).toContain('SV');
+  });
+  test('Flight allows a SAME-MODULE (2nd flight) leg', () => {
+    expect(ALLOWED_LEG_MODULES.SF).toContain('SF');
   });
 });
 

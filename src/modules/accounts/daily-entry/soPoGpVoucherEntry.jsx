@@ -203,11 +203,16 @@ export function inbRowsFromDeal(spec, deal) {
 }
 
 // ── N-PO (Phase 2): additional purchase legs under one booking/Link No ────────
-// Flight (SF) may add ONE Misc PO; Holiday (SH) may add legs of ANY module type;
-// Visa (SV) may add another Visa (multi-country), Misc (courier/VFS) or Insurance.
-// Each leg carries its own module/supplier/cost-centre/ref/cost grid → its own
-// Purchase voucher on approval; the sale stays single. blank leg → dropped on save.
-export const ALLOWED_LEG_MODULES = { SF: ['SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'], SV: ['SV', 'SM', 'SI'] };
+// Flight (SF) may add another Flight PO or a Misc PO; Holiday (SH) may add legs
+// of ANY module type; Visa (SV) may add another Visa (multi-country), Misc
+// (courier/VFS) or Insurance. Each leg carries its own module/supplier/cost-centre/
+// ref/cost grid → its own Purchase voucher on approval; the sale stays single.
+// blank leg → dropped on save. MUST stay in sync with the backend mirror
+// (kbiz360-erp-backend shared/constants/bookingModules.js ALLOWED_LEG_MODULES).
+export const ALLOWED_LEG_MODULES = { SF: ['SF', 'SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'], SV: ['SV', 'SM', 'SI'] };
+// Leg modules whose ledger leaf + cost centre split Int'l vs Domestic (mirrors the
+// parent form's `hasPackage`) — such a leg must carry its own packageType.
+const multiLeafLeg = (m) => m === 'SF' || m === 'SH';
 const newLeg = (module) => ({ module, supplier: { name: '', ledgerGroup: '' }, costCenter: '', purTallyRef: '', gstMode: 'intra', packageType: '', availItc: false, line: blankLine(VSPECS[module] || VSPECS.SM) });
 // An INB deal's extra legs come back from getDeal as component `heads` (read off the
 // "<pfx>-<component> [IB-Pur]" ledgers) rather than a stored grid `rows` — a booking leg has
@@ -293,38 +298,201 @@ export const legFilled = (leg) => {
   return (sp.fareCols || []).some((c) => num(leg.line[c.key]) !== 0) || num(leg.line.psvc) !== 0;
 };
 
-function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, isForeign, supplyOf }) {
+function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs, onChange, isForeign, supplyOf }) {
   const allowed = ALLOWED_LEG_MODULES[parentModule];
   if (!allowed) return null;
   const setLeg = (i, patch) => onChange(legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const setLine = (i, key, val) => setLeg(i, { line: { ...legs[i].line, [key]: val } });
+  // Per-sector editing for a Flight leg's sectors sub-grid. Sectors live ON the leg's
+  // single fare line, so they ride into the save payload inside rows[0] (the backend
+  // stores leg rows verbatim) and come back on edit via legsFromEdit's rows[0] spread.
+  const setLegSec = (i, si, key, val) => setLeg(i, { line: { ...legs[i].line, sectors: (legs[i].line.sectors || []).map((s, idx) => (idx === si ? { ...s, [key]: val } : s)) } });
+  const addLegSec = (i) => setLeg(i, { line: { ...legs[i].line, sectors: [...(legs[i].line.sectors || []), blankSector()] } });
+  const delLegSec = (i, si) => setLeg(i, { line: { ...legs[i].line, sectors: (legs[i].line.sectors || []).filter((_, idx) => idx !== si) } });
   // Re-picking the module reseeds the grid line, but MUST carry the leg's identity: `vno` (an
   // existing leg — without it the server can't match and would mint a new number and retire the
   // original) and `unmapped` (its keep-untouched marker — without it the reseeded blank line reads
   // as empty and the leg is dropped from the payload entirely, i.e. retired). newLeg() has
   // neither, so spreading it first silently discarded both.
   const setModule = (i, m) => onChange(legs.map((l, idx) => (idx === i
-    ? { ...newLeg(m), vno: l.vno, unmapped: l.unmapped, supplier: l.supplier, costCenter: l.costCenter, purTallyRef: l.purTallyRef }
+    ? { ...newLeg(m), vno: l.vno, unmapped: l.unmapped, supplier: l.supplier, costCenter: l.costCenter, purTallyRef: l.purTallyRef,
+        ...(multiLeafLeg(m) ? { packageType: l.packageType || parentScope || '' } : {}) }
     : l)));
   const del = (i) => onChange(legs.filter((_, idx) => idx !== i));
-  const add = () => onChange([...legs, newLeg(allowed[0])]);
+  // A multi-leaf leg (Flight) seeds Int'l/Domestic from the PARENT booking — blank
+  // would silently resolve to the Domestic ledger leaf on approval (resolveChartLeaf),
+  // and an inter-branch deal outright rejects an untagged Flight leg.
+  const add = (m) => onChange([...legs, { ...newLeg(m), ...(multiLeafLeg(m) ? { packageType: parentScope || '' } : {}) }]);
   const cell = { width: 90, padding: '5px 7px', border: '1px solid #cdd1d8', borderRadius: 5, fontSize: 12 };
   return (
     <div style={{ ...card, marginTop: 14, marginBottom: 14, borderColor: '#cdb46a' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <strong style={{ fontSize: 13, color: '#6b5a1e' }}>➕ Additional Purchases (N-PO)</strong>
-        <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add a Misc cost leg' : 'Holiday package — add any component (flight/hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
-        <button type="button" onClick={add} style={{ ...btnGh, marginLeft: 'auto', padding: '5px 11px', fontSize: 11 }}>+ Add PO</button>
+        <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add another Flight or a Misc cost leg' : 'Holiday package — add any component (flight/hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
+        <div style={{ marginLeft: 'auto' }}>
+          <DropdownMenu
+            ariaLabel="Add purchase leg"
+            align="right"
+            width={200}
+            items={allowed.map((m) => ({ key: m, label: VSPECS[m].name, onSelect: () => add(m) }))}
+            renderTrigger={({ ref, toggle, triggerProps }) => (
+              <button ref={ref} {...triggerProps} onClick={toggle} type="button" style={{ ...btnGh, padding: '5px 11px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                + Add PO <ChevronDown size={12} />
+              </button>
+            )}
+          />
+        </div>
       </div>
       {legs.length === 0 && <p style={{ margin: 0, fontSize: 11.5, color: '#9A9A9A' }}>No extra purchase legs. The sale stays a single invoice; add a PO to attach another supplier cost under this Link No.</p>}
       {legs.map((leg, i) => {
-        const spec = VSPECS[leg.module] || VSPECS.SM;
+        const specRaw = VSPECS[leg.module] || VSPECS.SM;
+        // Africa/VAT branches don't levy India's K3 (airline) tax — drop the column,
+        // mirroring the parent grid's filter, so a Flight leg never shows K3 there.
+        const spec = isVatBranch(brCode) && (specRaw.fareCols || []).some((fc) => fc.key === 'k3')
+          ? { ...specRaw, fareCols: specRaw.fareCols.filter((fc) => fc.key !== 'k3') }
+          : specRaw;
         const pkg = spec.model === 'package';
-        const po = legToPayload(leg, brCode, noVat, isForeign ? isForeign(leg.supplier.name) : false).po;
+        const foreign = isForeign ? isForeign(leg.supplier.name) : false;
+        const po = legToPayload(leg, brCode, noVat, foreign).po;
         // This leg carries a component the grid has no column for (a migrated leg whose desc
         // drifted from the spec labels). It is saved back UNTOUCHED, so editing it here would be
         // silently discarded — say so and lock it, rather than accept keystrokes that go nowhere.
         const locked = (leg.unmapped || []).length > 0;
+        // A Flight leg renders the SAME full Purchase Order UI as the main PO section —
+        // fare grid with computed GST/TDS/Total, per-sector sub-grid, TOTAL footer — it
+        // IS another flight PO under this Link No, not a component cost line. Locked
+        // (keep-untouched) legs fall through to the compact card, which renders read-only.
+        if (spec.sectors && !locked) {
+          const c = lineCalc(spec, leg.line, { branch: brCode, noVat, foreignSupplier: foreign });
+          const isVat = isVatBranch(brCode);
+          const taxLabel = isVat ? 'VAT' : 'GST';
+          const taxRate = isVat ? vatPctOf({ branch: brCode }) : ((spec.tax && spec.tax.rate) || 18);
+          const legCols = 2 + spec.fareCols.length + 5;
+          return (
+            <div key={i} style={{ marginBottom: 12, border: '1px solid #e6c9d2', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(180deg, ' + PO_BAR + ' 0%, #6f1830 100%)' }}>
+                <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.6px', color: '#fff', background: 'rgba(255,255,255,.18)', padding: '2px 8px', borderRadius: 999 }}>PO #{i + 1}</span>
+                <strong style={{ fontSize: 12, color: '#fff', letterSpacing: '1px', textTransform: 'uppercase' }}>{spec.name} Purchase Order</strong>
+                <span style={{ marginLeft: 'auto', fontSize: 10.5, color: 'rgba(255,255,255,.75)' }}>same Link No · separate supplier invoice</span>
+                <button type="button" onClick={() => del(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#fff', fontSize: 16, lineHeight: 1 }} title="Remove leg">×</button>
+              </div>
+              <div style={{ padding: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 11, marginBottom: 12 }}>
+                  <FL label="PO type">
+                    <select value={leg.module} onChange={(e) => setModule(i, e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
+                      {allowed.map((m) => <option key={m} value={m}>{VSPECS[m].name}</option>)}
+                    </select>
+                  </FL>
+                  <FL label="Supplier ledger (Pay to) *">
+                    <PartyPicker branch={branch} kind="supplier" value={{ name: leg.supplier.name, group: leg.supplier.ledgerGroup }}
+                      onChange={(v) => {
+                        // The leg supplier's master state auto-picks THIS leg's GST mode
+                        // (still overridable via the select); foreign → mode is moot (0 GST).
+                        const auto = supplyOf ? supplyOf(v.name) : '';
+                        setLeg(i, { supplier: { name: v.name, ledgerGroup: v.group }, ...(auto === 'intra' || auto === 'inter' ? { gstMode: auto } : {}) });
+                      }} />
+                  </FL>
+                  {!isVat && <FL label="Purchase GST mode">
+                    {foreign
+                      ? <div style={{ ...inp, display: 'flex', alignItems: 'center', background: '#eef0f4', color: '#5b616e', fontWeight: 700, cursor: 'default' }}>🌐 Overseas supplier — no GST</div>
+                      : <select value={leg.gstMode} onChange={(e) => setLeg(i, { gstMode: e.target.value })} style={{ ...inp, cursor: 'pointer' }}>
+                          <option value="intra">Intra-state (CGST+SGST)</option>
+                          <option value="inter">Inter-state (IGST)</option>
+                        </select>}
+                  </FL>}
+                  <FL label="Package type *">
+                    {/* Int'l vs Domestic picks this leg's ledger leaf + cost-centre bucket.
+                        Blank silently posts Domestic — flag it red until set. */}
+                    <select value={leg.packageType} onChange={(e) => setLeg(i, { packageType: e.target.value })}
+                      style={{ ...inp, cursor: 'pointer', ...(leg.packageType ? {} : { borderColor: '#c0392b', color: '#c0392b' }) }}>
+                      <option value="">Select International / Domestic</option>
+                      <option value="International">International</option>
+                      <option value="Domestic">Domestic</option>
+                    </select>
+                  </FL>
+                  <FL label="Cost Centre">
+                    <input value={leg.costCenter} onChange={(e) => setLeg(i, { costCenter: e.target.value.toUpperCase() })} placeholder="Cost Centre" style={inp} />
+                  </FL>
+                  <FL label="Supplier Inv. No (Tally ref)">
+                    <input value={leg.purTallyRef} onChange={(e) => setLeg(i, { purTallyRef: e.target.value })} placeholder="Supplier Inv. No" style={inp} />
+                  </FL>
+                </div>
+                <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #ecd5dc' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900, tableLayout: 'fixed' }}>
+                    <thead><tr style={{ borderBottom: '2px solid ' + PO_BAR }}>
+                      <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[0].label}</th>
+                      <th style={{ ...poHdrL, width: 140 }}>{spec.idCols[1].label}</th>
+                      {spec.fareCols.map((col) => <th key={col.key} style={{ ...poHdr, width: 95 }}>{col.label}</th>)}
+                      <th style={{ ...poHdr, width: 95 }}>Supplier Service Charge</th>
+                      <th style={{ ...poHdr, width: 95, background: '#FBF3DE', color: GOLD_DEEP }}>{taxLabel} ({taxRate}%)</th>
+                      <th style={{ ...poHdr, width: 100 }}>Supp Comm/Inc Rcvd</th>
+                      <th style={{ ...poHdr, width: 85 }}>{isVat ? 'WHT' : 'TDS (2%)'}</th>
+                      <th style={{ ...poHdr, width: 110 }}>Total</th>
+                    </tr></thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', borderBottom: 'none' }}><input value={leg.line.fn ?? ''} onChange={(e) => setLine(i, 'fn', e.target.value)} placeholder={spec.idCols[0].label} style={cellTxt} /></td>
+                        <td style={{ ...tdC, textAlign: 'left', padding: '6px 3px', borderBottom: 'none' }}><input value={leg.line.sn ?? ''} onChange={(e) => setLine(i, 'sn', e.target.value)} placeholder={spec.idCols[1].label} style={cellTxt} /></td>
+                        {spec.fareCols.map((col) => (
+                          <td key={col.key} style={{ padding: '6px 3px', borderBottom: 'none' }}>
+                            <input type="number" min="0" value={leg.line[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value)} style={cellInp} />
+                          </td>
+                        ))}
+                        <td style={{ padding: '6px 3px', borderBottom: 'none' }}>
+                          <input type="number" min="0" value={leg.line.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value)} style={cellInp} />
+                        </td>
+                        <td style={{ ...tdAuto, background: '#FBF3DE', color: GOLD_DEEP, borderBottom: 'none' }}>{fmt(c.gstPur)}</td>
+                        <td style={{ padding: '6px 3px', borderBottom: 'none' }}>
+                          <input type="number" min="0" value={leg.line.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cellInp} />
+                        </td>
+                        <td style={{ ...tdAuto, borderBottom: 'none' }}>{fmt(c.tds)}</td>
+                        <td style={{ ...tdC, fontWeight: 800, color: CR, background: '#faf7ef', borderBottom: 'none' }}>{fmt(c.finalPurchase)}</td>
+                      </tr>
+                      <tr>
+                        <td colSpan={legCols} style={{ padding: '10px 14px 12px 26px', background: '#fbfcff', borderBottom: '1px solid #dfe2e7' }}>
+                          <div style={{ border: '1px dashed #ecd5dc', borderRadius: 10, background: '#fffdfb', padding: '10px 14px 12px' }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.4px', color: GOLD_DEEP, textTransform: 'uppercase', marginBottom: 8 }}>✈ Sectors — enter each segment</div>
+                            <table style={{ borderCollapse: 'collapse' }}>
+                              <thead><tr>
+                                {spec.sectorCols.map((sc) => <th key={sc.key} style={{ ...thA, ...thL, fontSize: 8.5, padding: '4px 16px', color: GOLD_DEEP, background: 'transparent', borderBottom: '1px solid #ecdfb8' }}>{sc.label}</th>)}
+                                <th style={{ ...thA, width: 26, background: 'transparent', borderBottom: '1px solid #ecdfb8' }} />
+                              </tr></thead>
+                              <tbody>
+                                {(leg.line.sectors || []).map((s, si) => (
+                                  <tr key={si}>
+                                    {spec.sectorCols.map((sc) => (
+                                      <td key={sc.key} style={{ padding: '6px 16px' }}>
+                                        <input type={sc.type === 'date' ? 'date' : 'text'} value={s[sc.key] ?? ''} onChange={(e) => setLegSec(i, si, sc.key, e.target.value)} placeholder={sc.label} style={{ ...cellTxt, width: sc.type === 'date' ? 140 : 110, color: sc.kind === 'pnr' ? GOLD : DARK }} />
+                                      </td>
+                                    ))}
+                                    <td style={{ padding: '6px 16px', textAlign: 'center' }}><button type="button" onClick={() => delLegSec(i, si)} title="Remove sector" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={12} /></button></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            <button type="button" onClick={() => addLegSec(i)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, padding: '5px 12px', fontSize: 10.5, fontWeight: 700, color: GOLD_DEEP, background: '#FBF3DE', border: '1px solid #ecdfb8', borderRadius: 999, cursor: 'pointer' }}>
+                              <Plus size={11} /> Add sector
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                    <tfoot><tr>
+                      <td style={{ ...poTf, textAlign: 'left' }}>TOTAL</td>
+                      <td style={poTf} />
+                      {spec.fareCols.map((col) => <td key={col.key} style={poTf}>{fmt(num(leg.line[col.key]))}</td>)}
+                      <td style={poTf}>{fmt(num(leg.line.psvc))}</td>
+                      <td style={poTf}>{fmt(po.gst)}</td>
+                      <td style={poTf}>{fmt(po.incentiveAmt)}</td>
+                      <td style={poTf}>{fmt(po.incentiveTds)}</td>
+                      <td style={{ ...poTf, color: CR }}>{fmt(po.total)}{num(po.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {po.roundOff > 0 ? '+' : ''}{fmt(po.roundOff)}</span> : null}</td>
+                    </tr></tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        }
         return (
           <div key={i} style={{ padding: 11, marginBottom: 10, background: locked ? '#f6f7f9' : '#fffdf7', border: `1px solid ${locked ? '#cdd1d8' : '#eee3cf'}`, borderRadius: 7 }}>
             {locked && (
@@ -350,9 +518,19 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
               <input value={leg.costCenter} onChange={(e) => setLeg(i, { costCenter: e.target.value.toUpperCase() })} placeholder="Cost Centre" style={{ ...cell, width: 120 }} />
               <input value={leg.purTallyRef} onChange={(e) => setLeg(i, { purTallyRef: e.target.value })} placeholder="Supplier Inv. No (Tally ref)" style={{ ...cell, width: 170 }} />
               {/* VAT has no intra/inter split — hidden on Africa branches. */}
-              {!isVatBranch(brCode) && (isForeign && isForeign(leg.supplier.name)
+              {!isVatBranch(brCode) && (foreign
                 ? <span title="Overseas supplier — no Indian GST (import of service)" style={{ ...cell, width: 'auto', background: '#eef0f4', color: '#5b616e', fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>🌐 No GST — overseas</span>
                 : <select value={leg.gstMode} onChange={(e) => setLeg(i, { gstMode: e.target.value })} style={{ ...cell, width: 'auto' }}><option value="intra">Intra (CGST+SGST)</option><option value="inter">Inter (IGST)</option></select>)}
+              {/* Multi-leaf leg (Flight): Int'l vs Domestic picks this leg's ledger leaf +
+                  cost-centre bucket. Blank silently posts Domestic — flag it red until set. */}
+              {multiLeafLeg(leg.module) && (
+                <select value={leg.packageType} onChange={(e) => setLeg(i, { packageType: e.target.value })} disabled={locked}
+                  style={{ ...cell, width: 'auto', ...(leg.packageType ? {} : { borderColor: '#c0392b', color: '#c0392b' }) }}>
+                  <option value="">Int&apos;l / Domestic *</option>
+                  <option value="International">International</option>
+                  <option value="Domestic">Domestic</option>
+                </select>
+              )}
               <button type="button" onClick={() => del(i)} style={{ marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: '#c0392b', fontSize: 16 }} title="Remove leg">×</button>
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -1597,7 +1775,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* N-PO: additional purchase legs (Flight +Misc / Holiday components) */}
       {!isNoSupp && ALLOWED_LEG_MODULES[moduleCode] && (
-        <ExtraPurchases parentModule={moduleCode} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} isForeign={isForeignSupplier} supplyOf={supplySupplierOf} />
+        <ExtraPurchases parentModule={moduleCode} parentScope={hasPackage ? packageType : ''} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} isForeign={isForeignSupplier} supplyOf={supplySupplierOf} />
       )}
 
       {/* ③ Gross Profit */}
