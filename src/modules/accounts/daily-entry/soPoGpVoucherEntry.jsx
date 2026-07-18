@@ -178,9 +178,19 @@ export function rowsForEdit(spec, booking) {
 export function inbRowsFromDeal(spec, deal) {
   const line = blankLine(spec);
   const cols = spec.fareCols || [];
+  // A fare line whose label no longer has a column (a LEGACY deal captured before a
+  // module's fare columns were removed — insurance → service-only, 2026-07-18) must
+  // NOT be silently dropped: carry it on its legacy key so the entry screen can SEE
+  // the money and refuse the lossy re-save (legacyFareCarry gate) instead of quietly
+  // rebuilding the deal without it.
+  const LEGACY_FARE_KEY = { 'base fare': 'base', 'k3 tax': 'k3', 'taxes': 'tax' };
   for (const f of (deal.fareLines || [])) {
     const col = cols.find((c) => String(c.label).trim().toLowerCase() === String(f.desc).trim().toLowerCase());
     if (col) line[col.key] = num(f.amt);
+    else {
+      const k = LEGACY_FARE_KEY[String(f.desc || '').trim().toLowerCase()];
+      if (k) line[k] = round2(num(line[k]) + num(f.amt));
+    }
   }
   line.ssvc = num(deal.serviceFee);
   // PURCHASE side: the fares mirror the sale (set above), but the Supplier Service
@@ -816,8 +826,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     if (!interBranch && !isNoSupp && !purTallyRef.trim()) miss.push('Purchase Tally Ref');
     return miss;
   })();
+  // Legacy fare carry-over: rows captured BEFORE a module's fare columns were removed
+  // (insurance → service-only, 2026-07-18) hold money the grid can no longer show —
+  // re-saving would silently re-price the booking/deal without it. Block the save and
+  // say why; the file should be revoked/rejected and re-entered under the new rule.
+  const legacyFareCarry = editing ? round2(lines.reduce((s, l) =>
+    s + ['base', 'k3', 'tax'].filter((k) => !(spec.fareCols || []).some((c) => c.key === k))
+      .reduce((t, k) => t + num(l[k]), 0), 0)) : 0;
+
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
-  const canSave = !blockedNew && missingFields.length === 0 && (interBranch
+  const canSave = !blockedNew && legacyFareCarry === 0 && missingFields.length === 0 && (interBranch
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope && (!crossCcy || fxRateNum > 0))  // INB: counterparty + sale value + Int'l/Domestic for Flights/Holiday + FX rate on a cross-currency deal
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
       && (isNoSupp || (totals.po.total > 0 && hasSuppLedger))));
@@ -1661,6 +1679,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ ...card, background: '#fef3e2', border: '1px solid #f0cc8a', color: '#8a5a12', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <Lock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
           <span>{originate.reason}</span>
+        </div>
+      )}
+
+      {/* Legacy fare carry-over — this file holds money in fare columns the module no
+          longer has (e.g. an Insurance premium captured before insurance went
+          service-only). Re-saving would silently re-price it without that money. */}
+      {legacyFareCarry > 0 && (
+        <div style={{ ...card, background: '#fdecec', border: '1px solid #e8a6a6', color: '#8a1f1f', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <Lock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span><b>Save blocked — legacy fares this grid can no longer show.</b> This {interBranch ? 'deal' : 'booking'} carries {cur} {fmt(legacyFareCarry)} in fare columns that were removed from the {spec.name} voucher (service-only since 18-07-2026). Saving would silently drop that amount from the totals. Keep it as-is, or revoke/reject it and re-enter it under the new format.</span>
         </div>
       )}
 
