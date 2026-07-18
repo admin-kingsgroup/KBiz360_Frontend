@@ -56,9 +56,9 @@ const EXTRA = {
   '/transactions/approvals/acm': ['Finance', 'Approvals', 'ACM'],
   '/finance/reco-queue': ['Accounts', 'Reconciliation', 'Reconciliation Queue'],
   '/reconciliation/inbox': ['Statement Reconciliation', 'Approvals — Daily & Weekly', 'Approval Inbox'],
-  // Month/Quarter/Year reconciliation is CERTIFIED at TK Group Central (cockpit),
-  // so these pages are not on the static branch menu — give them stable crumbs here.
-  '/reconciliation/monthly': ['Statement Reconciliation', 'Certification', 'Monthly Certification'],
+  // Quarter/Year reconciliation is CERTIFIED at TK Group Central (cockpit) and is
+  // NOT on the static branch menu — give those stable crumbs here. Monthly IS on the
+  // branch pill now (Freeze ▸ Monthly Freeze), so the menu-walk supplies its crumb.
   '/reconciliation/quarterly': ['Statement Reconciliation', 'Certification', 'Quarterly Certification'],
   '/reconciliation/yearly': ['Statement Reconciliation', 'Certification', 'Yearly Certification'],
   '/reconciliation/hub/monthly': ['Statement Reconciliation', 'Reconciliation Hub', 'Monthly Reconciliation'],

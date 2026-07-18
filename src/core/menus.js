@@ -987,7 +987,8 @@ export function fullMenuRoots(branch, currentUser){
   // (and App.jsx blocks the route for them even by direct URL).
   // Tally Reconciliation is NOT on the branch surface — it is a TK Group Central
   // activity only (the cockpit carries it; the BE 403s branch-scoped tokens). The
-  // branch Statement Reconciliation pill is freeze-only (Daily & Weekly).
+  // branch Statement Reconciliation pill is freeze-scoped: Daily, Weekly and the
+  // Monthly bank/client/supplier freeze (Quarter/Year certification stays central).
   return [...top, MENU_DECISIONS, MENU_ACCOUNTS, MENU_RECONCILIATION, MENU_REPORTS, taxSection, MENU_MASTERS, MENU_HR, MENU_ADMIN_BRANCH, MENU_SUPPORT,
     ...(role === 'Super Admin' ? [MENU_DEV_CONTROL] : [])];
 }

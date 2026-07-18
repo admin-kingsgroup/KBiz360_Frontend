@@ -263,7 +263,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
         </div>
       </PageSection>
 
-      {openId && <CertificateDrawer id={openId} branch={branch} setRoute={setRoute} onClose={() => setOpenId(null)} />}
+      {openId && <CertificateDrawer id={openId} branch={branch} currentUser={currentUser} setRoute={setRoute} onClose={() => setOpenId(null)} />}
     </div>
   );
 }

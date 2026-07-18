@@ -60,7 +60,11 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
   // freeze — so for a Branch Accountant the month register is a freeze workbench.
   const soft = isSoftTier(tierKey);
   const isBA = /accountant/i.test(String(currentUser?.role || ''));
-  const registerNoun = (soft || (tierKey === 'month' && isBA)) ? 'Freeze' : 'Certification';
+  // Month-End is a certification tier, but the BRANCH does the bank/client/supplier
+  // freeze — so for a Branch Accountant the whole month register reads as a freeze
+  // workbench (title AND sub-line), while central roles see "Certification".
+  const freezeView = soft || (tierKey === 'month' && isBA);
+  const registerNoun = freezeView ? 'Freeze' : 'Certification';
 
   // Follow the app-wide branch selector — the module must never show a
   // different branch than the rest of the ERP (branch-isolation convention).
@@ -116,7 +120,7 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="kbiz-page-title">{tierMenuName(tierKey)} {registerNoun}</h1>
-          <p className="text-sm text-ink-muted">One {soft ? 'freeze' : 'certificate'} per ledger · {soft ? 'freeze + approve chain' : (tier.mode === 'digital' ? 'digital sign chain' : 'physical certificate + scan-back')} · branch-wise, never mixed.</p>
+          <p className="text-sm text-ink-muted">One {freezeView ? 'freeze' : 'certificate'} per ledger · {freezeView ? 'freeze + approve chain' : (tier.mode === 'digital' ? 'digital sign chain' : 'physical certificate + scan-back')} · branch-wise, never mixed.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" icon={LayoutDashboard} onClick={() => setRoute && setRoute(hubPathFor(tierKey))}>{tierMenuName(tierKey)} Hub</Button>
@@ -214,7 +218,7 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
         </div>
       </PageSection>
 
-      {openId && <CertificateDrawer id={openId} branch={branch} setRoute={setRoute} onClose={() => setOpenId(null)} />}
+      {openId && <CertificateDrawer id={openId} branch={branch} currentUser={currentUser} setRoute={setRoute} onClose={() => setOpenId(null)} />}
       {showCycleCfg && <CycleLedgerDrawer branch={branch} onClose={() => setShowCycleCfg(false)} />}
     </div>
   );

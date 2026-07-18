@@ -30,7 +30,8 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
   const tier = tierOf(tierKey);
   const [statusFilter, setStatusFilter] = useState('');
 
-  // Branch Accountant sees the weekly cycle only — Month/Quarter/Year closings
+  // Branch Accountant sees the Daily/Weekly cycles and the Monthly report (they
+  // freeze the branch bank/client/supplier reconciliations) — Quarter/Year closings
   // are worked from TK Group Central by AE/FM/Director/Owner. An explicit
   // Page-Visibility GRANT of this report opens it (read-only data anyway) —
   // otherwise the admin's grant toggle would promise a page the guard refuses.
@@ -65,7 +66,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
       <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
         <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Report</h1>
         <EmptyState title="Central closing tier"
-          hint="The Branch Accountant works the Daily & Weekly freeze only — Month-End, Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
+          hint="The Branch Accountant works the Daily & Weekly freeze and the monthly bank / client / supplier freeze — Quarterly and Year-End closings are done from TK Group Central by AE / FM / Director / Owner."
           action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/reports/weekly')}>Open Weekly Report</Button>} />
       </div>
     );

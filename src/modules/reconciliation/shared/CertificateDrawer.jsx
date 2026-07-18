@@ -4,7 +4,7 @@ import { CheckCircle2, Circle, FileUp, ShieldCheck, AlertTriangle, Stamp, Lock, 
 import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan, getAttachmentUrl, scrutinizeStatement } from '../api';
 import { parseStatementFile } from '../statementParse';
 import { ScrutinyView } from './ScrutinyView';
-import { tierOf, statusMeta, sourceMeta, chainProgress, chainForCert, fmtAmt, openExceptions } from '../utils';
+import { tierOf, statusMeta, sourceMeta, chainForCert, isSoftTier, isHardTier, isStatementLedgerCert, fmtAmt, openExceptions } from '../utils';
 import { Drawer, Badge, Button, Input, Select, FormField, LoadingState, EmptyState, ErrorState } from '../../../shell/primitives';
 
 // ─── Certificate Drawer — one ledger, one certificate ───────────────────────
@@ -23,7 +23,7 @@ function Row({ label, children }) {
   );
 }
 
-function SnapshotForm({ cert, books, onFreeze, busy, error }) {
+function SnapshotForm({ cert, books, onFreeze, busy, error, blocked, blockReason }) {
   const [stmt, setStmt] = useState('');
   const [adj, setAdj] = useState('0');
   // Scrutiny hand-off: adopt the parsed statement closing + the classified
@@ -57,8 +57,11 @@ function SnapshotForm({ cert, books, onFreeze, busy, error }) {
         Difference after reconciling items: {fmtAmt(diff, cert.branch)} {diff === 0 && books ? '— ready to freeze' : '— must be zero to sign'}
       </div>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {blocked ? <p className="rounded-brand border border-warning/30 bg-warning-soft/40 px-3 py-2 text-xs font-semibold text-warning">{blockReason}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <Button write variant="primary" loading={busy} disabled={stmt === '' || !books} onClick={() => onFreeze({ statementBalance: Number(stmt), adjustments: Number(adj) || 0 })}>
+        <Button write variant="primary" loading={busy} disabled={blocked || stmt === '' || !books}
+          title={blocked ? blockReason : undefined}
+          onClick={() => onFreeze({ statementBalance: Number(stmt), adjustments: Number(adj) || 0 })}>
           Freeze snapshot (Rule 02)
         </Button>
         {scr && (
@@ -73,7 +76,7 @@ function SnapshotForm({ cert, books, onFreeze, busy, error }) {
   );
 }
 
-export function CertificateDrawer({ id, branch, onClose, setRoute }) {
+export function CertificateDrawer({ id, branch, onClose, setRoute, currentUser }) {
   const qc = useQueryClient();
   const [attLabel, setAttLabel] = useState('');
   const [attSource, setAttSource] = useState('download');
@@ -133,13 +136,32 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
 
   if (!id) return null;
   const tier = cert ? tierOf(cert.tier) : null;
-  // The RESOLVED chain for this cert — a month statement ledger carries the
-  // branch-freeze step, so the drawer shows the same ladder the server enforces.
-  const chain = cert ? chainForCert(cert) : [];
-  const prog = cert ? chainProgress(cert) : null;
+  // Prefer the AUTHORITATIVE chain the server sent (data.chain = chainFor(cert));
+  // fall back to the local resolver only if it's absent. A month statement ledger
+  // carries the branch-freeze step, so the drawer shows exactly the ladder the
+  // server enforces (no FE/BE drift).
+  const chain = data?.chain?.length ? data.chain : (cert ? chainForCert(cert) : []);
+  const done = cert ? (cert.signatures?.length || 0) : 0;
+  const prog = cert ? { done, total: chain.length, next: chain[done] || null } : null;
   const frozen = !!cert?.snapshot?.frozenAt;
   const signedFully = cert && prog.done >= prog.total;
   const meta = cert ? statusMeta(cert.status) : null;
+
+  // Branch-action gate — mirrors the backend certPrepareAllowed + assertBranchNotHandedOff:
+  // a Branch Accountant may freeze/prepare a soft tier, or a MONTH statement ledger
+  // (bank/client/supplier) up until it is handed to TK Group (any signature on a
+  // month cert). Everything else is a TK Group action; the branch buttons DISABLE
+  // WITH A REASON rather than 403 on click (house rule: gate the action, not the screen).
+  const isBA = !!(cert && /accountant/i.test(String(currentUser?.role || '')));
+  const baMayPrepare = !isBA || isSoftTier(cert.tier) || (cert.tier === 'month' && isStatementLedgerCert(cert));
+  const baHandedOff = isBA && isHardTier(cert?.tier) && (cert?.signatures?.length || 0) > 0;
+  const branchBlocked = !!(isBA && (!baMayPrepare || baHandedOff));
+  const branchBlockReason = !baMayPrepare
+    ? 'Prepared at TK Group Central — the branch freezes bank / client / supplier only.'
+    : 'This monthly reconciliation is now with TK Group — un-freeze it to make branch changes.';
+  // The signed scan-back LOCKS the period (the Owner's act at TK Group), never a
+  // branch one — so a Branch Accountant never gets the Lock action.
+  const lockReasonForBA = 'The signed scan-back locks the period — done at TK Group Central, not the branch.';
 
   return (
     <Drawer open onClose={onClose} width="lg"
@@ -155,7 +177,9 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
               </Button>
             )}
             {tier?.mode === 'physical' && signedFully && cert.status !== 'locked' && openExceptions(cert) === 0 && (
-              <Button write variant="success" icon={ShieldCheck} loading={scanM.isPending} onClick={() => scanM.mutate('')}>
+              <Button write variant="success" icon={ShieldCheck} loading={scanM.isPending}
+                disabled={isBA} title={isBA ? lockReasonForBA : undefined}
+                onClick={() => scanM.mutate('')}>
                 Upload signed scan → Lock (Rule 05)
               </Button>
             )}
@@ -166,6 +190,13 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
         <ErrorState title="Couldn’t load this certificate" message="It may have been removed, or the reconciliation service didn’t respond." onRetry={() => refetch()} />
       ) : isLoading || !cert ? <LoadingState label="Loading certificate…" /> : (
         <div className="grid gap-5 p-4">
+
+          {/* branch-action notice — say WHY the branch buttons are disabled */}
+          {branchBlocked && (
+            <div className="rounded-brand border border-warning/30 bg-warning-soft/40 px-4 py-2.5 text-sm text-warning">
+              <span className="font-semibold">View only for the branch here.</span> {branchBlockReason}
+            </div>
+          )}
 
           {/* identity */}
           <section className="rounded-brand border border-surface-border bg-surface-alt/50 px-4 py-3">
@@ -189,7 +220,7 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
                 <p className="pt-2 text-xs text-ink-subtle">Frozen {new Date(cert.snapshot.frozenAt).toLocaleString()} by {cert.snapshot.frozenBy || '—'} — signatures attest to exactly these figures.</p>
               </div>
             ) : (
-              <SnapshotForm cert={cert} books={books} onFreeze={(b) => freeze.mutate(b)} busy={freeze.isPending} error={err} />
+              <SnapshotForm cert={cert} books={books} onFreeze={(b) => freeze.mutate(b)} busy={freeze.isPending} error={err} blocked={branchBlocked} blockReason={branchBlockReason} />
             )}
           </section>
 
@@ -232,7 +263,8 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
                       <option value="internal">Internal</option>
                     </Select>
                   </FormField>
-                  <Button write icon={FileUp} loading={attachM.isPending} disabled={!attLabel.trim()}
+                  <Button write icon={FileUp} loading={attachM.isPending} disabled={branchBlocked || !attLabel.trim()}
+                    title={branchBlocked ? branchBlockReason : undefined}
                     onClick={() => { attachM.mutate({ label: attLabel, source: attSource, file: attFile }); setAttLabel(''); setAttFile(null); }}>
                     Attach
                   </Button>
@@ -280,7 +312,7 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
                     ? <CheckCircle2 size={16} className="shrink-0 text-success" aria-hidden="true" />
                     : <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />}
                   <span className={`flex-1 ${e.resolved ? 'text-ink-subtle line-through' : 'text-ink'}`}>{e.text}</span>
-                  {!e.resolved && cert.status !== 'locked' && <Button write size="xs" variant="ghost" loading={exResolve.isPending} onClick={() => exResolve.mutate(e._id)}>Resolve</Button>}
+                  {!e.resolved && cert.status !== 'locked' && <Button write size="xs" variant="ghost" loading={exResolve.isPending} disabled={branchBlocked} title={branchBlocked ? branchBlockReason : undefined} onClick={() => exResolve.mutate(e._id)}>Resolve</Button>}
                 </li>
               ))}
             </ul>
@@ -289,7 +321,7 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
                 <FormField label="Raise an exception" className="flex-1">
                   <Input value={exText} onChange={(e) => setExText(e.target.value)} placeholder="e.g. 1 cheque unpresented beyond 90 days" />
                 </FormField>
-                <Button write variant="secondary" loading={exAdd.isPending} disabled={!exText.trim()} onClick={() => { exAdd.mutate(exText); setExText(''); }}>Add</Button>
+                <Button write variant="secondary" loading={exAdd.isPending} disabled={branchBlocked || !exText.trim()} title={branchBlocked ? branchBlockReason : undefined} onClick={() => { exAdd.mutate(exText); setExText(''); }}>Add</Button>
               </div>
             )}
           </section>
