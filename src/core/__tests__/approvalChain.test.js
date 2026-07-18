@@ -20,7 +20,7 @@ const cfgOf = (flags = {}) => ({
 
 const ba = { email: 'ap@travkings.com', role: 'Branch Accountant' };
 const sughra = { email: 'sughra@travkings.com', role: 'Sr. Accounts Executive' };
-const faiz = { email: 'faiz@travkings.com', role: 'Senior Finance Manager' };
+const faiz = { email: 'faiz@travkings.com', name: 'Faiz', role: 'Senior Finance Manager' };  // name matters: the runtime stamps NAME
 const owner = { email: 'afshin.dhanani@kingsgroupco.com', role: 'Owner' };
 const su = { email: 'root@x.com', role: 'Super Admin' };
 
@@ -109,35 +109,42 @@ describe('nextActionFor · Verify / Approve are unchanged by the Branch Accounta
   });
 });
 
-// Mirror of the server gate shared/approvalChain.assertFinalApprove: the FE approve button must
-// NOT render enabled and then 403. maker ≠ approver always; verifier ≠ approver when engaged.
-describe('nextActionFor · Approve mirrors the SoD gates (no stale-UI 403)', () => {
-  test('a configured approver who is ALSO the maker is blocked (maker ≠ approver); Super Admin still may', () => {
-    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'sughra@travkings.com', submittedBy: 'faiz@travkings.com' };
-    const r = nextActionFor(e, cfgOf(), faiz);
-    expect(r.allowed).toBe(false);
-    expect(r.hint).toMatch(/maker/i);
+// Mirror of the server gate shared/approvalChain.assertFinalApprove. The button must NOT render
+// enabled then 403. CRITICAL: the server stamps checkedBy/verifiedBy/submittedBy with labelOf =
+// the display NAME at runtime, not the email — so these must match by NAME too (email-only was
+// the original bug: the block was inert for every name-stamped entry).
+describe('nextActionFor · Approve mirrors the SoD gates by identity (name OR email — no stale-UI 403)', () => {
+  test('the approver who is the maker is blocked whether the entry stamped their NAME or email; Super Admin still may', () => {
+    for (const stamp of ['Faiz', 'faiz@travkings.com']) {   // runtime stamps the NAME; email also tolerated
+      const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'sughra@travkings.com', submittedBy: stamp };
+      const r = nextActionFor(e, cfgOf(), faiz);
+      expect(r.allowed).toBe(false);
+      expect(r.hint).toMatch(/maker/i);
+    }
+    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'sughra@travkings.com', submittedBy: 'Faiz' };
     expect(nextActionFor(e, cfgOf(), su).allowed).toBe(true);   // Super Admin override, mirrors BE isSuper
   });
 
-  test('with verifier ≠ approver engaged, the person who verified cannot also approve', () => {
+  test('with verifier ≠ approver engaged, the prior verifier is blocked by NAME stamp too', () => {
     const sodCfg = cfgOf({ 'sod.verifier_ne_approver': { enabled: true } });
     sodCfg.verify = ['faiz@travkings.com']; sodCfg.approve = ['faiz@travkings.com']; // the overlap the panel warns about
-    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'faiz@travkings.com', submittedBy: 'ap@travkings.com' };
-    const r = nextActionFor(e, sodCfg, faiz);
-    expect(r.allowed).toBe(false);
-    expect(r.hint).toMatch(/verifier/i);
+    for (const stamp of ['Faiz', 'faiz@travkings.com']) {
+      const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: stamp, submittedBy: 'ap@travkings.com' };
+      const r = nextActionFor(e, sodCfg, faiz);
+      expect(r.allowed).toBe(false);
+      expect(r.hint).toMatch(/verifier/i);
+    }
   });
 
   test('the SoD flag OFF → a verifier-also-approver may approve (no phantom block)', () => {
     const cfg = cfgOf(); // sod flag absent
     cfg.verify = ['faiz@travkings.com']; cfg.approve = ['faiz@travkings.com'];
-    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'faiz@travkings.com', submittedBy: 'ap@travkings.com' };
+    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'Faiz', submittedBy: 'ap@travkings.com' };
     expect(nextActionFor(e, cfg, faiz).allowed).toBe(true);
   });
 
   test('a non-maker configured approver approves normally', () => {
-    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'sughra@travkings.com', submittedBy: 'ap@travkings.com' };
+    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'Sughra', submittedBy: 'ap@travkings.com' };
     expect(nextActionFor(e, cfgOf(), faiz).allowed).toBe(true);
   });
 });

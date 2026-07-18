@@ -20,12 +20,21 @@ const asList = (v, fb) => {
   return clean.length ? clean : fb;
 };
 
-// Signed-in user (email drives L2/L3 eligibility; role only for the Super Admin override).
+// Signed-in user. email drives L2/L3 list eligibility; role only for the Super Admin override.
+// name/id are ALSO carried because the server stamps checkedBy/verifiedBy/submittedBy with
+// labelOf(actor) — the display NAME at runtime, not the email — so the maker/verifier SoD
+// mirror must match against name/id too (see nextActionFor), exactly like the backend's
+// isMakerOf / signedSamePerson (email || name || id).
 export function chainUser() {
   try {
     const u = JSON.parse(localStorage.getItem('kb360-user') || '{}');
-    return { email: String(u.email || '').toLowerCase(), role: u.role || '' };
-  } catch { return { email: '', role: '' }; }
+    return {
+      email: String(u.email || '').toLowerCase(),
+      name: String(u.name || '').toLowerCase(),
+      id: String(u.id || u.userId || u._id || '').toLowerCase(),
+      role: u.role || '',
+    };
+  } catch { return { email: '', name: '', id: '', role: '' }; }
 }
 
 // Branch-wise flag read — mirrors backend flags.isEnabled: an explicit per-branch override
@@ -112,11 +121,15 @@ export function nextActionFor(e, cfg, user = chainUser()) {
   // button never renders enabled and then 403s: a Super Admin may always approve; otherwise the
   // configured approver may, EXCEPT the maker of the entry (maker ≠ approver) and, when
   // sod.verifier_ne_approver is engaged, the person who already Verified it (verifier ≠ approver).
-  const maker = String((e.submittedBy || e.createdBy) || '').trim().toLowerCase();
-  const isMaker = !!maker && maker === user.email;
+  // Match the stamped signer against ALL of the user's identities (email / name / id), because
+  // the server stamps labelOf(actor) = the display NAME at runtime — comparing email-only would
+  // never match a name-stamped entry, leaving the button enabled to then 403. Mirrors the
+  // backend isMakerOf / signedSamePerson.
+  const idents = new Set([user.email, user.name, user.id].map((x) => String(x || '').trim().toLowerCase()).filter(Boolean));
+  const isSelf = (who) => { const w = String(who || '').trim().toLowerCase(); return !!w && idents.has(w); };
+  const isMaker = isSelf(e.submittedBy || e.createdBy);
   const sodOn = flagOn(cfg && cfg.flags, 'sod.verifier_ne_approver', e.branch);
-  const priorVerifier = String(e.verifiedBy || '').trim().toLowerCase();
-  const isPriorVerifier = sodOn && !!priorVerifier && priorVerifier === user.email;
+  const isPriorVerifier = sodOn && isSelf(e.verifiedBy);
   const inApproveList = cfg.approve.includes(user.email);
   const approveAllowed = su || (inApproveList && !isMaker && !isPriorVerifier);
   let hint = `Level 3 · ${cfg.approve.join(', ')}`;
