@@ -57,13 +57,28 @@ const BranchHead = ({ code, cur }) => (
 // (the backend returns byBranch for P&L / BS / trial-balance / module-GP / ageing / tax). In
 // single-branch scope it renders once with that branch's own data. `renderOne` receives
 // (dataForBranch, currency, code). This is the per-branch counterpart of currencySplit/CurHead.
-function BranchSplit({ branch, byBranch, single, renderOne, emptyMsg = 'No branch data for this period.' }) {
+function BranchSplit({ branch, byBranch, single, renderOne, emptyMsg = 'No branch data for this period.', loading, error }) {
   if (isGroupScope(branch)) {
     const rows = Array.isArray(byBranch) ? byBranch.filter(Boolean) : [];
-    if (!rows.length) return <div style={{ padding: '14px 2px', fontSize: 12.5, color: C.dim }}>{emptyMsg}</div>;
+    if (!rows.length) {
+      // Distinguish loading / error / genuinely-empty — never show a false "no data" on a
+      // still-loading or failed query (the "never leave a screen silent" rule).
+      if (loading) return <div style={{ padding: '14px 2px', fontSize: 12.5, color: C.dim }}>Loading branches…</div>;
+      if (error) return <div style={{ padding: '14px 2px', fontSize: 12.5, color: C.red }}>Couldn’t load this view — try refreshing. (Load error, not an empty result.)</div>;
+      return <div style={{ padding: '14px 2px', fontSize: 12.5, color: C.dim }}>{emptyMsg}</div>;
+    }
+    // Per-branch failure: the backend's perBranch marks a branch it couldn't compute with
+    // `_error` instead of dropping it — show that branch's own error note, never a blank/₹0.
     return rows.map((e) => {
       const code = e.branch; const cur = (bc({ code }) || {}).cur || '₹';
-      return <div key={code} style={{ marginBottom: 14 }}><BranchHead code={code} cur={cur} />{renderOne(e, cur, code)}</div>;
+      return (
+        <div key={code} style={{ marginBottom: 14 }}>
+          <BranchHead code={code} cur={cur} />
+          {e._error
+            ? <div style={{ padding: '10px 2px', fontSize: 12, color: C.red }}>Couldn’t load {code} — {e._error}</div>
+            : renderOne(e, cur, code)}
+        </div>
+      );
     });
   }
   const cur = (bc(branch) || {}).cur || '₹';
@@ -234,8 +249,8 @@ function deltaPct(cur, prev) { cur = Number(cur) || 0; prev = Number(prev) || 0;
 // ── 2) Profitability (P&L) ────────────────────────────────────────────────────
 export function ProfitabilityDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const pl = useProfitAndLoss(branch, range).data || {};
-  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
+  const plQ = useProfitAndLoss(branch, range); const pl = plQ.data || {};
+  const mplQ = useModulePL(branch, { ...range, summary: true }); const mpl = mplQ.data || {};
   const bar = (label, val, base, col, cur) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
       <span style={{ width: 150, fontSize: 12.5, color: C.dim }}>{label}</span>
@@ -282,6 +297,7 @@ export function ProfitabilityDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Profitability (P&L)" sub={`Revenue → Net Profit · ${range.label}`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={merged} single={{ pl, mpl }} renderOne={renderOne}
+        loading={plQ.isLoading || mplQ.isLoading} error={plQ.isError || mplQ.isError}
         emptyMsg="No P&L data for any branch this period." />
     </div>
   );
@@ -330,6 +346,7 @@ export function CashLiquidityDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Cash & Liquidity" sub={`Cash + bank position · ${range.label}`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={trial.byBranch} single={trial} renderOne={renderOne}
+        loading={trialQ.isLoading} error={trialQ.isError}
         emptyMsg="No cash/bank data for any branch this period." />
     </div>
   );
@@ -340,7 +357,7 @@ export function ReceivablesPayablesDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
   // Ageing is an as-of snapshot — drive it off the period's `to` so the period bar
   // actually changes the view (previously it always showed "as of today").
-  const age = useAgeing(branch, range.to).data || {};
+  const ageQ = useAgeing(branch, range.to); const age = ageQ.data || {};
   const buckets = (t) => ['d0', 'd30', 'd60', 'd90'].map((k, i) => [['0–30', '30–60', '60–90', '90+'][i], t?.[k] || 0]);
   const tbl = (title, data, tone, to, cur) => (
     <Card title={title} right={
@@ -373,6 +390,7 @@ export function ReceivablesPayablesDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Receivables & Payables" sub={`Ageing as of ${range.to} · top 12 each`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={age.byBranch} single={age} renderOne={renderOne}
+        loading={ageQ.isLoading} error={ageQ.isError}
         emptyMsg="No receivables/payables for any branch this period." />
     </div>
   );
@@ -573,6 +591,7 @@ export function BalanceSheetDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Balance Sheet" sub={`Financial position as of ${range.to}`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={bs.byBranch} single={bs} renderOne={renderOne}
+        loading={bsQ.isLoading} error={bsQ.isError}
         emptyMsg="No balance sheet data for any branch this period." />
     </div>
   );
@@ -581,7 +600,7 @@ export function BalanceSheetDash({ branch, go }) {
 // ── 7) Module / Product GP ────────────────────────────────────────────────────
 export function ModuleGpDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
+  const mplQ = useModulePL(branch, { ...range, summary: true }); const mpl = mplQ.data || {};
   const toGp = go && (() => go('/reports/gp'));
   // Group/ALL: module GP PER BRANCH in its own currency (modulePL's byBranch); single: the one.
   const renderOne = (data, cur) => {
@@ -611,6 +630,7 @@ export function ModuleGpDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Module / Product GP" sub={`Gross profit by product · ${range.label}`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={mpl.byBranch} single={mpl} renderOne={renderOne}
+        loading={mplQ.isLoading} error={mplQ.isError}
         emptyMsg="No module GP data for any branch this period." />
     </div>
   );
@@ -619,7 +639,7 @@ export function ModuleGpDash({ branch, go }) {
 // ── 8) Sales & Bookings ───────────────────────────────────────────────────────
 export function SalesBookingsDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
+  const mplQ = useModulePL(branch, { ...range, summary: true }); const mpl = mplQ.data || {};
   const igp = useInvoiceGP(branch, range).data || {};
   // Group/ALL: Sales & GP PER BRANCH in its own currency (modulePL's byBranch). The file-wise
   // metrics (deals, avg deal, top customers) come from invoiceGP, which has NO per-branch split,
@@ -628,7 +648,8 @@ export function SalesBookingsDash({ branch, go }) {
     return (
       <div style={{ margin: 12 }}>
         <Toolbar title="Sales & Bookings" sub={`Sales & GP per branch · ${range.label}`} branch={branch} p={p} />
-        <BranchSplit branch={branch} byBranch={mpl.byBranch} single={mpl} emptyMsg="No sales data for any branch this period."
+        <BranchSplit branch={branch} byBranch={mpl.byBranch} single={mpl} loading={mplQ.isLoading} error={mplQ.isError}
+          emptyMsg="No sales data for any branch this period."
           renderOne={(data, cur) => {
             const t = data?.totals || {};
             return (
@@ -669,11 +690,11 @@ export function SalesBookingsDash({ branch, go }) {
 // ── 9) Supplier / Purchase ────────────────────────────────────────────────────
 export function SupplierPurchaseDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
+  const mplQ = useModulePL(branch, { ...range, summary: true }); const mpl = mplQ.data || {};
   const igp = useInvoiceGP(branch, range).data || {};
   // Payables ageing respects the period's as-of date (mirrors ReceivablesPayablesDash) —
   // previously fixed to "today" regardless of the period bar.
-  const age = useAgeing(branch, range.to).data || {};
+  const ageQ = useAgeing(branch, range.to); const age = ageQ.data || {};
   // Group/ALL: Purchases (modulePL) + Payables (ageing) PER BRANCH in its own currency — stitch
   // the two hooks' byBranch by code. Supplier count / top suppliers come from invoiceGP (no
   // per-branch split) so they show on single-branch drill only, never a ₹+$ blended list.
@@ -687,7 +708,8 @@ export function SupplierPurchaseDash({ branch, go }) {
     return (
       <div style={{ margin: 12 }}>
         <Toolbar title="Supplier / Purchase" sub={`Purchases & payables per branch · ${range.label}`} branch={branch} p={p} />
-        <BranchSplit branch={branch} byBranch={merged} single={{ mpl, age }} emptyMsg="No purchase/payable data for any branch this period."
+        <BranchSplit branch={branch} byBranch={merged} single={{ mpl, age }} loading={mplQ.isLoading || ageQ.isLoading} error={mplQ.isError || ageQ.isError}
+          emptyMsg="No purchase/payable data for any branch this period."
           renderOne={(e, cur) => {
             const m = e?.mpl || {}, a = e?.age || {};
             return (
@@ -724,7 +746,7 @@ export function SupplierPurchaseDash({ branch, go }) {
 // ── 10) Tax & Compliance ──────────────────────────────────────────────────────
 export function TaxComplianceDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const tax = useTaxSummary(branch, range).data || {};
+  const taxQ = useTaxSummary(branch, range); const tax = taxQ.data || {};
   // Group/ALL: GST/VAT position PER BRANCH in its own currency (taxSummary's byBranch); single: one.
   const renderOne = (t, cur) => (
     <>
@@ -744,6 +766,7 @@ export function TaxComplianceDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Tax & Compliance" sub={`GST / VAT position · ${range.label}`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={tax.byBranch} single={tax} renderOne={renderOne}
+        loading={taxQ.isLoading} error={taxQ.isError}
         emptyMsg="No tax data for any branch this period." />
     </div>
   );
@@ -755,7 +778,7 @@ export function ExpensesDash({ branch, go }) {
   // `summary:true` — Expenses only needs `indirect` (Section B, computed regardless of summary),
   // not the per-voucher module scan. Matters in ALL scope where the BE re-runs modulePL per
   // branch: the full scan is ~12s/branch, the summary path ~1–2s.
-  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
+  const mplQ = useModulePL(branch, { ...range, summary: true }); const mpl = mplQ.data || {};
   // Group/ALL: indirect-expense breakdown PER BRANCH in its own currency (modulePL's byBranch); single: one.
   const renderOne = (data, cur) => {
     const ind = data?.indirect || {};
@@ -782,6 +805,7 @@ export function ExpensesDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Expenses" sub={`Indirect expenses by head · ${range.label}`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={mpl.byBranch} single={mpl} renderOne={renderOne}
+        loading={mplQ.isLoading} error={mplQ.isError}
         emptyMsg="No expense data for any branch this period." />
     </div>
   );
@@ -1138,6 +1162,7 @@ export function CashForecastDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="Cash Forecast (13-week)" sub={`Projected liquidity from due-dated invoices · opening as of ${range.to}`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={d.byBranch} single={d} renderOne={renderOne}
+        loading={q.isLoading} error={q.isError}
         emptyMsg="No cash forecast for any branch this period." />
     </div>
   );
@@ -1202,6 +1227,7 @@ export function YoYGrowthDash({ branch, go }) {
     <div style={{ margin: 12 }}>
       <Toolbar title="YoY Growth" sub={`${d.current?.label || 'This year'} vs ${d.prior?.label || 'last year'}`} branch={branch} p={p} />
       <BranchSplit branch={branch} byBranch={d.byBranch} single={d} renderOne={renderOne}
+        loading={yq.isLoading} error={yq.isError}
         emptyMsg="No YoY data for any branch this period." />
     </div>
   );
