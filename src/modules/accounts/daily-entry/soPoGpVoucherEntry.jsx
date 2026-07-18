@@ -2072,6 +2072,9 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       cancelRecover: r.cancelRecover !== false,
       commissionReversal: r.commissionReversal !== false,
       incentiveAmt: r.incentiveAmt ?? '', incentiveGst: r.incentiveGst ?? '', incentiveTds: r.incentiveTds ?? '',
+      // Ticket/sector stamp — which PO's segments this reversal targets (set by the
+      // Link-No fetch / leg picker; round-trips so an edit re-opens with it intact).
+      sectors: Array.isArray(r.sectors) ? r.sectors : [], sectorRef: r.sectorRef || '',
       remarks: (editing && editBooking.remarks) || '',
     };
   });
@@ -2108,6 +2111,9 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         incentiveAmt: reverseCommission ? (+state.incentiveAmt || 0) : 0,
         incentiveGst: reverseCommission ? (+state.incentiveGst || 0) : 0,
         incentiveTds: reverseCommission ? (+state.incentiveTds || 0) : 0,
+        // Ticket/sector stamp — the targeted PO's segments (reversal is Mixed, so the
+        // snapshot stores as-is and the RF/RI records exactly which ticket it reverses).
+        sectors: Array.isArray(state.sectors) ? state.sectors : [], sectorRef: state.sectorRef || '',
         againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
       };
       const payload = {
@@ -2115,7 +2121,8 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         customer: { name: state.party, ledgerName: state.party },
         supplier: { name: state.counterParty, ledgerName: state.counterParty },
         againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
-        reversal, remarks: state.remarks,
+        reversal,
+        remarks: state.remarks || (state.sectorRef ? `Being ${kind} against ${state.againstInvoice} · ${state.sectorRef}` : state.remarks),
       };
       const booking = editing
         ? await apiPut('/api/booking-orders/' + editBooking.id, { ...payload, editReason: 'Edit ' + kind })

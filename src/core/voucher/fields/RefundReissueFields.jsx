@@ -8,7 +8,7 @@ import { LedgerPicker } from '../LedgerPicker';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money, money2, r2 } from '../ui';
-import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv, clientNetFromJv } from './refundPrefill';
+import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv, clientNetFromJv, ticketSectors } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
 import { JvBlock } from '../JvBlock';
 
@@ -248,22 +248,63 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       </div>
       {fetchErr && <p style={{ margin: '-8px 0 12px', fontSize: 11, color: '#A32D2D', fontWeight: 600 }}>⚠ {fetchErr}</p>}
 
-      {/* N-PO: this folder has extra purchase legs — pick which one this refund targets. */}
-      {booking?.purchases?.length > 0 && (
-        <div style={{ marginBottom: 14, padding: 11, background: '#FFFDF7', border: '1px solid #eee3cf', borderRadius: 8 }}>
-          <FL label="Refund which cost leg?">
-            <select value={legIdx} onChange={(e) => selectLeg(Number(e.target.value))} style={inp}>
-              <option value={-1}>Primary — {booking.module} · {booking.supplier?.ledgerName || booking.supplier?.name || '—'} · {booking.purchaseVno}</option>
-              {booking.purchases.map((leg, i) => (
-                <option key={i} value={i}>{leg.module} · {leg.supplier?.ledgerName || leg.supplier?.name || '—'} · {leg.purchaseVno || '(pending)'} ({money(cur, leg.po?.total || 0)})</option>
-              ))}
-            </select>
-          </FL>
-          <p style={{ margin: '6px 0 0', fontSize: 10.5, color: '#9197a3' }}>
-            This folder has {booking.purchases.length} additional purchase leg{booking.purchases.length > 1 ? 's' : ''} under one Link No. Refund <b>one leg</b> here (single / partial); for a <b>full</b> folder refund, process each leg as its own refund voucher.
-          </p>
-        </div>
-      )}
+      {/* N-PO: this folder has extra purchase legs — pick which one this refund targets.
+          Every PO carries its tickets' SECTORS, so the options say WHICH ticket/segments
+          each PO is — the preparer picks by ticket, not by voucher number. */}
+      {booking?.purchases?.length > 0 && (() => {
+        const secSummary = (rows) => { const ss = ticketSectors(rows); return ss.length ? ` · ✈ ${ss.map((s) => s.sector).filter(Boolean).join(' + ')}` : ''; };
+        return (
+          <div style={{ marginBottom: 14, padding: 11, background: '#FFFDF7', border: '1px solid #eee3cf', borderRadius: 8 }}>
+            <FL label={`${kind === 'refund' ? 'Refund' : 'Reissue'} which ticket / PO?`}>
+              <select value={legIdx} onChange={(e) => selectLeg(Number(e.target.value))} style={inp}>
+                <option value={-1}>PO #1 (primary) — {booking.module} · {booking.supplier?.ledgerName || booking.supplier?.name || '—'} · {booking.purchaseVno}{secSummary(booking.rows)}</option>
+                {booking.purchases.map((leg, i) => (
+                  <option key={i} value={i}>PO #{i + 2} — {leg.module} · {leg.supplier?.ledgerName || leg.supplier?.name || '—'} · {leg.purchaseVno || '(pending)'} ({money(cur, leg.po?.total || 0)}){secSummary(leg.rows)}</option>
+                ))}
+              </select>
+            </FL>
+            <p style={{ margin: '6px 0 0', fontSize: 10.5, color: '#9197a3' }}>
+              This folder has {booking.purchases.length} additional purchase leg{booking.purchases.length > 1 ? 's' : ''} under one Link No. Refund <b>one leg</b> here (single / partial); for a <b>full</b> folder refund, process each leg as its own refund voucher.
+            </p>
+          </div>
+        );
+      })()}
+
+      {/* The picked PO's segments — what this reversal actually reverses. Shown for
+          single-PO folders too (the ticket being refunded should always be visible),
+          and stamped onto the saved reversal (sectors/sectorRef via the prefill). */}
+      {(() => {
+        const targetSectors = booking ? ticketSectors(legIdx < 0 ? booking.rows : booking.purchases?.[legIdx]?.rows) : [];
+        if (!targetSectors.length) return null;
+        const secTd = { padding: '5px 12px', fontSize: 11.5, borderBottom: '1px solid #eef1f5' };
+        return (
+          <div style={{ marginBottom: 14, padding: 11, background: '#F7FAFF', border: '1px solid #d8e0ea', borderRadius: 8 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.5px', color: '#185FA5', textTransform: 'uppercase', marginBottom: 6 }}>
+              🎫 Segments this {kind} reverses — {legIdx < 0 ? 'PO #1 (primary)' : `Flight PO #${legIdx + 2}`}
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', minWidth: 560 }}>
+                <thead><tr>{['Passenger', 'Sector', 'Airline', 'Flight', 'Ticket No', 'PNR', 'Travel date'].map((h) => (
+                  <th key={h} style={{ padding: '4px 12px', fontSize: 9.5, fontWeight: 800, letterSpacing: '.4px', color: '#5b616e', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #d8e0ea' }}>{h}</th>
+                ))}</tr></thead>
+                <tbody>
+                  {targetSectors.map((s, i) => (
+                    <tr key={i}>
+                      <td style={{ ...secTd, fontWeight: 700 }}>{`${s.fn} ${s.sn}`.trim() || '—'}</td>
+                      <td style={{ ...secTd, fontWeight: 700 }}>{s.sector || '—'}</td>
+                      <td style={secTd}>{s.airline || '—'}</td>
+                      <td style={secTd}>{s.flightNo || '—'}</td>
+                      <td style={secTd}>{s.ticketNo || '—'}</td>
+                      <td style={{ ...secTd, color: '#A07828', fontWeight: 700 }}>{s.pnr || '—'}</td>
+                      <td style={secTd}>{s.travelDate || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 0.7fr', gap: 12, marginBottom: 14 }}>
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>

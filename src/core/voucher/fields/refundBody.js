@@ -44,7 +44,11 @@ export function buildRefundReissueBody(s, ctx, kind) {
     // wouldn't clear an omitted key). Same stale-field class as the party-edit bug.
     partialAmount: 0,
     againstInvoice: s.againstInvoice, againstPurchase: s.againstPurchase || '', linkNo: s.againstInvoice,
-    remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}`,
+    // Ticket/sector traceability — the targeted PO's segments (set by the Link-No
+    // fetch / leg picker), so the voucher records WHICH ticket it reverses and the
+    // default narration names it.
+    sectors: Array.isArray(s.sectors) ? s.sectors : [], sectorRef: s.sectorRef || '',
+    remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}${s.sectorRef ? ` · ${s.sectorRef}` : ''}`,
     status: 'saved',
   };
 }
