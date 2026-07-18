@@ -410,9 +410,10 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
         <span title={e.rejectedReason ? `Rejected — ${e.rejectedReason}` : 'Rejected'} style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected{e.rejectedBy ? ` · ${e.rejectedBy}` : ''}</span>
         <button
           onClick={() => setEditId(e.id)}
-          disabled={busy}
-          title="Correct and resubmit — this returns the voucher to Pending and re-enters the approval chain at Check (level 1). The number is kept."
-          style={{ ...ABTN(C.blue), marginLeft: 6 }}
+          disabled={busy || vo}
+          title={vo ? VO_REASON : 'Correct and resubmit — this returns the voucher to Pending and re-enters the approval chain at Check (level 1). The number is kept.'}
+          aria-label={vo ? VO_REASON : undefined}
+          style={{ ...ABTN(C.blue), marginLeft: 6, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}
         >Edit &amp; resubmit</button>
       </>
     )
@@ -732,9 +733,10 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                                             // dead in whichever view the user happened to be in.
                                             <>
                                               <span title={e.rejectedReason ? `Rejected — ${e.rejectedReason}` : 'Rejected'} style={{ fontSize: 10, fontWeight: 700, color: C.red }}>✗ rejected{e.rejectedBy ? ` · ${e.rejectedBy}` : ''}</span>
-                                              <button onClick={() => setEditId(e.id)} disabled={busy}
-                                                title="Correct and resubmit — this returns the voucher to Pending and re-enters the approval chain at Check (level 1). The number is kept."
-                                                style={{ marginLeft: 6, padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }}>Edit &amp; resubmit</button>
+                                              <button onClick={() => setEditId(e.id)} disabled={busy || vo}
+                                                title={vo ? VO_REASON : 'Correct and resubmit — this returns the voucher to Pending and re-enters the approval chain at Check (level 1). The number is kept.'}
+                                                aria-label={vo ? VO_REASON : undefined}
+                                                style={{ marginLeft: 6, padding: '3px 9px', background: vo ? '#cfd6e4' : '#fff', color: vo ? '#6b7280' : C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: vo ? 'not-allowed' : 'pointer' }}>Edit &amp; resubmit</button>
                                             </>
                                           )}
                                         </td>

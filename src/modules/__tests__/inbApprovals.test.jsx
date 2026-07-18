@@ -61,7 +61,7 @@ jest.mock('../../core/ux/clickable', () => ({ clickable: (fn) => ({ onClick: fn 
 jest.mock('../../core/ux/toast', () => ({ toast: jest.fn() }));
 jest.mock('../../core/ux/FocusBanner', () => ({ FocusBanner: () => null }));
 jest.mock('../../core/ux/navFocus', () => ({ useNavFocusStore: jest.fn(() => null) }));
-jest.mock('../../shell/primitives', () => ({ SkeletonTable: () => null }));
+jest.mock('../../shell/primitives', () => ({ SkeletonTable: () => null, isViewOnly: () => false, VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.' }));
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';

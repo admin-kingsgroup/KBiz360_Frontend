@@ -12,6 +12,7 @@ import { localeOf } from '../../../core/format';
 import { toast } from '../../../core/ux/toast';
 import { confirmDialog } from '../../../core/ux/confirm';
 import { bc } from '../../../core/styles.jsx';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { inbTaxOf } from '../../../core/voucherSpecs.js';
 
 // Book-currency symbol for a branch (₹ for India, $ for Africa) — used so a same-currency
@@ -39,6 +40,9 @@ const CAN_DELETE = /super.?admin|director/i;
 
 export function InboundInterBranch({ branch, setRoute, currentUser }) {
   const canDelete = CAN_DELETE.test(String(currentUser?.role || ''));
+  // View-only: the buyer-side INB actions (Convert / Revoke INB / Delete) are writes that post to
+  // this branch's books — replace them with a disabled "View only" indicator, never a live 403.
+  const vo = isViewOnly();
   const q = useInbInbound(branch);
   const data = q.data || { rows: [], totals: { pending: 0, converted: 0, approved: 0, deleted: 0, edited: 0 } };
   const rows = Array.isArray(data.rows) ? data.rows : [];
@@ -233,7 +237,9 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
                       {/* Convert is the ACCEPT action and only exists while the deal is still
                           only offered. Every later state shows what it became instead. */}
                       {rw.state === 'pending'
-                        ? <>
+                        ? (vo
+                          ? <span title={VIEW_ONLY_REASON} aria-label={VIEW_ONLY_REASON} style={{ fontSize: 11, fontWeight: 700, color: C.dim, cursor: 'not-allowed' }}>👁 View only</span>
+                          : <>
                             {/* RETURNED: the seller is un-posting these very legs right now, so
                                 converting would book a cost off an un-posted deal — and off the
                                 OLD figures we already asked them to change. Disabled with the
@@ -251,7 +257,7 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
                             {!rw.returned && <button type="button" onClick={() => onReturn(rw)} disabled={ret.isPending}
                               title={`Send this deal back to ${rw.fromBranch} to correct — unlocks their Revoke. Do this only after revoking and deleting your own SO/PO/GP.`}
                               style={{ padding: '5px 9px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.amber}`, borderRadius: 6, cursor: ret.isPending ? 'default' : 'pointer', color: C.amber, background: '#fff', opacity: ret.isPending ? 0.6 : 1 }}>↩ Revoke INB</button>}
-                          </>
+                          </>)
                         : <span style={{ fontFamily: 'monospace', color: C.dark }}>
                             {rw.buyerBookingNo || '—'}
                             <div style={{ fontSize: 10.5, color: C.dim }}>
@@ -266,7 +272,7 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
                           </span>}
                       {/* An already-deleted deal has nothing left to delete — offering the
                           button would be a control that can only fail. */}
-                      {canDelete && rw.state !== 'deleted' && <button type="button" onClick={() => onDelete(rw)} disabled={del.isPending}
+                      {canDelete && rw.state !== 'deleted' && !vo && <button type="button" onClick={() => onDelete(rw)} disabled={del.isPending}
                         title="Delete this deal — reverses both sides (kept for audit); the selling branch re-raises a corrected one"
                         style={{ padding: '5px 9px', fontSize: 11, fontWeight: 700, border: '1px solid #A32D2D', borderRadius: 6, cursor: del.isPending ? 'default' : 'pointer', color: '#A32D2D', background: '#fff', opacity: del.isPending ? 0.6 : 1 }}>Delete</button>}
                     </div>
