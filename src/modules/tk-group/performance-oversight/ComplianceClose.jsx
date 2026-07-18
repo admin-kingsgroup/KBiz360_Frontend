@@ -6,6 +6,7 @@ import { isFocused } from '../utils/cockpitFocus';
 import { Badge } from '../../../shell/primitives';
 import { DataTable } from '../../../shell/DataTable';
 import { useReconSummary, useReconPending } from '../../../core/useReconciliation';
+import { weeklyCoveredByMonth } from '../../reconciliation/utils';
 
 // ─── TK GROUP CENTRAL · Compliance & Close ───────────────────────────────────
 // Per-branch close & compliance posture — is the branch locked, does it have pending
@@ -47,13 +48,15 @@ const doneBadge = (t, okNeutral) =>
 
 const RECO_READY_COLS = [
   { key: 'branch', header: 'Branch', className: 'font-bold' },
-  { key: 'weekly', header: 'Weekly (this week)', sortable: false, render: (r) => doneBadge(r.wk, false) },
+  // A branch whose weeks are covered by the Month-End close reads "Covered", not an
+  // amber incomplete count (the weekly certs were skipped because the month covers them).
+  { key: 'weekly', header: 'Weekly (this week)', sortable: false, render: (r) => r.wkCovered ? <Badge tone="info" size="sm">Covered</Badge> : doneBadge(r.wk, false) },
   { key: 'month', header: 'Month-End', sortable: false, render: (r) => doneBadge(r.mo, true) },
   { key: 'overdue', header: 'Overdue', num: true, render: (r) => r.overdue > 0 ? <Badge tone="danger" size="sm">{r.overdue}</Badge> : <Badge tone="neutral" size="sm">0</Badge> },
   {
     key: 'status', header: 'Status', sortable: false,
     render: (r) => {
-      const clear = r.overdue === 0 && (!r.wk.total || r.wk.done >= r.wk.total);
+      const clear = r.overdue === 0 && (r.wkCovered || !r.wk.total || r.wk.done >= r.wk.total);
       if (clear) return <Badge tone="success" size="sm">Clear</Badge>;
       const label = r.overdue > 0 ? `${r.overdue} overdue` : `${Math.max(0, r.wk.total - r.wk.done)} to reconcile`;
       return <Badge tone={r.overdue > 0 ? 'danger' : 'warning'} size="sm">{label}</Badge>;
@@ -72,7 +75,7 @@ function ReconReadiness({ focus }) {
     // Exclude 'superseded' weeks (their month is certified — Covered by Month-End)
     // as well as 'closed', so a certified month doesn't show as red-overdue here.
     const overdue = prows.filter((r) => r.tier === 'weekly' && !r.upcoming && r.state !== 'closed' && r.state !== 'superseded' && r.dueOn && r.dueOn < today).length;
-    return { branch: b.branch, wk: tierCount(b.tiers && b.tiers.weekly), mo: tierCount(b.tiers && b.tiers.month), overdue };
+    return { branch: b.branch, wk: tierCount(b.tiers && b.tiers.weekly), mo: tierCount(b.tiers && b.tiers.month), overdue, wkCovered: weeklyCoveredByMonth(prows) };
   });
   if (isFocused(focus)) rows = rows.filter((r) => r.branch === focus);
   return (

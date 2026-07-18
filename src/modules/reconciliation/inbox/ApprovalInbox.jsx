@@ -20,11 +20,12 @@ const headCls = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider 
 const TONE = { daily: 'neutral', weekly: 'success', month: 'info', quarter: 'gold', year: 'warning' };
 
 // Does the signed-in user's role satisfy this chain signer? Mirrors the backend
-// normalizeRole (Owner ≡ Super Admin; the Owner may act a Director step, Rule 07).
+// normalizeRole + roleSatisfies (Owner ≡ Super Admin; the Owner may act a Director
+// step — Rule 07 — and break-glass the Branch-Accountant prepare step).
 export function roleActs(me, signer) {
   const r = String(me || '').toLowerCase();
   const owner = /owner|super[\s_-]*admin/.test(r);
-  if (signer === 'Branch Accountant') return /branch\s*account/.test(r);
+  if (signer === 'Branch Accountant') return /branch\s*account/.test(r) || owner; // Owner break-glass
   if (signer === 'AE') return /account.*(exec|executive)|(^|[^a-z])ae([^a-z]|$)/.test(r);
   if (signer === 'FM') return /finance\s*manager|(^|[^a-z])fm([^a-z]|$)/.test(r);
   if (signer === 'Director') return /director/.test(r) || owner; // Rule 07 fallback

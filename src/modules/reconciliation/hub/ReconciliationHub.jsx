@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ClipboardCheck, ChevronRight, CalendarClock, BookOpenCheck, ListChecks, AlertTriangle, Sparkles } from 'lucide-react';
 import { getScopeTree, getSummary, getPending } from '../api';
 import { useCockpitFocus } from '../../../store/cockpitFocus';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, visibleTiers, certPathFor, hubPathFor, reportPathFor, tierMenuName } from '../utils';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, visibleTiers, certPathFor, hubPathFor, reportPathFor, tierMenuName, weeklyCoveredByMonth } from '../utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState } from '../../../shell/primitives';
 import { CertificateDrawer } from '../shared/CertificateDrawer';
 
@@ -89,6 +89,8 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
 
   // Weekly cycles carry a Friday deadline — surface it (and whether it's overdue).
   const today = new Date().toISOString().slice(0, 10);
+  // Per-branch pending rows (group mode) — for the readiness matrix's supersession.
+  const pendByBranch = new Map((pendingData?.byBranch || []).map((b) => [b.branch, b.rows || []]));
   const tierRows = (pendingData?.rows || []).filter((r) => r.tier === tierKey);
   // A 'superseded' weekly row (its month is certified — Covered by Month-End) is
   // not overdue; skip it when picking the due-row and computing overdue.
@@ -169,20 +171,26 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
                 </tr>
               </thead>
               <tbody>
-                {summary.byBranch.map((row) => (
+                {summary.byBranch.map((row) => {
+                  // Weekly cells whose month is certified read "covered" (muted), not an
+                  // amber incomplete count — the weeks are covered by the Month-End close.
+                  const wkCovered = weeklyCoveredByMonth(pendByBranch.get(row.branch) || []);
+                  return (
                   <tr key={row.branch} className="border-b border-surface-border last:border-0">
                     <td className="px-3 py-2 font-semibold text-ink">{row.branch}</td>
                     {TIERS.map((t) => {
                       const p = tierProgress(row.tiers?.[t.key]);
-                      const tone = p.total === 0 ? 'text-ink-subtle' : p.done >= p.total ? 'text-success' : 'text-warning';
+                      const covered = t.key === 'weekly' && wkCovered;
+                      const tone = covered ? 'text-ink-subtle' : p.total === 0 ? 'text-ink-subtle' : p.done >= p.total ? 'text-success' : 'text-warning';
                       return (
                         <td key={t.key} className="px-3 py-2 text-center tabular-nums">
-                          <span className={`font-semibold ${tone}`}>{p.total === 0 ? '—' : `${p.done}/${p.total}`}</span>
+                          <span className={`font-semibold ${tone}`}>{covered ? 'covered' : p.total === 0 ? '—' : `${p.done}/${p.total}`}</span>
                         </td>
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -155,11 +155,12 @@ describe('ReconReportsPage · render (one report per tier)', () => {
     expect(screen.queryByText(/Year-End Closing/)).not.toBeInTheDocument();   // other tiers live on their own reports
     expect(screen.queryByText(/Month-End Closing/)).not.toBeInTheDocument();
     expect(screen.getByText(/opens Fri/)).toBeInTheDocument();               // upcoming = no Generate button
-    // A superseded week reads "Covered by Month-End" (badge) with a "covered by Month-End"
-    // action instead of Generate/Open — not a red overdue.
-    expect(await screen.findByText(/Weekly Certification — 2026-W25/)).toBeInTheDocument();
-    expect(screen.getByText('Covered by Month-End')).toBeInTheDocument();     // status badge
-    expect(screen.getByText('covered by Month-End')).toBeInTheDocument();     // action cell (no Generate/Open)
+    // A superseded week is folded into a collapsed "covered by Month-End" disclosure,
+    // kept off the main pending board (detail one click away) — not a red overdue.
+    expect(await screen.findByTestId('covered-by-month-end')).toBeInTheDocument();
+    expect(screen.getByText(/1 weekly cycle covered by Month-End/)).toBeInTheDocument();
+    expect(screen.getByText(/Weekly Certification — 2026-W25/)).toBeInTheDocument();
+    expect(screen.getByText('Covered by Month-End')).toBeInTheDocument();     // per-row badge in the disclosure
     expect(await screen.findByText(/Cheque unpresented 90\+ days/)).toBeInTheDocument(); // open exceptions report
     // certNo appears in BOTH the register and the open-exceptions list
     expect(screen.getAllByText('WK/BOM/2026-W28/B1').length).toBeGreaterThanOrEqual(2);

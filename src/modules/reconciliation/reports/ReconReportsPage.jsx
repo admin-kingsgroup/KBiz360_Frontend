@@ -55,6 +55,11 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
   });
 
   const pendingRows = (pendingData?.rows || []).filter((r) => r.tier === tierKey);
+  // Weeks a certified month already covers are not "pending" — keep them off the
+  // main board (which would otherwise grow an unbounded faded list over time) and
+  // fold them into a collapsed "covered by Month-End" disclosure instead.
+  const activePending = pendingRows.filter((r) => r.state !== 'superseded');
+  const coveredPending = pendingRows.filter((r) => r.state === 'superseded');
   const registerRows = certs.filter((c) => c.tier === tierKey && (!statusFilter || c.status === statusFilter));
   const exceptionRows = certs.filter((c) => c.tier === tierKey).flatMap((c) => (c.exceptions || []).filter((e) => !e.resolved)
     .map((e) => ({ cert: c, text: e.text })));
@@ -106,8 +111,8 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
         {gen.isSuccess && gen.data && <p className="mb-3 text-sm text-success">Generated {gen.data.created ?? 0} certificate{(gen.data.created ?? 0) === 1 ? '' : 's'} for {gen.variables?.period} — open {tierMenuName(tierKey)} Certification to work them.</p>}
         {pendingLoading && <LoadingState label="Loading pending closings…" />}
         {pendingError && <ErrorState title="Couldn’t load the pending closings" message="The reconciliation service didn’t respond — this board may NOT be complete. Retry before relying on it." onRetry={() => refetchPending()} />}
-        {!pendingLoading && !pendingError && pendingRows.length === 0 && <EmptyState title="Nothing pending" hint="Every scheduled closing is complete for this branch." />}
-        {!pendingError && pendingRows.length > 0 && (
+        {!pendingLoading && !pendingError && activePending.length === 0 && <EmptyState title="Nothing pending" hint="Every scheduled closing is complete for this branch." />}
+        {!pendingError && activePending.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse">
               <thead><tr>
@@ -115,12 +120,12 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
                 <th className={headCls}>Due</th><th className={headCls}>Ledgers signed</th><th className={headCls}>Status</th><th className={headCls}>Action</th>
               </tr></thead>
               <tbody>
-                {pendingRows.map((r) => {
+                {activePending.map((r) => {
                   const t = tierOf(r.tier);
                   const st = pendingStateMeta(r);
                   const busy = gen.isPending && gen.variables?.tier === r.tier && gen.variables?.period === r.period;
                   return (
-                    <tr key={`${r.tier}:${r.period}`} className={r.upcoming ? 'bg-info-soft/30' : r.state === 'superseded' ? 'opacity-60' : undefined}>
+                    <tr key={`${r.tier}:${r.period}`} className={r.upcoming ? 'bg-info-soft/30' : undefined}>
                       <td className={cellCls}>
                         <span className="font-semibold text-ink">{r.label}</span>
                         {r.note ? <div className="text-xs text-ink-subtle">{r.note}</div> : null}
@@ -131,13 +136,11 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
                       <td className={`${cellCls} tabular-nums`}>{r.total ? `${r.done} / ${r.total}` : '—'}</td>
                       <td className={cellCls}><Badge tone={st.tone} size="sm" dot>{st.label}</Badge></td>
                       <td className={cellCls}>
-                        {r.state === 'superseded'
-                          ? <span className="text-xs text-ink-subtle">covered by Month-End</span>
-                          : r.state === 'not-started' && !r.upcoming
-                            ? <Button size="xs" variant="secondary" loading={busy} onClick={() => gen.mutate({ tier: r.tier, period: r.period })}>Generate</Button>
-                            : r.upcoming
-                              ? <span className="text-xs text-ink-subtle">opens {fmtDue(r).replace(' (upcoming)', '')}</span>
-                              : <Button size="xs" variant="ghost" onClick={() => setRoute && setRoute(certPathFor(tierKey))}>Open</Button>}
+                        {r.state === 'not-started' && !r.upcoming
+                          ? <Button size="xs" variant="secondary" loading={busy} onClick={() => gen.mutate({ tier: r.tier, period: r.period })}>Generate</Button>
+                          : r.upcoming
+                            ? <span className="text-xs text-ink-subtle">opens {fmtDue(r).replace(' (upcoming)', '')}</span>
+                            : <Button size="xs" variant="ghost" onClick={() => setRoute && setRoute(certPathFor(tierKey))}>Open</Button>}
                       </td>
                     </tr>
                   );
@@ -145,6 +148,24 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
               </tbody>
             </table>
           </div>
+        )}
+        {/* Covered by Month-End — the weeks a certified month subsumed, collapsed so
+            the board stays about what's still outstanding but the detail stays one click away. */}
+        {!pendingError && coveredPending.length > 0 && (
+          <details className="mt-3 rounded-brand border border-surface-border bg-surface-alt/40 px-3 py-2" data-testid="covered-by-month-end">
+            <summary className="cursor-pointer text-xs font-semibold text-ink-muted">
+              {coveredPending.length} weekly cycle{coveredPending.length === 1 ? '' : 's'} covered by Month-End
+            </summary>
+            <ul className="mt-2 grid gap-1">
+              {coveredPending.map((r) => (
+                <li key={`${r.tier}:${r.period}`} className="flex items-center gap-2 text-xs text-ink-subtle">
+                  <span className="font-mono">{r.period}</span>
+                  <span className="truncate">{r.label}</span>
+                  <Badge tone="info" size="sm" className="ml-auto shrink-0">Covered by Month-End</Badge>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
       </PageSection>
 

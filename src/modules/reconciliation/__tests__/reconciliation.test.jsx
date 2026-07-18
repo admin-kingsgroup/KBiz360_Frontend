@@ -3,7 +3,7 @@
 import {
   BRANCHES, TIERS, tierOf, statusMeta, sourceMeta, tierProgress, chainProgress,
   fmtAmt, currencyOf, openExceptions, GOLDEN_RULES, ROLE_MATRIX,
-  pendingStateMeta, fmtDue, periodOptions, visibleTiers, canEditCycleConfig, branchCodeOf,
+  pendingStateMeta, fmtDue, periodOptions, visibleTiers, canEditCycleConfig, branchCodeOf, weeklyCoveredByMonth,
   classifyOptionsFor, classificationLabel, MATCH_TYPE_LABELS, BANK_CLASSIFY, PARTY_CLASSIFY,
   chainForCert, isStatementLedgerCert, tierSignersLabel,
 } from '../utils';
@@ -120,6 +120,17 @@ describe('reconciliation · pending board display', () => {
     expect(pendingStateMeta({ state: 'closed' })).toMatchObject({ tone: 'navy' });
     // A weekly cycle whose month is certified → "Covered by Month-End", not overdue.
     expect(pendingStateMeta({ state: 'superseded' })).toMatchObject({ tone: 'info', label: 'Covered by Month-End' });
+  });
+  test('weeklyCoveredByMonth: weekly is "covered" when every due week is superseded/closed and at least one is superseded', () => {
+    expect(weeklyCoveredByMonth([])).toBe(false);
+    expect(weeklyCoveredByMonth([{ tier: 'weekly', state: 'superseded' }])).toBe(true);
+    expect(weeklyCoveredByMonth([{ tier: 'weekly', state: 'superseded' }, { tier: 'weekly', state: 'closed' }])).toBe(true);
+    // a genuinely pending week → not covered
+    expect(weeklyCoveredByMonth([{ tier: 'weekly', state: 'superseded' }, { tier: 'weekly', state: 'not-started' }])).toBe(false);
+    // all signed (no supersession) → not "covered" (the normal complete state shows instead)
+    expect(weeklyCoveredByMonth([{ tier: 'weekly', state: 'closed' }])).toBe(false);
+    // upcoming rows don't count
+    expect(weeklyCoveredByMonth([{ tier: 'weekly', state: 'superseded', upcoming: true }])).toBe(false);
   });
   test('periodOptions: backlog periods first, then current; deduped; upcoming excluded', () => {
     const rows = [

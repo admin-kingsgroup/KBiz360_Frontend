@@ -250,6 +250,15 @@ export function pendingStateMeta(row = {}) {
   return { tone: 'danger', label: 'Pending' };
 }
 
+/** True when a branch's due weekly cycles are all accounted for — every non-upcoming
+ *  weekly pending row is 'superseded' (its month is certified — Covered by Month-End)
+ *  or 'closed', and at least one is superseded. Lets the readiness surfaces show
+ *  "Covered" instead of an amber "0/13 to reconcile" once the month covers the weeks. */
+export function weeklyCoveredByMonth(pendingRows = []) {
+  const wk = (pendingRows || []).filter((r) => r.tier === 'weekly' && !r.upcoming);
+  return wk.length > 0 && wk.every((r) => r.state === 'superseded' || r.state === 'closed') && wk.some((r) => r.state === 'superseded');
+}
+
 /** Due-date cell for a pending row: weekly cycles show their FRIDAY. */
 export function fmtDue(row = {}) {
   if (!row.dueOn) return row.tier === 'weekly' ? 'Friday' : '—';
@@ -267,7 +276,7 @@ export const GOLDEN_RULES = [
   { n: '04', title: 'Branch freezes, Group certifies', text: 'Daily & Weekly are FREEZE-ONLY at the branch (Branch Accountant freezes; AE — and FM, weekly — approve). At Month-End the Branch Accountant ALSO freezes the branch bank / client / supplier reconciliations; TK Group then certifies them (AE verifies → FM verifies → Director certifies → Owner locks). The month’s other heads (tax, loans, capital, assets) and all Quarter/Year certification are prepared and certified at TK Group Central. Nothing hard-locks at branch level.' },
   { n: '05', title: 'Physical = scan back', text: 'Month/Quarter/Year are wet-signed on paper, then the signed scan is uploaded — that upload is what fires the period lock.' },
   { n: '06', title: 'Branch-wise, never mixed', text: 'Every reconciliation is per branch. TK Group certifies each branch on its own; balances are never merged across branches. Tally Reconciliation is a TK Group Central activity only.' },
-  { n: '07', title: 'Delegation, not bottleneck', text: 'If the Director is unavailable, the Owner signs the certify step in his place (within approval limits) so a close is never stuck.' },
+  { n: '07', title: 'Delegation, not bottleneck', text: 'If the Director is unavailable, the Owner signs the certify step in his place (within approval limits); and if a branch has no Branch Accountant, the Owner may break-glass the branch’s monthly prepare step — so a close is never stuck.' },
   { n: '08', title: 'Locked stays locked', text: 'A locked period is re-opened ONLY by the Owner; during the correction window only the FM may edit, then it is re-certified up the chain. Records retained 8 years.' },
 ];
 
