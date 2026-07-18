@@ -24,6 +24,9 @@ export function buildRefundReissueBody(s, ctx, kind) {
   const incentiveAmt = isRefund ? r2(+s.incentiveAmt || 0) : 0;
   const incentiveGst = isRefund ? r2(+s.incentiveGst || 0) : 0;
   const incentiveTds = isRefund ? r2(+s.incentiveTds || 0) : 0;
+  const newSecs = (!isRefund && Array.isArray(s.newSectors) ? s.newSectors : [])
+    .filter((x) => x && String(x.sector || x.ticketNo || x.flightNo || x.pnr || '').trim());
+  const newRef = newSecs.map((x) => [x.sector, x.flightNo || x.airline, x.ticketNo ? `TKT ${x.ticketNo}` : ''].filter(Boolean).join(' ')).filter(Boolean).join(' + ');
   const total = isRefund
     ? r2(supplierAmt + supSvc + supGst - ourIncome - taxAmt - otherTaxesGst)
     : r2(supplierAmt - supSvc - supGst + ourIncome + taxAmt + otherTaxesGst);
@@ -48,10 +51,13 @@ export function buildRefundReissueBody(s, ctx, kind) {
     // fetch / leg picker), so the voucher records WHICH ticket it reverses and the
     // default narration names it.
     sectors: Array.isArray(s.sectors) ? s.sectors : [], sectorRef: s.sectorRef || '',
+    // Reissue only: the NEW ticket's segments the passenger now flies (blank rows
+    // dropped) — recorded on the voucher and named in the default narration.
+    newSectors: newSecs,
     // Explicit escape hatch for the backend's double-refund guard (genuine
     // additional/partial refund of a ticket that already has one).
     allowDuplicate: !!s.allowDuplicate,
-    remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}${s.sectorRef ? ` · ${s.sectorRef}` : ''}`,
+    remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}${s.sectorRef ? ` · ${s.sectorRef}` : ''}${newRef ? ` → ${newRef}` : ''}`,
     status: 'saved',
   };
 }

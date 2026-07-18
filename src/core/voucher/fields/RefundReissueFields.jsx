@@ -353,6 +353,38 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         );
       })()}
 
+      {/* REISSUE ONLY — the NEW ticket the passenger now flies. The exchange posts
+          the money (fee + fare difference); this records the itinerary that money
+          bought: stamped onto the voucher (`newSectors`) and named in the default
+          narration ("… BOM-DXB EK 501 → BOM-DXB EK 507 TKT …"). */}
+      {!isRefund && (booking || (state.newSectors || []).length > 0) && (() => {
+        const rows = Array.isArray(state.newSectors) ? state.newSectors : [];
+        const setRow = (i, k, v) => patch({ newSectors: rows.map((r, idx) => (idx === i ? { ...r, [k]: v } : r)) });
+        const addRow = () => patch({ newSectors: [...rows, { sector: '', airline: '', flightNo: '', ticketNo: '', pnr: '', travelDate: '' }] });
+        const delRow = (i) => patch({ newSectors: rows.filter((_, idx) => idx !== i) });
+        const cell = { padding: '5px 7px', fontSize: 11.5, border: '1px solid #cdd1d8', borderRadius: 6 };
+        return (
+          <div style={{ marginBottom: 14, padding: 11, background: '#F6FFF7', border: '1px solid #cfe8d2', borderRadius: 8 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.5px', color: '#1a7a42', textTransform: 'uppercase', marginBottom: 6 }}>
+              ✈ New ticket — segments after this reissue
+            </div>
+            {rows.length === 0 && <p style={{ margin: '0 0 8px', fontSize: 11, color: '#9197a3' }}>Record the replacement flight(s) — the folder then shows what the passenger actually flies, not just the money moved.</p>}
+            {rows.map((r, i) => (
+              <div key={i} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 6, alignItems: 'center' }}>
+                <input value={r.sector || ''} onChange={(e) => setRow(i, 'sector', e.target.value)} placeholder="Sector" style={{ ...cell, width: 110 }} />
+                <input value={r.airline || ''} onChange={(e) => setRow(i, 'airline', e.target.value)} placeholder="Airline" style={{ ...cell, width: 110 }} />
+                <input value={r.flightNo || ''} onChange={(e) => setRow(i, 'flightNo', e.target.value)} placeholder="Flight No" style={{ ...cell, width: 90 }} />
+                <input value={r.ticketNo || ''} onChange={(e) => setRow(i, 'ticketNo', e.target.value)} placeholder="New Ticket No" style={{ ...cell, width: 130 }} />
+                <input value={r.pnr || ''} onChange={(e) => setRow(i, 'pnr', e.target.value)} placeholder="PNR" style={{ ...cell, width: 90 }} />
+                <input type="date" value={r.travelDate || ''} onChange={(e) => setRow(i, 'travelDate', e.target.value)} style={{ ...cell, width: 140 }} />
+                <button type="button" onClick={() => delRow(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#c0392b', fontSize: 15 }} title="Remove segment">×</button>
+              </div>
+            ))}
+            <button type="button" onClick={addRow} style={{ padding: '5px 12px', fontSize: 10.5, fontWeight: 700, color: '#1a7a42', background: '#e6f6e9', border: '1px solid #cfe8d2', borderRadius: 999, cursor: 'pointer' }}>+ Add segment</button>
+          </div>
+        );
+      })()}
+
       {/* Double-refund override — the backend 409s a second refund against a PO that
           already has an active one; this is the explicit escape hatch for a genuine
           additional / partial refund. Refunds only (reissues may repeat freely). */}

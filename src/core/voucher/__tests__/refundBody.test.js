@@ -68,3 +68,25 @@ describe('buildRefundReissueBody — partial-by-ticket refund', () => {
     expect(b.partialAmount).toBe(0);
   });
 });
+
+describe('buildRefundReissueBody — reissue records the NEW ticket', () => {
+  const { buildRefundReissueBody } = require('../fields/refundBody');
+  const base = { date: '2026-07-18', party: 'C', counterParty: 'S', gstMode: 'intra', gstPct: 18, againstInvoice: 'SV/1', supplierAmt: 2000, sectorRef: 'BOM-DXB EK 501 TKT T1' };
+  const newSectors = [
+    { sector: 'BOM-DXB', airline: 'Emirates', flightNo: 'EK 507', ticketNo: 'T9', pnr: 'P9', travelDate: '2026-08-10' },
+    { sector: '', airline: '', flightNo: '', ticketNo: '', pnr: '', travelDate: '' },   // blank row dropped
+  ];
+
+  test('reissue carries newSectors (blank rows dropped) + names both in the narration', () => {
+    const b = buildRefundReissueBody({ ...base, newSectors }, { branchCode: 'BOM' }, 'reissue');
+    expect(b.newSectors).toHaveLength(1);
+    expect(b.newSectors[0].ticketNo).toBe('T9');
+    expect(b.remarks).toContain('BOM-DXB EK 501 TKT T1');
+    expect(b.remarks).toContain('→ BOM-DXB EK 507 TKT T9');
+  });
+
+  test('refund never carries newSectors', () => {
+    const b = buildRefundReissueBody({ ...base, newSectors }, { branchCode: 'BOM' }, 'refund');
+    expect(b.newSectors).toEqual([]);
+  });
+});
