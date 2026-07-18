@@ -27,7 +27,7 @@ import {
   useBudgetVsActual,
 } from '../../../core/useAccounting';
 import { usePDCSummary } from '../../../core/usePDC';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { useMasterHealth } from '../../../core/useMasters';
 import { useTaxCalendar, useExpenseBudgets } from '../../../core/useReference';
 import { useBankLedgers, useBankReconSummary, useBankReconAggregate } from '../../../core/useBankReco';
@@ -636,6 +636,7 @@ function PnlTrend({ branch }) {
 // never crashes. Unset / 0 target → an honest "no target set".
 function TargetsVsActual({ branch, cur, fyActual, fyModules = [] }) {
   const code = branchCode(branch);
+  const vo = isViewOnly();   // view-only user: saving targets disabled with a reason
   const fyKey = `targets:${code || 'ALL'}:${CUR_FY.label}`;
   const saved = useConfigValue(fyKey).data || {};
   const saveCfg = useSaveConfigValue();
@@ -749,7 +750,7 @@ function TargetsVsActual({ branch, cur, fyActual, fyModules = [] }) {
           <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>Sales target<br />{nInp('salesYearly')}</label>
           <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>GP target<br />{nInp('gpYearly')}</label>
           <label style={{ fontSize: 11, fontWeight: 700, color: C.dim }}>NP target<br />{nInp('npYearly')}</label>
-          <button onClick={save} disabled={!draft || saveCfg.isPending} style={{ ...aBtn(C.blue), opacity: (!draft || saveCfg.isPending) ? 0.6 : 1 }}>{saveCfg.isPending ? 'Saving…' : 'Save targets'}</button>
+          <button onClick={save} disabled={!draft || saveCfg.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.blue), opacity: (!draft || saveCfg.isPending) ? 0.6 : 1, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>{saveCfg.isPending ? 'Saving…' : 'Save targets'}</button>
           {err && <span style={{ fontSize: 11, color: C.red, fontWeight: 700 }}>{err}</span>}
         </div>
       </div>
@@ -930,6 +931,7 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
   const branch = (branchProp && branchProp !== 'ALL') ? branchProp : (ownCode || branchProp);
   const cur = (bc(branch) || {}).cur || '₹';
   const go = (r) => setRoute && setRoute(r);
+  const vo = isViewOnly();   // view-only user: write actions disabled with a reason
   const ym = thisYM();
   const monthFrom = `${ym}-01`;
   const today = new Date().toISOString().slice(0, 10);
@@ -1602,11 +1604,13 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
                       type="text"
+                      disabled={vo}
+                      title={vo ? VIEW_ONLY_REASON : undefined}
                       value={editingNotes[r.party] !== undefined ? editingNotes[r.party] : (savedNotes[r.party] || '')}
-                      onChange={(e) => setEditingNotes({ ...editingNotes, [r.party]: e.target.value })}
+                      onChange={(e) => !vo && setEditingNotes({ ...editingNotes, [r.party]: e.target.value })}
                       onBlur={() => {
                         const val = editingNotes[r.party];
-                        if (val !== undefined && val !== (savedNotes[r.party] || '')) {
+                        if (!vo && val !== undefined && val !== (savedNotes[r.party] || '')) {
                           const next = { ...savedNotes, [r.party]: val };
                           saveNoteMutation.mutate({ key: `followup-notes:${branchCode(branch) || 'ALL'}`, value: next, description: `Save note for ${r.party}` });
                         }
@@ -1749,8 +1753,9 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
               const ok = it.manualOnly ? !!manualChecklist[it.key] : it.auto;
               return (
                 <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
-                  <span {...(it.manualOnly ? clickable(() => toggleManualCheck(it.key)) : {})}
-                    style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber), fontSize: 11 }}>
+                  <span {...(it.manualOnly && !vo ? clickable(() => toggleManualCheck(it.key)) : {})}
+                    title={it.manualOnly && vo ? VIEW_ONLY_REASON : undefined}
+                    style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? (vo ? 'not-allowed' : 'pointer') : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber), fontSize: 11 }}>
                     {ok ? '✓' : (it.manualOnly ? '' : '!')}
                   </span>
                   <div style={{ flex: 1 }}>

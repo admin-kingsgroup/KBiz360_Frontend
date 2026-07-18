@@ -116,7 +116,7 @@ function EditProfileModal({ profiles, initialCode = 'BOM', onClose }) {
       footer={
         <>
           <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-          <Button variant="accent" size="sm" disabled={create.isPending || update.isPending} onClick={save}>💾 Save Profile</Button>
+          <Button variant="accent" size="sm" disabled={create.isPending || update.isPending} onClick={save} write>💾 Save Profile</Button>
         </>
       }>
       <div className="grid gap-3 p-4">

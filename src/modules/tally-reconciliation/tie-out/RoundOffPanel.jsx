@@ -115,7 +115,7 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
                 named first for a non-settler, since a certificate re-open would not unblock
                 them anyway (re-open is Director/Owner, reversing is still FM+). */}
             <div className="flex flex-wrap items-center gap-2">
-              {canSettle && <Button variant="ghost" icon={RotateCcw} loading={reverse.isPending} onClick={() => reverse.mutate()}>{existing.length === 1 ? 'Reverse settlement' : `Reverse all ${existing.length} JVs`}</Button>}
+              {canSettle && <Button variant="ghost" write icon={RotateCcw} loading={reverse.isPending} onClick={() => reverse.mutate()}>{existing.length === 1 ? 'Reverse settlement' : `Reverse all ${existing.length} JVs`}</Button>}
               {!isSettler && <span className="text-xs text-ink-subtle">Reversing a settlement is FM, Director or Owner only — this is a record of what was posted.</span>}
               {isSettler && certified && <span className="text-xs text-ink-subtle">This period is certified — re-open the Tally certificate before reversing.</span>}
               {reverse.isError && <span className="text-xs text-danger">{reverse.error?.message}</span>}
@@ -207,7 +207,7 @@ export function RoundOffPanel({ branch, period, tier, currentUser, certified = f
                   subtitle and reverse button were all made N-aware; this button — the one
                   the operator actually commits with — still said "Post settlement JV
                   (12 legs)" twelve pixels under "Posts 3 journal vouchers". */}
-              <Button variant="primary" icon={Scale} loading={settle.isPending} disabled={!canSettle || !groups.length}
+              <Button variant="primary" write icon={Scale} loading={settle.isPending} disabled={!canSettle || !groups.length}
                 onClick={() => settle.mutate()}>
                 {settle.isPending && groups.length > 1 ? `Posting ${groups.length} JVs…`
                   : groups.length > 1 ? `Post ${groups.length} settlement JVs (one per cost centre)`

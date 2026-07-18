@@ -109,7 +109,7 @@ function PaymentCard({ p, actions, cur = '₹' }) {
         {/* Action bar */}
         {!mode && (
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="success" size="sm" icon={CheckCircle2} disabled={busy} onClick={doVerify}>Verify</Button>
+            <Button variant="success" size="sm" icon={CheckCircle2} write disabled={busy} onClick={doVerify}>Verify</Button>
             <Button variant="secondary" size="sm" icon={XCircle} disabled={busy}
               className="border-danger/30 text-danger hover:bg-danger-soft hover:text-danger"
               onClick={() => { setMode('reject'); setErr(''); }}>Reject</Button>
@@ -127,7 +127,7 @@ function PaymentCard({ p, actions, cur = '₹' }) {
             </Select>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" rows={2} />
             <div className="flex gap-2">
-              <Button variant="danger" size="sm" disabled={busy} onClick={doReject}>Confirm Reject</Button>
+              <Button variant="danger" size="sm" write disabled={busy} onClick={doReject}>Confirm Reject</Button>
               <Button variant="secondary" size="sm" onClick={() => setMode(null)}>Cancel</Button>
             </div>
           </div>
@@ -137,7 +137,7 @@ function PaymentCard({ p, actions, cur = '₹' }) {
           <div className="mt-3 flex flex-col gap-2">
             <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="What clarification do you need from the salesperson?" rows={2} />
             <div className="flex gap-2">
-              <Button variant="primary" size="sm" disabled={busy} onClick={doClarify}>Send Request</Button>
+              <Button variant="primary" size="sm" write disabled={busy} onClick={doClarify}>Send Request</Button>
               <Button variant="secondary" size="sm" onClick={() => setMode(null)}>Cancel</Button>
             </div>
           </div>

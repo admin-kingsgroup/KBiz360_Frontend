@@ -178,7 +178,7 @@ export function CustomReportBuilder({ branch, setRoute }) {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setSaveModal(false)}>Cancel</Button>
-              <Button variant="primary" size="sm" disabled={!viewName.trim() || create.isPending} onClick={saveView}>
+              <Button variant="primary" size="sm" write disabled={!viewName.trim() || create.isPending} onClick={saveView}>
                 {create.isPending ? 'Saving…' : 'Save view'}
               </Button>
             </>

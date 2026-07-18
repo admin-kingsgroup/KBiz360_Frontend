@@ -14,7 +14,7 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { toastError, toastSuccess } from '../../../core/ux/toast';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { PageSection, Button, Input, FormField, Modal, Switch, StatusPill, EmptyState, Select } from '../../../shell/primitives';
+import { PageSection, Button, Input, FormField, Modal, Switch, StatusPill, EmptyState, Select, isViewOnly } from '../../../shell/primitives';
 import { stashBuilderConfig, currentUserEmail, describeConfig } from './builderShared';
 
 export function SavedReportViews({ setRoute }) {
@@ -72,14 +72,14 @@ export function SavedReportViews({ setRoute }) {
     ) },
     { key: 'owner', header: 'Owner', render: (v) => (isMine(v) ? 'Me' : (v.owner || '—')) },
     { key: 'shared', header: 'Shared', align: 'center', render: (v) => (
-      <Switch checked={!!v.shared} disabled={!isMine(v)} onChange={() => toggleShared(v)} label="" />
+      <Switch checked={!!v.shared} disabled={!isMine(v) || isViewOnly()} onChange={() => !isViewOnly() && toggleShared(v)} label="" />
     ) },
     { key: 'updatedAt', header: 'Updated', render: (v) => String(v.updatedAt || '').slice(0, 10) || '—' },
     { key: '__act', header: 'Actions', align: 'center', sortable: false, hideable: false, render: (v) => (
       <div className="flex justify-center gap-1.5 whitespace-nowrap">
         <Button variant="primary" size="xs" icon={Play} onClick={() => openView(v)}>Open</Button>
         <Button variant="secondary" size="xs" icon={Pencil} disabled={!isMine(v)} onClick={() => { setRenaming(v); setNewName(v.name); }}>Rename</Button>
-        <Button variant="secondary" size="xs" icon={Trash2} className="text-maroon" disabled={!isMine(v)} onClick={() => del(v)}>Delete</Button>
+        <Button variant="secondary" size="xs" icon={Trash2} className="text-maroon" write disabled={!isMine(v)} onClick={() => del(v)}>Delete</Button>
       </div>
     ) },
   ];
@@ -127,7 +127,7 @@ export function SavedReportViews({ setRoute }) {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setRenaming(null)}>Cancel</Button>
-              <Button variant="primary" size="sm" disabled={!newName.trim() || update.isPending} onClick={rename}>{update.isPending ? 'Saving…' : 'Save'}</Button>
+              <Button variant="primary" size="sm" write disabled={!newName.trim() || update.isPending} onClick={rename}>{update.isPending ? 'Saving…' : 'Save'}</Button>
             </>
           }
         >

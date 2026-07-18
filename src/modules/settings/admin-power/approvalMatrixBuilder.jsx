@@ -10,7 +10,7 @@ import { listKeyNav } from '../../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../core/api';
 import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../../core/useReference';
-import { Switch } from '../../../shell/primitives';
+import { Switch, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { fmt } from '../../../core/format';
 import { PERM_ACTIONS, cardStyle } from '../../../core/helpers';
@@ -31,6 +31,7 @@ export function ApprovalMatrixBuilder(){
   const [rules,setRules]=useState([]);
   const [removed,setRemoved]=useState([]); // dbIds queued for DELETE on save
   const [saving,setSaving]=useState(false);
+  const vo=isViewOnly();
   useEffect(()=>{ if(live){ setRules(live.map(r=>({...r}))); setRemoved([]);} },[live]);
   const [form,setForm]=useState({role:"Accounts Executive",voucherType:"Payment Voucher",minAmount:0,maxAmount:50000,backup:"Sr. Accounts Executive"});
   const groupByType={};
@@ -57,7 +58,7 @@ export function ApprovalMatrixBuilder(){
   };
   return(
     <PHASE2_Page title="Approval Matrix Builder" subtitle="Per-role, per-voucher-type thresholds — saved live to /api/approval-limits"
-      toolbar={<button onClick={saveAll} disabled={saving} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",opacity:saving?0.6:1}}>💾 {saving?"Publishing…":"Save & Publish"}</button>}>
+      toolbar={<button onClick={saveAll} disabled={saving||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",opacity:saving?0.6:1,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 {saving?"Publishing…":"Save & Publish"}</button>}>
       <div style={{display:"grid",gridTemplateColumns:"1fr 300px",gap:14}}>
         <div>
           {Object.entries(groupByType).map(([type,typeRules])=>(
@@ -73,7 +74,7 @@ export function ApprovalMatrixBuilder(){
                   <td style={{padding:"6px 12px",borderBottom:"1px solid #dfe2e7"}}><input type="number" value={r.maxAmount<999999999?r.maxAmount:""} onChange={e=>setRule(r.id,{maxAmount:e.target.value===""?999999999:+e.target.value})} placeholder="Unlimited" style={{...inp,textAlign:"right",fontFamily:"monospace",width:100}}/></td>
                   <td style={RPT_tdStyle}><input value={r.backup||""} onChange={e=>setRule(r.id,{backup:e.target.value})} style={{...inp,width:"auto"}}/></td>
                   <td style={{padding:"6px 12px",textAlign:"center",borderBottom:"1px solid #dfe2e7"}}>
-                    <button onClick={()=>removeRule(r)} title="Remove tier (deleted on Save & Publish)" style={{padding:"2px 8px",background:"#fbe9e9",border:"1px solid #f3c9c9",color:"#dc2626",borderRadius:3,fontSize:10.5,cursor:"pointer",fontWeight:700}}>✕</button>
+                    <button onClick={()=>removeRule(r)} disabled={vo} title={vo?VIEW_ONLY_REASON:"Remove tier (deleted on Save & Publish)"} style={{padding:"2px 8px",background:"#fbe9e9",border:"1px solid #f3c9c9",color:"#dc2626",borderRadius:3,fontSize:10.5,cursor:"pointer",fontWeight:700,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>✕</button>
                   </td>
                 </tr>))}</tbody>
               </table>

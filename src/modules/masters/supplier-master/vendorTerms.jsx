@@ -16,6 +16,7 @@ import { localeOf } from '../../../core/format';
 import { SETTLE_CYCLES, PAY_METHODS } from '../../../core/partyEnums';
 import { bc, btnG, card, inp } from '../../../core/styles';
 import { ExportBtn } from '../shared/exportBtn';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function VendorTermsMaster({branch}){
   const cfg=bc(branch);
@@ -25,6 +26,7 @@ export function VendorTermsMaster({branch}){
   const { update } = useMasterMutations('suppliers');
   const [search,setSearch]=useState("");
   const [draft,setDraft]=useState({}); // id → {creditDays,creditLimit,settlementCycle,paymentMethod}
+  const vo=isViewOnly();
   const rows=(suppliers||[])
     .filter(s=>!s.derived&&s.active!==false)
     .filter(s=>!brc||!s.branch||s.branch==="ALL"||s.branch===brc)
@@ -76,7 +78,7 @@ export function VendorTermsMaster({branch}){
               <td style={{padding:"6px 11px",width:150}}><select value={valOf(s,"settlementCycle")} onChange={e=>setVal(s,"settlementCycle",e.target.value)} style={inpS}><option value="">—</option>{SETTLE_CYCLES.filter(Boolean).map(x=><option key={x} value={x}>{x}</option>)}</select></td>
               <td style={{padding:"6px 11px",width:140}}><select value={valOf(s,"paymentMethod")} onChange={e=>setVal(s,"paymentMethod",e.target.value)} style={inpS}><option value="">—</option>{PAY_METHODS.filter(Boolean).map(x=><option key={x} value={x}>{x}</option>)}</select></td>
               <td style={{padding:"6px 11px",width:80}}>
-                {dirty(s)&&<button onClick={()=>saveRow(s)} disabled={update.isPending} style={{...btnG,padding:"3px 10px",fontSize:10}}>{update.isPending?"…":"Save"}</button>}
+                {dirty(s)&&<button onClick={()=>saveRow(s)} disabled={update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,padding:"3px 10px",fontSize:10,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{update.isPending?"…":"Save"}</button>}
               </td>
             </tr>
           ))}

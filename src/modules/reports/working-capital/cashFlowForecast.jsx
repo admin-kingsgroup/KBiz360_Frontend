@@ -14,6 +14,7 @@ import { useCrud } from '../../../core/useRegisters';
 import { useTrialBalance } from '../../../core/useAccounting';
 import { bc, btnG, inp } from '../../../core/styles';
 import { fmt } from '../../../core/format';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function CashFlowForecast({branch}){
   const cur=bc(branch).cur;
@@ -34,6 +35,7 @@ export function CashFlowForecast({branch}){
   const card={background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",padding:"12px 14px"};
   const ip={...inp,minHeight:30,fontSize:11,width:"100%"};
   const kc=(label,val,col)=>(<div style={{...card,borderTop:`3px solid ${col}`}}><p style={{margin:0,fontSize:10,color:"#5a6691",textTransform:"uppercase"}}>{label}</p><p style={{margin:"4px 0 0",fontSize:20,fontWeight:800,color:col}}>{cur+fmt(val)}</p></div>);
+  const vo=isViewOnly();
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:19,fontWeight:800,color:"#0d1326"}}>13-Week Cash-Flow Forecast</h2>
@@ -62,7 +64,7 @@ export function CashFlowForecast({branch}){
           />
           <input style={ip} placeholder="Category" value={f.category} onChange={set('category')}/>
           <input style={ip} type="number" placeholder="Amount" value={f.amount} onChange={set('amount')}/>
-          <button onClick={add} disabled={create.isPending} style={{...btnG,minHeight:32,fontSize:11}}>+ Add</button>
+          <button onClick={add} disabled={create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,minHeight:32,fontSize:11,...(vo?{opacity:0.5,cursor:"not-allowed"}:null)}}>+ Add</button>
         </div>
       </div>
       <div style={{...card,padding:0,overflow:"hidden",marginBottom:12}}>
@@ -91,7 +93,7 @@ export function CashFlowForecast({branch}){
               {rows.map((r)=>(<tr key={r.id} style={{borderBottom:"1px solid #dfe2e7"}}>
                 <td style={{padding:"6px 8px"}}>{r.date}</td><td style={{padding:"6px 8px"}}>{r.kind}</td><td style={{padding:"6px 8px"}}>{r.category||"-"}</td>
                 <td style={{padding:"6px 8px",textAlign:"right",fontWeight:600,color:r.kind==="inflow"?"#27500A":"#A32D2D"}}>{cur+fmt(r.amount)}</td>
-                <td style={{padding:"6px 8px",textAlign:"center"}}><button onClick={()=>remove.mutate(r.id)} style={{background:"none",border:"none",color:"#A32D2D",cursor:"pointer",fontWeight:700}}>x</button></td>
+                <td style={{padding:"6px 8px",textAlign:"center"}}><button onClick={()=>remove.mutate(r.id)} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{background:"none",border:"none",color:vo?"#9aa0ac":"#A32D2D",cursor:vo?"not-allowed":"pointer",fontWeight:700}}>x</button></td>
               </tr>))}
             </tbody>
           </table>

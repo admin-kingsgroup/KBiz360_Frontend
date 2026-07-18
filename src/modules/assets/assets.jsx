@@ -128,7 +128,7 @@ export function FixedAssetRegister({ branch, setRoute }) {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button variant="accent" size="sm" disabled={createAsset.isPending || createCategory.isPending} onClick={async () => {
+              <Button variant="accent" size="sm" write disabled={createAsset.isPending || createCategory.isPending} onClick={async () => {
                 if (!af.name.trim()) { toast('Asset description is required', 'error'); return; }
                 if (!af.code) { toast('Pick or create an asset category', 'error'); return; }
                 if (!(+af.cost > 0)) { toast('Cost must be greater than 0', 'error'); return; }

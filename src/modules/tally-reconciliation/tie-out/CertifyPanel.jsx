@@ -99,14 +99,14 @@ export function CertifyPanel({ branch, period, tier, offTotal, fixTotal = 0, cur
             {/* actions. Freeze is blocked once signing has started (the snapshot is
                 frozen — re-open to change). */}
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="secondary" icon={Snowflake} loading={freeze.isPending} disabled={!tied || (cert?.signatures?.length > 0)}
+              <Button variant="secondary" write icon={Snowflake} loading={freeze.isPending} disabled={!tied || (cert?.signatures?.length > 0)}
                 onClick={() => freeze.mutate()}>
                 {frozen ? 'Re-freeze snapshot' : 'Freeze tie-out'}
               </Button>
               {/* Sign requires the BE gate (frozen snapshot clean) AND the LIVE tie
                   still clean — otherwise a voucher/re-upload after a clean freeze
                   could be signed on a stale-clean snapshot. */}
-              <Button variant="primary" icon={PenLine} loading={sign.isPending} disabled={!gate.ok || !tied}
+              <Button variant="primary" write icon={PenLine} loading={sign.isPending} disabled={!gate.ok || !tied}
                 onClick={() => sign.mutate()}>
                 {progress.next ? `Sign as ${progress.next.role}` : 'Sign'}
               </Button>
@@ -136,7 +136,7 @@ export function CertifyPanel({ branch, period, tier, offTotal, fixTotal = 0, cur
                   placeholder="e.g. BSP ledger had a wrong closing in Tally — corrected + re-exporting"
                   className="w-full rounded-brand border border-surface-border bg-surface p-2 text-sm text-ink" />
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="danger" icon={RotateCcw} loading={reopen.isPending} disabled={!reason.trim()} onClick={() => reopen.mutate()}>
+                  <Button variant="danger" write icon={RotateCcw} loading={reopen.isPending} disabled={!reason.trim()} onClick={() => reopen.mutate()}>
                     Confirm re-open ({cert?.signatures?.length || 0} signature{(cert?.signatures?.length || 0) === 1 ? '' : 's'} cleared)
                   </Button>
                   <Button variant="ghost" onClick={() => { setReopening(false); setReason(''); }}>Cancel</Button>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { card, inp } from '../../core/styles';
-import { Skeleton } from '../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../shell/primitives';
 import { localeOf } from '../../core/format';
 import { bookingTravelDetail } from '../../core/registerSearch';
 import { isVatBranch } from '../../core/voucherSpecs';
@@ -140,6 +140,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   const [msg, setMsg] = useState('');
   const [done, setDone] = useState(false); // after a successful save → show the entry preview
   const dismiss = () => (onClose || onBack || (() => {}))();
+  const vo = isViewOnly();
   useEffect(() => {
     if (v) {
       setForm({
@@ -278,7 +279,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           {parent && parent.navigable && <button onClick={() => { openParentFile(v); dismiss(); }} title={`Open its ${parent.label} ${parent.ref} — revoke the whole file there`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff' }}>⟲ Open {parent.label} →</button>}
-          {canRevoke && !parent && <button onClick={() => doRevoke(voucherId, dismiss)} disabled={revoking} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: revoking ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1 }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
+          {canRevoke && !parent && <button onClick={() => doRevoke(voucherId, dismiss)} disabled={revoking || vo} title={vo ? VIEW_ONLY_REASON : "Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)"} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: (revoking || vo) ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: '#A07828', color: '#fff', opacity: revoking ? 0.6 : 1, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>⟲ {revoking ? 'Revoking…' : 'Revoke'}</button>}
           <button onClick={printEntry} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: BLUE, color: '#fff' }}>🖨 Print</button>
           <button onClick={dismiss} style={{ padding: '10px 18px', borderRadius: 7, border: '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12.5, fontWeight: 700, background: '#fff', color: DARK }}>Close</button>
         </div>
@@ -400,9 +401,9 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         {(() => {
           const blocked = pv.balanced === false;
           return (
-            <button disabled={upd.isPending || blocked} onClick={save}
-              title={blocked ? `Cannot save — debit and credit must match (out by ${money(cur, pv.diff)})` : 'Save voucher'}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: (upd.isPending || blocked) ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: blocked ? '#9bbfa0' : GREEN, color: '#fff', opacity: blocked ? 0.75 : 1 }}>
+            <button disabled={upd.isPending || blocked || vo} onClick={save}
+              title={vo ? VIEW_ONLY_REASON : blocked ? `Cannot save — debit and credit must match (out by ${money(cur, pv.diff)})` : 'Save voucher'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 7, border: 'none', cursor: (upd.isPending || blocked || vo) ? 'not-allowed' : 'pointer', fontSize: 12.5, fontWeight: 700, background: blocked ? '#9bbfa0' : GREEN, color: '#fff', opacity: blocked ? 0.75 : 1, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>
               {upd.isPending ? 'Saving...' : 'Save'}
             </button>
           );

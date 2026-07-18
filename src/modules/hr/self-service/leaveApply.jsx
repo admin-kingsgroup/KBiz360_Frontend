@@ -11,7 +11,7 @@ import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
 import { RPT_tdStyle, RPT_thStyle, inp } from '../../../core/styles';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { SelfServiceGate, SS_DEFAULT_ENT } from './selfServiceGate';
 
 export function LeaveApply(){
@@ -52,6 +52,7 @@ function LeaveApplyBody({emp}){
   /* Submit a REAL request to /api/leave-requests, attributed to the resolved
      employee — it lands in HR's Leave Management queue as Pending. */
   const {create}=useMasterMutations('leave-requests');
+  const vo=isViewOnly();
   const submit=()=>{
     if(!reason.length||create.isPending) return;
     create.mutate(toLeavePayload({empId:emp.id,empName:emp.name,branch:emp.branch,type,from,to,days,reason,status:"Pending"}),{
@@ -85,7 +86,7 @@ function LeaveApplyBody({emp}){
                   {bal?.balance==null&&<span style={{color:"#5a6691"}}>LOP — salary deducted</span>}
                 </div>
                 <div><label style={{fontSize:11,color:"#5a6691",fontWeight:700,textTransform:"uppercase",letterSpacing:"0.4px",display:"block",marginBottom:4}}>Reason</label><textarea value={reason} onChange={e=>setReason(e.target.value)} rows={3} style={{...inp,fontFamily:"inherit",resize:"vertical"}} placeholder="Brief reason for leave…"/></div>
-                <button onClick={submit} disabled={create.isPending} style={{padding:"10px",background:reason.length>0?"#d4a437":"#e1e3ec",color:reason.length>0?"#0d1326":"#5a6691",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:reason.length>0?"pointer":"not-allowed"}}>{create.isPending?"Submitting…":"Submit Application"}</button>
+                <button onClick={submit} disabled={create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"10px",background:reason.length>0?"#d4a437":"#e1e3ec",color:reason.length>0?"#0d1326":"#5a6691",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:reason.length>0?"pointer":"not-allowed",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{create.isPending?"Submitting…":"Submit Application"}</button>
               </div>
             </div>
           )}

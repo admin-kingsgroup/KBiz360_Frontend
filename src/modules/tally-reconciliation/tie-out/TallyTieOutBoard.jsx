@@ -600,7 +600,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
           <Button variant="secondary" icon={Upload} disabled={periodCertified} title={periodCertified ? 'This period is certified — re-open the certificate to re-upload' : undefined} onClick={() => { setShowImport((s) => !s); setShowDayBook(false); }}>Upload Tally TB</Button>
           <Button variant="secondary" icon={FileUp} disabled={periodCertified} title={periodCertified ? 'This period is certified — re-open the certificate to re-upload' : undefined} onClick={() => { setShowDayBook((s) => !s); setShowImport(false); }}>Upload Day Book</Button>
           {(imported.count > 0 || dbStatus?.vouchers > 0) && (
-            <Button variant="danger" icon={Trash2} loading={clr.isPending}
+            <Button variant="danger" write icon={Trash2} loading={clr.isPending}
               disabled={periodCertified}
               title={periodCertified ? 'This period is certified — re-open the certificate to clear' : `Remove the uploaded Tally TB & Day Book for ${branch} · ${periodLabel(period)}`}
               onClick={() => { const n = tier === 'year' ? 'year' : 'month'; if (window.confirm(`Clear the uploaded Tally data for ${branch} · ${periodLabel(period)}?\n\nThis removes only this ${n}'s Trial Balance and Day Book upload — no other ${n} is affected, and your live ERP books are untouched.`)) clr.mutate(); }}>
@@ -678,7 +678,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             placeholder={'ICICI Bank A/c\t1245300\t0\nHDFC Bank A/c\t805000\t0\nBSP / IATA\t0\t9000'}
             className="w-full rounded-brand border border-surface-border bg-surface p-3 font-mono text-xs text-ink" />
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <Button variant="primary" loading={imp.isPending} disabled={tbRows().length === 0} onClick={() => imp.mutate()}>
+            <Button variant="primary" write loading={imp.isPending} disabled={tbRows().length === 0} onClick={() => imp.mutate()}>
               Upload ({tbRows().length} rows)
             </Button>
             {imp.isError && <span className="text-sm text-danger">{imp.error?.message}</span>}
@@ -705,7 +705,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             : <p className="mt-2 text-sm text-success">{dbFile.name} — {dbFile.rows.length} voucher legs ready.</p>)}
           {dbFile && !dbFile.error && dbFile.note && <p className="mt-1 text-xs text-warning">{dbFile.note}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button variant="primary" icon={FileUp} loading={impDB.isPending} disabled={!dbFile || dbFile.rows.length === 0} onClick={() => impDB.mutate()}>
+            <Button variant="primary" write icon={FileUp} loading={impDB.isPending} disabled={!dbFile || dbFile.rows.length === 0} onClick={() => impDB.mutate()}>
               Upload Day Book ({dbFile ? dbFile.rows.length : 0} legs)
             </Button>
             {impDB.isError && <span className="text-sm text-danger">{impDB.error?.message}</span>}

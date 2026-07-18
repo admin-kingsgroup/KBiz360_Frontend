@@ -8,6 +8,7 @@ import { CUR_FY } from '../../../core/dates';
 import { toast, toastError } from '../../../core/ux/toast';
 import { localeOf } from '../../../core/format';
 import { bc } from '../../../core/styleTokens';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 /* ════════════════════════════════════════════════════════════════════
    YEAR-END CLOSE — live (replaces the hardcoded 4-step demo wizard)
@@ -53,6 +54,7 @@ export function YearEndClosePage() {
   const qc = useQueryClient();
   const [fy, setFy] = useState('');
   const [confirmed, setConfirmed] = useState(false);
+  const vo = isViewOnly();
 
   const fysQ = useQuery({
     queryKey: ['fiscal-years'],
@@ -120,7 +122,9 @@ export function YearEndClosePage() {
                   <b>FY {s.fy} is CLOSED.</b> Closed by {closedRecord.closedBy || '—'} on {String(closedRecord.closedAt || '').slice(0, 10)} · all 12 periods hard-locked group-wide.
                 </div>
                 {isSuperAdmin() && (
-                  <button onClick={() => reopenMut.mutate()} disabled={reopenMut.isPending}
+                  <button onClick={() => reopenMut.mutate()} disabled={reopenMut.isPending || vo}
+                    title={vo ? VIEW_ONLY_REASON : undefined}
+                    style={vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : undefined}
                     className="flex items-center gap-1.5 rounded-md border border-surface-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-alt">
                     <Unlock size={13} /> Reopen (Super Admin)
                   </button>
@@ -173,9 +177,10 @@ export function YearEndClosePage() {
                 </label>
                 <button
                   onClick={() => closeMut.mutate()}
-                  disabled={!confirmed || !s.allGatesPass || closeMut.isPending}
+                  disabled={!confirmed || !s.allGatesPass || closeMut.isPending || vo}
+                  title={vo ? VIEW_ONLY_REASON : undefined}
                   className="rounded-md px-4 py-2 text-sm font-bold text-white disabled:opacity-40"
-                  style={{ background: '#A32D2D' }}
+                  style={{ background: '#A32D2D', ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}
                 >
                   🔒 {closeMut.isPending ? 'Closing…' : `Close & lock FY ${s.fy}`}
                 </button>

@@ -17,7 +17,7 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { toastSuccess, toastError, toastWarning } from '../../../core/ux/toast';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { PageSection, Button, Input, Select, FormField, Modal, Switch, StatusPill, EmptyState } from '../../../shell/primitives';
+import { PageSection, Button, Input, Select, FormField, Modal, Switch, StatusPill, EmptyState, isViewOnly } from '../../../shell/primitives';
 import { describeConfig } from './builderShared';
 
 const FREQS = [
@@ -113,11 +113,11 @@ export function ScheduledReports() {
     } },
     { key: 'lastRun', header: 'Last run', render: (s) => (s.lastRun ? String(s.lastRun).slice(0, 16).replace('T', ' ') : '—') },
     { key: 'lastStatus', header: 'Status', align: 'center', render: (s) => statusPill(s.lastStatus) },
-    { key: 'active', header: 'Active', align: 'center', render: (s) => <Switch checked={!!s.active} onChange={() => toggleActive(s)} label="" /> },
+    { key: 'active', header: 'Active', align: 'center', render: (s) => <Switch checked={!!s.active} disabled={isViewOnly()} onChange={() => !isViewOnly() && toggleActive(s)} label="" /> },
     { key: '__act', header: 'Actions', align: 'center', sortable: false, hideable: false, render: (s) => (
       <div className="flex justify-center gap-1.5 whitespace-nowrap">
-        <Button variant="primary" size="xs" icon={Zap} disabled={runNow.isPending} onClick={() => runNow.mutate(s.id)}>Run now</Button>
-        <Button variant="secondary" size="xs" icon={Trash2} className="text-maroon" onClick={() => del(s)}>Delete</Button>
+        <Button variant="primary" size="xs" icon={Zap} write disabled={runNow.isPending} onClick={() => runNow.mutate(s.id)}>Run now</Button>
+        <Button variant="secondary" size="xs" icon={Trash2} className="text-maroon" write onClick={() => del(s)}>Delete</Button>
       </div>
     ) },
   ];
@@ -160,7 +160,7 @@ export function ScheduledReports() {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button>
-              <Button variant="primary" size="sm" disabled={!form.name.trim() || !form.viewId || !form.recipients.trim() || create.isPending} onClick={createSchedule}>
+              <Button variant="primary" size="sm" write disabled={!form.name.trim() || !form.viewId || !form.recipients.trim() || create.isPending} onClick={createSchedule}>
                 {create.isPending ? 'Creating…' : 'Create Schedule'}
               </Button>
             </>

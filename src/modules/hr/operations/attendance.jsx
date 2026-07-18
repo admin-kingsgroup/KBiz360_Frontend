@@ -10,9 +10,10 @@ import { toast } from '../../../core/ux/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPut, getAuthToken } from '../../../core/api';
 import { btnG, btnGh, card, inp } from '../../../core/styles';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function HrAttendance({branch}){
+  const vo=isViewOnly();
   // Last 6 months through the current one, derived from the live clock (was hard-coded to
   // Mar–May 2026, so the current month — where marks & the dashboard KPI live — couldn't
   // even be selected). Default to the current month.
@@ -178,10 +179,10 @@ export function HrAttendance({branch}){
           <select value={brFilter} onChange={e=>setBrFilter(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
             {HR_BRANCHES_F.map(b=><option key={b}>{b}</option>)}
           </select>
-          {isCurMonth&&<button onClick={markToday} disabled={!canBulk} title={bulkBranch?"Mark every listed employee Present today (respecting weekly-off)":"Pick a single branch to bulk-mark"}
-            style={{...btnG,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed"}}>✓ All present today</button>}
-          <button onClick={fillWorking} disabled={!canBulk} title={bulkBranch?"Mark all working days up to date as Present (per each shift's weekly-off)":"Pick a single branch to bulk-mark"}
-            style={{...btnGh,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed"}}>Fill working days →</button>
+          {isCurMonth&&<button onClick={markToday} disabled={!canBulk||vo} title={vo?VIEW_ONLY_REASON:(bulkBranch?"Mark every listed employee Present today (respecting weekly-off)":"Pick a single branch to bulk-mark")}
+            style={{...btnG,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>✓ All present today</button>}
+          <button onClick={fillWorking} disabled={!canBulk||vo} title={vo?VIEW_ONLY_REASON:(bulkBranch?"Mark all working days up to date as Present (per each shift's weekly-off)":"Pick a single branch to bulk-mark")}
+            style={{...btnGh,fontSize:11,minHeight:32,opacity:canBulk?1:0.5,cursor:canBulk?"pointer":"not-allowed",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>Fill working days →</button>
           <button onClick={openPunch} disabled={emps.length===0} title="Record in/out punch times and see late marks"
             style={{...btnGh,fontSize:11,minHeight:32,opacity:emps.length?1:0.5,cursor:emps.length?"pointer":"not-allowed"}}>🕒 Punch times</button>
           <button onClick={()=>{setHolForm({date:month+"-01",name:"",branch:brScope||"ALL"});setHolModal(true);}} title="Manage the public-holiday calendar (auto-marks H on the grid)"
@@ -204,7 +205,7 @@ export function HrAttendance({branch}){
                   <span style={{fontFamily:"monospace",fontWeight:700,color:"#185FA5"}}>{h.date}</span>
                   <span style={{flex:1,color:"#0d1326",fontWeight:600}}>{h.name}</span>
                   <span style={{fontSize:10,padding:"1px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{h.branch}</span>
-                  <button onClick={()=>holidayRemove.mutate(h.id)} title="Remove holiday" style={{background:"#fbe9e9",border:"1px solid #f3c9c9",color:"#dc2626",borderRadius:3,fontSize:10.5,padding:"2px 8px",cursor:"pointer",fontWeight:700}}>✕</button>
+                  <button onClick={()=>holidayRemove.mutate(h.id)} disabled={vo} title={vo?VIEW_ONLY_REASON:"Remove holiday"} style={{background:"#fbe9e9",border:"1px solid #f3c9c9",color:"#dc2626",borderRadius:3,fontSize:10.5,padding:"2px 8px",cursor:"pointer",fontWeight:700,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>✕</button>
                 </div>
               ))}
               <div style={{marginTop:14,padding:12,background:"#fafbfd",border:"1px solid #cdd1d8",borderRadius:8}}>
@@ -217,11 +218,11 @@ export function HrAttendance({branch}){
                     {BRANCHES.map(b=><option key={b.code} value={b.code}>{b.code}</option>)}
                   </select>
                 </div>
-                <button disabled={!holForm.date||!holForm.name.trim()||holidayCreate.isPending}
+                <button disabled={!holForm.date||!holForm.name.trim()||holidayCreate.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined}
                   onClick={()=>holidayCreate.mutate({date:holForm.date,name:holForm.name.trim(),branch:holForm.branch,active:true},
                     {onSuccess:()=>{toast("Holiday added — the grid now auto-marks H.");setHolForm(f=>({...f,name:""}));},
                      onError:(e)=>toast(e?.message||"Add failed (duplicate date for this branch?)","error")})}
-                  style={{...btnG,fontSize:11,marginTop:8,opacity:!holForm.date||!holForm.name.trim()?0.5:1}}>
+                  style={{...btnG,fontSize:11,marginTop:8,opacity:!holForm.date||!holForm.name.trim()?0.5:1,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>
                   {holidayCreate.isPending?"Adding…":"+ Add holiday"}
                 </button>
                 <p style={{margin:"8px 0 0",fontSize:10,color:"#5a6691"}}>A hand-marked cell still wins over the auto-H, and bulk "Fill working days" skips holidays like weekly-offs.</p>
@@ -287,9 +288,9 @@ export function HrAttendance({branch}){
                   const late=lateFor(emp,i+1);
                   return (
                     <td key={i} style={{padding:"4px 2px",textAlign:"center"}}>
-                      <span onClick={()=>cycleCell(emp,i+1)} title={late?"Late arrival — click to change":"Click to change"}
+                      <span onClick={()=>!vo&&cycleCell(emp,i+1)} title={vo?VIEW_ONLY_REASON:(late?"Late arrival — click to change":"Click to change")}
                         style={{display:"inline-block",width:20,height:20,borderRadius:4,
-                        lineHeight:"20px",fontSize:8.5,fontWeight:700,cursor:"pointer",
+                        lineHeight:"20px",fontSize:8.5,fontWeight:700,cursor:vo?"not-allowed":"pointer",
                         border:att?"none":"1px dashed #e1e3ec",
                         boxShadow:late?"inset 0 -3px 0 #dc2626":undefined,
                         background:ac.bg,color:ac.c}}>
@@ -335,8 +336,8 @@ export function HrAttendance({branch}){
                 <tr key={emp.id} style={{borderBottom:"1px solid #dfe2e7",background:ei%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{emp.name}</td>
                   <td style={{padding:"7px 12px",color:"#5a6691",fontSize:10}}>{sh?`${sh.code||sh.name} ${sh.startTime}–${sh.endTime}`:"— default —"}</td>
-                  <td style={{padding:"6px 12px"}}><input key={`in-${emp.id}-${punchDay}-${t.in||""}`} type="time" defaultValue={t.in||""} onBlur={e=>{if((e.target.value||"")!==(t.in||""))saveTime(emp,punchDay,{in:e.target.value});}} style={{...inp,width:110,minHeight:30}}/></td>
-                  <td style={{padding:"6px 12px"}}><input key={`out-${emp.id}-${punchDay}-${t.out||""}`} type="time" defaultValue={t.out||""} onBlur={e=>{if((e.target.value||"")!==(t.out||""))saveTime(emp,punchDay,{out:e.target.value});}} style={{...inp,width:110,minHeight:30}}/></td>
+                  <td style={{padding:"6px 12px"}}><input key={`in-${emp.id}-${punchDay}-${t.in||""}`} type="time" defaultValue={t.in||""} disabled={vo} onBlur={e=>{if(!vo&&(e.target.value||"")!==(t.in||""))saveTime(emp,punchDay,{in:e.target.value});}} style={{...inp,width:110,minHeight:30}}/></td>
+                  <td style={{padding:"6px 12px"}}><input key={`out-${emp.id}-${punchDay}-${t.out||""}`} type="time" defaultValue={t.out||""} disabled={vo} onBlur={e=>{if(!vo&&(e.target.value||"")!==(t.out||""))saveTime(emp,punchDay,{out:e.target.value});}} style={{...inp,width:110,minHeight:30}}/></td>
                   <td style={{padding:"7px 12px"}}>{t.in?(late?<span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:"#FCEBEB",color:"#A32D2D"}}>Late</span>:<span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:"#EAF3DE",color:"#27500A"}}>On time</span>):<span style={{fontSize:10,color:"#8b94b3"}}>—</span>}</td>
                 </tr>
               );

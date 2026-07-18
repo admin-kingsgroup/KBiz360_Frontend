@@ -100,11 +100,11 @@ export function AcmRegister({ branch }) {
       footer: (rows) => `TOTAL — ${rows.length} ACMs`,
       render: (a) => (
         <div className="flex flex-wrap gap-1">
-          {['Received', 'Disputed'].includes(a.status) && <Button variant="success" size="xs" disabled={acceptM.isPending} onClick={() => acceptAcm(a)} title="Accept → create a pending ACM voucher">Accept → Voucher</Button>}
-          {a.status === 'Received' && <Button variant="secondary" size="xs" onClick={() => disputeM.mutate({ id: a.rid, note: 'Query raised on credit' }, { onSuccess: () => toast('Query raised'), onError: (e) => toast(e.message, 'error') })}>Query</Button>}
-          {a.status === 'Disputed' && <Button variant="secondary" size="xs" onClick={() => rejectAcm(a)}>Reject</Button>}
+          {['Received', 'Disputed'].includes(a.status) && <Button variant="success" size="xs" write disabled={acceptM.isPending} onClick={() => acceptAcm(a)} title="Accept → create a pending ACM voucher">Accept → Voucher</Button>}
+          {a.status === 'Received' && <Button variant="secondary" size="xs" write onClick={() => disputeM.mutate({ id: a.rid, note: 'Query raised on credit' }, { onSuccess: () => toast('Query raised'), onError: (e) => toast(e.message, 'error') })}>Query</Button>}
+          {a.status === 'Disputed' && <Button variant="secondary" size="xs" write onClick={() => rejectAcm(a)}>Reject</Button>}
           {a.status === 'Accepted' && a.voucherVno && <span className="text-[9px] font-bold text-[#27500A]">→ {a.voucherVno}</span>}
-          {a.status === 'Accepted' && <Button variant="danger" size="xs" disabled={reverseM.isPending} onClick={() => reverseAcm(a)} title="Reverse (un-accept) → un-post the voucher, memo back to Received">↺ Reverse</Button>}
+          {a.status === 'Accepted' && <Button variant="danger" size="xs" write disabled={reverseM.isPending} onClick={() => reverseAcm(a)} title="Reverse (un-accept) → un-post the voucher, memo back to Received">↺ Reverse</Button>}
         </div>
       ),
     },
@@ -179,7 +179,7 @@ export function AcmRegister({ branch }) {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button>
-              <Button variant="success" size="sm" loading={createM.isPending} onClick={addAcm}>{createM.isPending ? 'Saving…' : 'Record ACM'}</Button>
+              <Button variant="success" size="sm" write loading={createM.isPending} onClick={addAcm}>{createM.isPending ? 'Saving…' : 'Record ACM'}</Button>
             </>
           }
         >

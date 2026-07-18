@@ -25,6 +25,7 @@ import { TDS_SECTIONS } from '../../../core/taxSections';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { SampleBanner } from '../../../core/ux/SampleBanner';
+import { isViewOnly } from '../../../shell/primitives';
 
 export function Gstr9c({branch,setRoute}){
   const mob=useMobile();
@@ -68,8 +69,8 @@ export function Gstr9c({branch,setRoute}){
   // Plain render helper (NOT a nested component — a nested component would
   // remount on every keystroke and drop the input focus).
   const manualInput=(k)=>(
-    <input type="number" value={mVal(k)} placeholder="0"
-      onChange={e=>setEdits(s=>({...s,[k]:e.target.value}))} onBlur={commitManual}
+    <input type="number" value={mVal(k)} placeholder="0" disabled={isViewOnly()}
+      onChange={e=>setEdits(s=>({...s,[k]:e.target.value}))} onBlur={()=>!isViewOnly()&&commitManual()}
       style={{width:110,padding:"3px 6px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:10.5,textAlign:"right"}}/>
   );
 

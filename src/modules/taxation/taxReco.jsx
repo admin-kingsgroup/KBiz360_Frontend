@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { useTaxReco, useUpsertTaxFigure } from '../../core/useTaxReco';
 import { bc } from '../../core/styles';
-import { Skeleton } from '../../shell/primitives';
+import { Skeleton, isViewOnly } from '../../shell/primitives';
 
 const C = { dark: '#0d1326', gold: '#d4a437', blue: '#185FA5', red: '#A32D2D', green: '#27500A', dim: '#5a6691', border: '#cdd1d8' };
 const money = (cur, n) => cur + Math.round(Number(n) || 0).toLocaleString((cur === '₹' || cur === '₨' || cur === 'Rs') ? 'en-IN' : 'en-US');
@@ -90,8 +90,8 @@ export function TaxReco({ branch }) {
                 <td style={{ ...td, ...rnum }}>{money(cur, r.left)}</td>
                 <td style={{ ...td, ...rnum }}>
                   <input value={valFor(r)} onChange={(e) => setEdits((s) => ({ ...s, [r.head]: e.target.value }))}
-                    onBlur={() => saveFigure(r)} type="number" placeholder="enter filed"
-                    style={{ ...inp, width: 130, textAlign: 'right' }} />
+                    onBlur={() => !isViewOnly() && saveFigure(r)} type="number" placeholder="enter filed"
+                    disabled={isViewOnly()} style={{ ...inp, width: 130, textAlign: 'right' }} />
                 </td>
                 <td style={{ ...td, ...rnum, fontWeight: 700, color: r.matched ? C.dim : C.red }}>{money(cur, Math.abs(r.difference))}</td>
                 <td style={{ ...td, textAlign: 'center' }}>

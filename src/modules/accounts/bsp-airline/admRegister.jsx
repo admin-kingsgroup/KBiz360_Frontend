@@ -15,6 +15,8 @@ import { Menu as StatusMenu } from '../../../core/ux/Menu';
 import { todayISO } from '../../../core/dates';
 import { useMobile } from '../../../core/hooks';
 import { FL, bc, btnG, btnGh, card, inp } from '../../../core/styles';
+// Leaf, test-safe view-only read (NOT core/api — no import.meta) to gate the raw write buttons.
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function AdmRegister({branch}){
   const mob=useMobile();
@@ -22,6 +24,9 @@ export function AdmRegister({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const brCode=branch==="ALL"?null:branch?.code;
+  // View-only user: write (accept/reject/reverse/record/file-dispute) buttons are pre-disabled
+  // with a reason — never a live no-op that only 403s. Collapses to the original when vo is false.
+  const vo=isViewOnly();
 
   // Live DB-backed register (/api/adm-memos?kind=adm). Accept spawns a PENDING
   // gated ADM voucher into the approval queue (source: 'adm-register').
@@ -223,11 +228,11 @@ export function AdmRegister({branch}){
                           <button onClick={()=>{setDisputeNote("");setDisputeModal(a);}} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#dc2626",whiteSpace:"nowrap"}}>Dispute</button>
                         )}
                         {["Received","Disputed"].includes(a.status)&&(
-                          <button onClick={()=>acceptAdm(a)} disabled={acceptM.isPending} title="Accept → create a pending ADM voucher" style={{...btnG,padding:"2px 7px",fontSize:9,background:"#16a34a",whiteSpace:"nowrap"}}>Accept → Voucher</button>
+                          <button onClick={()=>acceptAdm(a)} disabled={acceptM.isPending||vo} title={vo?VIEW_ONLY_REASON:"Accept → create a pending ADM voucher"} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#16a34a",whiteSpace:"nowrap",...(vo?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{})}}>Accept → Voucher</button>
                         )}
-                        {a.status==="Disputed"&&<button onClick={()=>rejectAdm(a)} style={{...btnGh,padding:"2px 7px",fontSize:9,whiteSpace:"nowrap"}}>Reject</button>}
+                        {a.status==="Disputed"&&<button onClick={()=>rejectAdm(a)} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,padding:"2px 7px",fontSize:9,whiteSpace:"nowrap",...(vo?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{})}}>Reject</button>}
                         {a.status==="Accepted"&&a.voucherVno&&<span style={{fontSize:9,color:"#16a34a",fontWeight:700}}>→ {a.voucherVno}</span>}
-                        {a.status==="Accepted"&&<button onClick={()=>reverseAdm(a)} disabled={reverseM.isPending} title="Reverse (un-accept) → un-post the voucher, memo back to Received" style={{...btnGh,padding:"2px 7px",fontSize:9,color:"#dc2626",borderColor:"#dc2626",whiteSpace:"nowrap"}}>↺ Reverse</button>}
+                        {a.status==="Accepted"&&<button onClick={()=>reverseAdm(a)} disabled={reverseM.isPending||vo} title={vo?VIEW_ONLY_REASON:"Reverse (un-accept) → un-post the voucher, memo back to Received"} style={{...btnGh,padding:"2px 7px",fontSize:9,color:"#dc2626",borderColor:"#dc2626",whiteSpace:"nowrap",...(vo?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{})}}>↺ Reverse</button>}
                       </div>
                     </td>
                   </tr>
@@ -287,7 +292,7 @@ export function AdmRegister({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={addAdm} style={{...btnG,background:"#dc2626"}}>💾 Record ADM</button>
+              <button onClick={addAdm} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,background:"#dc2626",...(vo?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{})}}>💾 Record ADM</button>
             </div>
           </div>
         </div>
@@ -321,12 +326,12 @@ export function AdmRegister({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setDisputeModal(null)} style={btnGh}>Cancel</button>
-              <button disabled={disputeM.isPending} onClick={()=>{
+              <button disabled={disputeM.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} onClick={()=>{
                 disputeM.mutate({id:disputeModal.rid,note:disputeNote||"Dispute filed via BSP Link — awaiting airline response"},{
                   onSuccess:()=>{setDisputeModal(null);toast("Dispute filed");},
                   onError:(e)=>toast("Could not file dispute — "+e.message,"error"),
                 });
-              }} style={{...btnG,background:"#dc2626",opacity:disputeM.isPending?0.6:1,cursor:disputeM.isPending?"not-allowed":"pointer"}}>{disputeM.isPending?"📨 Filing…":"📨 File Dispute"}</button>
+              }} style={{...btnG,background:"#dc2626",opacity:disputeM.isPending?0.6:1,cursor:disputeM.isPending?"not-allowed":"pointer",...(vo?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{})}}>{disputeM.isPending?"📨 Filing…":"📨 File Dispute"}</button>
             </div>
           </div>
         </div>

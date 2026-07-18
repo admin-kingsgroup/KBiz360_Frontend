@@ -10,7 +10,7 @@ import { listKeyNav } from '../../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../core/api';
 import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../../core/useReference';
-import { Switch } from '../../../shell/primitives';
+import { Switch, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { fmt } from '../../../core/format';
 import { PERM_ACTIONS, cardStyle } from '../../../core/helpers';
@@ -26,6 +26,7 @@ export function CustomFieldsManager(){
   // Live custom fields (GET /api/custom-fields). Was hardcoded CUSTOM_FIELDS_DATA.
   const all=useCustomFields().data||[];
   const qc=useQueryClient();
+  const vo=isViewOnly();
   const [master,setMaster]=useState("ALL");
   const [modal,setModal]=useState(null); // null | {dbId?, master, label, type, options, required, active}
   const masters=["ALL","Customer","Supplier","Employee"];
@@ -66,7 +67,7 @@ export function CustomFieldsManager(){
               <td style={{...RPT_tdStyle,textAlign:"center"}}>
                 <div style={{display:"flex",gap:4,justifyContent:"center"}}>
                   <button onClick={()=>setModal({dbId:f.dbId,master:f.master,label:f.label,type:f.type,options:f.options||"",required:!!f.required,active:f.active!==false})} style={{padding:"3px 8px",background:"transparent",border:"1px solid #d4a437",color:"#d4a437",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Edit</button>
-                  <button onClick={()=>toggleActive(f)} title={f.active?"Deactivate":"Activate"} style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer"}}>{f.active?"Off":"On"}</button>
+                  <button onClick={()=>toggleActive(f)} disabled={vo} title={vo?VIEW_ONLY_REASON:(f.active?"Deactivate":"Activate")} style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:3,fontSize:10,cursor:"pointer",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{f.active?"Off":"On"}</button>
                 </div>
               </td>
             </tr>
@@ -88,7 +89,7 @@ export function CustomFieldsManager(){
               </div>
               <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:4}}>
                 <button onClick={()=>setModal(null)} style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-                <button onClick={saveModal} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save</button>
+                <button onClick={saveModal} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 Save</button>
               </div>
             </div>
           </div>

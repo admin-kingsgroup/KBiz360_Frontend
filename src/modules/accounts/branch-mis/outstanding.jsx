@@ -52,7 +52,7 @@ function SettleModal({ adv, side, branch, cur, onClose }) {
           </span>
           <span className="inline-flex gap-2">
             <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-            <Button variant="success" size="sm" disabled={entered <= 0 || over || settle.isPending} loading={settle.isPending} onClick={save}>
+            <Button write variant="success" size="sm" disabled={entered <= 0 || over || settle.isPending} loading={settle.isPending} onClick={save}>
               {settle.isPending ? 'Settling…' : `Settle ${money(cur, entered)}`}
             </Button>
           </span>
@@ -167,7 +167,7 @@ export function OutstandingOnAccount({ branch, side, initialTab, initialParty })
     { key: 'ageDays', header: 'Age (d)', num: true, render: ageCell },
     {
       key: '__action', header: 'Action', align: 'center', sortable: false, hideable: false, exportable: false,
-      render: (r) => <Button variant="success" size="xs" onClick={() => setSettleAdv({ adv: r, side })}>Settle bill-wise</Button>,
+      render: (r) => <Button write variant="success" size="xs" onClick={() => setSettleAdv({ adv: r, side })}>Settle bill-wise</Button>,
     },
   ];
 

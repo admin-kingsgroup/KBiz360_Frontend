@@ -10,7 +10,7 @@ import { listKeyNav } from '../../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../core/api';
 import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../../core/useReference';
-import { Switch } from '../../../shell/primitives';
+import { Switch, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { fmt } from '../../../core/format';
 import { PERM_ACTIONS, cardStyle } from '../../../core/helpers';
@@ -28,6 +28,7 @@ export function BulkUserOperations(){
   const _USERS_DATA=useUsersAdmin().data||[];   // DB-backed (/api/auth/users)
   const roles=(useRoles().data||[]).map(r=>r.name);
   const qc=useQueryClient();
+  const vo=isViewOnly();
   const toggle=id=>setSelected(s=>({...s,[id]:!s[id]}));
   const allSelected=_USERS_DATA.every(u=>selected[u.id]);
   const toggleAll=()=>{if(allSelected)setSelected({});else setSelected(Object.fromEntries(_USERS_DATA.map(u=>[u.id,true])));};
@@ -55,9 +56,9 @@ export function BulkUserOperations(){
         <select value={role} onChange={e=>setRole(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:5,fontSize:11.5,background:"#fff"}}>
           <option value="">— pick role —</option>{roles.map(r=><option key={r}>{r}</option>)}
         </select>
-        <button onClick={()=>role?apply("Change Role",{role}):toast("Pick a role first","error")} disabled={!selCount} style={actBtn("#0d1326","#d4a437")}>Change Role</button>
-        <button onClick={()=>apply("Activate",{active:true})} disabled={!selCount} style={actBtn("#22c55e","#fff")}>Activate</button>
-        <button onClick={()=>apply("Deactivate",{active:false})} disabled={!selCount} style={actBtn("#f97316","#fff")}>Deactivate</button>
+        <button onClick={()=>role?apply("Change Role",{role}):toast("Pick a role first","error")} disabled={!selCount||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...actBtn("#0d1326","#d4a437"),...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>Change Role</button>
+        <button onClick={()=>apply("Activate",{active:true})} disabled={!selCount||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...actBtn("#22c55e","#fff"),...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>Activate</button>
+        <button onClick={()=>apply("Deactivate",{active:false})} disabled={!selCount||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...actBtn("#f97316","#fff"),...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>Deactivate</button>
         <button disabled title="Per-user only — use Settings → Users & Roles (admin password reset)" style={disabledBtn}>Reset Password</button>
         <button disabled title="Branch scope is managed per-user in Settings → Users & Roles / Page Visibility" style={disabledBtn}>Change Branch</button>
       </div>

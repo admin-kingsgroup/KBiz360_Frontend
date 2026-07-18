@@ -11,7 +11,7 @@ import { buildRevisionDue } from '../hrReports';
 import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function SalaryRevision({branch}){
   const mob=useMobile();
@@ -26,6 +26,7 @@ export function SalaryRevision({branch}){
   const revQ=useMasterList('salary-revisions', brScope?{branch:brScope}:{});
   const revisions=((revQ.data)||[]).map(fromRevisionDTO);
   const {create}=useMasterMutations('salary-revisions');
+  const vo=isViewOnly();
 
   const dueFiltered=buildRevisionDue(emps,revisions,todayISO());
   const overdue=dueFiltered.filter(e=>e.status==="OVERDUE");
@@ -149,7 +150,7 @@ export function SalaryRevision({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={saveRevision} disabled={create.isPending} style={btnG}>{create.isPending?"Saving…":"Record Revision"}</button>
+              <button onClick={saveRevision} disabled={create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{create.isPending?"Saving…":"Record Revision"}</button>
             </div>
           </div>
         </div>

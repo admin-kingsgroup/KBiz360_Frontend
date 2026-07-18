@@ -14,6 +14,7 @@ import { Check, ChevronDown, ReceiptText } from 'lucide-react';
 import { bc } from '../../../core/styles';
 import { useCollectionsBoard, useUpsertFollowup, useAddContact, useReminderRun } from '../../../core/useCollections';
 import { C, money, brLabel, Shell, th, td, rnum, Table, aBtn, card } from '../../accountantWorkspace/shared';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 const AGE_COLS = [['d0', '0–30'], ['d30', '31–60'], ['d60', '61–90'], ['d90', '90+']];
 
@@ -29,7 +30,7 @@ const fmtWhen = (d) => (d ? String(d).slice(0, 10) : '');
 // Custom status picker — a native <select>'s dropdown can't be themed (square
 // corners, OS-default option rows), so this renders the same DUN_STATUS choices
 // as a small rounded popover with colour-dot options instead.
-function StatusMenu({ value, onChange }) {
+function StatusMenu({ value, onChange, disabled }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -40,8 +41,9 @@ function StatusMenu({ value, onChange }) {
   }, [open]);
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
-      <button type="button" onClick={() => setOpen((o) => !o)}
-        style={{ ...dunBadge(value), border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <button type="button" onClick={() => !disabled && setOpen((o) => !o)} disabled={disabled}
+        title={disabled ? VIEW_ONLY_REASON : undefined}
+        style={{ ...dunBadge(value), border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, ...(disabled ? { background: '#cfd6e4', color: '#6b7280' } : {}) }}>
         {value}
         <ChevronDown size={10} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
@@ -72,6 +74,7 @@ function StatusMenu({ value, onChange }) {
 
 export function CollectionsFollowup({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
+  const vo = isViewOnly();   // view-only user: write actions disabled with a reason
   const boardQ = useCollectionsBoard(branch);
   const board = boardQ.data || { rows: [], totals: {} };
   const rows = board.rows || [];
@@ -101,8 +104,8 @@ export function CollectionsFollowup({ branch, setRoute }) {
                 <div key={c.currency} style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.red }}>Overdue {money(c.symbol, c.overdue || 0)} · {c.customers || 0} customers</div>
               ))
             : <div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.red }}>Overdue {money(cur, t.overdue || 0)} · {t.customers || 0} customers</div>}
-          <button disabled={!rows.length || remind.isPending} onClick={() => remind.mutate({ branch: brCode, channel: 'whatsapp' })}
-            style={{ ...aBtn(C.amber), opacity: !rows.length || remind.isPending ? 0.6 : 1 }}>
+          <button disabled={!rows.length || remind.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={() => remind.mutate({ branch: brCode, channel: 'whatsapp' })}
+            style={{ ...aBtn(C.amber), opacity: !rows.length || remind.isPending ? 0.6 : 1, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>
             <ReceiptText size={12} /> {remind.isPending ? 'Sending…' : 'Send reminders to all'}</button>
         </>
       }>
@@ -130,15 +133,15 @@ export function CollectionsFollowup({ branch, setRoute }) {
                   {AGE_COLS.map(([k]) => <td key={k} style={{ ...td, ...rnum, color: k === 'd90' && r[k] > 0 ? C.red : C.dark }}>{r[k] ? money(cur, r[k]) : '—'}</td>)}
                   <td style={{ ...td, ...rnum, fontWeight: 800, color: C.red }}>{money(cur, r.overdue)}</td>
                   <td style={td}>
-                    <StatusMenu value={f.status || 'open'} onChange={(s) => save(r.party, { status: s })} />
+                    <StatusMenu value={f.status || 'open'} onChange={(s) => save(r.party, { status: s })} disabled={vo} />
                   </td>
                   <td style={td}>
-                    <input type="date" value={fmtWhen(f.promisedDate)} onChange={(e) => save(r.party, { promisedDate: e.target.value, status: e.target.value ? 'promised' : (f.status || 'open') })}
+                    <input type="date" value={fmtWhen(f.promisedDate)} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} onChange={(e) => !vo && save(r.party, { promisedDate: e.target.value, status: e.target.value ? 'promised' : (f.status || 'open') })}
                       style={{ padding: '3px 6px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11 }} />
                   </td>
                   <td style={{ ...td, ...rnum }}>
                     <span style={{ fontWeight: 700 }}>{f.remindersSent || 0}</span>
-                    <button title="Send one reminder" onClick={() => remind.mutate({ branch: brCode, parties: [r.party], channel: 'whatsapp' })} style={{ ...aBtn(C.amber), marginLeft: 6, padding: '3px 7px' }}>Remind</button>
+                    <button title={vo ? VIEW_ONLY_REASON : 'Send one reminder'} disabled={vo} onClick={() => remind.mutate({ branch: brCode, parties: [r.party], channel: 'whatsapp' })} style={{ ...aBtn(C.amber), marginLeft: 6, padding: '3px 7px', ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>Remind</button>
                   </td>
                   <td style={{ ...td, textAlign: 'center', whiteSpace: 'nowrap' }}>
                     {setRoute && <button title="Customer 360°" onClick={() => setRoute(`/reports/customer-360?party=${encodeURIComponent(r.party)}`)} style={{ ...aBtn(C.blue), marginRight: 4 }}>360°</button>}
@@ -159,9 +162,9 @@ export function CollectionsFollowup({ branch, setRoute }) {
                             </select>
                             <input placeholder="Note (what was said)" value={draft.note} onChange={(e) => setDraft((d) => ({ ...d, note: e.target.value }))} style={{ flex: 1, minWidth: 160, padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12 }} />
                             <input placeholder="Outcome (e.g. promised 5th)" value={draft.outcome} onChange={(e) => setDraft((d) => ({ ...d, outcome: e.target.value }))} style={{ width: 180, padding: '5px 8px', border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12 }} />
-                            <button onClick={() => logContact(r.party)} style={aBtn(C.green)}>Save</button>
+                            <button onClick={() => logContact(r.party)} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.green), ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>Save</button>
                           </div>
-                          <textarea placeholder="Account notes (auto-saves)" defaultValue={f.notes || ''} onBlur={(e) => { if (e.target.value !== (f.notes || '')) save(r.party, { notes: e.target.value }); }}
+                          <textarea placeholder="Account notes (auto-saves)" defaultValue={f.notes || ''} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} onBlur={(e) => { if (!vo && e.target.value !== (f.notes || '')) save(r.party, { notes: e.target.value }); }}
                             rows={2} style={{ width: '100%', boxSizing: 'border-box', marginTop: 8, border: `1px solid ${C.border}`, borderRadius: 6, padding: 6, fontSize: 12 }} />
                         </div>
                         <div style={{ flex: '1 1 320px' }}>

@@ -8,7 +8,7 @@ import { challanDueDate } from '../payrollMaps';
 import { toast } from '../../../core/ux/toast';
 import { B, btnG, card, inp } from '../../../core/styles';
 import { MiniBar } from '../../../core/insightsUI';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function HrPayroll({branch}){
   const mob=useMobile();
@@ -32,6 +32,7 @@ export function HrPayroll({branch}){
   const processed=reg.persisted&&reg.run?.status==="Paid";
   const processMut=useProcessPayroll();
   const runPending=processMut.isPending;
+  const vo=isViewOnly();
 
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const DUE_DATE=challanDueDate(period);
@@ -77,7 +78,7 @@ export function HrPayroll({branch}){
             {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
           </select>
           {!processed
-            ?<button onClick={processPayroll} disabled={runPending||payroll.length===0} style={{...btnG,fontSize:11,background:"#27500A"}}>{runPending?"Processing…":"⚙ Process Payroll"}</button>
+            ?<button onClick={processPayroll} disabled={runPending||payroll.length===0||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,fontSize:11,background:"#27500A",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{runPending?"Processing…":"⚙ Process Payroll"}</button>
             :<span style={{padding:"6px 12px",borderRadius:9,background:"#EAF3DE",color:"#27500A",fontSize:11,fontWeight:700}}>✔ Processed{reg.run?.runAt?` · ${reg.run.runAt}`:""}</span>}
         </div>
       </div>
@@ -301,8 +302,8 @@ export function HrPayroll({branch}){
           {journalPosted
             ?<div style={{padding:"10px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center"}}>✔ Payroll Journal JV/{period}/001 posted to accounts · All ledgers updated</div>
             :<div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
-              <button onClick={()=>setJournalPosted(true)} disabled={!processed||!balanced}
-                style={{...btnG,background:processed&&balanced?"#185FA5":"#bfc3d6",opacity:!processed||!balanced?0.6:1}}>
+              <button onClick={()=>setJournalPosted(true)} disabled={!processed||!balanced||vo} title={vo?VIEW_ONLY_REASON:undefined}
+                style={{...btnG,background:processed&&balanced?"#185FA5":"#bfc3d6",opacity:!processed||!balanced?0.6:1,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>
                 📒 Post Payroll Journal {!processed?"(Process first)":!balanced?"(Check balance)":""}
               </button>
             </div>}

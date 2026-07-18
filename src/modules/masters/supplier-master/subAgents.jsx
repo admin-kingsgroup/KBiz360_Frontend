@@ -112,7 +112,7 @@ export function MastersSubAgents() {
 
       {modal && (
         <Modal title="Add Sub-Agent" maxWidth={600} onClose={() => setModal(false)}
-          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" disabled={!form.name || create.isPending} onClick={addSubAgent}>{create.isPending ? 'Adding…' : 'Add Sub-Agent'}</Button></>}>
+          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" write disabled={!form.name || create.isPending} onClick={addSubAgent}>{create.isPending ? 'Adding…' : 'Add Sub-Agent'}</Button></>}>
           <div className="flex flex-col gap-3 p-4">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Agency name"><Input value={form.name} onChange={(e) => setF({ name: e.target.value })} /></FormField>

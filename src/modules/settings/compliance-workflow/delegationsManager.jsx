@@ -13,10 +13,12 @@ import { toast } from '../../../core/ux/toast';
 import { cardStyle } from '../../../core/helpers';
 import { FL, RPT_tdStyle, RPT_thStyle, btnG, btnGh, inp } from '../../../core/styles';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function DelegationsManager(){
   const { data: all = [] } = useMasterList('delegations');
   const { create, update } = useMasterMutations('delegations');
+  const vo=isViewOnly(); // view-only: record/end delegation are disabled with a reason
   const [modal,setModal]=useState(false);
   const TODAY=new Date().toISOString().slice(0,10);
   const blank={fromUser:"",toUser:"",scope:"",fromDate:TODAY,toDate:"",reason:""};
@@ -51,7 +53,7 @@ export function DelegationsManager(){
               <td style={{...RPT_tdStyle,fontSize:11,color:"#5a6691"}}>{d.reason}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}><span style={{padding:"3px 9px",borderRadius:3,fontSize:10,fontWeight:700,background:d.status==="Active"?"#d4edda":d.status==="Scheduled"?"#cfe2ff":d.status==="Completed"?"#e2e3e5":"#fff3cd",color:d.status==="Active"?"#155724":d.status==="Scheduled"?"#004085":d.status==="Completed"?"#383d41":"#856404"}}>{d.status}</span></td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}>
-                {(d.status==="Active"||d.status==="Scheduled")&&<button onClick={()=>update.mutate({id:d.id,body:{active:false}},{onSuccess:()=>toast("Delegation ended."),onError:(e)=>toast(e?.message||"Failed","error")})} style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#A32D2D",borderRadius:3,fontSize:10,cursor:"pointer",fontWeight:700}}>End now</button>}
+                {(d.status==="Active"||d.status==="Scheduled")&&<button disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} onClick={()=>update.mutate({id:d.id,body:{active:false}},{onSuccess:()=>toast("Delegation ended."),onError:(e)=>toast(e?.message||"Failed","error")})} style={{padding:"3px 8px",background:"transparent",border:"1px solid #cdd1d8",color:"#A32D2D",borderRadius:3,fontSize:10,cursor:vo?"not-allowed":"pointer",fontWeight:700,opacity:vo?0.5:1}}>End now</button>}
               </td>
             </tr>
           ))}
@@ -76,7 +78,7 @@ export function DelegationsManager(){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={saveNew} disabled={!form.fromUser.trim()||!form.toUser.trim()||!form.scope.trim()||create.isPending} style={{...btnG,opacity:!form.fromUser.trim()||!form.toUser.trim()||!form.scope.trim()?0.5:1}}>{create.isPending?"Saving…":"Create"}</button>
+              <button onClick={saveNew} disabled={!form.fromUser.trim()||!form.toUser.trim()||!form.scope.trim()||create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,opacity:(!form.fromUser.trim()||!form.toUser.trim()||!form.scope.trim()||vo)?0.5:1}}>{create.isPending?"Saving…":"Create"}</button>
             </div>
           </div>
         </div>

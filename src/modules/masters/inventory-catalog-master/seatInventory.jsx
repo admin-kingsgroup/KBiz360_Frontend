@@ -5,6 +5,7 @@ import { todayISO } from '../../../core/dates';
 import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styleTokens';
 import { HExportBtn } from '../shared/hExportBtn';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 const SEAT_BLOCK_BLANK=()=>({flight:"",airline:"",route:"",date:todayISO(),dep:"",aircraft:"",status:"Open",classConfig:[{cls:"Economy",total:"",held:"",sold:""}]});
 
@@ -19,6 +20,7 @@ export function SeatInventory({branch}){
   const [modal,setModal]=useState(false);
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState(SEAT_BLOCK_BLANK());
+  const vo=isViewOnly();
   const setF=(p)=>setForm(f=>({...f,...p}));
   const setCls=(i,key,val)=>setForm(f=>({...f,classConfig:f.classConfig.map((c,idx)=>idx===i?{...c,[key]:val}:c)}));
   const addCls=()=>setForm(f=>({...f,classConfig:[...f.classConfig,{cls:"Business",total:"",held:"",sold:""}]}));
@@ -74,7 +76,7 @@ export function SeatInventory({branch}){
             </div>
             <div style={{display:"flex",gap:6}}>
               <button onClick={()=>openEdit(s)} style={{...btnG,fontSize:10,padding:"4px 12px"}}>✎ Edit / Reserve</button>
-              <button onClick={()=>releaseHeld(s)} disabled={update.isPending} style={{...btnGh,fontSize:10,padding:"4px 10px"}}>Release Held</button>
+              <button onClick={()=>releaseHeld(s)} disabled={update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,fontSize:10,padding:"4px 10px",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>Release Held</button>
             </div>
           </div>
           {/* Class config */}
@@ -144,7 +146,7 @@ export function SeatInventory({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={saveBlock} disabled={create.isPending||update.isPending} style={btnG}>💾 {create.isPending||update.isPending?"Saving…":editId?"Save Block":"Reserve Seats"}</button>
+              <button onClick={saveBlock} disabled={create.isPending||update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 {create.isPending||update.isPending?"Saving…":editId?"Save Block":"Reserve Seats"}</button>
             </div>
           </div>
         </div>

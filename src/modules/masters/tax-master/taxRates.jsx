@@ -14,7 +14,7 @@ import { confirmDialog } from '../../../core/ux/confirm';
 import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
-import { Modal, Button, Input, Select, FormField, StatusPill } from '../../../shell/primitives';
+import { Modal, Button, Input, Select, FormField, StatusPill, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 const MODULE_OPTS = ['Flight', 'Holiday', 'Hotel', 'Car', 'Visa', 'Insurance', 'Misc'];
 const ITC_OPTS = ['Yes', 'No', 'Varies'];
@@ -65,6 +65,7 @@ export function MastersTaxRates() {
   const [formErr, setFormErr] = useState('');
   const [editVat, setEditVat] = useState(null);
   const [vatErr, setVatErr] = useState('');
+  const vo = isViewOnly();
 
   const openNewHsn = () => { setFormErr(''); setEditing({ __new: true, ...blankHsn }); };
   const openEditHsn = (r) => { setFormErr(''); setEditing({ ...blankHsn, ...r }); };
@@ -127,9 +128,9 @@ export function MastersTaxRates() {
       <span className="inline-flex gap-1">
         <button onClick={() => openEditHsn(r)} title="Edit" className="p-1 text-[#2563eb] hover:text-[#134d85]"><Pencil size={14} /></button>
         {r.active === false
-          ? <button onClick={() => toggleRow(gstMut, r, `HSN/SAC "${r.code}"`)} title="Reactivate" className="p-1 text-[#16a34a] hover:opacity-80"><RotateCcw size={14} /></button>
-          : <button onClick={() => toggleRow(gstMut, r, `HSN/SAC "${r.code}"`)} title="Deactivate — keeps the record and its history; use instead of Delete" className="p-1 text-[#b45309] hover:opacity-80"><Ban size={14} /></button>}
-        <button onClick={() => delHsn(r)} title="Delete" className="p-1 text-maroon hover:opacity-80"><Trash2 size={14} /></button>
+          ? <button onClick={() => toggleRow(gstMut, r, `HSN/SAC "${r.code}"`)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Reactivate'} style={vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : undefined} className="p-1 text-[#16a34a] hover:opacity-80"><RotateCcw size={14} /></button>
+          : <button onClick={() => toggleRow(gstMut, r, `HSN/SAC "${r.code}"`)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Deactivate — keeps the record and its history; use instead of Delete'} style={vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : undefined} className="p-1 text-[#b45309] hover:opacity-80"><Ban size={14} /></button>}
+        <button onClick={() => delHsn(r)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Delete'} style={vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : undefined} className="p-1 text-maroon hover:opacity-80"><Trash2 size={14} /></button>
       </span>
     ) : <span title="Built-in default — seed the HSN/SAC master to edit (npm run seed:hsn)" className="text-ink-subtle">🔒</span>) },
   ];
@@ -149,9 +150,9 @@ export function MastersTaxRates() {
       <span className="inline-flex gap-1">
         <button onClick={() => openEditVat(r)} title="Edit" className="p-1 text-[#2563eb] hover:text-[#134d85]"><Pencil size={14} /></button>
         {r.active === false
-          ? <button onClick={() => toggleRow(vatMut, r, `the ${r.branch} VAT rate`)} title="Reactivate" className="p-1 text-[#16a34a] hover:opacity-80"><RotateCcw size={14} /></button>
-          : <button onClick={() => toggleRow(vatMut, r, `the ${r.branch} VAT rate`)} title="Deactivate — keeps the record and its history; use instead of Delete" className="p-1 text-[#b45309] hover:opacity-80"><Ban size={14} /></button>}
-        <button onClick={() => delVat(r)} title="Delete" className="p-1 text-maroon hover:opacity-80"><Trash2 size={14} /></button>
+          ? <button onClick={() => toggleRow(vatMut, r, `the ${r.branch} VAT rate`)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Reactivate'} style={vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : undefined} className="p-1 text-[#16a34a] hover:opacity-80"><RotateCcw size={14} /></button>
+          : <button onClick={() => toggleRow(vatMut, r, `the ${r.branch} VAT rate`)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Deactivate — keeps the record and its history; use instead of Delete'} style={vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : undefined} className="p-1 text-[#b45309] hover:opacity-80"><Ban size={14} /></button>}
+        <button onClick={() => delVat(r)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Delete'} style={vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : undefined} className="p-1 text-maroon hover:opacity-80"><Trash2 size={14} /></button>
       </span>
     ) : <span title="Built-in default — seed the VAT master to edit (npm run seed:vat-rates or add a branch)" className="text-ink-subtle">🔒</span>) },
   ];
@@ -187,7 +188,7 @@ export function MastersTaxRates() {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setEditing(null)}>Cancel</Button>
-              <Button variant="primary" size="sm" loading={savingHsn} disabled={savingHsn} onClick={saveHsn}>{savingHsn ? 'Saving…' : 'Save'}</Button>
+              <Button variant="primary" size="sm" write loading={savingHsn} disabled={savingHsn} onClick={saveHsn}>{savingHsn ? 'Saving…' : 'Save'}</Button>
             </>
           }
         >
@@ -218,7 +219,7 @@ export function MastersTaxRates() {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setEditVat(null)}>Cancel</Button>
-              <Button variant="primary" size="sm" loading={savingVat} disabled={savingVat} onClick={saveVat}>{savingVat ? 'Saving…' : 'Save'}</Button>
+              <Button variant="primary" size="sm" write loading={savingVat} disabled={savingVat} onClick={saveVat}>{savingVat ? 'Saving…' : 'Save'}</Button>
             </>
           }
         >

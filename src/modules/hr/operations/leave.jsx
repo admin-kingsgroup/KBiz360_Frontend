@@ -9,9 +9,10 @@ import { fromEmpDTO } from '../employeeMap';
 import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, takenFor } from '../hrMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function HrLeave({branch}){
+  const vo=isViewOnly();
   const mob=useMobile();
   const brScope=branch==="ALL"?"":(branch?.code||"");
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
@@ -106,8 +107,8 @@ export function HrLeave({branch}){
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[l.status],color:STATUS_CLR[l.status]}}>{l.status}</span></td>
                 <td style={{padding:"8px 12px"}}>
                   {l.status==="Pending"&&<div style={{display:"flex",gap:4}}>
-                    <button onClick={()=>approve(l)} disabled={update.isPending} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A"}}>✓ Approve</button>
-                    <button onClick={()=>reject(l)}  disabled={update.isPending} style={{...btnGh,padding:"2px 7px",fontSize:9,color:"#A32D2D"}}>✗ Reject</button>
+                    <button onClick={()=>approve(l)} disabled={update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>✓ Approve</button>
+                    <button onClick={()=>reject(l)}  disabled={update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,padding:"2px 7px",fontSize:9,color:"#A32D2D",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>✗ Reject</button>
                   </div>}
                 </td>
               </tr>
@@ -173,7 +174,7 @@ export function HrLeave({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setBalForm(null)} style={btnGh}>Cancel</button>
-              <button onClick={saveBal} disabled={createBal.isPending||updateBal.isPending} style={btnG}>{createBal.isPending||updateBal.isPending?"Saving…":"Save"}</button>
+              <button onClick={saveBal} disabled={createBal.isPending||updateBal.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{createBal.isPending||updateBal.isPending?"Saving…":"Save"}</button>
             </div>
           </div>
         </div>
@@ -202,7 +203,7 @@ export function HrLeave({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={submit} disabled={create.isPending} style={btnG}>{create.isPending?"Submitting…":"📨 Submit Request"}</button>
+              <button onClick={submit} disabled={create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{create.isPending?"Submitting…":"📨 Submit Request"}</button>
             </div>
           </div>
         </div>

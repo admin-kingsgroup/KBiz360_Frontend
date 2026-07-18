@@ -12,8 +12,10 @@ import { toast } from '../../../core/ux/toast';
 import { useCrud } from '../../../core/useRegisters';
 import { bc, btnG, inp } from '../../../core/styles';
 import { fmt } from '../../../core/format';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function LoanEmiRegister({branch}){
+  const vo=isViewOnly();
   const cur=bc(branch).cur;
   const brCode=branch==="ALL"?undefined:branch&&branch.code;
   const { rows, create, remove } = useCrud('loans', brCode?{branch:brCode}:{});
@@ -42,7 +44,7 @@ export function LoanEmiRegister({branch}){
           <input style={ip} type="number" placeholder="Tenure m" value={f.tenure} onChange={set('tenure')}/>
           <input style={ip} type="number" placeholder="EMI" value={f.emi} onChange={set('emi')}/>
           <input style={ip} type="number" placeholder="Balance" value={f.balance} onChange={set('balance')}/>
-          <button onClick={add} disabled={create.isPending} style={{...btnG,minHeight:32,fontSize:11}}>+ Add</button>
+          <button onClick={add} disabled={create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,minHeight:32,fontSize:11,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>+ Add</button>
         </div>
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
@@ -60,7 +62,7 @@ export function LoanEmiRegister({branch}){
                 <td style={{padding:"7px 8px",textAlign:"right"}}>{l.emi>0?cur+fmt(l.emi):"-"}</td>
                 <td style={{padding:"7px 8px",textAlign:"right",fontWeight:700,color:"#A32D2D"}}>{cur+fmt(l.balance)}</td>
                 <td style={{padding:"7px 8px",textAlign:"center",fontSize:10}}>{l.nextDue||"-"}</td>
-                <td style={{padding:"7px 8px",textAlign:"center"}}><button onClick={()=>remove.mutate(l.id)} style={{background:"none",border:"none",color:"#A32D2D",cursor:"pointer",fontWeight:700}}>x</button></td>
+                <td style={{padding:"7px 8px",textAlign:"center"}}><button onClick={()=>remove.mutate(l.id)} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{background:"none",border:"none",color:"#A32D2D",cursor:"pointer",fontWeight:700,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>x</button></td>
               </tr>))}
               {rows.length===0&&<tr><td colSpan={8} style={{padding:20,textAlign:"center",color:"#5a6691"}}>No loans yet - add one above.</td></tr>}
             </tbody>

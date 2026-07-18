@@ -27,6 +27,7 @@ import { ReportDateBar, ReportSearch, matchNeedle, resolveReportRange } from '..
 import { B, FL, RPT_tdStyle, RPT_thStyle, bc, btnG, btnGh, card, inp, inpStd, tabBtnStyle } from '../../core/styles';
 import { PHASE2_Page } from '../../shell/PHASE2_Page';
 import { TopBar } from '../../shell/TopBar';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../shell/primitives';
 import { clickable } from '../../core/ux/clickable';
 
 export function MastersForex(){
@@ -39,6 +40,7 @@ export function MastersForex(){
   // initial INR→INR pair (the user only needs to type the rate).
   const [form,setForm]=useState({from:"INR",to:(ACTIVE_CURRENCIES.find((c)=>c!=="INR")||"USD"),rate:0,source:"Manual"});
   const CURRENCIES=ACTIVE_CURRENCIES;
+  const vo=isViewOnly();
 
   const save=async()=>{
     if(create.isPending) return;            // ignore double-clicks while the POST is in flight
@@ -116,7 +118,7 @@ export function MastersForex(){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={save} disabled={create.isPending} style={{...btnG, opacity: create.isPending ? 0.6 : 1, cursor: create.isPending ? 'not-allowed' : 'pointer'}}>{create.isPending ? 'Saving…' : '💾 Save Rate'}</button>
+              <button onClick={save} disabled={create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG, opacity: create.isPending ? 0.6 : 1, cursor: create.isPending ? 'not-allowed' : 'pointer',...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{create.isPending ? 'Saving…' : '💾 Save Rate'}</button>
             </div>
           </div>
         </div>

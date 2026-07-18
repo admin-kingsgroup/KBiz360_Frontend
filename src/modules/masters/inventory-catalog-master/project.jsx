@@ -98,7 +98,7 @@ export function ProjectMaster() {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button>
-              <Button variant="accent" size="sm" disabled={create.isPending} onClick={save}>💾 Create Project</Button>
+              <Button variant="accent" size="sm" write disabled={create.isPending} onClick={save}>💾 Create Project</Button>
             </>
           }>
           <div className="grid gap-3 p-4">

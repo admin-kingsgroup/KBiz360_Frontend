@@ -10,7 +10,7 @@ import { listKeyNav } from '../../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../core/api';
 import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../../core/useReference';
-import { Switch, Skeleton } from '../../../shell/primitives';
+import { Switch, Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { fmt } from '../../../core/format';
 import { PERM_ACTIONS, cardStyle } from '../../../core/helpers';
@@ -78,7 +78,7 @@ function AppAccessTab({ rows, search, setSearch, onToggle, loaded }){
                 {APP_ACCESS_COLS.map(a=>(
                   <td key={a.key} style={{padding:"8px 12px",textAlign:"center"}}>
                     <span style={{display:"inline-flex"}}>
-                      <Switch checked={!!u.access?.[a.key]} onChange={(v)=>onToggle(u,a.key,v)} label=""/>
+                      <Switch checked={!!u.access?.[a.key]} onChange={(v)=>onToggle(u,a.key,v)} disabled={isViewOnly()} label=""/>
                     </span>
                   </td>
                 ))}
@@ -120,6 +120,10 @@ export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
   const updateUserMut=useMutation({mutationFn:({id,body})=>apiPut(`/api/auth/users/${id}`,body),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','users']})});
   const deleteUserMut=useMutation({mutationFn:(id)=>apiDelete(`/api/auth/users/${id}`),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','users']})});
   const setAccessMut=useMutation({mutationFn:({id,body})=>apiPatch(`/api/user-access/${id}`,body),onSuccess:()=>qc.invalidateQueries({queryKey:['ref','user-access']})});
+  // View-only accounts may review Users & Roles but not mutate: WRITE controls below
+  // (activate/deactivate, save permissions, create user, app-access toggle) are pre-disabled
+  // with a reason rather than left live to 403 on the server.
+  const vo=isViewOnly();
 
   const ALL_BRANCHES=BRANCH_CODES;
   const ROLE_NAMES=Object.keys(ROLE_TEMPLATES);
@@ -198,6 +202,7 @@ export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
      component (AppAccessTab, defined above this function) so its search box keeps
      focus while typing; this closure only owns the toggle mutation + self-lock guard. */
   const toggleAccess=(u,key,val)=>{
+    if(isViewOnly())return; // view-only: toggle is disabled in the UI; guard the mutation too
     // Guard against locking YOURSELF out of the app you're using right now.
     if(!val && key==="erp" && u.email && u.email.toLowerCase()===myEmail){
       toast("You can't disable your own ERP access while signed in here.","error");
@@ -272,9 +277,9 @@ export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
               <td style={{padding:"8px 12px"}}>
                 <div style={{display:"flex",gap:4}}>
                   <button onClick={()=>startEdit(u)} style={{...btnG,padding:"3px 9px",fontSize:9.5,background:"#185FA5"}}>Permissions</button>
-                  <button disabled={updateUserMut.isPending}
+                  <button disabled={updateUserMut.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined}
                     onClick={()=>updateUserMut.mutate({id:u.id,body:{active:!u.active}},{onError:(e)=>toast(e?.message||'Failed to update user','error')})}
-                    style={{...btnGh,padding:"3px 9px",fontSize:9.5,color:u.active?"#A32D2D":"#27500A",opacity:updateUserMut.isPending?0.5:1}}>
+                    style={{...btnGh,padding:"3px 9px",fontSize:9.5,color:u.active?"#A32D2D":"#27500A",opacity:(updateUserMut.isPending||vo)?0.5:1}}>
                     {u.active?"Deactivate":"Activate"}
                   </button>
                 </div>
@@ -460,7 +465,7 @@ export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
                   their ROLE (granular perms/special come from the role template) plus the
                   branch scope. perms/special are UI-derived from the role and not stored.
                   savePermissions() persists role + branches with toast + error handling. */}
-              <button onClick={savePermissions} disabled={updateUserMut.isPending} style={{...btnG,background:"#27500A",opacity:updateUserMut.isPending?0.6:1,cursor:updateUserMut.isPending?"wait":"pointer"}}>{updateUserMut.isPending?"Saving…":"💾 Save Permissions"}</button>
+              <button onClick={savePermissions} disabled={updateUserMut.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,background:"#27500A",opacity:(updateUserMut.isPending||vo)?0.6:1,cursor:vo?"not-allowed":updateUserMut.isPending?"wait":"pointer"}}>{updateUserMut.isPending?"Saving…":"💾 Save Permissions"}</button>
             </div>
           </div>
         </div>
@@ -606,7 +611,7 @@ export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setNewUserModal(false)} style={btnGh}>Cancel</button>
-              <button disabled={createUserMut.isPending} onClick={()=>{
+              <button onClick={()=>{
                 if(!newUserForm.name.trim()||!newUserForm.email.trim()){ toast("Name and email are required","error"); return; }
                 if((newUserForm.password||"").length<8){ toast("Password must be at least 8 characters","error"); return; }
                 if(newUserForm.password!==newUserForm.confirm){ toast("Passwords do not match","error"); return; }
@@ -615,7 +620,7 @@ export function SettingsUsers({ embedded=false, tab:tabProp, onTabChange }={}){
                   onSuccess:()=>{ setNewUserModal(false); setNewUserForm({name:"",email:"",phone:"",role:"Accounts Executive",branches:["BOM"],password:"",confirm:""}); toast(`User ${newUserForm.name} created`); },
                   onError:(e)=>toast(e?.message||"Could not create user","error"),
                 });
-              }} style={{...btnG,opacity:createUserMut.isPending?0.6:1,cursor:createUserMut.isPending?"not-allowed":"pointer"}}>{createUserMut.isPending?"Adding…":"Add User"}</button>
+              }} disabled={createUserMut.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,opacity:(createUserMut.isPending||vo)?0.6:1,cursor:(createUserMut.isPending||vo)?"not-allowed":"pointer"}}>{createUserMut.isPending?"Adding…":"Add User"}</button>
             </div>
           </div>
         </div>

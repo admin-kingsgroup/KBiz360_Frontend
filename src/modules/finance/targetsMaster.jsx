@@ -60,7 +60,7 @@ export function TargetsMaster({ branch }) {
           </Select>
         </FormField>
       </div>
-      <Card title={`${metricLabel} target · ${brCode} · FY ${fy}`} right={<Button variant="accent" size="sm" loading={save.isPending} onClick={onSave}>Save</Button>}>
+      <Card title={`${metricLabel} target · ${brCode} · FY ${fy}`} right={<Button variant="accent" size="sm" write loading={save.isPending} onClick={onSave}>Save</Button>}>
         <div className="mb-1.5 grid grid-cols-1 gap-3 p-3.5 tablet:grid-cols-2 desktop:grid-cols-3 wide:grid-cols-4">
           {rows.map(([mod, label]) => (
             <div key={mod || 'all'}

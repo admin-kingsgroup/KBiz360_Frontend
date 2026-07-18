@@ -18,7 +18,7 @@ import { ACM_DATA, ACM_REASON_CODES, LedgerSelect, REFUNDS_DATA, STATUS_FLOW, TR
 import { triggerSaveRefresh, useMobile } from '../../core/hooks';
 import { useVNo } from '../../core/useNextNo';
 import { ARow, DBtn, FL, SalespersonField, VHead, VNarr, VParty, VTot, VWrap, bc, btnG, btnGh, card, inp, inpStd } from '../../core/styles';
-import { SkeletonTable } from '../../shell/primitives';
+import { SkeletonTable, isViewOnly, VIEW_ONLY_REASON } from '../../shell/primitives';
 import { Dashboard } from '../dashboard';
 import { MastersSubAgents } from '../masters';
 import { ApiKeySettings } from '../settings';
@@ -596,6 +596,7 @@ export function SalesFlight({branch,setRoute}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const isIntl=tripType==="International";
+  const vo=isViewOnly();
   return (
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto",paddingBottom:72}}>
       <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:12,overflow:"hidden"}}>
@@ -814,18 +815,19 @@ export function SalesFlight({branch,setRoute}){
         padding:"12px 10px",display:"flex",gap:9,justifyContent:"flex-end"}}>
         <button style={btnGh}>Cancel</button>
         <button
-          disabled={!linkedPurch}
+          disabled={!linkedPurch || vo}
           style={{...btnG,
             background:linkedPurch?"#1a1c22":"#9ca3af",
             cursor:linkedPurch?"pointer":"not-allowed",
             opacity:linkedPurch?1:0.6,
+            ...(vo?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{}),
           }}
           onClick={()=>{
-            if(!linkedPurch)return;
+            if(!linkedPurch||vo)return;
             settlePurchaseEntry(linkedPurch);
             triggerSaveRefresh();
           }}
-          title={linkedPurch?"Save voucher":"Select a purchase entry first"}
+          title={vo?VIEW_ONLY_REASON:(linkedPurch?"Save voucher":"Select a purchase entry first")}
         >
           {linkedPurch?"Accept & save ✔":"Link Purchase to Enable Save"}
         </button>
@@ -3306,6 +3308,7 @@ export function VoucherCommentsDemo(){
   const [thread,setThread]=useState([]);
   const [busy,setBusy]=useState(false);
   const [err,setErr]=useState("");
+  const vo=isViewOnly();
   const AVATAR_CLRS=["#2563eb","#d97706","#16a34a","#dc2626","#7c3aed"];
   const colorOf=(u)=>AVATAR_CLRS[(String(u).charCodeAt(0)||0)%AVATAR_CLRS.length];
   const STATUS_STYLE={approved:{bg:"#e8f6ed",fg:"#16a34a",label:"✓ Approved"},pending:{bg:"#fbeedb",fg:"#d97706",label:"⏳ Pending"},rejected:{bg:"#fbe9e9",fg:"#dc2626",label:"✕ Rejected"}};
@@ -3388,9 +3391,9 @@ export function VoucherCommentsDemo(){
           <div style={{padding:"10px 14px",borderTop:"1px solid #cdd1d8"}}>
             <div style={{display:"flex",gap:8}}>
               <textarea value={comment} onChange={e=>setComment(e.target.value)}
-                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}
+                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!vo){e.preventDefault();send();}}}
                 placeholder="Add a comment… (Shift+Enter for new line, Enter to send)" rows={2} style={{flex:1,padding:"8px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,resize:"none",fontFamily:"inherit"}}/>
-              <button onClick={send} disabled={busy||!comment.trim()} className="max-tablet:min-h-[44px]" style={{padding:"8px 14px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"flex-end",opacity:busy||!comment.trim()?0.5:1}}>Send</button>
+              <button onClick={send} disabled={busy||!comment.trim()||vo} title={vo?VIEW_ONLY_REASON:undefined} className="max-tablet:min-h-[44px]" style={{padding:"8px 14px",background:"#1a1c22",color:"#c2a04a",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer",alignSelf:"flex-end",opacity:busy||!comment.trim()?0.5:1,...(vo?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{})}}>Send</button>
             </div>
             <p style={{margin:"5px 0 0",fontSize:10,color:"#5b616e"}}>Comments persist on the voucher and are append-only (audit-tracked).</p>
           </div>

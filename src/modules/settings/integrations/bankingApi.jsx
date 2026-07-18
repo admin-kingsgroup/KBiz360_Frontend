@@ -13,6 +13,7 @@ import { useConfigValue, useSaveConfigValue } from '../../../core/useAccounting'
 import { toast } from '../../../core/ux/toast';
 import { useMobile } from '../../../core/hooks';
 import { FL, inp, btnG, btnGh } from '../../../core/styles';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 const BANKING_CONFIG_KEY='integration.banking';
 const BANKING_AWAITING='Awaiting bank API / aggregator provider contract — Test Connection and live sync stay disabled until then.';
@@ -30,6 +31,7 @@ export function BankingApiSettings({branch,setRoute}){
   },[q.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const set=(k)=>(e)=>{setDirty(true);setForm(f=>({...f,[k]:e.target.value}));};
   const configured=!!(saved.apiBase||saved.clientId||saved.bankName);
+  const vo=isViewOnly(); // view-only accounts can review credentials but not save them
 
   const onSave=()=>{
     const value={
@@ -79,7 +81,7 @@ export function BankingApiSettings({branch,setRoute}){
         </div>
         <p style={{margin:"8px 0 0",fontSize:10,color:"#5a6691"}}>Secrets are masked after save — leave a secret blank to keep the stored one, type to replace it.</p>
         <div style={{display:"flex",gap:8,alignItems:"center",marginTop:14,flexWrap:"wrap"}}>
-          <button onClick={onSave} disabled={saveCfg.isPending} style={{...btnG,fontSize:11.5,opacity:saveCfg.isPending?0.6:1}}><Save size={13}/> {saveCfg.isPending?"Saving…":"Save credentials"}</button>
+          <button onClick={onSave} disabled={saveCfg.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,fontSize:11.5,opacity:(saveCfg.isPending||vo)?0.6:1}}><Save size={13}/> {saveCfg.isPending?"Saving…":"Save credentials"}</button>
           <button disabled title={BANKING_AWAITING} aria-disabled="true" style={{...btnGh,fontSize:11.5,opacity:0.5,cursor:"not-allowed"}}>Test connection</button>
           <span title={BANKING_AWAITING} style={{fontSize:10,padding:"3px 10px",borderRadius:999,fontWeight:700,background:"#f3f4f8",color:"#5a6691"}}>Live sync: awaiting provider contract</span>
         </div>

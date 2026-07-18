@@ -10,9 +10,10 @@ import { fromEmpDTO, toEmpPayload, BLANK_EMP } from '../employeeMap';
 import { fromShiftDTO } from '../hrMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function HrEmployees({branch}){
+  const vo=isViewOnly();
   const mob=useMobile();
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const [selected,setSelected]=useState(null);
@@ -283,16 +284,16 @@ export function HrEmployees({branch}){
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",
               display:"flex",justifyContent:"space-between",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
               <div style={{display:"flex",gap:8}}>{selected&&(<>
-                <button onClick={toggleEmpStatus} disabled={update.isPending}
-                  style={{...btnGh,color:form.status==="Inactive"?"#27500A":"#854F0B",borderColor:form.status==="Inactive"?"#27500A":"#854F0B"}}
-                  title="Keeps the record and its payroll/attendance history — use instead of Delete">
+                <button onClick={toggleEmpStatus} disabled={update.isPending||vo}
+                  style={{...btnGh,color:form.status==="Inactive"?"#27500A":"#854F0B",borderColor:form.status==="Inactive"?"#27500A":"#854F0B",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}
+                  title={vo?VIEW_ONLY_REASON:"Keeps the record and its payroll/attendance history — use instead of Delete"}>
                   {update.isPending?"Saving…":form.status==="Inactive"?"Reactivate":"Deactivate"}</button>
-                <button onClick={deleteEmp} disabled={remove.isPending}
-                  style={{...btnGh,color:"#A32D2D",borderColor:"#A32D2D"}}>{remove.isPending?"Deleting…":"Delete"}</button>
+                <button onClick={deleteEmp} disabled={remove.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined}
+                  style={{...btnGh,color:"#A32D2D",borderColor:"#A32D2D",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{remove.isPending?"Deleting…":"Delete"}</button>
               </>)}</div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={closeModal} style={btnGh}>Cancel</button>
-                <button onClick={saveEmp} disabled={saving} style={btnG}>{saving?"Saving…":"Save Employee"}</button>
+                <button onClick={saveEmp} disabled={saving||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{saving?"Saving…":"Save Employee"}</button>
               </div>
             </div>
           </div>

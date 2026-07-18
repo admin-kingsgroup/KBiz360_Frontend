@@ -35,6 +35,7 @@ import { apiPost } from '../../core/api';
 import { toast } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
 import { invalidateBooks } from '../../core/useAccounting';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../shell/primitives';
 import {
   rowsForEdit, inbRowsFromDeal, ALLOWED_LEG_MODULES, legToPayload, legsFromEdit, legFilled, SoPoGpVoucherEntry,
 } from '../accounts/daily-entry/soPoGpVoucherEntry';
@@ -110,6 +111,7 @@ export function PendingBookings({ branch, setRoute }) {
   };
   const onReview = makeBookingReview(qc, setBusyId, setMsg);
   const onReviewSelected = makeBookingReviewSelected(qc, setBusyId, setMsg, sel, setSel);
+  const vo = isViewOnly();
 
   return (
     <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
@@ -128,9 +130,9 @@ export function PendingBookings({ branch, setRoute }) {
         {rows.length > 0 && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
-            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('check')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>Check selected ({sel.size})</button>}
-            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('verify')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: GOLD, borderColor: '#e3cd97' }}>Verify selected ({sel.size})</button>}
-            {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: DR }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {busyId === 'bulk' ? 'Approving…' : `Approve selected (${sel.size})`}</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk' || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={() => onReviewSelected('check')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: vo ? '#6b7280' : BLUE, borderColor: '#bcd4ee', ...(vo ? { background: '#cfd6e4', cursor: 'not-allowed' } : {}) }}>Check selected ({sel.size})</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk' || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={() => onReviewSelected('verify')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: vo ? '#6b7280' : GOLD, borderColor: '#e3cd97', ...(vo ? { background: '#cfd6e4', cursor: 'not-allowed' } : {}) }}>Verify selected ({sel.size})</button>}
+            {sel.size > 0 && <button disabled={busyId === 'bulk' || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={onApproveSelected} style={{ ...btnG, padding: '5px 13px', fontSize: 11.5, background: vo ? '#cfd6e4' : DR, ...(vo ? { color: '#6b7280', cursor: 'not-allowed' } : {}) }}>{busyId === 'bulk' ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {busyId === 'bulk' ? 'Approving…' : `Approve selected (${sel.size})`}</button>}
           </span>
         )}
       </div>

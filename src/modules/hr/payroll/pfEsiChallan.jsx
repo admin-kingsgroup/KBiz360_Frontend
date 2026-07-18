@@ -7,7 +7,7 @@ import { usePayrollRegister, useChallans, useMarkChallanPaid } from '../usePayro
 import { challanDueDate } from '../payrollMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, card, inp } from '../../../core/styles';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function PfEsiChallan({branch}){
   const mob=useMobile();
@@ -52,6 +52,7 @@ export function PfEsiChallan({branch}){
      below is just the entry form, hydrated from the saved record. */
   const challansQ=useChallans(brCode,month);
   const markPaid=useMarkChallanPaid();
+  const vo=isViewOnly();
   const savedPF=challansQ.byType.PF||null;
   const savedESI=challansQ.byType.ESI||null;
   const [challanPF,setChallanPF]=useState({bsr:"",date:"",trn:""});
@@ -149,7 +150,7 @@ export function PfEsiChallan({branch}){
               <FL label="BSR Code"><input value={challanPF.bsr} onChange={e=>setChallanPF(c=>({...c,bsr:e.target.value}))} style={{...inp,fontFamily:"monospace",width:120}} placeholder="0600115"/></FL>
               <FL label="Challan Date"><input type="date" value={challanPF.date} onChange={e=>setChallanPF(c=>({...c,date:e.target.value}))} style={{...inp,width:150}}/></FL>
               <FL label="TRN / Ref No."><input value={challanPF.trn} onChange={e=>setChallanPF(c=>({...c,trn:e.target.value}))} style={{...inp,fontFamily:"monospace",width:160}} placeholder="CRN123456"/></FL>
-              <button onClick={()=>recordChallan("PF",challanPF,totalPFChallan)} disabled={markPaid.isPending} style={{...btnG,background:"#27500A",fontSize:11,marginBottom:4}}>{markPaid.isPending?"Saving…":`✔ Mark PF Paid — ${f(totalPFChallan)}`}</button>
+              <button onClick={()=>recordChallan("PF",challanPF,totalPFChallan)} disabled={markPaid.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,background:"#27500A",fontSize:11,marginBottom:4,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{markPaid.isPending?"Saving…":`✔ Mark PF Paid — ${f(totalPFChallan)}`}</button>
             </div>
             {savedPF?.status==="Paid"&&<p style={{margin:"8px 0 0",fontSize:11,color:"#27500A",fontWeight:700}}>✅ PF Challan marked as paid · BSR {savedPF.bsr||"—"} · {savedPF.paidDate||"—"} · {f(savedPF.amount||0)}</p>}
           </div>
@@ -193,7 +194,7 @@ export function PfEsiChallan({branch}){
               <FL label="BSR Code"><input value={challanESI.bsr} onChange={e=>setChallanESI(c=>({...c,bsr:e.target.value}))} style={{...inp,fontFamily:"monospace",width:120}} placeholder="0600115"/></FL>
               <FL label="Challan Date"><input type="date" value={challanESI.date} onChange={e=>setChallanESI(c=>({...c,date:e.target.value}))} style={{...inp,width:150}}/></FL>
               <FL label="TRN / Ref No."><input value={challanESI.trn} onChange={e=>setChallanESI(c=>({...c,trn:e.target.value}))} style={{...inp,fontFamily:"monospace",width:160}} placeholder="CRN123456"/></FL>
-              <button onClick={()=>recordChallan("ESI",challanESI,totEmpESI+totEmplESI)} disabled={markPaid.isPending} style={{...btnG,background:"#27500A",fontSize:11,marginBottom:4}}>{markPaid.isPending?"Saving…":`✔ Mark ESI Paid — ${f(totEmpESI+totEmplESI)}`}</button>
+              <button onClick={()=>recordChallan("ESI",challanESI,totEmpESI+totEmplESI)} disabled={markPaid.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,background:"#27500A",fontSize:11,marginBottom:4,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{markPaid.isPending?"Saving…":`✔ Mark ESI Paid — ${f(totEmpESI+totEmplESI)}`}</button>
             </div>
             {savedESI?.status==="Paid"&&<p style={{margin:"8px 0 0",fontSize:11,color:"#27500A",fontWeight:700}}>✅ ESI Challan marked as paid · BSR {savedESI.bsr||"—"} · {savedESI.paidDate||"—"} · {f(savedESI.amount||0)}</p>}
           </div>

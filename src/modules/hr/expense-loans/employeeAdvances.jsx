@@ -10,7 +10,7 @@ import { fromLoanDTO, toLoanPayload } from '../hrMaps';
 import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
 import { FL, bc, btnG, btnGh, card, inp } from '../../../core/styles';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function EmployeeAdvances({branch,setRoute}){
   const mob=useMobile();
@@ -26,6 +26,7 @@ export function EmployeeAdvances({branch,setRoute}){
   const loansQ=useMasterList('employee-loans', brScope?{branch:brScope}:{});
   const all=((loansQ.data)||[]).map(fromLoanDTO);
   const {create}=useMasterMutations('employee-loans');
+  const vo=isViewOnly();
   const disburse=()=>{
     if(!form.name||!(+form.principal)){toast("Employee name and principal are required","error");return;}
     create.mutate(toLoanPayload(form),{onSuccess:()=>{toast("Loan disbursed");setModal(false);setForm(blankLoan);},onError:e=>toast(e?.message||"Could not disburse","error")});
@@ -134,7 +135,7 @@ export function EmployeeAdvances({branch,setRoute}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={disburse} disabled={create.isPending} style={btnG}>{create.isPending?"Saving…":"Disburse"}</button>
+              <button onClick={disburse} disabled={create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{create.isPending?"Saving…":"Disburse"}</button>
             </div>
           </div>
         </div>

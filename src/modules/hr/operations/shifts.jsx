@@ -8,9 +8,10 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { fromShiftDTO, toShiftPayload } from '../hrMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function HrShifts({branch}){
+  const vo=isViewOnly();
   const brScope=branch==="ALL"?"":(branch?.code||"");
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
   const blank={name:"",code:"",branch:brScope||"BOM",startTime:"09:30",endTime:"18:30",breakMins:60,graceMins:10,weeklyOff:[0],nightShift:false,active:true,id:null};
@@ -77,9 +78,9 @@ export function HrShifts({branch}){
               <td style={{padding:"8px 12px",color:"#5a6691",fontSize:10}}>{s.weeklyOff.length?s.weeklyOff.map(d=>DOW[d]).join(", "):"—"}</td>
               <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:s.active?"#EAF3DE":"#f3f4f8",color:s.active?"#27500A":"#5a6691"}}>{s.active?"Active":"Inactive"}</span></td>
               <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>
-                <button onClick={ev=>{ev.stopPropagation();toggleShift(s);}} title="Keeps past attendance — use instead of Delete"
-                  style={{...btnGh,padding:"2px 8px",fontSize:9,color:s.active?"#854F0B":"#27500A",marginRight:6}}>{s.active?"Deactivate":"Reactivate"}</button>
-                <button onClick={ev=>{ev.stopPropagation();del(s);}} style={{...btnGh,padding:"2px 8px",fontSize:9,color:"#A32D2D"}}>Delete</button>
+                <button onClick={ev=>{ev.stopPropagation();toggleShift(s);}} disabled={vo} title={vo?VIEW_ONLY_REASON:"Keeps past attendance — use instead of Delete"}
+                  style={{...btnGh,padding:"2px 8px",fontSize:9,color:s.active?"#854F0B":"#27500A",marginRight:6,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{s.active?"Deactivate":"Reactivate"}</button>
+                <button onClick={ev=>{ev.stopPropagation();del(s);}} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,padding:"2px 8px",fontSize:9,color:"#A32D2D",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>Delete</button>
               </td>
             </tr>
           ))}</tbody>
@@ -116,7 +117,7 @@ export function HrShifts({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={save} disabled={create.isPending||update.isPending} style={btnG}>{create.isPending||update.isPending?"Saving…":"Save shift"}</button>
+              <button onClick={save} disabled={create.isPending||update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{create.isPending||update.isPending?"Saving…":"Save shift"}</button>
             </div>
           </div>
         </div>

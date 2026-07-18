@@ -7,9 +7,10 @@ import { fromJobDTO, toJobPayload, JOB_NEXT_STATUS } from '../hrMaps';
 import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styleTokens';
-import { Skeleton } from '../../../shell/primitives';
+import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function Recruitment({branch}){
+  const vo=isViewOnly();
   const mob=useMobile();
   const brScope=branch==="ALL"?"":(branch?.code||"");
   const jobsQ=useMasterList('job-openings', brScope?{branch:brScope}:{});
@@ -69,7 +70,7 @@ export function Recruitment({branch}){
             <p style={{margin:"0 0 10px",fontSize:10.5,color:"#5a6691"}}><b>Skills:</b> {j.skills}</p>
             <div style={{display:"flex",gap:6}}>
               <button style={{...btnG,fontSize:10,padding:"4px 12px",flex:1}}>View Applicants</button>
-              <button onClick={()=>advance(j)} disabled={update.isPending} style={{...btnGh,fontSize:10,padding:"4px 10px"}}>{j.status==="Open"?"→ Interview":j.status==="Interviewing"?"→ Hire":j.status==="Hired"?"Close":"Close"}</button>
+              <button onClick={()=>advance(j)} disabled={update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,fontSize:10,padding:"4px 10px",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{j.status==="Open"?"→ Interview":j.status==="Interviewing"?"→ Hire":j.status==="Hired"?"Close":"Close"}</button>
             </div>
           </div>
         ))}
@@ -95,7 +96,7 @@ export function Recruitment({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={postJob} disabled={create.isPending} style={btnG}>{create.isPending?"Posting…":"Post Job"}</button>
+              <button onClick={postJob} disabled={create.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{create.isPending?"Posting…":"Post Job"}</button>
             </div>
           </div>
         </div>

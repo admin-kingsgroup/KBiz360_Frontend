@@ -86,7 +86,7 @@ export function TourCodeMaster({ setRoute }) {
               <div className="mt-2.5 flex gap-1.5">
                 <Button size="xs" variant="primary" icon={ClipboardList} className="flex-1" onClick={() => setRoute && setRoute('/sales/holiday')}>Use in Sale</Button>
                 <Button size="xs" variant="secondary" icon={Pencil}>Edit</Button>
-                <Button size="xs" variant="secondary" className={c.active ? 'text-maroon' : 'text-[#16a34a]'} onClick={() => toggleArchive(c)}>{c.active ? 'Archive' : 'Restore'}</Button>
+                <Button size="xs" variant="secondary" write className={c.active ? 'text-maroon' : 'text-[#16a34a]'} onClick={() => toggleArchive(c)}>{c.active ? 'Archive' : 'Restore'}</Button>
               </div>
             </div>
           </div>
@@ -95,7 +95,7 @@ export function TourCodeMaster({ setRoute }) {
 
       {modal && (
         <Modal title="New Tour Code" onClose={() => setModal(false)}
-          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" disabled={!form.id || !form.name || create.isPending} onClick={createPackage}>{create.isPending ? 'Creating…' : 'Create Package'}</Button></>}>
+          footer={<><Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button><Button variant="primary" size="sm" write disabled={!form.id || !form.name || create.isPending} onClick={createPackage}>{create.isPending ? 'Creating…' : 'Create Package'}</Button></>}>
           <div className="flex flex-col gap-3 p-4">
             <div className="grid grid-cols-2 gap-3">
               <FormField label="Tour code (unique ID)"><Input value={form.id} onChange={(e) => setF({ id: e.target.value.toUpperCase() })} className="font-mono" placeholder="DXB-4N-2P" /></FormField>

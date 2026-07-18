@@ -338,7 +338,7 @@ export function PageAccessControl({ currentUser, setRoute, embedded = false }) {
                   <Button size="sm" variant="secondary" icon={Eye} onClick={showAll}>Show all</Button>
                   <Button size="sm" variant="secondary" icon={EyeOff} onClick={hideAll} className="text-maroon">Hide all</Button>
                   <Button size="sm" variant="secondary" icon={RotateCcw} onClick={resetDraft} disabled={!isDirty}>Reset</Button>
-                  <Button size="sm" variant="primary" icon={Save} onClick={save} loading={saveMut.isPending} disabled={!isDirty || saveMut.isPending}>
+                  <Button size="sm" variant="primary" icon={Save} onClick={save} loading={saveMut.isPending} disabled={!isDirty || saveMut.isPending} write>
                     {saveMut.isPending ? 'Saving…' : 'Save changes'}
                   </Button>
                   <Button size="sm" variant="secondary" icon={KeyRound} onClick={() => (resetOpen ? closeReset() : setResetOpen(true))}>
@@ -368,7 +368,7 @@ export function PageAccessControl({ currentUser, setRoute, embedded = false }) {
                         <Input type={showPwd ? 'text' : 'password'} value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} placeholder="Re-enter new password" autoComplete="new-password" />
                       </label>
                       <Button size="sm" variant="secondary" onClick={closeReset} disabled={resetMut.isPending}>Cancel</Button>
-                      <Button size="sm" variant="primary" icon={KeyRound} onClick={doReset} loading={resetMut.isPending} disabled={resetMut.isPending}>
+                      <Button size="sm" variant="primary" icon={KeyRound} onClick={doReset} loading={resetMut.isPending} disabled={resetMut.isPending} write>
                         {resetMut.isPending ? 'Resetting…' : 'Set password'}
                       </Button>
                     </div>

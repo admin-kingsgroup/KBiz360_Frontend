@@ -11,11 +11,13 @@ import { toast } from '../../../core/ux/toast';
 import { cardStyle } from '../../../core/helpers';
 import { RPT_tdStyle, RPT_thStyle } from '../../../core/styles';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function StatutoryFilingRegister(){
   const [filter,setFilter]=useState("ALL");
   const { data: events = [] } = useMasterList('tax-calendar', { active: true });
   const { update } = useMasterMutations('tax-calendar');
+  const vo=isViewOnly(); // view-only: "Mark Filed" is disabled with a reason
   const TODAY=new Date().toISOString().slice(0,10);
   const statusOf=(f)=>f.filedDate?"Filed":f.date<TODAY?"Overdue":f.date===TODAY?"Due Today":"Pending";
   const rows=events.map(e=>({...e,status:statusOf(e)})).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
@@ -67,7 +69,7 @@ export function StatutoryFilingRegister(){
               <td style={{...RPT_tdStyle,fontSize:11}}>{f.filedBy||<span style={{color:"#5a6691"}}>—</span>}</td>
               <td style={{...RPT_tdStyle,fontFamily:"monospace",fontSize:10.5,color:f.ack?"#22c55e":"#5a6691",fontWeight:600}}>{f.ack||(f.filedDate?"filed "+f.filedDate:"—")}</td>
               <td style={{...RPT_tdStyle,textAlign:"center"}}>
-                {!f.filedDate&&<button onClick={()=>markFiled(f)} disabled={update.isPending} style={{padding:"3px 10px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:"pointer"}}>Mark Filed</button>}
+                {!f.filedDate&&<button onClick={()=>markFiled(f)} disabled={update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"3px 10px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:3,fontSize:10,fontWeight:700,cursor:vo?"not-allowed":"pointer",opacity:vo?0.5:1}}>Mark Filed</button>}
               </td>
             </tr>
           ))}

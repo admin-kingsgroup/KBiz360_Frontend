@@ -16,6 +16,7 @@ import { toast } from '../../core/ux/toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiPut } from '../../core/api';
 import { FL, bc, btnG, btnGh, card, inp } from '../../core/styles';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../shell/primitives';
 
 export function ExpenseBudget({branch,setRoute}){
   const mob=useMobile();
@@ -27,6 +28,7 @@ export function ExpenseBudget({branch,setRoute}){
   // Expense-ledger catalogue entry (/api/expense-ledgers) — the catalogue has no
   // master screen of its own, and budgets can't be set until it has rows.
   const ledgerMut=useMasterMutations('expense-ledgers');
+  const vo=isViewOnly();
   const [ledgerModal,setLedgerModal]=useState(false); useModalEsc(()=>setLedgerModal(false),ledgerModal);
   const [ledgerForm,setLedgerForm]=useState({code:"",name:"",group:""});
   const saveLedger=()=>{
@@ -93,7 +95,7 @@ export function ExpenseBudget({branch,setRoute}){
           <button onClick={()=>setLedgerModal(true)} style={{...btnGh,fontSize:11}}>＋ Add Ledger</button>
           {!editing
             ?<button onClick={startEdit} style={{...btnG,background:"#185FA5",fontSize:11}}>✏ Set / Edit Budget</button>
-            :<><button onClick={cancelEdit} style={btnGh}>Cancel</button><button onClick={saveEdit} style={btnG}>💾 Save Budget</button></>
+            :<><button onClick={cancelEdit} style={btnGh}>Cancel</button><button onClick={saveEdit} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 Save Budget</button></>
           }
           <button onClick={()=>setRoute("/reports/exp-bgt")} style={{...btnGh,fontSize:11,display:"flex",alignItems:"center",gap:5}}><BarChart2 size={13}/> BGT vs ACT</button>
         </div>
@@ -221,7 +223,7 @@ export function ExpenseBudget({branch,setRoute}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setLedgerModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={saveLedger} style={btnG}>💾 Save Ledger</button>
+              <button onClick={saveLedger} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 Save Ledger</button>
             </div>
           </div>
         </div>

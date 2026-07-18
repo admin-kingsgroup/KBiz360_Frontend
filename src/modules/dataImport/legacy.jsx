@@ -16,6 +16,7 @@ import { apiPost, apiGet } from '../../core/api';
 import { VSPECS } from '../../core/voucherSpecs';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { clickable } from '../../core/ux/clickable';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../shell/primitives';
 
 const DARK = '#0d1326', BLUE = '#0070f2', DIM = '#5a6691', RED = '#A32D2D', GREEN = '#27500A';
 
@@ -379,6 +380,7 @@ function EntityCard({ spec, onUpload, onPreview, onViewExisting, state, subgroup
   const inputId = `imp-${spec.entity}`;
   const previewId = `prev-${spec.entity}`;
   const [showRef, setShowRef] = useState(false);
+  const vo = isViewOnly();
   return (
     <div style={{ ...card, background: 'linear-gradient(180deg, #ffffff 0%, #f5f8ff 100%)', border: '1px solid #dde4f5', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -403,11 +405,11 @@ function EntityCard({ spec, onUpload, onPreview, onViewExisting, state, subgroup
         </label>
         <input id={previewId} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onPreview(spec, f); e.target.value = ''; }} />
-        <label htmlFor={inputId} style={{ ...btn(BLUE, '#fff'), ...((state?.busy || state?.previewing) ? { pointerEvents: 'none', opacity: 0.6 } : {}) }}>
+        <label htmlFor={inputId} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...btn(BLUE, '#fff'), ...((state?.busy || state?.previewing) ? { pointerEvents: 'none', opacity: 0.6 } : {}), ...(vo ? { pointerEvents: 'none', background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>
           <Upload size={13} /> {state?.busy ? 'Uploading…' : 'Upload CSV'}
         </label>
-        <input id={inputId} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(spec, f); e.target.value = ''; }} />
+        <input id={inputId} type="file" accept=".csv,text/csv" style={{ display: 'none' }} disabled={isViewOnly()}
+          onChange={(e) => { if (isViewOnly()) { e.target.value = ''; return; } const f = e.target.files?.[0]; if (f) onUpload(spec, f); e.target.value = ''; }} />
       </div>
       {spec.entity === 'ledgers' && (
         <div style={{ borderTop: '1px dashed #e7eaf2', paddingTop: 8 }}>
@@ -460,6 +462,7 @@ function EntityCard({ spec, onUpload, onPreview, onViewExisting, state, subgroup
 function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
   useModalEsc(onNo);
   const n = newLedgers.length;
+  const vo = isViewOnly();
   return (
     <div onClick={onNo} style={{ position: 'fixed', inset: 0, background: 'rgba(13,19,38,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ ...card, width: 'min(580px, 96vw)', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
@@ -494,7 +497,7 @@ function LedgerConfirmModal({ spec, newLedgers, busy, onYes, onNo }) {
         </div>
         <div style={{ padding: '12px 18px', borderTop: '1px solid #dfe2e7', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onNo} disabled={busy} style={{ ...btn('#fff', DIM, true), opacity: busy ? 0.5 : 1 }}>Cancel</button>
-          <button onClick={onYes} disabled={busy} style={{ ...btn(BLUE, '#fff'), opacity: busy ? 0.6 : 1 }}>
+          <button onClick={onYes} disabled={busy || vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...btn(BLUE, '#fff'), opacity: busy ? 0.6 : 1, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>
             <CheckCircle2 size={13} /> {busy ? 'Creating…' : `Yes, create & import`}
           </button>
         </div>

@@ -77,6 +77,8 @@ import { RefundReissueFields } from '../../../core/voucher/fields/RefundReissueF
 import { useRefundLiveAmount } from '../../../core/voucher/useRefundLiveAmount';
 import { invalidateBooks, useVoucherApprovals, useApproveMany, useApproveVoucher, useRejectVoucher } from '../../../core/useAccounting';
 import { VoucherEditor } from '../../accountingLive';
+// Leaf, test-safe view-only read (NOT core/api — no import.meta) to gate the raw Save buttons.
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', CR = '#C0392B', BLUE = '#2563eb';
 // Gold theme tokens + per-section bar accents (SO / PO / GP voucher theme).
@@ -791,6 +793,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope && (!crossCcy || fxRateNum > 0))  // INB: counterparty + sale value + Int'l/Domestic for Flights/Holiday + FX rate on a cross-currency deal
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
       && (isNoSupp || (totals.po.total > 0 && hasSuppLedger))));
+  // View-only user: the Save (commit) button is pre-disabled with a reason — never a live
+  // no-op that only 403s server-side. Collapses to the original when vo is false.
+  const vo = isViewOnly();
 
   // Saving ALWAYS lands the booking in Pending — there is no save-and-approve from
   // entry (for ANY user, Super Admin included). Approval happens only from the
@@ -1663,8 +1668,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
-        <button disabled={!canSave} onClick={() => save()} className="max-tablet:min-h-[44px]"
-          style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
+        <button disabled={!canSave || vo} onClick={() => save()} className="max-tablet:min-h-[44px]"
+          title={vo ? VIEW_ONLY_REASON : undefined}
+          style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>
           {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes (Pending)' : 'Save voucher (Pending)')}
         </button>
       </div>
@@ -1711,6 +1717,8 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   const originate = useCanOriginate(brCode, 'reversal');
   const blockedNew = originate.blocked && !editing;
   const ready = !blockedNew && !!brCode && !!state.againstInvoice && !!state.party && !!state.counterParty && (+state.supplierAmt > 0) && !saving;
+  // View-only user: pre-disable the Save (commit) button with a reason. Collapses to the original when false.
+  const vo = isViewOnly();
 
   // Saving always lands the RF/RI booking in Pending — no save-and-approve from entry
   // (any user). It posts only when approved from the Pending queue.
@@ -1821,7 +1829,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
           {editing && (
             <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
           )}
-          <button disabled={!ready} onClick={() => save()} className="max-tablet:min-h-[44px]" style={{ ...btnG, opacity: ready ? 1 : 0.5 }}><Save size={14} /> Save (Pending)</button>
+          <button disabled={!ready || vo} onClick={() => save()} className="max-tablet:min-h-[44px]" title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...btnG, opacity: ready ? 1 : 0.5, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}><Save size={14} /> Save (Pending)</button>
         </div>
         {!ready && <p style={{ margin: '8px 0 0', padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#854F0B' }}>Need: original invoice, customer, supplier/airline &amp; a supplier amount &gt; 0.</p>}
       </div>

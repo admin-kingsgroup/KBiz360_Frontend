@@ -23,6 +23,7 @@ import {
 import { parseTallyStatement } from '../../../core/tallyStatementParse';
 import { C, card, money, brLabel, Shell, th, td, rnum, Table, aBtn, Tile, SecTitle, Row } from '../../accountantWorkspace/shared';
 import { recoBadge } from '../../reconciliation/statement-matching/shared';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 // Shared "Match / Action" cell for every Statement Matching tab (client/supplier/tally).
 // Builds a match from ONE OR MORE book legs (N:1 split): pick legs from the dropdown,
@@ -30,8 +31,9 @@ import { recoBadge } from '../../reconciliation/statement-matching/shared';
 // A non-tying selection warns before saving a partial, so a split never silently looks done.
 function ReconMatchCell({ line, book, cur, bookSign = 1, onManual, onGroup, onUnmatch, onDispute, onDelete }) {
   const [legs, setLegs] = useState([]);
+  const vo = isViewOnly();
   if (line.status === 'reconciled' || line.status === 'partial') {
-    return <td style={{ ...td, whiteSpace: 'nowrap' }}><button onClick={onUnmatch} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button></td>;
+    return <td style={{ ...td, whiteSpace: 'nowrap' }}><button onClick={onUnmatch} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>Unmatch</button></td>;
   }
   const chosen = new Set(legs.map((l) => l.bookKey));
   const available = book.filter((b) => !chosen.has(b.bookKey));
@@ -68,9 +70,9 @@ function ReconMatchCell({ line, book, cur, bookSign = 1, onManual, onGroup, onUn
         <option value="">{legs.length ? 'Add another leg…' : 'Match to book…'}</option>
         {available.map((b) => <option key={b.bookKey} value={b.bookKey}>{b.vno} · {b.date} · {money(cur, amt(b))}</option>)}
       </select>
-      {legs.length > 0 && <button onClick={commit} style={{ ...aBtn(C.green), marginLeft: 5 }}>Match{legs.length > 1 ? ` ${legs.length}` : ''}</button>}
-      <button onClick={onDispute} style={{ ...aBtn(C.red), marginLeft: 5 }}>Dispute</button>
-      <button onClick={onDelete} title="Delete this line" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
+      {legs.length > 0 && <button onClick={commit} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.green), marginLeft: 5, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>Match{legs.length > 1 ? ` ${legs.length}` : ''}</button>}
+      <button onClick={onDispute} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.red), marginLeft: 5, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>Dispute</button>
+      <button onClick={onDelete} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Delete this line'} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>✕</button>
     </td>
   );
 }
@@ -98,6 +100,7 @@ export function TallyReco({ branch }) {
   const setStatus = useSetTallyRecoStatus();
   const del = useDeleteTallyLine();
   const clear = useClearTally();
+  const vo = isViewOnly();
 
   const [paste, setPaste] = useState('');
   const parsed = useMemo(() => parseTallyStatement(paste), [paste]);
@@ -114,7 +117,7 @@ export function TallyReco({ branch }) {
             {!ledgers.length && <option value="">No ledgers</option>}
             {ledgers.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
-          <button disabled={!sel || auto.isPending} onClick={() => auto.mutate({ ledger: sel, branch: branch?.code || branch })} style={{ ...aBtn(C.blue), opacity: !sel || auto.isPending ? 0.6 : 1 }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>
+          <button disabled={!sel || auto.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={() => auto.mutate({ ledger: sel, branch: branch?.code || branch })} style={{ ...aBtn(C.blue), opacity: !sel || auto.isPending ? 0.6 : 1, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>
         </>
       }>
       {!sel ? (
@@ -133,8 +136,8 @@ export function TallyReco({ branch }) {
             <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} placeholder={'2026-05-01, RCP-1, 1000, 0, deposit\n2026-05-04, PMT-1, 0, 300, cheque 5001'}
               style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 6, padding: 8, fontSize: 12, fontFamily: 'monospace' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <button disabled={!parsed.length || imp.isPending} onClick={doImport} style={{ ...aBtn(C.green), opacity: !parsed.length || imp.isPending ? 0.6 : 1 }}><Plus size={12} /> {imp.isPending ? 'Importing…' : `Import ${parsed.length} row${parsed.length === 1 ? '' : 's'}`}</button>
-              {rows.length > 0 && <button onClick={() => clear.mutate({ ledger: sel, branch })} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}` }}>Clear all imported</button>}
+              <button disabled={!parsed.length || imp.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={doImport} style={{ ...aBtn(C.green), opacity: !parsed.length || imp.isPending ? 0.6 : 1, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}><Plus size={12} /> {imp.isPending ? 'Importing…' : `Import ${parsed.length} row${parsed.length === 1 ? '' : 's'}`}</button>
+              {rows.length > 0 && <button onClick={() => clear.mutate({ ledger: sel, branch })} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}`, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>Clear all imported</button>}
               <span style={{ fontSize: 11, color: C.dim }}>Duplicates and blank rows are skipped automatically.</span>
             </div>
           </div>

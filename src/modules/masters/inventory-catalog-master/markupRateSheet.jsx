@@ -3,6 +3,7 @@ import { Plus, AlertTriangle } from 'lucide-react';
 import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styleTokens';
 import { HExportBtn } from '../shared/hExportBtn';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 const MARKUP_RULE_BLANK={client:"ALL B2C",type:"B2C",module:"Flight",markupType:"Percentage",value:12,floor:8,note:""};
 
@@ -14,6 +15,7 @@ export function MarkupRateSheet({branch}){
   const [modal,setModal]=useState(false);
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState(MARKUP_RULE_BLANK);
+  const vo=isViewOnly();
   const openNew=()=>{setForm(MARKUP_RULE_BLANK);setEditId(null);setModal(true);};
   const openEdit=(r)=>{setForm({client:r.client||"ALL",type:r.type||"ALL",module:r.module||"ALL",markupType:r.markupType||"Percentage",value:r.value??0,floor:r.floor??0,note:r.note||""});setEditId(r.id);setModal(true);};
   const saveRule=()=>{
@@ -65,7 +67,7 @@ export function MarkupRateSheet({branch}){
               <td style={{padding:"8px 12px",fontSize:10,color:"#5a6691"}}>{r.note}</td>
               <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>
                 <button onClick={()=>openEdit(r)} title="Edit rule" style={{background:"transparent",border:"none",cursor:"pointer",color:"#185FA5",fontSize:13,marginRight:6}}>✎</button>
-                <button onClick={()=>remove.mutate(r.id)} title="Delete rule" style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D",fontSize:13}}>✕</button>
+                <button onClick={()=>remove.mutate(r.id)} disabled={vo} title={vo?VIEW_ONLY_REASON:"Delete rule"} style={{background:"transparent",border:"none",cursor:"pointer",color:"#A32D2D",fontSize:13,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>✕</button>
               </td>
             </tr>
           ))}</tbody>
@@ -95,7 +97,7 @@ export function MarkupRateSheet({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={saveRule} disabled={create.isPending||update.isPending} style={btnG}>💾 {create.isPending||update.isPending?"Saving…":"Save Rule"}</button>
+              <button onClick={saveRule} disabled={create.isPending||update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 {create.isPending||update.isPending?"Saving…":"Save Rule"}</button>
             </div>
           </div>
         </div>

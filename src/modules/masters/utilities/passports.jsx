@@ -14,6 +14,7 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { useMobile } from '../../../core/hooks';
 import { card, inp, btnG, btnGh, FL } from '../../../core/styles';
 import { ExportBtn } from '../shared/exportBtn';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function PassportManager({branch}){
   const mob=useMobile();
@@ -25,6 +26,7 @@ export function PassportManager({branch}){
   // saved here never reached the DB and the Tower's passports milestone never cleared).
   const { data: passports = [] } = useMasterList('passports');
   const { create } = useMasterMutations('passports');
+  const vo=isViewOnly();
   const TODAY=todayISO();
 
   const filtered=passports.filter(p=>(
@@ -138,7 +140,7 @@ export function PassportManager({branch}){
                   onSuccess:()=>{setModal(false);setForm({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});},
                   onError:(e)=>confirmDialog({title:"Save failed",message:`Could not save the passport — ${e?.message||'unknown error'}.`,confirmLabel:"OK",cancelLabel:"Close"}),
                 });
-              }} style={btnG}>💾 Save Passport</button>
+              }} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 Save Passport</button>
             </div>
           </div>
         </div>

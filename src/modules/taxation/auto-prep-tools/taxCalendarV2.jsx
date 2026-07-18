@@ -27,8 +27,10 @@ import { TDS_SECTIONS } from '../../../core/taxSections';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { SampleBanner } from '../../../core/ux/SampleBanner';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function TaxCalendarV2(){
+  const vo=isViewOnly();
   const [filter,setFilter]=useState("ALL");
   const TAX_CALENDAR_EVENTS=useTaxCalendar().data||[];   // DB-backed (/api/tax-calendar)
   // Add Due Date persists via /api/tax-calendar (admin-write CRUD) — the calendar
@@ -103,7 +105,7 @@ export function TaxCalendarV2(){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={saveEvent} style={btnG}>💾 Save Due Date</button>
+              <button onClick={saveEvent} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={vo?{...btnG,opacity:0.5,cursor:"not-allowed"}:btnG}>💾 Save Due Date</button>
             </div>
           </div>
         </div>

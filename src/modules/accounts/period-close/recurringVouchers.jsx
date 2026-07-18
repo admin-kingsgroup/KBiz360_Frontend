@@ -18,10 +18,12 @@ import { LedgerSelect } from '../../../core/helpers';
 import { triggerSaveRefresh, useMobile } from '../../../core/hooks';
 import { FL, btnG, btnGh, card, inp, bc } from '../../../core/styles';
 import { localeOf } from '../../../core/format';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function RecurringVouchers({branch}){
   const mob=useMobile();
   const qc=useQueryClient();
+  const vo=isViewOnly();   // view-only user: write actions disabled with a reason
   const { data: masterRows = [] } = useMasterList('recurring-vouchers');
   const { create, update } = useMasterMutations('recurring-vouchers');
   const CAT_LABEL={journal:"Journal",payment:"Payment",receipt:"Receipt"};
@@ -68,13 +70,13 @@ export function RecurringVouchers({branch}){
             <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5b616e"}}>{templates.length} templates · {due.length} due for posting · Auto-posting saves time each month</p>
           </div>
         </div>
-        <button onClick={()=>setModal(true)} style={{...btnG,fontSize:11}}><Plus size={13}/> New Template</button>
+        <button onClick={()=>setModal(true)} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,fontSize:11,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}><Plus size={13}/> New Template</button>
       </div>
 
       {due.length>0&&<div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#fbeedb",border:"1px solid #f3d9a8",fontSize:10.5,color:"#d97706",fontWeight:600,display:"flex",gap:8,flexWrap:"wrap"}}>
         <Clock size={14}/> {due.length} recurring voucher{due.length>1?"s":""} due for posting:
         {due.map(t=><span key={t.id} style={{padding:"1px 7px",borderRadius:999,background:"#d97706",color:"#fff",fontSize:9.5}}>{t.name}</span>)}
-        <button onClick={runAll} disabled={posting} style={{...btnG,padding:"2px 10px",fontSize:9.5,background:"#d97706",marginLeft:"auto",opacity:posting?0.5:1}}>{posting?"Posting…":"Post All Now"}</button>
+        <button onClick={runAll} disabled={posting||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,padding:"2px 10px",fontSize:9.5,background:"#d97706",marginLeft:"auto",opacity:posting?0.5:1,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{posting?"Posting…":"Post All Now"}</button>
       </div>}
 
       <div style={{...card,padding:0,overflow:"hidden"}}>
@@ -96,8 +98,8 @@ export function RecurringVouchers({branch}){
               <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:t.active?"#e8f6ed":"#f4f5f7",color:t.active?"#16a34a":"#5b616e"}}>{t.active?"Active":"Paused"}</span></td>
               <td style={{padding:"8px 12px"}}>
                 <div style={{display:"flex",gap:4}}>
-                  {t.active&&t.nextRun<=TODAY&&<button onClick={()=>run(t.id)} disabled={posting} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#16a34a",opacity:posting?0.5:1}}>Post</button>}
-                  <button onClick={()=>update.mutate({id:t.id,body:{active:!t.active}})} style={{...btnGh,padding:"2px 8px",fontSize:9.5}}>{t.active?"Pause":"Resume"}</button>
+                  {t.active&&t.nextRun<=TODAY&&<button onClick={()=>run(t.id)} disabled={posting||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#16a34a",opacity:posting?0.5:1,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>Post</button>}
+                  <button onClick={()=>update.mutate({id:t.id,body:{active:!t.active}})} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,padding:"2px 8px",fontSize:9.5,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{t.active?"Pause":"Resume"}</button>
                 </div>
               </td>
             </tr>
@@ -133,12 +135,13 @@ export function RecurringVouchers({branch}){
               {/* A template is branch-owned — no silent "BOM" fallback: on the group/ALL
                   view, Focus a branch first so its rent/salary JV posts into ITS books. */}
               {(branch==="ALL"||!branch?.code)&&<p style={{margin:0,fontSize:10.5,color:"#b3261e",alignSelf:"center"}}>Focus a branch to create a template</p>}
-              <button disabled={!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)||create.isPending||branch==="ALL"||!branch?.code}
+              <button disabled={!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)||create.isPending||branch==="ALL"||!branch?.code||vo}
+                title={vo?VIEW_ONLY_REASON:undefined}
                 onClick={()=>create.mutate(
                   {name:form.name.trim(),category:form.type.toLowerCase(),freq:form.freq,day:form.day,dr:ledgerNameOf(form.dr),cr:ledgerNameOf(form.cr),amt:form.amt,
                    branch:branch.code,active:true},
                   {onSuccess:()=>{setModal(false);setForm({name:"",type:"Journal",freq:"Monthly",day:1,dr:"",cr:"",amt:0});toast("Recurring template saved.");}})}
-                style={{...btnG,opacity:!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)||branch==="ALL"||!branch?.code?0.5:1}}>{create.isPending?"Saving…":"Create Template"}</button>
+                style={{...btnG,opacity:!form.name.trim()||!form.dr||!form.cr||!(form.amt>0)||branch==="ALL"||!branch?.code?0.5:1,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{create.isPending?"Saving…":"Create Template"}</button>
             </div>
           </div>
         </div>

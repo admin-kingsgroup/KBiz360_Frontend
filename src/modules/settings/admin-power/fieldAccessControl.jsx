@@ -10,7 +10,7 @@ import { listKeyNav } from '../../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../core/api';
 import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../../core/useReference';
-import { Switch } from '../../../shell/primitives';
+import { Switch, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { fmt } from '../../../core/format';
 import { PERM_ACTIONS, cardStyle } from '../../../core/helpers';
@@ -28,6 +28,7 @@ export function FieldAccessControl(){
   // Live field-access rules (GET /api/field-access). Was hardcoded FIELD_ACCESS_DATA.
   const accessRows=useFieldAccess().data||[];
   const qc=useQueryClient();
+  const vo=isViewOnly();
   // Unsaved edits keyed by rule id → { roleName: access } (merged over row.roles on save).
   const [draft,setDraft]=useState({});
   const dirtyCount=Object.keys(draft).length;
@@ -75,7 +76,7 @@ export function FieldAccessControl(){
         </div>
         <div style={{marginTop:12,display:"flex",justifyContent:"flex-end",alignItems:"center",gap:10}}>
           {dirtyCount>0&&<span style={{fontSize:11.5,color:"#9a6700",fontWeight:600}}>{dirtyCount} unsaved rule{dirtyCount!==1?"s":""}</span>}
-          <button onClick={save} disabled={!dirtyCount} style={{padding:"8px 18px",background:dirtyCount?"#d4a437":"#eef0f6",color:dirtyCount?"#0d1326":"#9aa3bd",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:dirtyCount?"pointer":"not-allowed"}}>💾 Save Access Rules</button>
+          <button onClick={save} disabled={!dirtyCount||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"8px 18px",background:dirtyCount?"#d4a437":"#eef0f6",color:dirtyCount?"#0d1326":"#9aa3bd",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:dirtyCount?"pointer":"not-allowed",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 Save Access Rules</button>
         </div>
       </div>
     </PHASE2_Page>

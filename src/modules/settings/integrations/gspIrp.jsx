@@ -93,7 +93,7 @@ export function GspIrpSettings() {
           ))}
         </ResponsiveGrid>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button variant="accent" onClick={onSave} disabled={saveCfg.isPending}>{saveCfg.isPending ? 'Saving…' : 'Save credentials'}</Button>
+          <Button variant="accent" onClick={onSave} disabled={saveCfg.isPending} write>{saveCfg.isPending ? 'Saving…' : 'Save credentials'}</Button>
           <span title={AWAITING}><Button variant="secondary" disabled>Test connection</Button></span>
           <span title={AWAITING} className="inline-flex items-center gap-2">
             <Switch checked={false} onChange={() => {}} disabled label="Enable e-invoicing" />

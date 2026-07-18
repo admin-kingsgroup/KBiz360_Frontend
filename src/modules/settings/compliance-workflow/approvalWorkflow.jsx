@@ -79,7 +79,7 @@ export function ApprovalWorkflow({ setRoute }) {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button>
-              <Button variant="accent" size="sm" disabled={create.isPending} onClick={saveRule}>💾 Save Rule</Button>
+              <Button variant="accent" size="sm" disabled={create.isPending} onClick={saveRule} write>💾 Save Rule</Button>
             </>
           }>
           <div className="grid gap-3 p-4">

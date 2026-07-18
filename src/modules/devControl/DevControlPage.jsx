@@ -85,7 +85,7 @@ function AssignBar({ itemId, current, onSave, saving }) {
       <FormField label="Note" className="min-w-[220px] flex-1">
         <Input value={note} placeholder="progress / blocker note" onChange={(e) => setNote(e.target.value)} />
       </FormField>
-      <Button size="sm" loading={saving} onClick={() => onSave({ itemId, owner: owner.trim(), status, dueDate, note: note.trim() })}>Save</Button>
+      <Button size="sm" write loading={saving} onClick={() => onSave({ itemId, owner: owner.trim(), status, dueDate, note: note.trim() })}>Save</Button>
       {current && current.updatedBy && <span className="pb-2 text-[11px] text-ink-subtle">last set by {current.updatedBy}</span>}
     </div>
   );

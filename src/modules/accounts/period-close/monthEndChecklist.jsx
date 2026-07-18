@@ -9,9 +9,11 @@ import { bc } from '../../../core/styles';
 import { clickable } from '../../../core/ux/clickable';
 import { branchCode, useBookingOrders, useConfigValue, useSaveConfigValue, useVoucherApprovals, useTrialBalance } from '../../../core/useAccounting';
 import { C, Shell, aBtn, brLabel, card, money, thisYM } from '../../accountantWorkspace/shared';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function MonthEndChecklist({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
+  const vo = isViewOnly();   // view-only user: manual ticks disabled with a reason
   const bookings = useBookingOrders(branch, { status: 'pending' }).data || []; // only pending is used here (stuck/suspense/counts)
   // /api/vouchers/approvals returns { counts, entries } — use the entries[] array.
   const pendVouchers = useVoucherApprovals(branch, 'pending').data?.entries || [];
@@ -60,8 +62,9 @@ export function MonthEndChecklist({ branch, setRoute }) {
           const ok = it.manualOnly ? !!manual[it.key] : it.auto;
           return (
             <div key={it.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderTop: i ? '1px solid #dfe2e7' : 'none' }}>
-              <span {...(it.manualOnly ? clickable(() => toggleManual(it.key)) : {})}
-                style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? 'pointer' : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber) }}>
+              <span {...(it.manualOnly && !vo ? clickable(() => toggleManual(it.key)) : {})}
+                title={it.manualOnly && vo ? VIEW_ONLY_REASON : undefined}
+                style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#fff', cursor: it.manualOnly ? (vo ? 'not-allowed' : 'pointer') : 'default', background: ok ? C.green : (it.manualOnly ? '#cbd0db' : C.amber) }}>
                 {ok ? '✓' : (it.manualOnly ? '' : '!')}
               </span>
               <div style={{ flex: 1 }}>

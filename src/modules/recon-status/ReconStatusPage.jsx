@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getReconList, saveRecon, deleteRecon } from './api';
 import { BRANCHES, ACCOUNT_TYPES, defaultPeriod, periodEndDate, statusTone, reconSummary } from './utils';
-import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, FormField } from '../../shell/primitives';
+import { PageSection, ResponsiveGrid, Badge, Button, Input, Select, FormField, isViewOnly } from '../../shell/primitives';
 import { KpiTile } from '../dashboard/components/cards/KpiTile';
 import { DataTable } from '../../shell/DataTable';
 
@@ -24,6 +24,7 @@ export function ReconStatusPage() {
   const invalidate = () => qc.invalidateQueries({ queryKey: key });
   const save = useMutation({ mutationFn: saveRecon, onSuccess: invalidate });
   const del = useMutation({ mutationFn: deleteRecon, onSuccess: invalidate });
+  const vo = isViewOnly();
 
   const s = reconSummary(rows);
   const addAccount = () => {
@@ -45,10 +46,10 @@ export function ReconStatusPage() {
     { key: 'by', header: 'By', render: (r) => <span className="text-ink-subtle">{r.by || '—'}</span> },
     { key: 'act', header: '', align: 'right', render: (r) => (
       <span className="flex justify-end gap-1.5">
-        <Button size="sm" variant={r.status === 'reconciled' ? 'ghost' : 'primary'} onClick={() => toggle(r)}>
+        <Button size="sm" write variant={r.status === 'reconciled' ? 'ghost' : 'primary'} onClick={() => toggle(r)}>
           {r.status === 'reconciled' ? 'Mark pending' : 'Mark reconciled'}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => del.mutate(r._id)} aria-label={`Remove ${r.account}`}>✕</Button>
+        <Button size="sm" write variant="ghost" onClick={() => del.mutate(r._id)} aria-label={`Remove ${r.account}`}>✕</Button>
       </span>
     ) },
   ];
@@ -73,9 +74,9 @@ export function ReconStatusPage() {
 
       <PageSection title="Add an account to track">
         <div className="flex flex-wrap items-end gap-3">
-          <FormField label="Account name" className="min-w-[220px]"><Input value={account} placeholder="e.g. ICICI Bank" onChange={(e) => setAccount(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addAccount(); }} /></FormField>
+          <FormField label="Account name" className="min-w-[220px]"><Input value={account} placeholder="e.g. ICICI Bank" onChange={(e) => setAccount(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !vo) addAccount(); }} /></FormField>
           <FormField label="Type"><Select value={accountType} onChange={(e) => setAccountType(e.target.value)}>{ACCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</Select></FormField>
-          <Button onClick={addAccount} disabled={!account.trim() || save.isPending}>Add</Button>
+          <Button write onClick={addAccount} disabled={!account.trim() || save.isPending}>Add</Button>
         </div>
       </PageSection>
 

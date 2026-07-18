@@ -10,7 +10,7 @@ import { listKeyNav } from '../../../core/ux/listKeys';
 import { ACTION_CLR, ACTION_LABELS, BRANCHES, BRANCH_CODES, CONSOLIDATED_LABEL } from '../../../core/data';
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../../../core/api';
 import { useUsersAdmin, useUserAccess, useRoles, useCompanyProfiles, useApprovalRules, useApprovalLimits, useEmailTemplates, useCustomFields, useFieldAccess } from '../../../core/useReference';
-import { Switch } from '../../../shell/primitives';
+import { Switch, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
 import { fmt } from '../../../core/format';
 import { PERM_ACTIONS, cardStyle } from '../../../core/helpers';
@@ -26,6 +26,7 @@ export function EmailSMSTemplates(){
   // Live email/SMS templates (GET /api/email-templates). Was hardcoded EMAIL_TEMPLATES_DATA.
   const templates=useEmailTemplates().data||[];
   const qc=useQueryClient();
+  const vo=isViewOnly();
   const [sel,setSel]=useState(0);
   const [edit,setEdit]=useState({name:"",trigger:"",channel:"Email",subject:"",active:true,body:""});
   const t=templates[sel]||templates[0]||{name:"",body:"",channel:"Email",trigger:"",subject:"",active:true};
@@ -64,7 +65,7 @@ export function EmailSMSTemplates(){
   };
   return(
     <PHASE2_Page title="Email / SMS Template Editor" subtitle="Customise communication templates · token substitution · channel-specific"
-      toolbar={<><button onClick={save} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>💾 Save Template</button><button onClick={openSend} style={{padding:"7px 12px",background:"#0d1326",border:"none",color:"#d4a437",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>📤 Send…</button></>}>
+      toolbar={<><button onClick={save} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 Save Template</button><button onClick={openSend} style={{padding:"7px 12px",background:"#0d1326",border:"none",color:"#d4a437",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>📤 Send…</button></>}>
       <div style={{display:"grid",gridTemplateColumns:"260px 1fr",gap:14}}>
         {/* Template list */}
         <div style={cardStyle} onKeyDown={listKeyNav()}>
@@ -78,7 +79,7 @@ export function EmailSMSTemplates(){
               <p style={{margin:"2px 0 0",fontSize:10,color:"#5a6691"}}>{tmpl.trigger}</p>
             </div>
           ))}
-          <button onClick={addNew} style={{width:"100%",padding:"7px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer",marginTop:6}}>+ New Template</button>
+          <button onClick={addNew} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{width:"100%",padding:"7px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:5,fontSize:11.5,fontWeight:700,cursor:"pointer",marginTop:6,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>+ New Template</button>
         </div>
         {/* Editor */}
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -120,7 +121,7 @@ export function EmailSMSTemplates(){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setSendModal(null)} style={{padding:"7px 14px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-              <button onClick={doSend} disabled={!sendModal.to.trim()} style={{padding:"7px 16px",background:"#0d1326",color:"#d4a437",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",opacity:sendModal.to.trim()?1:0.5}}>📤 Send now</button>
+              <button onClick={doSend} disabled={!sendModal.to.trim()||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"7px 16px",background:"#0d1326",color:"#d4a437",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer",opacity:sendModal.to.trim()?1:0.5,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>📤 Send now</button>
             </div>
           </div>
         </div>

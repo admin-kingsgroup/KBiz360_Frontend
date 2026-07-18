@@ -38,10 +38,10 @@ export function Gstr2bPage() {
     { key: 'status', header: 'Status', align: 'center', render: (r) => <Badge tone={statusTone(r.status)} size="sm">{r.status}</Badge> },
     { key: 'act', header: '', align: 'right', render: (r) => (
       <span className="flex justify-end gap-1.5">
-        <Button size="sm" variant={r.status === 'matched' ? 'ghost' : 'primary'} onClick={() => mark.mutate({ id: r._id, status: r.status === 'matched' ? 'unmatched' : 'matched' })}>
+        <Button size="sm" write variant={r.status === 'matched' ? 'ghost' : 'primary'} onClick={() => mark.mutate({ id: r._id, status: r.status === 'matched' ? 'unmatched' : 'matched' })}>
           {r.status === 'matched' ? 'Unmatch' : 'Match'}
         </Button>
-        {r.status !== 'mismatch' && <Button size="sm" variant="ghost" onClick={() => mark.mutate({ id: r._id, status: 'mismatch' })}>Mismatch</Button>}
+        {r.status !== 'mismatch' && <Button size="sm" write variant="ghost" onClick={() => mark.mutate({ id: r._id, status: 'mismatch' })}>Mismatch</Button>}
       </span>
     ) },
   ];
@@ -70,7 +70,7 @@ export function Gstr2bPage() {
           <Textarea rows={4} value={payload} placeholder='{"data":{"docdata":{"b2b":[…]}}}  — or  [{"gstin":"…","invoiceNo":"…","txval":…,"igst":…}]'
             onChange={(e) => setPayload(e.target.value)} />
           <div className="flex items-center gap-3">
-            <Button onClick={doImport} disabled={!payload.trim() || imp.isPending} loading={imp.isPending}>Import</Button>
+            <Button write onClick={doImport} disabled={!payload.trim() || imp.isPending} loading={imp.isPending}>Import</Button>
             {imp.data && <span className="text-xs text-ink-muted">Imported {imp.data.imported} line(s).</span>}
             {imp.isError && <span className="text-xs text-danger">Import failed — check the JSON.</span>}
           </div>
