@@ -41,6 +41,35 @@ const CurHead = ({ symbol, currency }) => (
   </div>
 );
 
+// Group / TK Group Central consolidated scope.
+const isGroupScope = (branch) => !branch || branch === 'ALL' || branch?.code === 'ALL';
+
+// Per-branch section header for the consolidated (ALL) view (mirrors ExecutiveOverview's).
+const BranchHead = ({ code, cur }) => (
+  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '16px 2px 8px', borderBottom: `2px solid ${C.blue}`, paddingBottom: 4 }}>
+    <span style={{ fontWeight: 800, fontSize: 14, color: C.dark }}>{code}</span>
+    <span style={{ fontSize: 12, fontWeight: 700, color: C.dim }}>· {cur}</span>
+  </div>
+);
+
+// BranchSplit — the consolidated (ALL) rule for money boards: render each branch SEPARATELY in
+// its OWN currency from the hook's `byBranch` slice, never a merged cross-currency (₹+$) total
+// (the backend returns byBranch for P&L / BS / trial-balance / module-GP / ageing / tax). In
+// single-branch scope it renders once with that branch's own data. `renderOne` receives
+// (dataForBranch, currency, code). This is the per-branch counterpart of currencySplit/CurHead.
+function BranchSplit({ branch, byBranch, single, renderOne, emptyMsg = 'No branch data for this period.' }) {
+  if (isGroupScope(branch)) {
+    const rows = Array.isArray(byBranch) ? byBranch.filter(Boolean) : [];
+    if (!rows.length) return <div style={{ padding: '14px 2px', fontSize: 12.5, color: C.dim }}>{emptyMsg}</div>;
+    return rows.map((e) => {
+      const code = e.branch; const cur = (bc({ code }) || {}).cur || '₹';
+      return <div key={code} style={{ marginBottom: 14 }}><BranchHead code={code} cur={cur} />{renderOne(e, cur, code)}</div>;
+    });
+  }
+  const cur = (bc(branch) || {}).cur || '₹';
+  return renderOne(single, cur, branch?.code);
+}
+
 export function ExecutiveOverview({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
   const cur = (bc(branch) || {}).cur || '₹';
@@ -205,51 +234,55 @@ function deltaPct(cur, prev) { cur = Number(cur) || 0; prev = Number(prev) || 0;
 // ── 2) Profitability (P&L) ────────────────────────────────────────────────────
 export function ProfitabilityDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
-  // A consolidated P&L folds INR + USD into one figure (and would print it as Rs) — every
-  // money KPI and every bridge bar would be rupees-plus-dollars. Refuse it, the same way
-  // Executive Overview, the Owner dashboard and PerformanceDash's bridge do.
-  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
   const pl = useProfitAndLoss(branch, range).data || {};
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
-  const sales = mpl?.totals?.sales || 0, cogs = mpl?.totals?.cogs || 0, gp = pl?.grossProfit ?? (sales - cogs);
-  const indExp = pl?.indirect?.debitTotal || 0, indInc = pl?.indirect?.creditTotal || 0, net = pl?.netProfit || 0;
-  const bar = (label, val, base, col) => (
+  const bar = (label, val, base, col, cur) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0' }}>
       <span style={{ width: 150, fontSize: 12.5, color: C.dim }}>{label}</span>
       <div style={{ flex: 1, background: '#eef1f7', borderRadius: 5, height: 18 }}><div style={{ width: `${base ? Math.min(100, Math.abs(val) / base * 100) : 0}%`, background: col, height: '100%', borderRadius: 5 }} /></div>
       <span style={{ width: 130, textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: val < 0 ? C.red : C.dark }}>{money(cur, val)}</span>
     </div>
   );
+  // Revenue → Net Profit KPIs + profit bridge PER BRANCH in the ALL view — each branch's own
+  // P&L in its own currency (never a ₹+$ merge), stitching profitAndLoss + modulePL byBranch.
+  const renderOne = (data, cur) => {
+    const dpl = data?.pl || {}, dmpl = data?.mpl || {};
+    const sales = dmpl?.totals?.sales || 0, cogs = dmpl?.totals?.cogs || 0, gp = dpl?.grossProfit ?? (sales - cogs);
+    const indExp = dpl?.indirect?.debitTotal || 0, indInc = dpl?.indirect?.creditTotal || 0, net = dpl?.netProfit || 0;
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Revenue" icon={TrendingUp} value={money(cur, sales)} onClick={go && (() => go('/dashboards/sales'))} />
+          <KPI label="Gross Profit" icon={PieChart} value={money(cur, gp)} sub={pct(sales ? gp / sales * 100 : 0)} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
+          <KPI label="Indirect Expenses" icon={Receipt} value={money(cur, indExp)} onClick={go && (() => go('/dashboards/expenses'))} />
+          <KPI label="Net Profit" icon={CircleDollarSign} value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} sub={pct(sales ? net / sales * 100 : 0)} onClick={go && (() => go('/reports/pnl'))} />
+        </div>
+        <Card title="Profit Bridge">
+          <div style={{ padding: '10px 16px' }}>
+            {bar('Revenue', sales, sales, C.blue, cur)}
+            {bar('– COGS', -cogs, sales, '#9aa7c2', cur)}
+            {bar('= Gross Profit', gp, sales, C.green, cur)}
+            {bar('+ Indirect Income', indInc, sales, '#6fae7e', cur)}
+            {bar('– Indirect Expense', -indExp, sales, '#d99', cur)}
+            {bar('= Net Profit', net, sales, net < 0 ? C.red : C.dark, cur)}
+          </div>
+        </Card>
+      </>
+    );
+  };
+  // Stitch the two hooks' byBranch by code for the ALL view; single-branch feeds top-level data.
+  const merged = isGroupScope(branch)
+    ? [...new Set([
+        ...(Array.isArray(pl.byBranch) ? pl.byBranch : []).map((b) => b.branch),
+        ...(Array.isArray(mpl.byBranch) ? mpl.byBranch : []).map((b) => b.branch),
+      ])].filter(Boolean).sort()
+        .map((code) => ({ branch: code, pl: (pl.byBranch || []).find((x) => x.branch === code) || {}, mpl: (mpl.byBranch || []).find((x) => x.branch === code) || {} }))
+    : null;
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Profitability (P&L)" sub={`Revenue → Net Profit · ${range.label}`} branch={branch} p={p} />
-      {isAll ? (
-        <Card title="Profitability (P&L)">
-          <div style={{ padding: '14px 16px', fontSize: 12.5, color: C.dim }}>
-            Per-branch — pick a branch from the selector (top-right) to view its P&amp;L and profit bridge. A consolidated P&amp;L isn’t shown because branches report in different currencies (₹ / $).
-          </div>
-        </Card>
-      ) : (
-        <>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <KPI label="Revenue" icon={TrendingUp} value={money(cur, sales)} onClick={go && (() => go('/dashboards/sales'))} />
-            <KPI label="Gross Profit" icon={PieChart} value={money(cur, gp)} sub={pct(sales ? gp / sales * 100 : 0)} tone={gp < 0 ? 'bad' : 'good'} onClick={go && (() => go('/dashboards/module-gp'))} />
-            <KPI label="Indirect Expenses" icon={Receipt} value={money(cur, indExp)} onClick={go && (() => go('/dashboards/expenses'))} />
-            <KPI label="Net Profit" icon={CircleDollarSign} value={money(cur, net)} tone={net < 0 ? 'bad' : 'good'} sub={pct(sales ? net / sales * 100 : 0)} onClick={go && (() => go('/reports/pnl'))} />
-          </div>
-          <Card title="Profit Bridge">
-            <div style={{ padding: '10px 16px' }}>
-              {bar('Revenue', sales, sales, C.blue)}
-              {bar('– COGS', -cogs, sales, '#9aa7c2')}
-              {bar('= Gross Profit', gp, sales, C.green)}
-              {bar('+ Indirect Income', indInc, sales, '#6fae7e')}
-              {bar('– Indirect Expense', -indExp, sales, '#d99')}
-              {bar('= Net Profit', net, sales, net < 0 ? C.red : C.dark)}
-            </div>
-          </Card>
-        </>
-      )}
+      <BranchSplit branch={branch} byBranch={merged} single={{ pl, mpl }} renderOne={renderOne}
+        emptyMsg="No P&L data for any branch this period." />
     </div>
   );
 }
@@ -257,39 +290,47 @@ export function ProfitabilityDash({ branch, go }) {
 // ── 3) Cash & Liquidity ───────────────────────────────────────────────────────
 export function CashLiquidityDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
   // Liquidity is a POSITION (as-of), not a period flow: read the trial balance with the
   // `from` bound dropped so each ledger's closing = opening + ALL movement up to the
   // period's `to` (the true balance). A `from`-bounded read would show only this-period
   // movement and disagree with the Cash Forecast's opening (which also strips `from`).
   const trialQ = useTrialBalance(branch, { to: range.to }); const trial = trialQ.data || {};
-  const rows = (trial.rows || []).filter(isLiquidRow);
-  const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0); // closing balance (Dr +ve)
-  const cash = rows.filter((r) => liquidityKind(r) === 'cash').reduce((s, r) => s + bal(r), 0);
-  const bankRows = rows.filter((r) => liquidityKind(r) === 'bank');
-  const bank = bankRows.reduce((s, r) => s + bal(r), 0);
   const loading = trialQ.isLoading;
+  const bal = (r) => (r.closingDebit || 0) - (r.closingCredit || 0); // closing balance (Dr +ve)
   // Drill to the (now live) Cash Position report — it lists exactly these cash & bank
   // ledgers, the same trial-balance liquid rows this KPI sums.
   const toCash = go && (() => go('/reports/cash-position'));
-  const mv = (n, tone) => (loading ? '…' : money(cur, n));
+  // Group/ALL: render each branch's cash position in its OWN currency (never a ₹+$ merge) from
+  // the trial balance's `byBranch` slice; single-branch: that one branch's rows.
+  const renderOne = (data, cur) => {
+    const rows = (data?.rows || []).filter(isLiquidRow);
+    const cash = rows.filter((r) => liquidityKind(r) === 'cash').reduce((s, r) => s + bal(r), 0);
+    const bank = rows.filter((r) => liquidityKind(r) === 'bank').reduce((s, r) => s + bal(r), 0);
+    const mv = (n) => (loading ? '…' : money(cur, n));
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Cash in Hand" value={mv(cash)} tone={loading ? undefined : (cash < 0 ? 'bad' : undefined)} onClick={toCash} />
+          <KPI label="Bank Balance" value={mv(bank)} tone={loading ? undefined : (bank < 0 ? 'bad' : undefined)} onClick={toCash} />
+          <KPI label="Total Liquid" value={mv(cash + bank)} tone={loading ? undefined : ((cash + bank) < 0 ? 'bad' : 'good')} onClick={toCash} />
+        </div>
+        <Card title="Bank & Cash Accounts">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Account</th><th style={th}>Group</th><th style={{ ...th, ...num }}>Balance</th></tr></thead>
+            <tbody>
+              {rows.map((r, i) => (<tr key={i} {...rowNav(go, '/reports/cash-position')}><td style={td}>{r.ledger || r.name}</td><td style={{ ...td, color: C.dim }}>{r.group}</td><td style={{ ...td, ...num, fontWeight: 700, color: bal(r) < 0 ? C.red : C.dark }}>{money(cur, bal(r))}</td></tr>))}
+              {!rows.length && <tr><td colSpan={3} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No cash/bank ledgers found.</td></tr>}
+            </tbody>
+          </table>
+        </Card>
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Cash & Liquidity" sub={`Cash + bank position · ${range.label}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Cash in Hand" value={mv(cash)} tone={loading ? undefined : (cash < 0 ? 'bad' : undefined)} onClick={toCash} />
-        <KPI label="Bank Balance" value={mv(bank)} tone={loading ? undefined : (bank < 0 ? 'bad' : undefined)} onClick={toCash} />
-        <KPI label="Total Liquid" value={mv(cash + bank)} tone={loading ? undefined : ((cash + bank) < 0 ? 'bad' : 'good')} onClick={toCash} />
-      </div>
-      <Card title="Bank & Cash Accounts">
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Account</th><th style={th}>Group</th><th style={{ ...th, ...num }}>Balance</th></tr></thead>
-          <tbody>
-            {rows.map((r, i) => (<tr key={i} {...rowNav(go, '/reports/cash-position')}><td style={td}>{r.ledger || r.name}</td><td style={{ ...td, color: C.dim }}>{r.group}</td><td style={{ ...td, ...num, fontWeight: 700, color: bal(r) < 0 ? C.red : C.dark }}>{money(cur, bal(r))}</td></tr>))}
-            {!rows.length && <tr><td colSpan={3} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No cash/bank ledgers found.</td></tr>}
-          </tbody>
-        </table>
-      </Card>
+      <BranchSplit branch={branch} byBranch={trial.byBranch} single={trial} renderOne={renderOne}
+        emptyMsg="No cash/bank data for any branch this period." />
     </div>
   );
 }
@@ -297,13 +338,11 @@ export function CashLiquidityDash({ branch, go }) {
 // ── 4) Receivables & Payables ─────────────────────────────────────────────────
 export function ReceivablesPayablesDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
   // Ageing is an as-of snapshot — drive it off the period's `to` so the period bar
   // actually changes the view (previously it always showed "as of today").
   const age = useAgeing(branch, range.to).data || {};
-  const ar = age.receivables || { rows: [], totals: {} }, ap = age.payables || { rows: [], totals: {} };
   const buckets = (t) => ['d0', 'd30', 'd60', 'd90'].map((k, i) => [['0–30', '30–60', '60–90', '90+'][i], t?.[k] || 0]);
-  const tbl = (title, data, tone, to) => (
+  const tbl = (title, data, tone, to, cur) => (
     <Card title={title} right={
       <strong onClick={to && go ? () => go(to) : undefined} role={to && go ? 'button' : undefined} tabIndex={to && go ? 0 : undefined}
         onKeyDown={to && go ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(to); } } : undefined}
@@ -324,11 +363,17 @@ export function ReceivablesPayablesDash({ branch, go }) {
       </table>
     </Card>
   );
+  // Group/ALL: one Receivables + Payables pair PER BRANCH in its own currency (ageing's
+  // `byBranch` carries per-branch receivables/payables); single-branch: the one pair.
+  const renderOne = (data, cur) => {
+    const ar = data?.receivables || { rows: [], totals: {} }, ap = data?.payables || { rows: [], totals: {} };
+    return <>{tbl('Receivables (from customers)', ar, C.green, '/reports/rec', cur)}{tbl('Payables (to suppliers)', ap, C.red, '/reports/pay', cur)}</>;
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Receivables & Payables" sub={`Ageing as of ${range.to} · top 12 each`} branch={branch} p={p} />
-      {tbl('Receivables (from customers)', ar, C.green, '/reports/rec')}
-      {tbl('Payables (to suppliers)', ap, C.red, '/reports/pay')}
+      <BranchSplit branch={branch} byBranch={age.byBranch} single={age} renderOne={renderOne}
+        emptyMsg="No receivables/payables for any branch this period." />
     </div>
   );
 }
@@ -496,31 +541,39 @@ const topBy = (rows, keyFn, valFn, n = 10) => {
 // ── 6) Balance Sheet ──────────────────────────────────────────────────────────
 export function BalanceSheetDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
   const bsQ = useBalanceSheet(branch, { to: range.to }); const bs = bsQ.data || {};
-  const assets = bs.assets || [], liabs = bs.liabilities || [];
-  const aT = assets.reduce((s, a) => s + (a.amount || 0), 0), lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
-  // The backend ALWAYS plugs the sheet with a "Difference in Opening Balances" row so
-  // Assets == Liabilities on paper (and its own `balanced` flag is computed AFTER the
-  // plug, so it's always true). The genuine imbalance is therefore the size of that
-  // plug row — surface it instead of recomputing aT−lT (which is always ~0).
-  const diffRow = liabs.find((l) => /difference in opening/i.test(l.group || ''));
-  const realDiff = diffRow ? (diffRow.amount || 0) : 0;
-  const balanced = Math.abs(realDiff) < 1;
   const loading = bsQ.isLoading;
   const toBs = go && (() => go('/reports/bs'));
+  // Group/ALL: one balance sheet PER BRANCH in its own currency (byBranch); single: the one.
+  const renderOne = (data, cur) => {
+    const assets = data?.assets || [], liabs = data?.liabilities || [];
+    const aT = assets.reduce((s, a) => s + (a.amount || 0), 0), lT = liabs.reduce((s, a) => s + (a.amount || 0), 0);
+    // The backend ALWAYS plugs the sheet with a "Difference in Opening Balances" row so
+    // Assets == Liabilities on paper (and its own `balanced` flag is computed AFTER the
+    // plug, so it's always true). The genuine imbalance is therefore the size of that
+    // plug row — surface it instead of recomputing aT−lT (which is always ~0).
+    const diffRow = liabs.find((l) => /difference in opening/i.test(l.group || ''));
+    const realDiff = diffRow ? (diffRow.amount || 0) : 0;
+    const balanced = Math.abs(realDiff) < 1;
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Total Assets" value={loading ? '…' : money(cur, aT)} onClick={toBs} />
+          <KPI label="Total Liabilities & Capital" value={loading ? '…' : money(cur, lT)} onClick={toBs} />
+          <KPI label="Balanced" value={loading ? '…' : (balanced ? '✓ Yes' : '✗ No')} tone={loading ? undefined : (balanced ? 'good' : 'bad')} sub={loading || balanced ? '' : money(cur, realDiff) + ' unbalanced'} />
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <div style={{ flex: '1 1 320px' }}><ListTable title="Liabilities & Capital" rows={[...liabs.map((l) => ({ name: l.group, amount: l.amount })), { name: 'Total', amount: lT, bold: true }]} cur={cur} go={go} rowTo="/reports/bs" /></div>
+          <div style={{ flex: '1 1 320px' }}><ListTable title="Assets" rows={[...assets.map((a) => ({ name: a.group, amount: a.amount })), { name: 'Total', amount: aT, bold: true }]} cur={cur} go={go} rowTo="/reports/bs" /></div>
+        </div>
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Balance Sheet" sub={`Financial position as of ${range.to}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Total Assets" value={loading ? '…' : money(cur, aT)} onClick={toBs} />
-        <KPI label="Total Liabilities & Capital" value={loading ? '…' : money(cur, lT)} onClick={toBs} />
-        <KPI label="Balanced" value={loading ? '…' : (balanced ? '✓ Yes' : '✗ No')} tone={loading ? undefined : (balanced ? 'good' : 'bad')} sub={loading || balanced ? '' : money(cur, realDiff) + ' unbalanced'} />
-      </div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <div style={{ flex: '1 1 320px' }}><ListTable title="Liabilities & Capital" rows={[...liabs.map((l) => ({ name: l.group, amount: l.amount })), { name: 'Total', amount: lT, bold: true }]} cur={cur} go={go} rowTo="/reports/bs" /></div>
-        <div style={{ flex: '1 1 320px' }}><ListTable title="Assets" rows={[...assets.map((a) => ({ name: a.group, amount: a.amount })), { name: 'Total', amount: aT, bold: true }]} cur={cur} go={go} rowTo="/reports/bs" /></div>
-      </div>
+      <BranchSplit branch={branch} byBranch={bs.byBranch} single={bs} renderOne={renderOne}
+        emptyMsg="No balance sheet data for any branch this period." />
     </div>
   );
 }
@@ -528,29 +581,37 @@ export function BalanceSheetDash({ branch, go }) {
 // ── 7) Module / Product GP ────────────────────────────────────────────────────
 export function ModuleGpDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
-  const mods = mpl.modules || [], t = mpl.totals || {};
-  const maxGp = Math.max(1, ...mods.map((m) => Math.abs(m.gp || 0)));
   const toGp = go && (() => go('/reports/gp'));
+  // Group/ALL: module GP PER BRANCH in its own currency (modulePL's byBranch); single: the one.
+  const renderOne = (data, cur) => {
+    const mods = data?.modules || [], t = data?.totals || {};
+    const maxGp = Math.max(1, ...mods.map((m) => Math.abs(m.gp || 0)));
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Sales" value={money(cur, t.sales)} onClick={toGp} />
+          <KPI label="COGS" value={money(cur, t.cogs)} onClick={toGp} />
+          <KPI label="Gross Profit" value={money(cur, t.gp)} tone={(t.gp || 0) < 0 ? 'bad' : 'good'} sub={pct(t.gpPct || 0)} onClick={toGp} />
+        </div>
+        <Card title="GP by Module"><div style={{ padding: '10px 16px' }}>{mods.map((m) => miniBar(m.name || m.key, m.gp, maxGp, (m.gp || 0) < 0 ? C.red : C.green, cur, rowNav(go, '/reports/gp')))}{!mods.length && <div style={{ color: C.dim, fontSize: 12 }}>No data.</div>}</div></Card>
+        <Card title="Detail">
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>COGS</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>% of Sales</th></tr></thead>
+            <tbody>
+              {mods.map((m) => (<tr key={m.key} {...rowNav(go, '/reports/gp')}><td style={td}>{m.name || m.key}</td><td style={{ ...td, ...num }}>{money(cur, m.sales)}</td><td style={{ ...td, ...num }}>{money(cur, m.cogs)}</td><td style={{ ...td, ...num, fontWeight: 700, color: (m.gp || 0) < 0 ? C.red : C.green }}>{money(cur, m.gp)}</td><td style={{ ...td, ...num }}>{pct(m.gpPct)}</td><td style={{ ...td, ...num }}>{pct(m.pctOfSales)}</td></tr>))}
+              {!mods.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No data.</td></tr>}
+            </tbody>
+          </table>
+        </Card>
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Module / Product GP" sub={`Gross profit by product · ${range.label}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Sales" value={money(cur, t.sales)} onClick={toGp} />
-        <KPI label="COGS" value={money(cur, t.cogs)} onClick={toGp} />
-        <KPI label="Gross Profit" value={money(cur, t.gp)} tone={(t.gp || 0) < 0 ? 'bad' : 'good'} sub={pct(t.gpPct || 0)} onClick={toGp} />
-      </div>
-      <Card title="GP by Module"><div style={{ padding: '10px 16px' }}>{mods.map((m) => miniBar(m.name || m.key, m.gp, maxGp, (m.gp || 0) < 0 ? C.red : C.green, cur, rowNav(go, '/reports/gp')))}{!mods.length && <div style={{ color: C.dim, fontSize: 12 }}>No data.</div>}</div></Card>
-      <Card title="Detail">
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={th}>Module</th><th style={{ ...th, ...num }}>Sales</th><th style={{ ...th, ...num }}>COGS</th><th style={{ ...th, ...num }}>GP</th><th style={{ ...th, ...num }}>GP %</th><th style={{ ...th, ...num }}>% of Sales</th></tr></thead>
-          <tbody>
-            {mods.map((m) => (<tr key={m.key} {...rowNav(go, '/reports/gp')}><td style={td}>{m.name || m.key}</td><td style={{ ...td, ...num }}>{money(cur, m.sales)}</td><td style={{ ...td, ...num }}>{money(cur, m.cogs)}</td><td style={{ ...td, ...num, fontWeight: 700, color: (m.gp || 0) < 0 ? C.red : C.green }}>{money(cur, m.gp)}</td><td style={{ ...td, ...num }}>{pct(m.gpPct)}</td><td style={{ ...td, ...num }}>{pct(m.pctOfSales)}</td></tr>))}
-            {!mods.length && <tr><td colSpan={6} style={{ ...td, textAlign: 'center', color: C.dim, padding: 18 }}>No data.</td></tr>}
-          </tbody>
-        </table>
-      </Card>
+      <BranchSplit branch={branch} byBranch={mpl.byBranch} single={mpl} renderOne={renderOne}
+        emptyMsg="No module GP data for any branch this period." />
     </div>
   );
 }
@@ -558,9 +619,33 @@ export function ModuleGpDash({ branch, go }) {
 // ── 8) Sales & Bookings ───────────────────────────────────────────────────────
 export function SalesBookingsDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
+  // Group/ALL: Sales & GP PER BRANCH in its own currency (modulePL's byBranch). The file-wise
+  // metrics (deals, avg deal, top customers) come from invoiceGP, which has NO per-branch split,
+  // so they show on single-branch drill only — never a cross-currency (₹+$) blended figure.
+  if (isGroupScope(branch)) {
+    return (
+      <div style={{ margin: 12 }}>
+        <Toolbar title="Sales & Bookings" sub={`Sales & GP per branch · ${range.label}`} branch={branch} p={p} />
+        <BranchSplit branch={branch} byBranch={mpl.byBranch} single={mpl} emptyMsg="No sales data for any branch this period."
+          renderOne={(data, cur) => {
+            const t = data?.totals || {};
+            return (
+              <>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <KPI label="Total Sales" value={money(cur, t.sales || 0)} onClick={go && (() => go('/reports/sreg'))} />
+                  <KPI label="Gross Profit" value={money(cur, t.gp || 0)} tone={(t.gp || 0) < 0 ? 'bad' : 'good'} sub={pct(t.gpPct || 0)} onClick={go && (() => go('/reports/gp'))} />
+                </div>
+                <ListTable title="Sales by Module" rows={(data?.modules || []).map((m) => ({ name: m.name || m.key, amount: m.sales }))} cur={cur} go={go} rowTo="/reports/gp" />
+              </>
+            );
+          }} />
+        <div style={{ marginTop: 10, fontSize: 12, color: C.dim, padding: '0 2px' }}>Deal count, average deal & top customers are per branch — pick a branch (top-right) to view them (a cross-branch ranking would span different currencies).</div>
+      </div>
+    );
+  }
+  const cur = (bc(branch) || {}).cur || '₹';
   const rows = igp.rows || [], deals = rows.length;
   const sales = mpl?.totals?.sales || 0;
   const topCust = topBy(rows, (r) => r.customer, (r) => r.sale, 10);
@@ -584,12 +669,39 @@ export function SalesBookingsDash({ branch, go }) {
 // ── 9) Supplier / Purchase ────────────────────────────────────────────────────
 export function SupplierPurchaseDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
   const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
   const igp = useInvoiceGP(branch, range).data || {};
   // Payables ageing respects the period's as-of date (mirrors ReceivablesPayablesDash) —
   // previously fixed to "today" regardless of the period bar.
   const age = useAgeing(branch, range.to).data || {};
+  // Group/ALL: Purchases (modulePL) + Payables (ageing) PER BRANCH in its own currency — stitch
+  // the two hooks' byBranch by code. Supplier count / top suppliers come from invoiceGP (no
+  // per-branch split) so they show on single-branch drill only, never a ₹+$ blended list.
+  if (isGroupScope(branch)) {
+    const find = (arr, code) => (Array.isArray(arr) ? arr.find((x) => x.branch === code) : null) || {};
+    const codes = [...new Set([
+      ...(Array.isArray(mpl.byBranch) ? mpl.byBranch : []).map((b) => b.branch),
+      ...(Array.isArray(age.byBranch) ? age.byBranch : []).map((b) => b.branch),
+    ])].filter(Boolean).sort();
+    const merged = codes.map((code) => ({ branch: code, mpl: find(mpl.byBranch, code), age: find(age.byBranch, code) }));
+    return (
+      <div style={{ margin: 12 }}>
+        <Toolbar title="Supplier / Purchase" sub={`Purchases & payables per branch · ${range.label}`} branch={branch} p={p} />
+        <BranchSplit branch={branch} byBranch={merged} single={{ mpl, age }} emptyMsg="No purchase/payable data for any branch this period."
+          renderOne={(e, cur) => {
+            const m = e?.mpl || {}, a = e?.age || {};
+            return (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <KPI label="Total Purchases" value={money(cur, m?.totals?.cogs || 0)} onClick={go && (() => go('/reports/preg'))} />
+                <KPI label="Payables Outstanding" value={money(cur, a?.payables?.totals?.total || 0)} tone={(a?.payables?.totals?.d90 || 0) ? 'bad' : undefined} sub={(a?.payables?.totals?.d90 || 0) ? money(cur, a.payables.totals.d90) + ' overdue 90+' : ''} onClick={go && (() => go('/reports/pay'))} />
+              </div>
+            );
+          }} />
+        <div style={{ marginTop: 10, fontSize: 12, color: C.dim, padding: '0 2px' }}>Supplier count & top suppliers are per branch — pick a branch (top-right) to view them (a cross-branch ranking would span different currencies).</div>
+      </div>
+    );
+  }
+  const cur = (bc(branch) || {}).cur || '₹';
   const rows = igp.rows || [];
   const topSup = topBy(rows, (r) => r.supplier, (r) => r.cost, 10);
   const payRows = (age.payables?.rows || []).slice(0, 10);
@@ -612,21 +724,27 @@ export function SupplierPurchaseDash({ branch, go }) {
 // ── 10) Tax & Compliance ──────────────────────────────────────────────────────
 export function TaxComplianceDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
   const tax = useTaxSummary(branch, range).data || {};
+  // Group/ALL: GST/VAT position PER BRANCH in its own currency (taxSummary's byBranch); single: one.
+  const renderOne = (t, cur) => (
+    <>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <KPI label="Output Tax" value={money(cur, t?.output?.total || 0)} onClick={go && (() => go('/tax/gstr-1-prep'))} />
+        <KPI label="Input Tax (ITC)" value={money(cur, t?.input?.total || 0)} onClick={go && (() => go('/tax/gstr-3b-prep'))} />
+        <KPI label="Net Payable" value={money(cur, t?.netPayable || 0)} tone={(t?.netPayable || 0) > 0 ? 'bad' : 'good'} sub={(t?.netPayable || 0) >= 0 ? 'payable' : 'refundable'} onClick={go && (() => go('/tax/gstr-3b-prep'))} />
+        <KPI label="TCS Payable" value={money(cur, t?.tcs?.payable || 0)} onClick={go && (() => go('/tax/tds'))} />
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Output Tax (on sales)" rows={(t?.output?.lines || []).map((l) => ({ name: l.ledger, amount: l.amount }))} cur={cur} go={go} rowTo="/tax/gstr-1-prep" right={<strong style={{ color: C.dark }}>{money(cur, t?.output?.total || 0)}</strong>} /></div>
+        <div style={{ flex: '1 1 320px' }}><ListTable title="Input Tax (on purchases)" rows={(t?.input?.lines || []).map((l) => ({ name: l.ledger, amount: l.amount }))} cur={cur} go={go} rowTo="/tax/gstr-3b-prep" right={<strong style={{ color: C.dark }}>{money(cur, t?.input?.total || 0)}</strong>} /></div>
+      </div>
+    </>
+  );
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Tax & Compliance" sub={`GST / VAT position · ${range.label}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Output Tax" value={money(cur, tax.output?.total || 0)} onClick={go && (() => go('/tax/gstr-1-prep'))} />
-        <KPI label="Input Tax (ITC)" value={money(cur, tax.input?.total || 0)} onClick={go && (() => go('/tax/gstr-3b-prep'))} />
-        <KPI label="Net Payable" value={money(cur, tax.netPayable || 0)} tone={(tax.netPayable || 0) > 0 ? 'bad' : 'good'} sub={(tax.netPayable || 0) >= 0 ? 'payable' : 'refundable'} onClick={go && (() => go('/tax/gstr-3b-prep'))} />
-        <KPI label="TCS Payable" value={money(cur, tax.tcs?.payable || 0)} onClick={go && (() => go('/tax/tds'))} />
-      </div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-        <div style={{ flex: '1 1 320px' }}><ListTable title="Output Tax (on sales)" rows={(tax.output?.lines || []).map((l) => ({ name: l.ledger, amount: l.amount }))} cur={cur} go={go} rowTo="/tax/gstr-1-prep" right={<strong style={{ color: C.dark }}>{money(cur, tax.output?.total || 0)}</strong>} /></div>
-        <div style={{ flex: '1 1 320px' }}><ListTable title="Input Tax (on purchases)" rows={(tax.input?.lines || []).map((l) => ({ name: l.ledger, amount: l.amount }))} cur={cur} go={go} rowTo="/tax/gstr-3b-prep" right={<strong style={{ color: C.dark }}>{money(cur, tax.input?.total || 0)}</strong>} /></div>
-      </div>
+      <BranchSplit branch={branch} byBranch={tax.byBranch} single={tax} renderOne={renderOne}
+        emptyMsg="No tax data for any branch this period." />
     </div>
   );
 }
@@ -634,28 +752,37 @@ export function TaxComplianceDash({ branch, go }) {
 // ── 11) Expenses ──────────────────────────────────────────────────────────────
 export function ExpensesDash({ branch, go }) {
   const p = usePeriod('all'); const range = p.range;
-  const cur = (bc(branch) || {}).cur || '₹';
- 
-  const mpl = useModulePL(branch, range).data || {};
-  const ind = mpl.indirect || {};
-  const total = ind.expense || 0;
-  
-  const heads = [];
-  (ind.groups || []).forEach((g) => {
-    if ((g.ledgers || []).length) (g.ledgers || []).forEach((l) => heads.push({ name: l.name, amount: l.amount }));
-    else heads.push({ name: g.name, amount: g.amount });
-  });
-  heads.sort((a, b) => (b.amount || 0) - (a.amount || 0));
-  const maxv = Math.max(1, ...heads.map((h) => Math.abs(h.amount || 0)));
+  // `summary:true` — Expenses only needs `indirect` (Section B, computed regardless of summary),
+  // not the per-voucher module scan. Matters in ALL scope where the BE re-runs modulePL per
+  // branch: the full scan is ~12s/branch, the summary path ~1–2s.
+  const mpl = useModulePL(branch, { ...range, summary: true }).data || {};
+  // Group/ALL: indirect-expense breakdown PER BRANCH in its own currency (modulePL's byBranch); single: one.
+  const renderOne = (data, cur) => {
+    const ind = data?.indirect || {};
+    const total = ind.expense || 0;
+    const heads = [];
+    (ind.groups || []).forEach((g) => {
+      if ((g.ledgers || []).length) (g.ledgers || []).forEach((l) => heads.push({ name: l.name, amount: l.amount }));
+      else heads.push({ name: g.name, amount: g.amount });
+    });
+    heads.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+    const maxv = Math.max(1, ...heads.map((h) => Math.abs(h.amount || 0)));
+    return (
+      <>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <KPI label="Total Indirect Expense" value={money(cur, total)} onClick={go && (() => go('/reports/pnl'))} />
+          <KPI label="Expense Heads" value={String(heads.length)} onClick={go && (() => go('/reports/pnl'))} />
+          <KPI label="Largest Head" value={heads[0] ? money(cur, heads[0].amount) : '—'} sub={heads[0]?.name || ''} onClick={go && (() => go('/reports/pnl'))} />
+        </div>
+        <Card title="Expenses by Head"><div style={{ padding: '10px 16px' }}>{heads.map((h) => miniBar(h.name, h.amount, maxv, '#c98', cur, rowNav(go, '/reports/pnl')))}{!heads.length && <div style={{ color: C.dim, fontSize: 12 }}>No expenses for this period.</div>}</div></Card>
+      </>
+    );
+  };
   return (
     <div style={{ margin: 12 }}>
       <Toolbar title="Expenses" sub={`Indirect expenses by head · ${range.label}`} branch={branch} p={p} />
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KPI label="Total Indirect Expense" value={money(cur, total)} onClick={go && (() => go('/reports/pnl'))} />
-        <KPI label="Expense Heads" value={String(heads.length)} onClick={go && (() => go('/reports/pnl'))} />
-        <KPI label="Largest Head" value={heads[0] ? money(cur, heads[0].amount) : '—'} sub={heads[0]?.name || ''} onClick={go && (() => go('/reports/pnl'))} />
-      </div>
-      <Card title="Expenses by Head"><div style={{ padding: '10px 16px' }}>{heads.map((h) => miniBar(h.name, h.amount, maxv, '#c98', cur, rowNav(go, '/reports/pnl')))}{!heads.length && <div style={{ color: C.dim, fontSize: 12 }}>No expenses for this period.</div>}</div></Card>
+      <BranchSplit branch={branch} byBranch={mpl.byBranch} single={mpl} renderOne={renderOne}
+        emptyMsg="No expense data for any branch this period." />
     </div>
   );
 }

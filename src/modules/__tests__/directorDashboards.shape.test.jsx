@@ -41,10 +41,14 @@ import { BalanceSheetDash, ExpensesDash } from '../directorDashboards';
 afterEach(() => jest.clearAllMocks());
 
 describe('BalanceSheetDash — rows keyed `group`', () => {
-  test('renders asset & liability line labels (not blank)', () => {
+  test('renders asset & liability line labels (not blank), per branch in ALL view', () => {
+    // ALL/Group view renders each branch from the balance sheet's `byBranch` slice, in its
+    // own currency (never a ₹+$ merge). Same `group`-keyed row shape the backend returns.
     useBalanceSheet.mockReturnValue({ data: {
-      assets: [{ group: 'Sundry Debtors', nature: 'asset', amount: 500000 }],
-      liabilities: [{ group: 'Capital Account', nature: 'liability', amount: 300000 }],
+      byBranch: [{ branch: 'BOM',
+        assets: [{ group: 'Sundry Debtors', nature: 'asset', amount: 500000 }],
+        liabilities: [{ group: 'Capital Account', nature: 'liability', amount: 300000 }],
+      }],
     } });
     render(<BalanceSheetDash branch={'ALL'} />);
     expect(screen.getByText('Sundry Debtors')).toBeInTheDocument();
@@ -55,7 +59,7 @@ describe('BalanceSheetDash — rows keyed `group`', () => {
 describe('ExpensesDash — module-PL ledger-level heads', () => {
   test('renders ledger-level expense head names from indirect.groups[].ledgers[]', () => {
     useModulePL.mockReturnValue({ data: {
-      indirect: {
+      byBranch: [{ branch: 'BOM', indirect: {
         expense: 75000,
         groups: [
           { name: 'Administrative Expenses', amount: 75000, ledgers: [
@@ -63,7 +67,7 @@ describe('ExpensesDash — module-PL ledger-level heads', () => {
             { name: 'Electricity', amount: 25000 },
           ] },
         ],
-      },
+      } }],
     } });
     render(<ExpensesDash branch={'ALL'} />);
     // ledger heads, not the group name, drive the bars
@@ -75,7 +79,7 @@ describe('ExpensesDash — module-PL ledger-level heads', () => {
 
   test('falls back to group level when a group carries no ledgers', () => {
     useModulePL.mockReturnValue({ data: {
-      indirect: { expense: 40000, groups: [{ name: 'Bank Charges', amount: 40000, ledgers: [] }] },
+      byBranch: [{ branch: 'BOM', indirect: { expense: 40000, groups: [{ name: 'Bank Charges', amount: 40000, ledgers: [] }] } }],
     } });
     render(<ExpensesDash branch={'ALL'} />);
     expect(screen.getAllByText('Bank Charges').length).toBeGreaterThan(0);
