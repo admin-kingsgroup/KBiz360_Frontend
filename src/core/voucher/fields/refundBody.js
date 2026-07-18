@@ -48,6 +48,9 @@ export function buildRefundReissueBody(s, ctx, kind) {
     // fetch / leg picker), so the voucher records WHICH ticket it reverses and the
     // default narration names it.
     sectors: Array.isArray(s.sectors) ? s.sectors : [], sectorRef: s.sectorRef || '',
+    // Explicit escape hatch for the backend's double-refund guard (genuine
+    // additional/partial refund of a ticket that already has one).
+    allowDuplicate: !!s.allowDuplicate,
     remarks: s.remarks || `Being ${kind}${s.againstInvoice ? ` against ${s.againstInvoice}` : ''}${s.sectorRef ? ` · ${s.sectorRef}` : ''}`,
     status: 'saved',
   };

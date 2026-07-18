@@ -306,6 +306,16 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
         );
       })()}
 
+      {/* Double-refund override — the backend 409s a second refund against a PO that
+          already has an active one; this is the explicit escape hatch for a genuine
+          additional / partial refund. Refunds only (reissues may repeat freely). */}
+      {isRefund && (
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, margin: '0 0 14px', fontSize: 11.5, color: '#5b616e', cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!state.allowDuplicate} onChange={(e) => patch({ allowDuplicate: e.target.checked })} />
+          Allow duplicate refund — this ticket already has a refund and this is a genuine additional / partial one
+        </label>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 0.7fr', gap: 12, marginBottom: 14 }}>
         <FL label="Date"><SmartDateInput max={todayISO()} value={state.date || ''} onChange={(iso) => patch({ date: iso })} style={inp} /></FL>
         <FL label="Against sales invoice 🔒"><input value={state.againstInvoice || ''} readOnly tabIndex={-1} style={lockedInp} placeholder="fetch by Link No" title="Locked — set by Link No lookup" /></FL>

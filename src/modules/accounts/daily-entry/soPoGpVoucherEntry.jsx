@@ -2122,6 +2122,8 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         supplier: { name: state.counterParty, ledgerName: state.counterParty },
         againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
         reversal,
+        // Explicit escape hatch for the backend's double-refund guard.
+        allowDuplicate: !!state.allowDuplicate,
         remarks: state.remarks || (state.sectorRef ? `Being ${kind} against ${state.againstInvoice} · ${state.sectorRef}` : state.remarks),
       };
       const booking = editing
