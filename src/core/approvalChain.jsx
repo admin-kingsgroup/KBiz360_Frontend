@@ -108,7 +108,21 @@ export function nextActionFor(e, cfg, user = chainUser()) {
   if (stage === 'owner') {
     return { stage, action: 'owner', label: 'Owner sign-off', allowed: su || (cfg.owner || DEFAULT_OWNER).includes(user.email), hint: `Owner · ${(cfg.owner || DEFAULT_OWNER).join(', ')}` };
   }
-  return { stage, action: 'approve', label: 'Approve & Post', allowed: su || cfg.approve.includes(user.email), hint: `Level 3 · ${cfg.approve.join(', ')}` };
+  // Final approve — mirror the server gate (shared/approvalChain.assertFinalApprove) so the
+  // button never renders enabled and then 403s: a Super Admin may always approve; otherwise the
+  // configured approver may, EXCEPT the maker of the entry (maker ≠ approver) and, when
+  // sod.verifier_ne_approver is engaged, the person who already Verified it (verifier ≠ approver).
+  const maker = String((e.submittedBy || e.createdBy) || '').trim().toLowerCase();
+  const isMaker = !!maker && maker === user.email;
+  const sodOn = flagOn(cfg && cfg.flags, 'sod.verifier_ne_approver', e.branch);
+  const priorVerifier = String(e.verifiedBy || '').trim().toLowerCase();
+  const isPriorVerifier = sodOn && !!priorVerifier && priorVerifier === user.email;
+  const inApproveList = cfg.approve.includes(user.email);
+  const approveAllowed = su || (inApproveList && !isMaker && !isPriorVerifier);
+  let hint = `Level 3 · ${cfg.approve.join(', ')}`;
+  if (!su && inApproveList && isMaker) hint = 'You entered this voucher — its maker can’t give final approval. A different approver (or the Owner) must.';
+  else if (!su && inApproveList && isPriorVerifier) hint = 'You verified this voucher — verifier ≠ approver is engaged, so a different person must approve it.';
+  return { stage, action: 'approve', label: 'Approve & Post', allowed: approveAllowed, hint };
 }
 
 const BADGE = {

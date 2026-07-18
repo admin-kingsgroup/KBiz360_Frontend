@@ -1,11 +1,14 @@
 import { apiGet, apiPost } from '../../../core/api';
 
-// Current control-flag state (read-only).
+// Current control-flag state (read-only). Stays resilient (never throws) so its many
+// read-only consumers keep working, but a failure is now DISTINGUISHABLE via `_error` — an
+// all-off `{flags:{}}` on load failure must not read as a genuinely dormant system (a screen
+// can't say "Everything OFF" when it actually couldn't load). Consumers that don't care ignore it.
 export async function getFlagState() {
   try {
     return (await apiGet('/api/tk/flags')) || { flags: {}, enabled: [] };
-  } catch {
-    return { flags: {}, enabled: [] };
+  } catch (e) {
+    return { flags: {}, enabled: [], _error: (e && e.message) || 'Could not load control flags.' };
   }
 }
 

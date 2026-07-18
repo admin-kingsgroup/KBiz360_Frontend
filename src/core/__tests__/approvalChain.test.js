@@ -108,3 +108,36 @@ describe('nextActionFor · Verify / Approve are unchanged by the Branch Accounta
     expect(nextActionFor(e, cfg, ba).allowed).toBe(false);
   });
 });
+
+// Mirror of the server gate shared/approvalChain.assertFinalApprove: the FE approve button must
+// NOT render enabled and then 403. maker ≠ approver always; verifier ≠ approver when engaged.
+describe('nextActionFor · Approve mirrors the SoD gates (no stale-UI 403)', () => {
+  test('a configured approver who is ALSO the maker is blocked (maker ≠ approver); Super Admin still may', () => {
+    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'sughra@travkings.com', submittedBy: 'faiz@travkings.com' };
+    const r = nextActionFor(e, cfgOf(), faiz);
+    expect(r.allowed).toBe(false);
+    expect(r.hint).toMatch(/maker/i);
+    expect(nextActionFor(e, cfgOf(), su).allowed).toBe(true);   // Super Admin override, mirrors BE isSuper
+  });
+
+  test('with verifier ≠ approver engaged, the person who verified cannot also approve', () => {
+    const sodCfg = cfgOf({ 'sod.verifier_ne_approver': { enabled: true } });
+    sodCfg.verify = ['faiz@travkings.com']; sodCfg.approve = ['faiz@travkings.com']; // the overlap the panel warns about
+    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'faiz@travkings.com', submittedBy: 'ap@travkings.com' };
+    const r = nextActionFor(e, sodCfg, faiz);
+    expect(r.allowed).toBe(false);
+    expect(r.hint).toMatch(/verifier/i);
+  });
+
+  test('the SoD flag OFF → a verifier-also-approver may approve (no phantom block)', () => {
+    const cfg = cfgOf(); // sod flag absent
+    cfg.verify = ['faiz@travkings.com']; cfg.approve = ['faiz@travkings.com'];
+    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'faiz@travkings.com', submittedBy: 'ap@travkings.com' };
+    expect(nextActionFor(e, cfg, faiz).allowed).toBe(true);
+  });
+
+  test('a non-maker configured approver approves normally', () => {
+    const e = { reviewStage: 'approve', branch: 'BOM', checkedBy: 'ap', verifiedBy: 'sughra@travkings.com', submittedBy: 'ap@travkings.com' };
+    expect(nextActionFor(e, cfgOf(), faiz).allowed).toBe(true);
+  });
+});

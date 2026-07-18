@@ -118,6 +118,10 @@ export function ControlPanel({ setRoute }) {
   const go = (route) => setRoute && setRoute(route);
   const qc = useQueryClient();
   const [msg, setMsg] = useState('');
+  const [msgTone, setMsgTone] = useState('info');
+  // Set the inline status line WITH its tone (success / info / warning / error) so a success
+  // message isn't rendered as a warning. Clearing (setMsg('')) hides the strip, so tone is moot.
+  const say = (text, tone = 'info') => { setMsg(text); setMsgTone(tone); };
   // Copy source = a REAL branch (not Group default — pushing the global as explicit overrides
   // is a footgun; use Reset-to-inherit for that). Defaults to the first real branch.
   const [copySource, setCopySource] = useState(() => (LIMIT_BRANCHES.find((b) => b.code !== 'default') || {}).code || 'default');
@@ -148,17 +152,17 @@ export function ControlPanel({ setRoute }) {
         qc.setQueryData(['tk', 'flags'], next);
         const lab = (next && next.flags && next.flags[key] && next.flags[key].label) || key;
         toastSuccess(`${lab}${where} — ${turningOn ? 'ON' : 'OFF'}`);
-        setMsg(`“${key}”${where} is now ${turningOn ? 'ON' : 'OFF'}.`);
+        say(`“${key}”${where} is now ${turningOn ? 'ON' : 'OFF'}.`, 'success');
       } else {
         await proposeFlags(withBranchToggled(flagsQ.data || { flags: {} }, key, targetBranch));
         toastInfo('Submitted for the Owner’s approval.');
-        setMsg(`Change to “${key}”${where} submitted for the Owner’s approval — it applies only once approved.`);
+        say(`Change to “${key}”${where} submitted for the Owner’s approval — it applies only once approved.`, 'info');
       }
       qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
     } catch (e) {
       const m = (e && e.message) || (owner ? 'Could not apply the change.' : 'Could not submit the change.');
       toastError(m);
-      setMsg(m);
+      say(m, 'error');
     }
   };
   // Configurable screen flips against the panel-selected branch scope.
@@ -168,17 +172,17 @@ export function ControlPanel({ setRoute }) {
   // refresh the cache. Shared by Enable-all/Disable-all, presets, and copy-across-branches.
   const applyBulk = async (changes, label) => {
     setMsg('');
-    if (!changes.length) { setMsg('Nothing to change.'); return; }
+    if (!changes.length) { say('Nothing to change.', 'info'); return; }
     try {
       const next = await setManyFlags(changes);
       if (next && next.flags) qc.setQueryData(['tk', 'flags'], next);
       toastSuccess(`${label} — applied (${changes.length} settings)`);
-      setMsg(`${label} — applied (${changes.length} settings).`);
+      say(`${label} — applied (${changes.length} settings).`, 'success');
       qc.invalidateQueries({ queryKey: ['tk', 'flags'] });
     } catch (e) {
       const m = (e && e.message) || 'Could not apply the bulk change.';
       toastError(m);
-      setMsg(m);
+      say(m, 'error');
     }
   };
 
@@ -472,25 +476,48 @@ export function ControlPanel({ setRoute }) {
   const stripBranch = showBranchBar ? branch : 'default';
   const stripScoped = showBranchBar && scoped;
   const engaged = CONFIGURABLE_FLAGS.filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length;
+  // A failed / blocked flag read returns {flags:{}, _error} (see api/flags getFlagState). Surface
+  // it as its OWN state — "Everything OFF · dormant" must never stand in for "couldn't load".
+  const loadError = flagsQ.data && flagsQ.data._error;
+  const loading = flagsQ.isLoading;
 
   return (
     <div data-testid="tk-control-panel">
-      {/* status strip — reflects the REAL configurable-flag state for the selected scope */}
-      <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${engaged > 0 ? 'border-success/40 bg-success-soft' : 'border-warning/40 bg-warning-soft'}`}>
-        <span className={`text-[11px] font-bold uppercase tracking-wide ${engaged > 0 ? 'text-success' : 'text-warning'}`}>Control Panel</span>
-        <Badge tone={engaged > 0 ? 'success' : 'warning'}>
-          {engaged > 0 ? `${engaged} control${engaged > 1 ? 's' : ''} on` : 'Everything OFF · dormant'}
-        </Badge>
-        <span className={`text-[12px] ${engaged > 0 ? 'text-success' : 'text-warning'}`}>
-          {stripScoped ? <><b>{branchLabel}</b> scope · </> : null}
-          {owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
-            : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
-        </span>
-        <button type="button" onClick={() => go('/tk/rules')}
-          className="ml-auto shrink-0 rounded-full border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">
-          📖 Rule Book
-        </button>
-      </div>
+      {/* status strip — the REAL configurable-flag state for the scope, OR a distinct load /
+          error state so a failed/blocked read never masquerades as a genuinely dormant system. */}
+      {loadError ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-danger/40 bg-danger-soft px-4 py-2.5">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-danger">Control Panel</span>
+          <Badge tone="danger">Couldn’t load</Badge>
+          <span className="text-[12px] text-danger">
+            <b>Control state didn’t load</b> — a <b>load error, not a dormant system</b>; the panel can’t show what’s enforced. Source: <code>/api/tk/flags</code>{owner ? '' : ' (central roles only)'}.
+          </span>
+          <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ['tk', 'flags'] })}
+            className="ml-auto shrink-0 rounded-full border border-danger/40 bg-surface px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger-soft">↻ Retry</button>
+        </div>
+      ) : loading ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-surface-border bg-surface-alt px-4 py-2.5">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-ink-subtle">Control Panel</span>
+          <span className="rounded-full bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-ink-muted">Loading…</span>
+          <span className="text-[12px] text-ink-muted">Reading the live control state…</span>
+        </div>
+      ) : (
+        <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${engaged > 0 ? 'border-success/40 bg-success-soft' : 'border-warning/40 bg-warning-soft'}`}>
+          <span className={`text-[11px] font-bold uppercase tracking-wide ${engaged > 0 ? 'text-success' : 'text-warning'}`}>Control Panel</span>
+          <Badge tone={engaged > 0 ? 'success' : 'warning'}>
+            {engaged > 0 ? `${engaged} control${engaged > 1 ? 's' : ''} on` : 'Everything OFF · dormant'}
+          </Badge>
+          <span className={`text-[12px] ${engaged > 0 ? 'text-success' : 'text-warning'}`}>
+            {stripScoped ? <><b>{branchLabel}</b> scope · </> : null}
+            {owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
+              : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
+          </span>
+          <button type="button" onClick={() => go('/tk/rules')}
+            className="ml-auto shrink-0 rounded-full border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">
+            📖 Rule Book
+          </button>
+        </div>
+      )}
 
       {/* branch scope selector — every control below applies to the chosen branch */}
       {showBranchBar && (
@@ -499,7 +526,7 @@ export function ControlPanel({ setRoute }) {
           {LIMIT_BRANCHES.map((b) => {
             const active = branch === b.code;
             return (
-              <button key={b.code} type="button" onClick={() => { setBranch(b.code); setImpacts({}); }}
+              <button key={b.code} type="button" aria-pressed={active} onClick={() => { setBranch(b.code); setImpacts({}); }}
                 className={`rounded-full border px-3 py-1 text-[11.5px] transition-colors ${active ? 'border-navy bg-navy text-white font-semibold' : 'border-surface-border text-ink-muted hover:bg-navy/5'}`}>
                 {b.label}{b.code !== 'default' && <span className={`ml-1 font-mono text-[9px] ${active ? 'text-white/70' : 'text-ink-subtle'}`}>{b.ccy}</span>}
               </button>
@@ -509,7 +536,13 @@ export function ControlPanel({ setRoute }) {
         </div>
       )}
 
-      {msg && <div role="status" className="mb-3 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}
+      {msg && (
+        <div role="status" className={`mb-3 rounded-brand px-3 py-2 text-xs ${
+          msgTone === 'success' ? 'bg-success-soft text-success'
+            : msgTone === 'error' ? 'bg-danger-soft text-danger'
+            : msgTone === 'warning' ? 'bg-warning-soft text-warning'
+            : 'bg-navy/5 text-navy'}`}>{msg}</div>
+      )}
       <div className="grid gap-4 desktop:grid-cols-[230px_1fr]">
         {/* nav */}
         <nav className="rounded-brand border border-surface-border bg-surface p-2" aria-label="Control Panel screens">
@@ -518,9 +551,12 @@ export function ControlPanel({ setRoute }) {
               <div className="px-2 py-1 font-mono text-[9px] uppercase tracking-widest text-ink-subtle">{grp.group}</div>
               {grp.items.map((it) => {
                 const keys = SCREEN_FLAGS[it.key];
-                const onN = keys ? keys.filter((k) => isOn(k)).length : null;
+                // Count in the SAME scope the status strip reports (stripBranch: the selected
+                // branch on branch-scoped screens, else the Group default) so the badge and strip
+                // never disagree on a screen with no visible branch selector.
+                const onN = keys ? keys.filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length : null;
                 return (
-                  <button key={it.key} onClick={() => setScreen(it.key)}
+                  <button key={it.key} onClick={() => setScreen(it.key)} aria-current={screen === it.key ? 'page' : undefined}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg border-l-[3px] px-2.5 py-2 text-left text-[12.5px] transition-colors ${screen === it.key ? 'border-l-gold bg-navy/5 font-semibold text-navy' : 'border-l-transparent text-ink-muted hover:bg-navy/5 hover:text-navy'}`}>
                     <span className="truncate">{it.label}</span>
                     {onN === null ? null : onN > 0

@@ -54,7 +54,7 @@ describe('Control Panel · two-screen model', () => {
   test('opens on Default Rules, dormant, with the two rule screens + tools in the nav', async () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     expect(await screen.findByText(/Control Panel/)).toBeInTheDocument();
-    expect(screen.getByText(/Everything OFF/)).toBeInTheDocument();
+    expect(await screen.findByText(/Everything OFF/)).toBeInTheDocument();   // resolves after the brief loading strip
     // rule screens + a few tools across the groups ("Default Rules" is both the nav item
     // and the active screen heading, so it appears twice)
     expect(screen.getAllByText('Default Rules').length).toBeGreaterThanOrEqual(1);
@@ -64,6 +64,14 @@ describe('Control Panel · two-screen model', () => {
     expect(screen.getByText('Break-Glass Access')).toBeInTheDocument();
     // the master switch is gone
     expect(screen.queryByText('Master Switch')).not.toBeInTheDocument();
+  });
+
+  test('a failed flag load shows a distinct error state, NOT a false “Everything OFF · dormant”', async () => {
+    const { getFlagState } = require('../api/flags');
+    getFlagState.mockResolvedValueOnce({ flags: {}, enabled: [], _error: 'Network error' });
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    expect(await screen.findByText(/Control state didn.t load/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Everything OFF/)).not.toBeInTheDocument();   // must not masquerade as dormant
   });
 
   test('Default Rules screen lists always-on foundation locks (read-only)', async () => {
