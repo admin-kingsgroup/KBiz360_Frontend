@@ -1395,6 +1395,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           </tr></tfoot>
         </table>
       </div>
+      {/* Passenger rows are entered HERE — the Sales grid above mirrors them automatically. */}
+      <button onClick={addLine} style={{ ...btnGh, marginTop: 8, padding: '6px 12px', fontSize: 11 }}><Plus size={12} /> Add line</button>
     </Section>
   );
 
@@ -1767,7 +1769,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </p>
           );
         })()}
-        <button onClick={addLine} style={{ ...btnGh, marginTop: 8, padding: '6px 12px', fontSize: 11 }}><Plus size={12} /> Add line</button>
+        {/* Rows are added on the PURCHASE grid (the sale derives from it) — except in
+            no-supplier mode, where the PO section is hidden and this is the only grid. */}
+        {isNoSupp && <button onClick={addLine} style={{ ...btnGh, marginTop: 8, padding: '6px 12px', fontSize: 11 }}><Plus size={12} /> Add line</button>}
       </Section>
 
       {/* ② Purchase Order — hidden in no-supplier mode (there's no cost leg). */}
