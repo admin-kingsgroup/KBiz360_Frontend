@@ -11,7 +11,7 @@ import { useFormKeys } from '../ux/forms';
 import { toast } from '../ux/toast';
 import { confirmDialog } from '../ux/confirm';
 import { Kbd } from '../ux/widgets.jsx';
-import { isViewOnly } from '../api';
+import { isViewOnly, VIEW_ONLY_REASON } from '../api';
 import { triggerSaveRefresh } from '../hooks';
 import { useVNo } from '../useNextNo';
 
@@ -226,7 +226,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
         {!isEdit && <button onClick={reset} className="max-tablet:min-h-[44px]" style={btnGh}>Reset</button>}
         {isEdit && <button onClick={dismiss} className="max-tablet:min-h-[44px]" style={btnGh}>Back</button>}
-        <button onClick={save} disabled={!canSave} title={viewOnly ? 'View only — changes are not allowed' : 'Save (Ctrl/Cmd+Enter)'} className="max-tablet:min-h-[44px]" style={{ ...btnG, background: canSave ? '#A07828' : '#cbd0db', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+        <button onClick={save} disabled={!canSave} title={viewOnly ? VIEW_ONLY_REASON : 'Save (Ctrl/Cmd+Enter)'} className="max-tablet:min-h-[44px]" style={{ ...btnG, background: canSave ? '#A07828' : '#cbd0db', opacity: canSave ? 1 : 0.6, display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           {desc.icon} Save Voucher {saving ? '…' : val.hint} {!saving && <Kbd>⌃↵</Kbd>}
         </button>
       </div>

@@ -336,8 +336,8 @@ export function HrAttendance({branch}){
                 <tr key={emp.id} style={{borderBottom:"1px solid #dfe2e7",background:ei%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"7px 12px",fontWeight:600,color:"#0d1326"}}>{emp.name}</td>
                   <td style={{padding:"7px 12px",color:"#5a6691",fontSize:10}}>{sh?`${sh.code||sh.name} ${sh.startTime}–${sh.endTime}`:"— default —"}</td>
-                  <td style={{padding:"6px 12px"}}><input key={`in-${emp.id}-${punchDay}-${t.in||""}`} type="time" defaultValue={t.in||""} disabled={vo} onBlur={e=>{if(!vo&&(e.target.value||"")!==(t.in||""))saveTime(emp,punchDay,{in:e.target.value});}} style={{...inp,width:110,minHeight:30}}/></td>
-                  <td style={{padding:"6px 12px"}}><input key={`out-${emp.id}-${punchDay}-${t.out||""}`} type="time" defaultValue={t.out||""} disabled={vo} onBlur={e=>{if(!vo&&(e.target.value||"")!==(t.out||""))saveTime(emp,punchDay,{out:e.target.value});}} style={{...inp,width:110,minHeight:30}}/></td>
+                  <td style={{padding:"6px 12px"}}><input key={`in-${emp.id}-${punchDay}-${t.in||""}`} type="time" defaultValue={t.in||""} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} onBlur={e=>{if(!vo&&(e.target.value||"")!==(t.in||""))saveTime(emp,punchDay,{in:e.target.value});}} style={{...inp,width:110,minHeight:30}}/></td>
+                  <td style={{padding:"6px 12px"}}><input key={`out-${emp.id}-${punchDay}-${t.out||""}`} type="time" defaultValue={t.out||""} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} onBlur={e=>{if(!vo&&(e.target.value||"")!==(t.out||""))saveTime(emp,punchDay,{out:e.target.value});}} style={{...inp,width:110,minHeight:30}}/></td>
                   <td style={{padding:"7px 12px"}}>{t.in?(late?<span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:"#FCEBEB",color:"#A32D2D"}}>Late</span>:<span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:"#EAF3DE",color:"#27500A"}}>On time</span>):<span style={{fontSize:10,color:"#8b94b3"}}>—</span>}</td>
                 </tr>
               );
