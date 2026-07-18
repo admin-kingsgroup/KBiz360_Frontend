@@ -1082,6 +1082,16 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       const fareLines = (spec.fareCols || [])
         .map((c) => ({ ledger: 'Inter-Branch Sales', amt: round2(lines.reduce((s, l) => s + num(l[c.key]), 0)), desc: c.label }))
         .filter((l) => l.amt > 0);
+      // N-PO pass-through (mirrors the CRM's interbranch save): each extra leg's net
+      // cost rides in the fares so the BUYER reimburses it at cost — the leg still
+      // ships in `purchases` and posts its own INB purchase voucher. Without this the
+      // seller's INB sale under-bills by the leg cost and the deal trips the
+      // negative-GP hard block (INGP = Service Fee only).
+      for (const leg of extraLegsFilled) {
+        const legPo = legToPayload(leg, brCode, effNoVat, isForeignSupplier(leg.supplier.name)).po;
+        const legNet = round2(num(legPo.total) - num(legPo.gst) - num(legPo.tcs) - num(legPo.incentiveAmt));
+        if (legNet > 0) fareLines.push({ ledger: 'Inter-Branch Sales', amt: legNet, desc: 'Base Fare' });
+      }
       const serviceFee = round2(lines.reduce((s, l) => s + num(l.ssvc), 0));
       const pax = lines.map((l) => [l.fn, l.sn].filter(Boolean).join(' ')).filter(Boolean).join(', ');
       if (!fareLines.length && !serviceFee) { setError('Enter the fares and/or a Service Fee'); return; }
