@@ -152,6 +152,34 @@ const partyBlock = (lab, p, cur, idLabel = 'GSTIN') => `<div class="party"><div 
 
 // side: 'sale' | 'purchase'. `master` = the resolved customer/supplier master record
 // (optional) — used to back-fill blank party fields on older bookings.
+// SALE print of a Flight folder: the extra FLIGHT N-PO legs are billed on THIS one
+// invoice (their fares are clubbed into so.lineTotal/total at entry), so the printed
+// line table must show them too — otherwise the lines no longer foot to the Sub
+// Total the summary prints. Same semantics as the SO grid: a leg clubs into its
+// passenger's row (fares summed, sectors appended, tagged with its PO no); a
+// passenger not on the main grid gets an own row (fares only — the service-charge
+// columns live on the main rows). Purchase prints are per-supplier — never merged.
+export function mergeLegRowsForSalePrint(rows = [], purchases = [], spec) {
+  if (!spec || !spec.sectors) return rows;
+  const legs = (Array.isArray(purchases) ? purchases : []).filter((p) => p && String(p.module || '').toUpperCase() === 'SF');
+  if (!legs.length) return rows;
+  const key = (fn, sn) => `${String(fn || '').trim().toLowerCase()}|${String(sn || '').trim().toLowerCase()}`;
+  const merged = (Array.isArray(rows) ? rows : []).map((r) => ({ ...r, sectors: Array.isArray(r.sectors) ? [...r.sectors] : [] }));
+  legs.forEach((leg) => {
+    const lr = (Array.isArray(leg.rows) && leg.rows[0]) || {};
+    const k = key(lr.fn, lr.sn);
+    let tgt = k !== '|' ? merged.find((r) => key(r.fn, r.sn) === k) : null;
+    if (!tgt) {
+      tgt = { fn: lr.fn || '', sn: lr.sn || '', markup: 0, ssvc: 0, psvc: 0, incentive: 0, sectors: [] };
+      spec.fareCols.forEach((col) => { tgt[col.key] = 0; });
+      merged.push(tgt);
+    }
+    spec.fareCols.forEach((col) => { tgt[col.key] = r2((Number(tgt[col.key]) || 0) + (Number(lr[col.key]) || 0)); });
+    (Array.isArray(lr.sectors) ? lr.sectors : []).forEach((s) => { if (s && (s.sector || s.ticketNo || s.pnr || s.flightNo)) tgt.sectors.push(s); });
+  });
+  return merged;
+}
+
 export function buildBookingInvoice(booking = {}, side = 'sale', branch, master = {}, opts = {}) {
   const isSale = side === 'sale';
   // Holiday (package) client invoice hides the SVC2 margin: it's folded into the Base
@@ -293,7 +321,9 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     ];
     cols = head.filter(Boolean).length;
     bkHead = head.join('');
-    bkBody = rows.map((l) => {
+    // Clubbed Flight N-PO legs join the printed rows — the lines must foot to the
+    // (clubbed) Sub Total the summary block prints from booking.so.
+    bkBody = mergeLegRowsForSalePrint(rows, booking.purchases, spec).map((l) => {
       const c = lineCalc(spec, l, ctx);
       const taxes = (Number(l.tax) || 0) + (Number(l.markup) || 0); // fare tax + hidden margin, combined
       const cells = [

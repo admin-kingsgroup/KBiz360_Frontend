@@ -360,3 +360,50 @@ describe('clientNetFromJv — displayed client figure matches the posted JV', ()
     expect(clientNetFromJv(postings, '', true, 168140)).toBe(168140);
   });
 });
+
+describe('ticketSectors / sectorRefOf — PO ↔ sector traceability for refunds', () => {
+  const { ticketSectors, sectorRefOf, refundPrefillFromLeg } = require('../fields/refundPrefill');
+  const rows = [
+    { fn: 'ANUBHAV', sn: 'KUMAR', sectors: [
+      { sector: 'BOM-DXB', airline: 'Emirates', flightNo: 'EK 501', ticketNo: 'TKT-1', pnr: 'PNR1' },
+      { sector: '', airline: '', flightNo: '', ticketNo: '', pnr: '' },   // blank seed row
+    ] },
+    { fn: 'PRIYA', sn: 'SHARMA', sectors: [{ sector: 'DXB-NBO', airline: 'Kenya Airways', flightNo: 'KQ 311', ticketNo: 'TKT-2', pnr: 'PNR2' }] },
+  ];
+
+  test('flattens rows → per-segment list with passenger, skipping blank seed rows', () => {
+    const secs = ticketSectors(rows);
+    expect(secs).toHaveLength(2);
+    expect(secs[0]).toMatchObject({ fn: 'ANUBHAV', sector: 'BOM-DXB', ticketNo: 'TKT-1' });
+    expect(secs[1]).toMatchObject({ fn: 'PRIYA', sector: 'DXB-NBO', flightNo: 'KQ 311' });
+  });
+
+  test('sectorRefOf builds the compact narration reference', () => {
+    expect(sectorRefOf(ticketSectors(rows))).toBe('BOM-DXB EK 501 TKT TKT-1 + DXB-NBO KQ 311 TKT TKT-2');
+  });
+
+  test('prefill from a Flight leg stamps sectors + sectorRef from THAT leg', () => {
+    const leg = { purchaseVno: 'PF/BOM/26/0009', po: { total: 5250 }, supplier: { ledgerName: 'Kenya Airways GSA' },
+      rows: [{ fn: 'PRIYA', sn: 'SHARMA', sectors: [{ sector: 'DXB-NBO', airline: 'Kenya Airways', flightNo: 'KQ 311', ticketNo: 'TKT-2', pnr: 'PNR2' }] }] };
+    const p = refundPrefillFromLeg(leg, { saleVno: 'SV/1', customer: {} }, {});
+    expect(p.sectors).toHaveLength(1);
+    expect(p.sectors[0].sector).toBe('DXB-NBO');
+    expect(p.sectorRef).toBe('DXB-NBO KQ 311 TKT TKT-2');
+    expect(p.counterParty).toBe('Kenya Airways GSA');
+  });
+
+  test('prefill from the booking stamps the primary PO rows', () => {
+    const { refundPrefillFromBooking } = require('../fields/refundPrefill');
+    const p = refundPrefillFromBooking({ saleVno: 'SV/1', rows, so: {}, po: {} }, {});
+    expect(p.sectors).toHaveLength(2);
+    expect(p.sectorRef).toContain('BOM-DXB');
+  });
+
+  test('no sectors (Misc leg / legacy booking) → empty stamp, no crash', () => {
+    expect(ticketSectors(undefined)).toEqual([]);
+    expect(sectorRefOf([])).toBe('');
+    const p = refundPrefillFromLeg({ po: {}, rows: [] }, {}, {});
+    expect(p.sectors).toEqual([]);
+    expect(p.sectorRef).toBe('');
+  });
+});
