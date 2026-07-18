@@ -5,6 +5,7 @@ import { confirmDialog } from '../../core/ux/confirm';
 import { toastSuccess, toastError } from '../../core/ux/toast';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
 import { SkeletonTable } from '../../shell/primitives';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 
 // ─── Control Panel · Break-Glass — emergency elevated access ─────────────────
 // A user self-invokes emergency Verify+Approve authority for a SHORT window with a
@@ -23,6 +24,9 @@ export function BreakGlass() {
   const [branch, setBranch] = useState('ALL');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  // View-only accounts may read the break-glass log but never invoke or end a session — the
+  // actions are pre-disabled with the shared reason instead of a live button that only 403s.
+  const vo = isViewOnly();
 
   const invoke = async () => {
     if (reason.trim().length < 5) { setMsg('A clear reason (≥ 5 characters) is required.'); return; }
@@ -74,8 +78,8 @@ export function BreakGlass() {
         </div>
         {msg && <div role="status" className="mt-2 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}
         <div className="mt-3">
-          <button type="button" onClick={invoke} disabled={busy}
-            className={`rounded-brand px-4 py-2 text-[13px] font-semibold text-white ${busy ? 'bg-ink-subtle' : 'bg-danger hover:bg-danger/90'}`}>
+          <button type="button" onClick={invoke} disabled={busy || vo} title={vo ? VIEW_ONLY_REASON : undefined}
+            className={`rounded-brand px-4 py-2 text-[13px] font-semibold text-white ${busy || vo ? 'cursor-not-allowed bg-ink-subtle' : 'bg-danger hover:bg-danger/90'}`}>
             {busy ? 'Invoking…' : '🔓 Invoke break-glass'}
           </button>
         </div>
@@ -98,7 +102,7 @@ export function BreakGlass() {
                   <td className="whitespace-nowrap p-2.5 font-mono text-[11px] text-ink-muted">{when(s.startedAt)}</td>
                   <td className="whitespace-nowrap p-2.5 font-mono text-[11px] text-ink-muted">{when(s.expiresAt)}</td>
                   <td className="p-2.5">{s.endedAt ? <span className="rounded-full bg-surface-alt px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase text-ink-subtle">ended</span> : s.active ? <span className="rounded-full bg-danger-soft px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase text-danger">active</span> : <span className="rounded-full bg-surface-alt px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase text-ink-subtle">expired</span>}</td>
-                  <td className="p-2.5">{!s.endedAt && s.active ? <button type="button" onClick={() => end(s.id)} className="text-[11px] text-ink-subtle underline hover:text-danger">End now</button> : null}</td>
+                  <td className="p-2.5">{!s.endedAt && s.active ? <button type="button" onClick={() => end(s.id)} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} className={`text-[11px] text-ink-subtle underline hover:text-danger ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>End now</button> : null}</td>
                 </tr>
               ))}
             </tbody>

@@ -22,6 +22,33 @@ describe('primitives', () => {
     expect(onClick).toHaveBeenCalledTimes(1); // disabled while loading
   });
 
+  test('Button `write` is pre-disabled with a reason for a view-only user (never a live no-op)', () => {
+    localStorage.removeItem('kb360-user');
+    const onClick = jest.fn();
+    // Not view-only → a write button behaves normally.
+    render(<Button write onClick={onClick}>Save</Button>);
+    fireEvent.click(screen.getByText('Save'));
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    // View-only → the SAME write button is disabled, carries the reason, and eats the click…
+    localStorage.setItem('kb360-user', JSON.stringify({ viewOnly: true }));
+    try {
+      render(<Button write onClick={onClick}>Post</Button>);
+      const writeBtn = screen.getByText('Post').closest('button');
+      expect(writeBtn).toBeDisabled();
+      expect(writeBtn.getAttribute('title')).toMatch(/view only/i);
+      fireEvent.click(screen.getByText('Post'));
+      expect(onClick).toHaveBeenCalledTimes(1); // still 1 — the disabled write button did nothing
+
+      // …while a NON-write (nav / filter / view) button is untouched — backward compatible.
+      render(<Button onClick={onClick}>Open</Button>);
+      fireEvent.click(screen.getByText('Open'));
+      expect(onClick).toHaveBeenCalledTimes(2);
+    } finally {
+      localStorage.removeItem('kb360-user');
+    }
+  });
+
   test('StatusPill / Badge render their content', () => {
     render(<StatusPill tone="success">Posted</StatusPill>);
     expect(screen.getByText('Posted')).toBeInTheDocument();

@@ -6,6 +6,8 @@
 const mockApiGet = jest.fn();
 
 jest.mock('../../core/api', () => ({
+  isViewOnly: () => false,
+  VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.',
   apiGet: (...a) => mockApiGet(...a),
   apiPost: jest.fn(() => Promise.resolve({})),
   apiPut: jest.fn(() => Promise.resolve({})),

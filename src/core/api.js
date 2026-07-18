@@ -42,6 +42,10 @@ export function isViewOnly() {
     return !!(u && u.viewOnly);
   } catch { return false; }
 }
+// One shared reason string for every view-only disabled control, so the message is identical
+// across Approvals, Masters, Reconciliation and TK-Central (the shared Button primitive + the
+// raw-button surfaces all read this).
+export const VIEW_ONLY_REASON = 'View only — this account can review but cannot make changes.';
 
 // Approver roles (FULL_SCOPE_ROLES) may Revoke a posted voucher/booking back to
 // Pending — stricter than Approve since it un-posts the books. Mirrors the role gate

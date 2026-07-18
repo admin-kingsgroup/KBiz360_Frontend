@@ -52,6 +52,112 @@ function LedgerDrill({ branch, ledger, from, to, onClose }) {
   );
 }
 
+/* Currency symbol for a branch CODE — the consolidated (ALL) view renders each
+   branch in ITS OWN currency, derived from the code via the same bc() map that
+   powers curOf (bc looks up B[branch.code]). Never a cross-currency merge. */
+const curOfCode = (code) => curOf({ code });
+
+/* ════════════════════════════════════════════════════════════════════
+   TrialBalanceScope — Trial Balance for ONE branch scope (one slice of the
+   consolidated view). Same banner + table markup as the single-branch render
+   below, but scoped to this branch's rows and its OWN currency `cur`. A scope
+   totals ONLY itself — there is NEVER a Dr/Cr or total summed across branches.
+   ════════════════════════════════════════════════════════════════════ */
+function TrialBalanceScope({ data, branchCode, view, from, to }) {
+  const cur = curOfCode(branchCode);
+  const [drill, setDrill] = useState(null); // ledger name
+
+  // Normalise exactly like the single-branch view (older payload → closing only).
+  const rows = useMemo(() => (data?.rows || []).map((r) => (
+    r.closingDebit != null || r.closingCredit != null
+      ? r
+      : { ...r, openingDebit: 0, openingCredit: 0, closingDebit: r.debit || 0, closingCredit: r.credit || 0, debit: 0, credit: 0 }
+  )), [data]);
+
+  const T = useMemo(() => {
+    const s = (k) => Math.round(rows.reduce((a, r) => a + (r[k] || 0), 0));
+    return { openDr: s('openingDebit'), openCr: s('openingCredit'), dr: s('debit'), cr: s('credit'), clDr: s('closingDebit'), clCr: s('closingCredit') };
+  }, [rows]);
+  const groupTotals = useMemo(() => {
+    const m = new Map();
+    for (const r of rows) {
+      if (!m.has(r.group)) m.set(r.group, { clDr: 0, clCr: 0, n: 0 });
+      const g = m.get(r.group); g.clDr += r.closingDebit || 0; g.clCr += r.closingCredit || 0; g.n += 1;
+    }
+    return m;
+  }, [rows]);
+
+  // Balanced banner reflects THIS branch's own totals — never a cross-branch sum.
+  const fullClDr = data?.totalClosingDebit != null ? data.totalClosingDebit : (data?.totalDebit || 0);
+  const fullClCr = data?.totalClosingCredit != null ? data.totalClosingCredit : (data?.totalCredit || 0);
+  const balanced = Math.abs(fullClDr - fullClCr) < 1;
+
+  if (!rows.length) {
+    return <div style={{ ...card, padding: 20, textAlign: 'center', color: DIM, fontSize: 12 }}>No ledger balances for this branch in this period.</div>;
+  }
+
+  let lastGroup = null; // group-header bookkeeping while rendering this branch's rows
+  return (
+    <>
+      {balanced
+        ? <Banner tone="ok">✔ Trial Balance tallied — Closing Dr {money(cur, fullClDr)} = Cr {money(cur, fullClCr)}</Banner>
+        : <Banner tone="err">⚠ Out of balance — Closing Dr {money(cur, fullClDr)} ≠ Cr {money(cur, fullClCr)}</Banner>}
+      <Table>
+        <thead><tr style={headRow}>
+          <Th>Ledger Account</Th>
+          {view === 'detailed' && <><Th right>Opening Dr</Th><Th right>Opening Cr</Th><Th right>Debit</Th><Th right>Credit</Th></>}
+          <Th right>Closing Dr ({cur})</Th><Th right>Closing Cr ({cur})</Th>
+        </tr></thead>
+        <tbody>
+          {rows.map((l, i) => {
+            const showGroup = l.group !== lastGroup;
+            lastGroup = l.group;
+            const gt = groupTotals.get(l.group);
+            return (
+              <React.Fragment key={(l.code || '') + l.ledger + i}>
+                {showGroup && (
+                  <tr style={{ background: '#eef1f7' }}>
+                    <td style={{ padding: '7px 14px', fontWeight: 800, color: DARK, fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{l.group} <span style={{ color: DIM, fontWeight: 600 }}>· {gt?.n} ledger(s)</span></td>
+                    {view === 'detailed' && <td colSpan={4} />}
+                    <td style={{ padding: '7px 14px', ...num, fontWeight: 700, color: DIM, fontSize: 10.5 }}>{money(cur, gt?.clDr)}</td>
+                    <td style={{ padding: '7px 14px', ...num, fontWeight: 700, color: DIM, fontSize: 10.5 }}>{money(cur, gt?.clCr)}</td>
+                  </tr>
+                )}
+                <tr style={{ ...rowBg(i), cursor: 'pointer' }}
+                  {...clickable(() => setDrill(l.ledger))}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'; }}>
+                  <td style={{ padding: '8px 14px 8px 26px', color: BLUE, fontWeight: 600 }}>{l.ledger}{l.code ? <span style={{ color: '#9197a3', fontSize: 9.5, marginLeft: 6 }}>{l.code}</span> : null} <span style={{ color: '#9197a3', fontSize: 10 }}>›</span></td>
+                  {view === 'detailed' && <>
+                    <td style={{ padding: '8px 14px', ...num, color: l.openingDebit > 0 ? DARK : '#9197a3' }}>{money(cur, l.openingDebit)}</td>
+                    <td style={{ padding: '8px 14px', ...num, color: l.openingCredit > 0 ? DARK : '#9197a3' }}>{money(cur, l.openingCredit)}</td>
+                    <td style={{ padding: '8px 14px', ...num, color: l.debit > 0 ? BLUE : '#9197a3' }}>{money(cur, l.debit)}</td>
+                    <td style={{ padding: '8px 14px', ...num, color: l.credit > 0 ? RED : '#9197a3' }}>{money(cur, l.credit)}</td>
+                  </>}
+                  <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingDebit > 0 ? DARK : '#9197a3' }}>{money(cur, l.closingDebit)}</td>
+                  <td style={{ padding: '8px 14px', ...num, fontWeight: 700, color: l.closingCredit > 0 ? DARK : '#9197a3' }}>{money(cur, l.closingCredit)}</td>
+                </tr>
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+        <tfoot><tr style={{ background: DARK, borderTop: `2px solid ${GOLD}` }}>
+          <td style={{ padding: '10px 14px', fontWeight: 700, color: GOLD, fontSize: 12 }}>TOTAL — {rows.length} ledgers</td>
+          {view === 'detailed' && <>
+            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.openDr)}</td>
+            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.openCr)}</td>
+            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.dr)}</td>
+            <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff' }}>{money(cur, T.cr)}</td>
+          </>}
+          <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: '#fff', fontSize: 13 }}>{money(cur, T.clDr)}</td>
+          <td style={{ padding: '10px 14px', ...num, fontWeight: 800, color: GOLD, fontSize: 13 }}>{money(cur, T.clCr)}</td>
+        </tr></tfoot>
+      </Table>
+      {drill && <LedgerDrill branch={{ code: branchCode }} ledger={drill} from={from} to={to} onClose={() => setDrill(null)} />}
+    </>
+  );
+}
+
 /* ════════════════════ TRIAL BALANCE ════════════════════════════════ */
 export function TrialBalanceLive({ branch }) {
   const cur = curOf(branch);
@@ -121,6 +227,43 @@ export function TrialBalanceLive({ branch }) {
 
   // group-header bookkeeping while rendering the page slice
   let lastGroup = null;
+
+  // Consolidated (ALL / Group) scope: render EACH branch as its own section in
+  // its OWN currency, driven by the BE `data.byBranch` breakdown. Money is NEVER
+  // summed across branches/currencies — each section totals only itself. Falls
+  // through to the single/merged render below when the BE sent no per-branch
+  // breakdown (older payload / single posted branch) — guarded by Array.isArray.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
+  if (isAll && Array.isArray(q.data?.byBranch)) {
+    const branches = q.data.byBranch;
+    return (
+      <Page
+        wide={view === 'detailed'}
+        title="Trial Balance"
+        sub={`${branchLabel(branch)} · ${branches.length} branch(es) · each in its own currency`}
+        right={<>
+          <ModeToggle view={view} setView={setView} modes={[{ id: 'detailed', label: 'Detailed' }, { id: 'summary', label: 'Summary' }]} />
+          <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} onChange={() => setPage(0)} branch={branch} />
+        </>}
+      >
+        <Banner tone="info">Consolidated — each branch shown separately in its own currency · <b>no cross-currency total</b></Banner>
+        {branches.length === 0 && (
+          <div style={{ ...card, padding: 28, textAlign: 'center', color: DIM, fontSize: 12 }}>No ledger balances in any branch for this period.</div>
+        )}
+        {branches.map((b) => (
+          <section key={b.branch} style={{ marginBottom: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, borderBottom: `2px solid ${DARK}`, paddingBottom: 4, marginBottom: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: DARK }}>{b.branch || '—'}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: DIM }}>· {curOfCode(b.branch)}</span>
+            </div>
+            {b._error
+              ? <Banner tone="err">⚠ Couldn't load {b.branch || 'this branch'} — {b._error}</Banner>
+              : <TrialBalanceScope data={b} branchCode={b.branch} view={view} from={from} to={to} />}
+          </section>
+        ))}
+      </Page>
+    );
+  }
 
   return (
     <Page

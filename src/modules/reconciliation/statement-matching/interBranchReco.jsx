@@ -18,6 +18,7 @@ import { useInterBranchReco, useInterBranchLinks } from '../../../core/useInterB
 import { C, card, money, Shell, th, td, rnum, Table, Tile, Row, aBtn } from '../../accountantWorkspace/shared';
 import { wbBadge } from './shared';
 import { getIbFreezeAll, ibFreeze, ibFreezeSign, ibUnfreeze, ibFreezeReopen } from '../api';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 import { Skeleton } from '../../../shell/primitives';
 
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
@@ -122,6 +123,7 @@ export function InterBranchReco({ branch }) {
 // soft Un-freeze (whoever froze); Certified → Director/Owner Re-open (reason).
 function IbFreezeCell({ branchA, branchB, period, st, onChanged }) {
   const [busy, setBusy] = useState(false);
+  const vo = isViewOnly();   // view-only user: freeze/sign/un-freeze/re-open disabled with a reason
 
   const run = async (fn, okMsg) => {
     setBusy(true);
@@ -149,14 +151,14 @@ function IbFreezeCell({ branchA, branchB, period, st, onChanged }) {
           ? <span style={{ fontSize: 10, fontWeight: 800, color: '#185FA5' }}><Snowflake size={10} style={{ verticalAlign: -1 }} /> Frozen{signatures ? ` · ${signatures} signed` : ''}</span>
           : <span style={{ fontSize: 10, color: C.dim }}>Open</span>}
       {!frozen && !certified && (
-        <button onClick={doFreeze} disabled={!agrees || busy} title={agrees ? '' : 'the two branches must agree this month first'}
-          style={{ ...aBtn(C.blue), opacity: (agrees && !busy) ? 1 : 0.5 }}>Freeze</button>
+        <button onClick={doFreeze} disabled={!agrees || busy || vo} title={vo ? VIEW_ONLY_REASON : (agrees ? '' : 'the two branches must agree this month first')}
+          style={{ ...aBtn(C.blue), opacity: (agrees && !busy && !vo) ? 1 : 0.5, ...(vo ? { cursor: 'not-allowed' } : {}) }}>Freeze</button>
       )}
       {frozen && !certified && (<>
-        {nextSigner && <button onClick={doSign} disabled={busy} style={{ ...aBtn(C.green), opacity: busy ? 0.6 : 1 }}><PenLine size={11} style={{ verticalAlign: -2 }} /> Sign as {nextSigner}</button>}
-        <button onClick={doUnfreeze} disabled={busy} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Un-freeze</button>
+        {nextSigner && <button onClick={doSign} disabled={busy || vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.green), opacity: (busy || vo) ? 0.6 : 1, ...(vo ? { cursor: 'not-allowed' } : {}) }}><PenLine size={11} style={{ verticalAlign: -2 }} /> Sign as {nextSigner}</button>}
+        <button onClick={doUnfreeze} disabled={busy || vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : {}) }}>Un-freeze</button>
       </>)}
-      {certified && <button onClick={doReopen} disabled={busy} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Re-open</button>}
+      {certified && <button onClick={doReopen} disabled={busy || vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : {}) }}>Re-open</button>}
     </div>
   );
 }

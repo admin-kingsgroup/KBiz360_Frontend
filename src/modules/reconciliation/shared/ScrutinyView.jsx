@@ -115,7 +115,7 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
           <span className="ml-auto flex items-center gap-2">
             {err ? <span className="text-xs text-danger">{err}</span> : null}
             {!frozen && (
-              <Button size="xs" variant="ghost" icon={RefreshCcw} loading={rerun.isPending} onClick={() => rerun.mutate()}
+              <Button write size="xs" variant="ghost" icon={RefreshCcw} loading={rerun.isPending} onClick={() => rerun.mutate()}
                 title="Re-match the stored statement against the CURRENT books — use after posting a missing charge.">
                 Re-run match
               </Button>
@@ -131,11 +131,11 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
               <option value="">Classify selected as…</option>
               {classify.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </Select>
-            <Button size="xs" variant="primary" loading={bulk.isPending} disabled={!bulkClass}
+            <Button write size="xs" variant="primary" loading={bulk.isPending} disabled={!bulkClass}
               onClick={() => bulk.mutate({ entryIds: [...selected], action: 'classify', classification: bulkClass })}>
               Apply
             </Button>
-            <Button size="xs" variant="secondary" loading={bulk.isPending}
+            <Button write size="xs" variant="secondary" loading={bulk.isPending}
               onClick={() => bulk.mutate({ entryIds: [...selected], action: 'confirm' })}
               title="Confirms every selected PROBABLE match (others are skipped).">
               Confirm probables
@@ -194,12 +194,12 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
                     <Cell className="whitespace-nowrap text-right font-semibold tabular-nums">{e.book ? fmtAmt(e.book.amount, cert.branch) : ''}</Cell>
                     <Cell>
                       {frozen ? <span className="text-[10.5px] text-ink-subtle">signed</span> : e.status === 'probable' ? (
-                        <Button size="xs" variant="primary" icon={CheckCircle2} loading={act.isPending && act.variables?.entryId === e._id}
+                        <Button write size="xs" variant="primary" icon={CheckCircle2} loading={act.isPending && act.variables?.entryId === e._id}
                           onClick={() => act.mutate({ entryId: e._id, action: 'confirm' })}>Confirm</Button>
                       ) : (e.status === 'stmt-only' || e.status === 'book-only') ? (
                         e.classification ? (
                           <span className="flex items-center gap-1">
-                            <Button size="xs" variant="ghost" onClick={() => act.mutate({ entryId: e._id, action: 'unclassify' })}>Unclassify</Button>
+                            <Button write size="xs" variant="ghost" onClick={() => act.mutate({ entryId: e._id, action: 'unclassify' })}>Unclassify</Button>
                             {(e.classification === 'to-post' || e.classification === 'credit-note-pending') && (
                               <Button size="xs" variant="ghost" icon={ClipboardCopy} title="Copy the line and open voucher entry"
                                 onClick={() => copyAndJump(e)}>Post</Button>
@@ -208,7 +208,7 @@ export function ScrutinyView({ cert, onClose, setRoute }) {
                         ) : (
                           <span className="flex flex-col items-start gap-1">
                             {e.suggested && (
-                              <Button size="xs" variant="secondary" loading={act.isPending && act.variables?.entryId === e._id}
+                              <Button write size="xs" variant="secondary" loading={act.isPending && act.variables?.entryId === e._id}
                                 title="Apply the suggested classification"
                                 onClick={() => act.mutate({ entryId: e._id, action: 'classify', classification: e.suggested })}>
                                 ✓ {classificationLabel(e.suggested)}

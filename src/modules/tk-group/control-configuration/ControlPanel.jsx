@@ -18,6 +18,7 @@ import { BreakGlass } from '../BreakGlass';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
 import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges } from '../utils/controlPanel';
 import { Badge } from '../../../shell/primitives';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 
 // ─── TK GROUP CENTRAL · Control Panel ────────────────────────────────────────
 // Two rule screens — DEFAULT RULES (always-on foundation locks, read-only) and
@@ -32,9 +33,13 @@ const H3 = ({ children }) => <h3 className="mb-2 mt-5 text-[15px] font-semibold 
 // Interactive switch — the Owner flips it live; everyone else proposes the change.
 // Off = grey, On = teal (crit = red for money controls).
 function Toggle({ on, crit, onClick, label }) {
+  // View-only accounts may review the posture but never flip a control — the switch is
+  // pre-disabled with the shared reason, never a live toggle that only 403s on the server.
+  const vo = isViewOnly();
   return (
     <button type="button" role="switch" aria-checked={!!on} aria-label={label} onClick={onClick}
-      className={`relative h-[24px] w-[42px] shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${on ? (crit ? 'bg-danger' : 'bg-success') : 'bg-surface-border'}`}>
+      disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined}
+      className={`relative h-[24px] w-[42px] shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${on ? (crit ? 'bg-danger' : 'bg-success') : 'bg-surface-border'} ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>
       <span className="absolute top-[2.5px] h-[19px] w-[19px] rounded-full bg-white shadow transition-all" style={{ left: on ? 20 : 2.5 }} />
     </button>
   );
@@ -87,12 +92,14 @@ function ChainCard({ k, r, w, n }) {
 // branch's value (Owner live-flips; others propose).
 function GridCell({ cell, crit, onClick, label }) {
   const { on, override } = cell || {};
+  // A view-only account can read the grid but never flip a cell — disabled with the reason.
+  const vo = isViewOnly();
   const cls = on
     ? (override ? (crit ? 'bg-danger text-white' : 'bg-success text-white') : (crit ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'))
     : (override ? 'bg-surface-alt text-ink-muted ring-1 ring-inset ring-surface-border' : 'bg-surface text-ink-subtle');
   return (
-    <button type="button" onClick={onClick} aria-label={label} title={label}
-      className={`flex h-7 w-7 items-center justify-center rounded-md text-[12px] font-bold transition-colors hover:opacity-80 ${cls}`}>
+    <button type="button" onClick={onClick} aria-label={label} disabled={vo} title={vo ? VIEW_ONLY_REASON : label}
+      className={`flex h-7 w-7 items-center justify-center rounded-md text-[12px] font-bold transition-colors hover:opacity-80 ${cls} ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>
       {on ? '✓' : '·'}
     </button>
   );
@@ -133,6 +140,10 @@ export function ControlPanel({ setRoute }) {
   const branchLabel = (LIMIT_BRANCHES.find((b) => b.code === branch) || {}).label || branch;
   const scoped = branch !== 'default';
   const owner = isOwner();
+  // View-only accounts (incl. a view-only Owner) may review every screen but apply NOTHING —
+  // the owner-only bulk / preset / copy / reset actions are layered with this on top of the
+  // isOwner() gate so a view-only user can neither apply nor propose.
+  const vo = isViewOnly();
 
   // Flip a single control for a SPECIFIC scope (`targetBranch`: a branch code, or
   // 'default'/'ALL'/'' for the Group global). The OWNER applies it LIVE (self-approved) and
@@ -327,17 +338,17 @@ export function ControlPanel({ setRoute }) {
                 {/* Bulk — go-live / rollback in one action */}
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="mr-1 w-[52px] shrink-0 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">Bulk</span>
-                  <button type="button" onClick={() => onBulk(true)} className="rounded-full border border-success/50 bg-success-soft px-3 py-1 text-[11.5px] font-semibold text-success hover:bg-success/10">Enable all</button>
-                  <button type="button" onClick={() => onBulk(false)} className="rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-danger-soft hover:text-danger">Disable all</button>
-                  {scoped && <button type="button" onClick={() => onResetBranch(branch)} className="rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">↺ Reset to inherit</button>}
+                  <button type="button" onClick={() => onBulk(true)} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} className={`rounded-full border border-success/50 bg-success-soft px-3 py-1 text-[11.5px] font-semibold text-success hover:bg-success/10 ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>Enable all</button>
+                  <button type="button" onClick={() => onBulk(false)} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} className={`rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-danger-soft hover:text-danger ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>Disable all</button>
+                  {scoped && <button type="button" onClick={() => onResetBranch(branch)} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} className={`rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>↺ Reset to inherit</button>}
                   <span className="ml-1 text-[11px] text-ink-muted">all {CONFIGURABLE_FLAGS.length} rules{scoped ? ` · ${branchLabel}` : ' · Group default'}</span>
                 </div>
                 {/* Presets — named posture bundles */}
                 <div className="flex flex-wrap items-center gap-2 border-t border-surface-border/60 pt-2">
                   <span className="mr-1 w-[52px] shrink-0 font-mono text-[9.5px] font-semibold uppercase tracking-wide text-ink-subtle">Presets</span>
                   {POSTURE_PRESETS.map((p) => (
-                    <button key={p.key} type="button" onClick={() => onApplyPreset(p)} title={p.desc}
-                      className="rounded-full border border-navy/30 bg-navy/5 px-3 py-1 text-[11.5px] font-semibold text-navy hover:bg-navy/10">{p.label}</button>
+                    <button key={p.key} type="button" onClick={() => onApplyPreset(p)} disabled={vo} title={vo ? VIEW_ONLY_REASON : p.desc}
+                      className={`rounded-full border border-navy/30 bg-navy/5 px-3 py-1 text-[11.5px] font-semibold text-navy hover:bg-navy/10 ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>{p.label}</button>
                   ))}
                   <span className="ml-1 text-[11px] text-ink-muted">a known-good bundle (sets the rest off).</span>
                 </div>
@@ -348,8 +359,8 @@ export function ControlPanel({ setRoute }) {
                     className="rounded-md border border-surface-border bg-surface px-2 py-1 text-[11.5px] text-ink">
                     {LIMIT_BRANCHES.filter((b) => b.code !== 'default').map((b) => <option key={b.code} value={b.code}>{b.label}</option>)}
                   </select>
-                  <button type="button" onClick={onCopyConfig}
-                    className="rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">Copy to all other branches</button>
+                  <button type="button" onClick={onCopyConfig} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined}
+                    className={`rounded-full border border-surface-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>Copy to all other branches</button>
                   <span className="ml-1 text-[11px] text-ink-muted">apply this branch’s setup everywhere else.</span>
                 </div>
               </div>
@@ -379,8 +390,8 @@ export function ControlPanel({ setRoute }) {
                       <th key={b.code} className="p-2 text-center font-mono text-[9px] font-semibold uppercase tracking-wide">
                         <div>{b.label}</div>
                         {owner && b.code !== 'default' && (
-                          <button type="button" onClick={() => onResetBranch(b.code)} title={`Reset ${b.label} to the Group default`}
-                            className="mt-0.5 font-sans text-[9px] font-normal normal-case text-ink-subtle hover:text-navy hover:underline">↺ inherit</button>
+                          <button type="button" onClick={() => onResetBranch(b.code)} disabled={vo} title={vo ? VIEW_ONLY_REASON : `Reset ${b.label} to the Group default`}
+                            className={`mt-0.5 font-sans text-[9px] font-normal normal-case text-ink-subtle hover:text-navy hover:underline ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>↺ inherit</button>
                         )}
                       </th>
                     ))}
@@ -486,7 +497,7 @@ export function ControlPanel({ setRoute }) {
       {/* status strip — the REAL configurable-flag state for the scope, OR a distinct load /
           error state so a failed/blocked read never masquerades as a genuinely dormant system. */}
       {loadError ? (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-danger/40 bg-danger-soft px-4 py-2.5">
+        <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-danger/40 bg-danger-soft px-4 py-2.5">
           <span className="text-[11px] font-bold uppercase tracking-wide text-danger">Control Panel</span>
           <Badge tone="danger">Couldn’t load</Badge>
           <span className="text-[12px] text-danger">
@@ -496,7 +507,7 @@ export function ControlPanel({ setRoute }) {
             className="ml-auto shrink-0 rounded-full border border-danger/40 bg-surface px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger-soft">↻ Retry</button>
         </div>
       ) : loading ? (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-surface-border bg-surface-alt px-4 py-2.5">
+        <div role="status" aria-busy="true" className="mb-4 flex flex-wrap items-center gap-3 rounded-brand border border-surface-border bg-surface-alt px-4 py-2.5">
           <span className="text-[11px] font-bold uppercase tracking-wide text-ink-subtle">Control Panel</span>
           <span className="rounded-full bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-ink-muted">Loading…</span>
           <span className="text-[12px] text-ink-muted">Reading the live control state…</span>
@@ -553,8 +564,9 @@ export function ControlPanel({ setRoute }) {
                 const keys = SCREEN_FLAGS[it.key];
                 // Count in the SAME scope the status strip reports (stripBranch: the selected
                 // branch on branch-scoped screens, else the Group default) so the badge and strip
-                // never disagree on a screen with no visible branch selector.
-                const onN = keys ? keys.filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length : null;
+                // never disagree on a screen with no visible branch selector. Suppressed on a
+                // load error so a nav badge never reads "off" while the strip says it couldn't load.
+                const onN = (keys && !loadError) ? keys.filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length : null;
                 return (
                   <button key={it.key} onClick={() => setScreen(it.key)} aria-current={screen === it.key ? 'page' : undefined}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg border-l-[3px] px-2.5 py-2 text-left text-[12.5px] transition-colors ${screen === it.key ? 'border-l-gold bg-navy/5 font-semibold text-navy' : 'border-l-transparent text-ink-muted hover:bg-navy/5 hover:text-navy'}`}>

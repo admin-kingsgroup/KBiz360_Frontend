@@ -46,7 +46,7 @@ export function MstrModal({ title, onClose, onSave, saving, children }) {
         onSave ? (
           <>
             <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" size="sm" loading={saving} onClick={onSave}>Save</Button>
+            <Button write variant="primary" size="sm" loading={saving} onClick={onSave}>Save</Button>
           </>
         ) : (
           <>

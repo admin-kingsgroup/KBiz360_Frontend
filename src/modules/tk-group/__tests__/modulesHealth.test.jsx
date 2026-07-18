@@ -98,6 +98,7 @@ const TASKS = {
   ] },
 };
 
+jest.mock('../../../core/api', () => ({ isViewOnly: () => false, VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.', apiGet: jest.fn(() => Promise.resolve({})), apiPost: jest.fn(() => Promise.resolve({})), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../api/monitor', () => ({
   getSetupReadiness: jest.fn().mockResolvedValue(READINESS),
   getSetupTasks: jest.fn().mockResolvedValue(TASKS),

@@ -17,6 +17,7 @@ import { confirmDialog } from '../../core/ux/confirm';
 import { useCostCenters, useCreateCostCenter, useUpdateCostCenter, useDeleteCostCenter, useBackfillCostCenters } from '../../core/useAccounting';
 import { useBranches } from '../../core/useReference';
 import { exportToExcel } from '../../core/exportExcel';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 
 const DARK = '#1a1c22', GOLD = '#c2a04a', DIM = '#5b616e', GREEN = '#16a34a', RED = '#dc2626';
 const isSuperAdmin = (u) => /super\s*admin/i.test(u?.role || '');
@@ -38,6 +39,9 @@ export function CostCenterMasterLive({ currentUser, shellBranch }) {
   const updateCc = useUpdateCostCenter();
   const deleteCc = useDeleteCostCenter();
   const backfill = useBackfillCostCenters();
+  // View-only accounts see every write action (Add / Save / Rename / Deactivate /
+  // Delete / Re-tag) disabled with a reason, never a live button that only 403s.
+  const vo = isViewOnly();
 
   const [form, setForm] = useState({ name: '', module: 'Miscellaneous', code: '' });
   const [showAdd, setShowAdd] = useState(false);
@@ -113,9 +117,9 @@ export function CostCenterMasterLive({ currentUser, shellBranch }) {
             </select>
           </label>
           <span style={{ padding: '4px 10px', background: '#fff7e6', color: '#8a6300', border: '1px solid #f0dca6', borderRadius: 14, fontSize: 11, fontWeight: 700 }}>{centers.length} centres</span>
-          <button onClick={() => setShowAdd((s) => !s)} className="max-tablet:min-h-[44px]" style={btn(GOLD, DARK)}>＋ Add cost centre</button>
+          <button onClick={() => setShowAdd((s) => !s)} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} className="max-tablet:min-h-[44px]" style={{ ...btn(GOLD, DARK), ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : null) }}>＋ Add cost centre</button>
           <button onClick={exportSheet} disabled={!centers.length} className="max-tablet:min-h-[44px]" style={{ ...btn('#fff', DARK), border: '1px solid #cdd1d8', cursor: centers.length ? 'pointer' : 'not-allowed', opacity: centers.length ? 1 : 0.5 }}>📤 Export</button>
-          <button onClick={runBackfill} disabled={backfill.isPending} className="max-tablet:min-h-[44px]" style={btn(DARK, GOLD)} title="Re-derive cost centres for already-imported vouchers from their saved Ticket Type / Service Type / Country">
+          <button onClick={runBackfill} disabled={backfill.isPending || vo} title={vo ? VIEW_ONLY_REASON : 'Re-derive cost centres for already-imported vouchers from their saved Ticket Type / Service Type / Country'} className="max-tablet:min-h-[44px]" style={{ ...btn(DARK, GOLD), ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : null) }}>
             {backfill.isPending ? 'Re-tagging…' : '↻ Re-tag vouchers'}
           </button>
         </div>
@@ -141,7 +145,7 @@ export function CostCenterMasterLive({ currentUser, shellBranch }) {
             <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="auto from name" style={{ ...inp, width: 150, fontFamily: 'monospace' }} />
           </div>
           <span style={{ fontSize: 10.5, color: DIM, alignSelf: 'center' }}>Will be created for <b>{activeBranch}</b> as <code style={{ color: DARK }}>{activeBranch}-…</code></span>
-          <button onClick={add} disabled={createCc.isPending} className="max-tablet:min-h-[44px]" style={btn(GREEN, '#fff')}>{createCc.isPending ? 'Saving…' : 'Save'}</button>
+          <button onClick={add} disabled={createCc.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} className="max-tablet:min-h-[44px]" style={{ ...btn(GREEN, '#fff'), ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : null) }}>{createCc.isPending ? 'Saving…' : 'Save'}</button>
           <button onClick={() => setShowAdd(false)} className="max-tablet:min-h-[44px]" style={{ ...btn('#fff', DIM), border: '1px solid #cdd1d8' }}>Cancel</button>
         </div>
       )}
@@ -186,9 +190,9 @@ export function CostCenterMasterLive({ currentUser, shellBranch }) {
                         <span style={{ padding: '2px 8px', background: c.active ? '#eef4ec' : '#f0f1f5', color: c.active ? GREEN : DIM, borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>● {c.active ? 'Active' : 'Inactive'}</span>
                       </td>
                       <td style={{ padding: '6px 14px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <button onClick={() => rename(c)} disabled={updateCc.isPending} title="Rename" style={{ ...btn('#fff', DARK), border: '1px solid #cdd1d8', padding: '3px 8px', marginRight: 5, opacity: updateCc.isPending ? 0.5 : 1 }}>✎</button>
-                        <button onClick={() => toggleActive(c)} disabled={updateCc.isPending} title={c.active ? 'Deactivate' : 'Reactivate'} style={{ ...btn('#fff', c.active ? RED : GREEN), border: '1px solid #cdd1d8', padding: '3px 8px', marginRight: 5, opacity: updateCc.isPending ? 0.5 : 1 }}>{c.active ? '⏻' : '✓'}</button>
-                        {!c.system && <button onClick={() => del(c)} disabled={deleteCc.isPending} title="Delete custom cost centre" style={{ ...btn('#fff', RED), border: '1px solid #f3c9c9', padding: '3px 8px', opacity: deleteCc.isPending ? 0.5 : 1 }}>🗑</button>}
+                        <button onClick={() => rename(c)} disabled={updateCc.isPending || vo} title={vo ? VIEW_ONLY_REASON : 'Rename'} style={{ ...btn('#fff', DARK), border: '1px solid #cdd1d8', padding: '3px 8px', marginRight: 5, cursor: vo ? 'not-allowed' : 'pointer', opacity: (updateCc.isPending || vo) ? 0.5 : 1 }}>✎</button>
+                        <button onClick={() => toggleActive(c)} disabled={updateCc.isPending || vo} title={vo ? VIEW_ONLY_REASON : (c.active ? 'Deactivate' : 'Reactivate')} style={{ ...btn('#fff', c.active ? RED : GREEN), border: '1px solid #cdd1d8', padding: '3px 8px', marginRight: 5, cursor: vo ? 'not-allowed' : 'pointer', opacity: (updateCc.isPending || vo) ? 0.5 : 1 }}>{c.active ? '⏻' : '✓'}</button>
+                        {!c.system && <button onClick={() => del(c)} disabled={deleteCc.isPending || vo} title={vo ? VIEW_ONLY_REASON : 'Delete custom cost centre'} style={{ ...btn('#fff', RED), border: '1px solid #f3c9c9', padding: '3px 8px', cursor: vo ? 'not-allowed' : 'pointer', opacity: (deleteCc.isPending || vo) ? 0.5 : 1 }}>🗑</button>}
                       </td>
                     </tr>
                   ))}

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { overviewKpis, streamRows, actorName } from '../utils/monitor';
 
+jest.mock('../../../core/api', () => ({ isViewOnly: () => false, VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.', apiGet: jest.fn(() => Promise.resolve({})), apiPost: jest.fn(() => Promise.resolve({})), getAuthToken: jest.fn(() => 'open') }));
 // api/monitor pulls core/api (import.meta) → mock for the container smoke tests.
 // The Control Tower Overview also reads the health/integrity/trend/readiness summaries;
 // stub them to empty so the summary charts render (zeros) without a network.

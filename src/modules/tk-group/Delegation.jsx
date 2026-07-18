@@ -6,6 +6,7 @@ import { isOwner } from './utils/owner';
 import { toastSuccess, toastError } from '../../core/ux/toast';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
 import { SkeletonTable } from '../../shell/primitives';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 
 // ─── Control Panel · Delegation — temporary hand-over of approval authority ───
 // The Owner hands one user's Verify/Approve authority to another for a date window; it
@@ -16,6 +17,9 @@ const SCOPES = [{ v: 'approve', l: 'Approve' }, { v: 'verify', l: 'Verify' }, { 
 export function Delegation() {
   const qc = useQueryClient();
   const owner = isOwner();
+  // View-only accounts (incl. a view-only Owner) may read the delegation list but never grant
+  // or revoke — the actions are pre-disabled with the shared reason, layered on the owner gate.
+  const vo = isViewOnly();
   const q = useQuery({ queryKey: ['tk', 'delegations'], queryFn: getDelegations, staleTime: 20_000 });
   const rosterQ = useQuery({ queryKey: ['tk', 'roster'], queryFn: getRoster, staleTime: 60_000 });
   const items = q.data?.items || [];
@@ -93,8 +97,8 @@ export function Delegation() {
           </div>
           {msg && <div role="status" className="mt-2 rounded-brand bg-warning-soft px-3 py-2 text-xs text-warning">{msg}</div>}
           <div className="mt-3">
-            <button type="button" onClick={submit} disabled={busy}
-              className={`rounded-brand px-4 py-2 text-[13px] font-semibold text-white ${busy ? 'bg-ink-subtle' : 'bg-success hover:bg-success/90'}`}>
+            <button type="button" onClick={submit} disabled={busy || vo} title={vo ? VIEW_ONLY_REASON : undefined}
+              className={`rounded-brand px-4 py-2 text-[13px] font-semibold text-white ${busy || vo ? 'cursor-not-allowed bg-ink-subtle' : 'bg-success hover:bg-success/90'}`}>
               {busy ? 'Granting…' : 'Grant delegation'}
             </button>
           </div>
@@ -117,7 +121,7 @@ export function Delegation() {
                   <td className="p-2.5 text-ink-muted">{d.branch || 'All'}</td>
                   <td className="p-2.5 font-mono text-[11px] text-ink-muted">{d.from} → {d.to}</td>
                   <td className="p-2.5">{d.revokedAt ? <span className="rounded-full bg-surface-alt px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase text-ink-subtle">revoked</span> : d.active ? <span className="rounded-full bg-success-soft px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase text-success">active</span> : <span className="rounded-full bg-surface-alt px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase text-ink-subtle">scheduled/ended</span>}</td>
-                  <td className="p-2.5">{owner && !d.revokedAt ? <button type="button" onClick={() => revoke(d.id)} className="text-[11px] text-ink-subtle underline hover:text-danger">Revoke</button> : null}</td>
+                  <td className="p-2.5">{owner && !d.revokedAt ? <button type="button" onClick={() => revoke(d.id)} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} className={`text-[11px] text-ink-subtle underline hover:text-danger ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>Revoke</button> : null}</td>
                 </tr>
               ))}
             </tbody>

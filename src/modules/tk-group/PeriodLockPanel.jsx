@@ -57,7 +57,7 @@ export function PeriodLockPanel({ rows = [], branches = [], onPropose }) {
         <FormField label="Reason" htmlFor="pl-reason" className="flex-1 min-w-[140px]">
           <Input id="pl-reason" aria-label="Reason" placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
         </FormField>
-        <Button type="submit" variant="success" size="sm" disabled={!valid}>
+        <Button type="submit" variant="success" size="sm" write disabled={!valid}>
           Propose lock
         </Button>
       </form>

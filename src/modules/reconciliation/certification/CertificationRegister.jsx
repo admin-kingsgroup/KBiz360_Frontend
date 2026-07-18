@@ -122,7 +122,7 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
             <Button variant="ghost" icon={Settings2} onClick={() => setShowCycleCfg(true)}>Cycle ledgers</Button>
           )}
           <Button variant="ghost" icon={BookOpenCheck} onClick={() => setRoute && setRoute('/reconciliation/rulebook')}>Rule Book</Button>
-          <Button variant="secondary" icon={RefreshCcw} loading={gen.isPending} onClick={() => gen.mutate()}>
+          <Button write variant="secondary" icon={RefreshCcw} loading={gen.isPending} onClick={() => gen.mutate()}>
             Generate {tier.short} certificates
           </Button>
         </div>
@@ -167,7 +167,7 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
         {empty && (
           <EmptyState title={`No ${tier.short} certificates for ${branch} · ${period || 'this period'}`}
             hint="Generate the period's certificates — one per ledger in this tier's scope."
-            action={<Button variant="primary" loading={gen.isPending} onClick={() => gen.mutate()}>Generate certificates</Button>} />
+            action={<Button write variant="primary" loading={gen.isPending} onClick={() => gen.mutate()}>Generate certificates</Button>} />
         )}
         <div className="grid gap-4">
           {groups.map((g) => (

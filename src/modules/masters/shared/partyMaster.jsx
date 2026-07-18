@@ -380,7 +380,7 @@ export function PartyShell({ title, subtitle, m, tabs, tab, setTab, children }) 
       <div className="flex-1" />
       {err && <span className="text-[11.5px] font-semibold text-danger">⚠ {err}</span>}
       {!err && savedAt > 0 && !dirty && <span className="text-[11.5px] font-semibold text-success">✓ Saved</span>}
-      <Button variant="accent" onClick={save} disabled={!current || saving || !dirty} loading={saving} title="Save (Ctrl/Cmd+Enter)">
+      <Button write variant="accent" onClick={save} disabled={!current || saving || !dirty} loading={saving} title="Save (Ctrl/Cmd+Enter)">
         {saving ? 'Saving…' : <>Save changes <Kbd>⌃↵</Kbd></>}
       </Button>
     </div>

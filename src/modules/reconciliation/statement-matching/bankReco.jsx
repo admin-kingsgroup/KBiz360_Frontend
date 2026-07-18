@@ -19,6 +19,7 @@ import { PeriodBar } from '../../../core/period';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
 import { CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
 import { bc, btnG, btnGh, card, inp } from '../../../core/styles';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 import { localeOf } from '../../../core/format';
 import { useMobile } from '../../../core/hooks';
 import { openPrintPreview } from '../../../core/PrintPreview';
@@ -186,6 +187,7 @@ export function BankReco({branch}){
   const cfg=bc(branch);
   const cur=cfg.cur;
   const code=branchCode(branch);
+  const vo=isViewOnly();   // view-only user: write actions disabled with a reason
 
   /* ── Bank ledger picker (live) ── */
   const {data:bankLedgers=[],isLoading:ledgersLoading}=useBankLedgers(branch);
@@ -332,7 +334,7 @@ export function BankReco({branch}){
           </select>
           <PeriodBar branch={branch} compact defaultPreset="all" onChange={(r)=>{setFrom(r.from);setTo(r.to);}}/>
           <button onClick={reFetchBooks} disabled={!ledger||refreshing} title="Re-fetch the ERP Books after correcting a voucher" style={{...btnGh,fontSize:11,opacity:(!ledger||refreshing)?0.6:1}}><RefreshCw size={12} style={refreshing?{animation:"spin 0.8s linear infinite"}:undefined}/> {refreshing?"Refreshing…":"Re-fetch Books"}</button>
-          <button onClick={runAutoMatch} disabled={!ledger||autoMut.isPending} style={{...btnG,fontSize:11,opacity:(!ledger||autoMut.isPending)?0.6:1}}><RefreshCw size={12}/> {autoMut.isPending?"Matching…":"Auto-match"}</button>
+          <button onClick={runAutoMatch} disabled={!ledger||autoMut.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,fontSize:11,opacity:(!ledger||autoMut.isPending||vo)?0.6:1,...(vo?{cursor:"not-allowed"}:{})}}><RefreshCw size={12}/> {autoMut.isPending?"Matching…":"Auto-match"}</button>
           <button onClick={()=>setShowImport(s=>!s)} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Upload size={12}/> Import</button>
           <button onClick={exportRecon} disabled={!ledger} style={{...btnGh,fontSize:11,opacity:!ledger?0.6:1}}><Download size={12}/> Export</button>
         </div>
@@ -383,7 +385,7 @@ export function BankReco({branch}){
               <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search date / ref / narration…" style={{border:"none",background:"transparent",outline:"none",fontSize:11,minWidth:200}}/>
             </div>
             <div style={{display:"flex",gap:4}}>
-              <button onClick={doUnmatchAll} disabled={!reconciledCount||unmatchAllMut.isPending} title="Release every match in this ledger + period back to Unreconciled (so matched receipts/payments can be revoked/edited)" style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#A32D2D",opacity:(!reconciledCount||unmatchAllMut.isPending)?0.5:1}}><Unlink size={11}/> {unmatchAllMut.isPending?"Un-reconciling…":`Unmatch all${reconciledCount?` (${reconciledCount})`:""}`}</button>
+              <button onClick={doUnmatchAll} disabled={!reconciledCount||unmatchAllMut.isPending||vo} title={vo?VIEW_ONLY_REASON:"Release every match in this ledger + period back to Unreconciled (so matched receipts/payments can be revoked/edited)"} style={{...btnGh,fontSize:10,padding:"4px 10px",color:"#A32D2D",opacity:(!reconciledCount||unmatchAllMut.isPending||vo)?0.5:1,...(vo?{cursor:"not-allowed"}:{})}}><Unlink size={11}/> {unmatchAllMut.isPending?"Un-reconciling…":`Unmatch all${reconciledCount?` (${reconciledCount})`:""}`}</button>
               <button onClick={()=>setOnlyOpen(o=>!o)} title="Show only the still-open (unreconciled / exception) lines" style={{...((onlyOpen)?btnG:btnGh),fontSize:10,padding:"4px 10px"}}>{onlyOpen?"● ":""}Unreconciled only</button>
               {["detailed","minimal"].map(v=>(
                 <button key={v} onClick={()=>setView(v)} style={{...((view===v)?btnG:btnGh),fontSize:10,padding:"4px 10px",textTransform:"capitalize"}}>{v}</button>
@@ -406,7 +408,7 @@ export function BankReco({branch}){
                 {selBooks.length>0&&selStmt&&Math.abs(variancePreview)<=0.01&&<span style={{color:"#27500A",fontWeight:700}}> · ties out ✓</span>}
               </div>
               <div style={{display:"flex",gap:6}}>
-                <button onClick={confirmMatch} disabled={!selBooks.length||!selStmt||matchMut.isPending||groupMut.isPending} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#27500A",opacity:(!selBooks.length||!selStmt)?0.5:1}}><Link2 size={12}/> Match</button>
+                <button onClick={confirmMatch} disabled={!selBooks.length||!selStmt||matchMut.isPending||groupMut.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#27500A",opacity:(!selBooks.length||!selStmt||vo)?0.5:1,...(vo?{cursor:"not-allowed"}:{})}}><Link2 size={12}/> Match</button>
                 <button onClick={clearSel} style={{...btnGh,fontSize:10.5,padding:"4px 10px"}}><X size={12}/> Clear</button>
               </div>
             </div>
@@ -477,10 +479,10 @@ export function BankReco({branch}){
                           <td style={{padding:"6px 9px",textAlign:"center"}}><StatusChip status={l.status}/></td>
                           <td style={{padding:"6px 6px",textAlign:"center",whiteSpace:"nowrap"}}>
                             {(l.status==="reconciled"||l.status==="partial")
-                              ? <button title="Unmatch" onClick={e=>{e.stopPropagation();unmatchMut.mutate({id:l.id});}} style={{...btnGh,padding:"2px 6px",fontSize:9,color:"#A32D2D"}}><Unlink size={11}/></button>
+                              ? <button title={vo?VIEW_ONLY_REASON:"Unmatch"} disabled={vo} onClick={e=>{e.stopPropagation();unmatchMut.mutate({id:l.id});}} style={{...btnGh,padding:"2px 6px",fontSize:9,color:"#A32D2D",...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}><Unlink size={11}/></button>
                               : l.status==="exception"
-                                ? <button title="Clear exception" onClick={e=>{e.stopPropagation();statusMut.mutate({id:l.id,status:"unreconciled"});}} style={{...btnGh,padding:"2px 6px",fontSize:9}}>↺</button>
-                                : <button title="Flag exception" onClick={e=>{e.stopPropagation();statusMut.mutate({id:l.id,status:"exception"});}} style={{...btnGh,padding:"2px 6px",fontSize:9,color:"#8a5a00"}}><AlertTriangle size={11}/></button>}
+                                ? <button title={vo?VIEW_ONLY_REASON:"Clear exception"} disabled={vo} onClick={e=>{e.stopPropagation();statusMut.mutate({id:l.id,status:"unreconciled"});}} style={{...btnGh,padding:"2px 6px",fontSize:9,...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}>↺</button>
+                                : <button title={vo?VIEW_ONLY_REASON:"Flag exception"} disabled={vo} onClick={e=>{e.stopPropagation();statusMut.mutate({id:l.id,status:"exception"});}} style={{...btnGh,padding:"2px 6px",fontSize:9,color:"#8a5a00",...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}><AlertTriangle size={11}/></button>}
                           </td>
                         </tr>
                       );
@@ -534,7 +536,7 @@ export function BankReco({branch}){
             <input value={pdcForm.bank} onChange={e=>setPdcForm(s=>({...s,bank:e.target.value}))} placeholder="Drawee bank" style={{...inp,width:130}}/>
             <input type="date" value={pdcForm.chequeDate} onChange={e=>setPdcForm(s=>({...s,chequeDate:e.target.value}))} style={{...inp,width:150}}/>
             <input type="number" value={pdcForm.amount} onChange={e=>setPdcForm(s=>({...s,amount:e.target.value}))} placeholder="Amount" style={{...inp,width:120,textAlign:"right"}}/>
-            <button onClick={addPDC} disabled={!pdcForm.party||!pdcForm.chequeDate||!(Number(pdcForm.amount)>0)||createPDC.isPending} style={{...btnG,padding:"6px 12px",fontSize:11,opacity:(!pdcForm.party||!pdcForm.chequeDate||!(Number(pdcForm.amount)>0))?0.6:1}}><Plus size={12}/> Add PDC</button>
+            <button onClick={addPDC} disabled={!pdcForm.party||!pdcForm.chequeDate||!(Number(pdcForm.amount)>0)||createPDC.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,padding:"6px 12px",fontSize:11,opacity:(!pdcForm.party||!pdcForm.chequeDate||!(Number(pdcForm.amount)>0)||vo)?0.6:1,...(vo?{cursor:"not-allowed"}:{})}}><Plus size={12}/> Add PDC</button>
           </div>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
             <thead><tr style={{background:"#0d1326"}}>
@@ -554,12 +556,12 @@ export function BankReco({branch}){
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 8px",borderRadius:999,fontWeight:700,background:PDC_BG[p.status],color:PDC_CLR[p.status]}}>{p.status}</span></td>
                 <td style={{padding:"8px 12px"}}>
                   {p.status==="Pending"&&<div style={{display:"flex",gap:4}}>
-                    <button onClick={()=>depositPDC(p.id)} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#27500A"}}>Deposit</button>
-                    <button onClick={()=>bouncePDC(p.id)} style={{...btnGh,padding:"2px 8px",fontSize:9.5,color:"#A32D2D"}}>Bounce</button>
-                    <button onClick={()=>deletePDCMut.mutate({id:p.id})} title="Delete" style={{...btnGh,padding:"2px 8px",fontSize:9.5,color:"#5a6691"}}>✕</button>
+                    <button onClick={()=>depositPDC(p.id)} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#27500A",...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}>Deposit</button>
+                    <button onClick={()=>bouncePDC(p.id)} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,padding:"2px 8px",fontSize:9.5,color:"#A32D2D",...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}>Bounce</button>
+                    <button onClick={()=>deletePDCMut.mutate({id:p.id})} disabled={vo} title={vo?VIEW_ONLY_REASON:"Delete"} style={{...btnGh,padding:"2px 8px",fontSize:9.5,color:"#5a6691",...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}>✕</button>
                   </div>}
                   {p.status==="Deposited"&&<span style={{fontSize:10,color:"#27500A"}}>✔ {p.depositDate}</span>}
-                  {p.status==="Bounced"&&<button onClick={()=>representMut.mutate({id:p.id})} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#A32D2D"}}>Re-present</button>}
+                  {p.status==="Bounced"&&<button onClick={()=>representMut.mutate({id:p.id})} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#A32D2D",...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}>Re-present</button>}
                 </td>
               </tr>
             ))}</tbody>
@@ -585,7 +587,7 @@ export function BankReco({branch}){
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Dear ${p.party}, your cheque #${p.chequeNo||""} for ${f(p.amount)} dated ${p.chequeDate} has been returned unpaid${p.bounceReason?` (${p.bounceReason})`:""}. Kindly arrange payment at the earliest.`)}`,"_blank","noopener")} style={{...btnGh,fontSize:10.5,padding:"4px 12px"}}>💬 WhatsApp Client</button>
                 <button onClick={()=>openPrintPreview&&openPrintPreview(demandNoticeHTML(p,f))} style={{...btnG,fontSize:10.5,padding:"4px 12px",background:"#A32D2D"}}>📋 Issue Demand Notice</button>
-                <button onClick={()=>representMut.mutate({id:p.id})} style={{...btnG,fontSize:10.5,padding:"4px 12px"}}>🔄 Re-present Cheque</button>
+                <button onClick={()=>representMut.mutate({id:p.id})} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,fontSize:10.5,padding:"4px 12px",...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}>🔄 Re-present Cheque</button>
               </div>
             </div>
           ))}
@@ -599,6 +601,7 @@ export function BankReco({branch}){
 /* Statement import — paste, upload CSV, or upload a PDF (extracted + stored to
    S3 server-side), map columns, preview, import. */
 function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut,onImported}){
+  const vo=isViewOnly();   // view-only user: import/clear disabled with a reason
   const [raw,setRaw]=useState("");
   const [fileName,setFileName]=useState("");
   const [pdfResult,setPdfResult]=useState(null); // {key,fileName,headers,rows,warning} once a PDF has been uploaded+parsed
@@ -683,8 +686,8 @@ function ImportPanel({ledger,code,from,to,onClose,importMut,clearMut,onImported}
       )}
 
       <div style={{display:"flex",gap:8,marginTop:10,alignItems:"center"}}>
-        <button onClick={doImport} disabled={!valid.length||mapping.date==null||importMut.isPending} style={{...btnG,fontSize:11,opacity:(!valid.length||mapping.date==null||importMut.isPending)?0.5:1}}><Upload size={12}/> {importMut.isPending?"Importing…":`Import ${valid.length} lines`}</button>
-        <button onClick={async()=>{ const{confirmed}=await confirmDialog({title:'Clear all statement lines?',message:`Delete ALL statement lines for ${ledger} between ${from} and ${to}? This cannot be undone.`,danger:true,confirmLabel:'Clear period'}); if(confirmed) clearMut.mutate({ledger,from,to}); }} disabled={clearMut.isPending} style={{...btnGh,fontSize:11,color:"#A32D2D"}}><Trash2 size={12}/> Clear period</button>
+        <button onClick={doImport} disabled={!valid.length||mapping.date==null||importMut.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,fontSize:11,opacity:(!valid.length||mapping.date==null||importMut.isPending||vo)?0.5:1,...(vo?{cursor:"not-allowed"}:{})}}><Upload size={12}/> {importMut.isPending?"Importing…":`Import ${valid.length} lines`}</button>
+        <button onClick={async()=>{ const{confirmed}=await confirmDialog({title:'Clear all statement lines?',message:`Delete ALL statement lines for ${ledger} between ${from} and ${to}? This cannot be undone.`,danger:true,confirmLabel:'Clear period'}); if(confirmed) clearMut.mutate({ledger,from,to}); }} disabled={clearMut.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,fontSize:11,color:"#A32D2D",...(vo?{cursor:"not-allowed",opacity:0.5}:{})}}><Trash2 size={12}/> Clear period</button>
         {importMut.isSuccess&&importMut.data&&<span style={{fontSize:10.5,color:"#27500A"}}>✔ {importMut.data.inserted} imported{importMut.data.duplicate?`, ${importMut.data.duplicate} already on file (re-import)`:""}{importMut.data.blank?`, ${importMut.data.blank} blank`:""}.</span>}
         {(importMut.isError||clearMut.isError)&&<span style={{fontSize:10.5,color:"#A32D2D"}}>{String(importMut.error?.message||clearMut.error?.message||"Failed")}</span>}
       </div>

@@ -32,7 +32,7 @@ import { useModalEsc } from '../../core/ux/useModalEsc';
 import { localeOf } from '../../core/format';
 import { periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
-import { apiGet, apiPost } from '../../core/api';
+import { apiGet, apiPost, isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 import { useApprovalChain, nextActionFor, StageChip } from '../../core/approvalChain';
 import { AuditTrail } from '../../core/AuditTrail';
 import { toast } from '../../core/ux/toast';
@@ -78,6 +78,11 @@ const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
 function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'none', onApprove, onReview, onCancel, onDelete, canDelete, onEdit, onRevoke, canRevoke, onEditPax, onInvoice, busyId, sel, onToggleSel }) {
   const chainCfg = useApprovalChain(); // three-level chain assignees (drives the stage-aware button)
+  // View-only accounts (e.g. a view-only Director) may browse the queue but not act. Every
+  // write button below is pre-DISABLED with a reason (never a live button that only 403s on
+  // click — the "never leave a screen silent / disable-with-reason" rule). The ONE exception
+  // is the Director/Owner escalation sign-off, which a view-only Director IS allowed to give.
+  const vo = isViewOnly();
   const cols = mode === 'approved'
     ? ['', 'Booking No', 'Voucher Date', 'Link No', 'Tally Ref', 'Module', 'Sale Inv', 'Purchase Inv', 'Sale', 'Purchase', 'GP', 'GP %', 'Approved', 'Actions']
     : mode === 'rejected'
@@ -93,6 +98,25 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
   // already bounds how much is on screen).
   const pg = usePager(rows);
   const shown = groupBy === 'none' ? pg.pageRows : rows;
+  // View-only action cell — a disabled "👁 View only" indicator (reason on hover) in place of
+  // the whole write-button cluster, EXCEPT the Director/Owner escalation sign-off, which a
+  // view-only Director may still give (mirrors voucherApprovals + the server's read-only exemption).
+  const voCell = (b) => {
+    if (mode === 'pending') {
+      const na = nextActionFor(b, chainCfg);
+      if (na.action === 'director' || na.action === 'owner') {
+        return (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <StageChip e={b} />
+            <button disabled={busyId === b.id || !na.allowed} onClick={() => onReview && onReview(b, na.action)} title={na.hint} aria-label={na.hint} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: !na.allowed ? '#cfd6e4' : GOLD, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>
+              {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} {na.label}
+            </button>
+          </div>
+        );
+      }
+    }
+    return <span title={VIEW_ONLY_REASON} aria-label={VIEW_ONLY_REASON} style={{ fontSize: 10.5, fontWeight: 700, color: '#9197a3', cursor: 'not-allowed' }}>👁 View only</span>;
+  };
   return (
     <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1080 }}>
@@ -145,7 +169,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                   <td style={{ padding: '8px 12px', textAlign: 'right', color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{gpPctTxt(b.gp?.total || 0, b.so?.total || 0)}</td>
                   {mode !== 'pending' && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>}
                   <td style={{ padding: '8px 12px' }} onClick={(e) => e.stopPropagation()}>
-                    {mode === 'pending' ? (
+                    {vo && (mode === 'pending' || mode === 'approved') ? voCell(b) : mode === 'pending' ? (
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <StageChip e={b} />
                         <button disabled={busyId === b.id} onClick={() => onEdit(b)} style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee' }}><Pencil size={12} /> Edit</button>
@@ -186,9 +210,10 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                       // lock's message tells them to ask the verifier for.
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                         <span style={{ fontSize: 11, color: '#9197a3' }} title={b.rejectedReason || ''}>{b.rejectedReason || '—'}</span>
-                        <button disabled={busyId === b.id} onClick={() => onEdit(b)}
-                          title="Correct and resubmit — this returns the booking to Pending and re-enters the approval chain at Check. The Link No is kept."
-                          style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: BLUE, borderColor: '#bcd4ee', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                        <button disabled={busyId === b.id || vo} onClick={() => onEdit(b)}
+                          title={vo ? VIEW_ONLY_REASON : "Correct and resubmit — this returns the booking to Pending and re-enters the approval chain at Check. The Link No is kept."}
+                          aria-label={vo ? VIEW_ONLY_REASON : undefined}
+                          style={{ ...btnGh, padding: '4px 9px', fontSize: 10.5, color: vo ? '#9197a3' : BLUE, borderColor: vo ? '#dfe2e7' : '#bcd4ee', marginLeft: 'auto', whiteSpace: 'nowrap', cursor: vo ? 'not-allowed' : 'pointer' }}>
                           <Pencil size={12} /> Edit &amp; resubmit
                         </button>
                       </div>
@@ -330,6 +355,8 @@ function RefundAmountCell({ entry, cur, fmt }) {
 function SopogpRefunds({ branch, status, needle, currentUser }) {
   const cur = bc(branch).cur;
   const isApprover = isApproverRole(currentUser);
+  // View-only: the refund/reissue write buttons are pre-disabled with a reason (see BookingTable).
+  const vo = isViewOnly();
   const q = useVoucherApprovals(branch, status, { refundScope: 'sopogp' });
   const approveOne = useApproveVoucher();
   const reject = useRejectVoucher();
@@ -378,6 +405,17 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
     finally { setBusy(false); }
   };
 
+  // View-only action cell for a refund/reissue row — a disabled "👁 View only" indicator
+  // (reason on hover) in place of Edit / Approve / Reject / Check / Verify, EXCEPT the
+  // Director/Owner escalation sign-off, which a view-only Director may still give.
+  const voRefundCell = (e) => {
+    const na = nextActionFor(e, chainCfg);
+    if (na.action === 'director' || na.action === 'owner') {
+      return <><StageChip e={e} /><button disabled={busy || !na.allowed} title={na.hint} aria-label={na.hint} onClick={() => doReview(e, na.action)} style={{ marginLeft: 6, marginRight: 6, padding: '5px 10px', background: na.allowed ? GOLD : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button></>;
+    }
+    return <><StageChip e={e} /><span title={VIEW_ONLY_REASON} aria-label={VIEW_ONLY_REASON} style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: '#9197a3', cursor: 'not-allowed' }}>👁 View only</span></>;
+  };
+
   const th = { padding: '9px 12px', fontSize: 10, fontWeight: 700, color: '#5b616e', textTransform: 'uppercase', whiteSpace: 'nowrap' };
   return (
     <div style={{ ...card, padding: 0, overflowX: 'auto', marginTop: 14 }}>
@@ -407,6 +445,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><RefundAmountCell entry={e} cur={cur} fmt={fmt} /></td>
                   {pendingTab
                     ? <td style={{ padding: '7px 12px', whiteSpace: 'nowrap' }}>
+                        {vo ? voRefundCell(e) : <>
                         <StageChip e={e} />
                         {isApprover && <>
                           {/* Edit in place (reuses the shared voucher editor); saving reverts it to
@@ -425,6 +464,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                         })()}
                         {isApprover && <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
                         {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
+                        </>}
                       </td>
                     : <td style={{ padding: '7px 12px', color: '#5b616e', textTransform: 'capitalize' }}>{e.status}</td>}
                 </tr>
@@ -573,6 +613,9 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const [range, setRange] = useState(() => periodRange('all', { branch })); // default All so Pending shows everything
   const [search, setSearch] = useState(initialSearch || '');
   const canDelete = isAdminRole(currentUser);
+  // View-only: hide the bulk write toolbar (Check / Verify / Approve selected) — those post
+  // to the books and would only 403. The per-row buttons are disabled-with-reason in the table.
+  const vo = isViewOnly();
   const inRange = (dt) => (!range.from || dt >= range.from) && (!range.to || dt <= range.to);
   // Search filters the visible list by Booking No, Link No, module, customer, supplier,
   // posted Sale/Purchase Vch No, or amount. Counts (tab badges) stay unfiltered.
@@ -694,7 +737,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
         </div>
         {needle && <span style={{ fontSize: 11, color: '#5b616e', fontWeight: 700 }}>{(status === 'edited' ? editedVisible.length : rows.length)} match{(status === 'edited' ? editedVisible.length : rows.length) === 1 ? '' : 'es'}</span>}
         {status === 'pending' && flaggedCount > 0 && <NeedsFixingChip count={flaggedCount} active={onlyFlagged} onToggle={() => setOnlyFlagged((v) => !v)} />}
-        {status === 'pending' && rows.length > 0 && (
+        {status === 'pending' && rows.length > 0 && !vo && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button onClick={toggleAllSel} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>{sel.size === allIds.length ? '☑ Clear' : `☐ Select all (${allIds.length})`}</button>
             {sel.size > 0 && <button disabled={busyId === 'bulk'} onClick={() => onReviewSelected('check')} style={{ ...btnGh, padding: '5px 11px', fontSize: 11, color: BLUE, borderColor: '#bcd4ee' }}>Check selected ({sel.size})</button>}

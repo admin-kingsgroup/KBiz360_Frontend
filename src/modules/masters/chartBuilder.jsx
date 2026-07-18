@@ -14,7 +14,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMasterList } from '../../core/useMasters';
 import { branchCode, useLedgerUsage, useBranchParity, useBranchParitySummary, useBranchParityDrill } from '../../core/useAccounting';
-import { apiPost } from '../../core/api';
+import { apiPost, isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 import { confirmDialog } from '../../core/ux/confirm';
 import { toastSuccess, toastError } from '../../core/ux/toast';
 import { FocusBanner } from '../../core/ux/FocusBanner';
@@ -159,6 +159,7 @@ export function flattenParentOptions(groups = [], excludeSubtreeOf = null) {
 // Senior Finance Manager); cycle (409) and lock (423) errors surface as toasts.
 function GroupStructureDialog({ action, groups, onClose }) {
   const { kind, node } = action;                       // kind: 'move' | 'clone'
+  const vo = isViewOnly();                              // view-only → confirm disabled with a reason
   const qc = useQueryClient();
   const [parentId, setParentId] = useState('');
   const [withLedgers, setWithLedgers] = useState(false);
@@ -215,8 +216,8 @@ function GroupStructureDialog({ action, groups, onClose }) {
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} style={{ padding: '6px 12px', fontSize: 12, fontWeight: 700, border: '1px solid #cdd1d8', borderRadius: 6, background: '#fff', color: DIM, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => m.mutate()} disabled={!parentId || m.isPending}
-            style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, background: !parentId || m.isPending ? '#9db4dd' : BLUE, color: '#fff', cursor: !parentId || m.isPending ? 'default' : 'pointer' }}>
+          <button onClick={() => m.mutate()} disabled={!parentId || m.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined}
+            style={{ padding: '6px 14px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 6, background: (!parentId || m.isPending || vo) ? '#9db4dd' : BLUE, color: '#fff', cursor: vo ? 'not-allowed' : (!parentId || m.isPending ? 'default' : 'pointer') }}>
             {m.isPending ? 'Working…' : kind === 'move' ? 'Move here' : 'Clone here'}
           </button>
         </div>
@@ -227,6 +228,7 @@ function GroupStructureDialog({ action, groups, onClose }) {
 
 export function AccountsTreeView({ branch, setRoute, setBranch }) {
   const brc = branchCode(branch);                    // undefined for ALL → shows all
+  const vo = isViewOnly();                            // view-only → Move/Clone disabled with a reason
   const [branchView, setBranchView] = useState(() => brc || 'ALL'); // in-page branch picker
   // Follow the TOP-BAR branch: switching it re-scopes this page live (the in-page
   // picker still overrides within that view until the next top-bar switch).
@@ -356,8 +358,8 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
   // 🔒 and never offer move/delete. Wired (~*) sub-groups can be CLONED (the copy is
   // unwired) but not MOVED (a move would re-classify module postings — backend 423s).
   const actBtn = (label, onClick, title) => (
-    <button type="button" title={title} onClick={(e) => { e.stopPropagation(); onClick(); }}
-      style={{ padding: '1px 7px', fontSize: 9.5, fontWeight: 700, border: '1px solid #cdd1d8', borderRadius: 5, background: '#fff', color: '#1a3a6e', cursor: 'pointer' }}>{label}</button>
+    <button type="button" title={vo ? VIEW_ONLY_REASON : title} disabled={vo} onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{ padding: '1px 7px', fontSize: 9.5, fontWeight: 700, border: '1px solid #cdd1d8', borderRadius: 5, background: '#fff', color: vo ? '#c2c8d6' : '#1a3a6e', cursor: vo ? 'not-allowed' : 'pointer' }}>{label}</button>
   );
   const nodeActions = (node) => (node.system ? null : (
     <span style={{ display: 'inline-flex', gap: 4 }}>
@@ -955,6 +957,7 @@ function TravkingsGroupTableView({ setRoute, setBranch, shellBranch }) {
 // (0 entries → delete, has entries → deactivate). Locked (wired/tax) heads are
 // ERP-managed — shown with a lock, not tappable.
 function PresenceToggles({ item, num, shellBranch }) {
+  const vo = isViewOnly();                              // view-only → every presence / lock / deactivate toggle disabled with a reason
   const qc = useQueryClient();
   const refresh = () => { qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['master', 'ledgers'] }); };
   const m = useMutation({
@@ -1029,8 +1032,8 @@ function PresenceToggles({ item, num, shellBranch }) {
     }
   };
   const pill = (p) => ({
-    appearance: 'none', cursor: p.locked ? 'not-allowed' : 'pointer', fontSize: 8.5, fontWeight: 800,
-    padding: '3px 5px', borderRadius: 5, letterSpacing: 0.2, opacity: m.isPending ? 0.5 : p.locked ? 0.55 : 1,
+    appearance: 'none', cursor: (p.locked || vo) ? 'not-allowed' : 'pointer', fontSize: 8.5, fontWeight: 800,
+    padding: '3px 5px', borderRadius: 5, letterSpacing: 0.2, opacity: m.isPending ? 0.5 : (p.locked || vo) ? 0.55 : 1,
     ...(p.state === 'active' ? { background: P_GREEN, color: '#fff', border: `1px solid ${P_GREEN}` }
       : p.state === 'hidden' ? { background: '#e5e9f0', color: '#4a5568', border: '1px solid #c3cbe0', textDecoration: 'line-through' }
       : p.state === 'inactive' ? { background: '#fff', color: P_AMBER, border: '1px solid #d8c084' }
@@ -1046,24 +1049,24 @@ function PresenceToggles({ item, num, shellBranch }) {
       {/* A specific top-bar branch shows only ITS presence pill — other branches'
           presence is managed from the ALL view. Org-wide lock/deact stay (actions). */}
       {(item.presence || []).filter((p) => !shellBranch || p.br === shellBranch).map((p) => (
-        <button key={p.br} type="button" disabled={p.locked || m.isPending} onClick={() => flip(p)} style={pill(p)}
-          title={`${p.br} · ${p.state}${p.posts ? ` · ${num(p.posts)} entries` : ''} · ${hint(p)}`}>
+        <button key={p.br} type="button" disabled={p.locked || m.isPending || vo} onClick={() => flip(p)} style={pill(p)}
+          title={vo ? VIEW_ONLY_REASON : `${p.br} · ${p.state}${p.posts ? ` · ${num(p.posts)} entries` : ''} · ${hint(p)}`}>
           {p.br}{p.locked ? '🔒' : ''}
         </button>
       ))}
       {item.statutory
         ? <span title="Statutory / module head — its lock is ERP-managed" style={{ fontSize: 12, marginLeft: 3, opacity: 0.55, cursor: 'not-allowed' }}>🔒</span>
         : (
-          <button type="button" disabled={lockM.isPending} onClick={flipLock}
-            title={headLocked ? 'Locked (org-wide) — tap to unlock, moves back to OL' : 'Tap to lock (org-wide) — moves to LL'}
-            style={{ appearance: 'none', border: `1px solid ${headLocked ? '#d8c084' : '#cdd1d8'}`, background: headLocked ? '#fdf6e3' : '#fff', borderRadius: 5, padding: '2px 5px', fontSize: 11, cursor: 'pointer', marginLeft: 3, opacity: lockM.isPending ? 0.5 : 1 }}>
+          <button type="button" disabled={lockM.isPending || vo} onClick={flipLock}
+            title={vo ? VIEW_ONLY_REASON : (headLocked ? 'Locked (org-wide) — tap to unlock, moves back to OL' : 'Tap to lock (org-wide) — moves to LL')}
+            style={{ appearance: 'none', border: `1px solid ${headLocked ? '#d8c084' : '#cdd1d8'}`, background: headLocked ? '#fdf6e3' : '#fff', borderRadius: 5, padding: '2px 5px', fontSize: 11, cursor: vo ? 'not-allowed' : 'pointer', marginLeft: 3, opacity: (lockM.isPending || vo) ? 0.5 : 1 }}>
             {headLocked ? '🔒' : '🔓'}
           </button>
         )}
       {!item.statutory && !headLocked && (anyLive || anyInactive) && (
-        <button type="button" disabled={deactM.isPending} onClick={flipActive}
-          title={anyLive ? 'Deactivate (org-wide) — moves to the Deact column; restorable' : 'Restore (org-wide) — brings it back from Deact'}
-          style={{ appearance: 'none', border: `1px solid ${anyLive ? '#f3c1bb' : '#bcd8ce'}`, background: anyLive ? '#fef2f2' : '#effaf5', color: anyLive ? '#b23c2b' : '#14795f', borderRadius: 5, padding: '2px 5px', fontSize: 11, fontWeight: 800, cursor: 'pointer', marginLeft: 2, opacity: deactM.isPending ? 0.5 : 1 }}>
+        <button type="button" disabled={deactM.isPending || vo} onClick={flipActive}
+          title={vo ? VIEW_ONLY_REASON : (anyLive ? 'Deactivate (org-wide) — moves to the Deact column; restorable' : 'Restore (org-wide) — brings it back from Deact')}
+          style={{ appearance: 'none', border: `1px solid ${anyLive ? '#f3c1bb' : '#bcd8ce'}`, background: anyLive ? '#fef2f2' : '#effaf5', color: anyLive ? '#b23c2b' : '#14795f', borderRadius: 5, padding: '2px 5px', fontSize: 11, fontWeight: 800, cursor: vo ? 'not-allowed' : 'pointer', marginLeft: 2, opacity: (deactM.isPending || vo) ? 0.5 : 1 }}>
           {anyLive ? '⊘' : '↺'}
         </button>
       )}

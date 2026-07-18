@@ -91,7 +91,7 @@ export function LimitsAdmin() {
             <div className="p-4"><LoadingState label="Loading limits…" /></div>
           )}
           <div className="flex justify-center border-t border-surface-border bg-surface-alt px-4 py-3">
-            <Button type="submit" variant="success" size="sm">
+            <Button type="submit" variant="success" size="sm" write>
               {isOwner() ? 'Save group-default thresholds' : 'Submit changes for Owner approval'}
             </Button>
           </div>

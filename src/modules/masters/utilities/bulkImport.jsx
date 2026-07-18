@@ -9,8 +9,11 @@
 import React, { useState } from 'react';
 import { RPT_tdStyle, RPT_thStyle } from '../../../core/styles';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 
 export function BulkImportMaster(){
+  // View-only accounts cannot run the bulk import — the final action is disabled with a reason.
+  const vo = isViewOnly();
   const [step, setStep] = useState(1);
   const [importType, setImportType] = useState("Customers");
   const types = ["Customers","Suppliers","Sub-Agents","Employees","Chart of Accounts","Tax Codes","Forex Rates","Numbering Series"];
@@ -99,7 +102,7 @@ export function BulkImportMaster(){
             <button onClick={()=>setStep(2)} style={{padding:"9px 18px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
             <div style={{display:"flex",gap:8}}>
               <button style={{padding:"9px 18px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>📥 Download Error Report</button>
-              <button style={{padding:"9px 22px",background:"#16a34a",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>✓ Import 48 Valid Rows</button>
+              <button disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"9px 22px",background:vo?"#9cc7ab":"#16a34a",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:vo?"not-allowed":"pointer"}}>✓ Import 48 Valid Rows</button>
             </div>
           </div>
         </div>

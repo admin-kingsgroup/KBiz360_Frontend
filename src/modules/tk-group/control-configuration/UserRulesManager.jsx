@@ -104,7 +104,7 @@ export function UserRulesManager({ canManage = true }) {
             </div>
             <FormField label="Remark"><Textarea rows={2} value={form.remark} placeholder="Why this rule / how to refine it" onChange={(e) => set('remark', e.target.value)} /></FormField>
             <div className="flex items-center gap-3">
-              <Button onClick={save} disabled={!formOk || create.isPending} loading={create.isPending}>Save as Draft</Button>
+              <Button onClick={save} write disabled={!formOk || create.isPending} loading={create.isPending}>Save as Draft</Button>
               {!formOk && <span className="text-[11px] text-ink-subtle">Needs a title, a subject and the access it governs.</span>}
               {create.isError && <span className="text-xs text-danger">{create.error?.message || 'Save failed'}</span>}
             </div>
@@ -144,11 +144,11 @@ export function UserRulesManager({ canManage = true }) {
                           <Button size="sm" variant="secondary" onClick={() => test.mutate(r._id)} loading={test.isPending && test.variables === r._id}>Test (who it hits)</Button>
                         )}
                         {!r.system && (
-                          <Button size="sm" variant={r.status === 'active' ? 'ghost' : 'primary'} onClick={() => setStatus.mutate({ id: r._id, s: toggleTarget(r.status) })}>
+                          <Button size="sm" variant={r.status === 'active' ? 'ghost' : 'primary'} write onClick={() => setStatus.mutate({ id: r._id, s: toggleTarget(r.status) })}>
                             {r.status === 'active' ? 'Deactivate' : 'Activate ▸'}
                           </Button>
                         )}
-                        {!r.system && <Button size="sm" variant="ghost" onClick={() => remove(r)} aria-label="Delete rule">✕</Button>}
+                        {!r.system && <Button size="sm" variant="ghost" write onClick={() => remove(r)} aria-label="Delete rule">✕</Button>}
                         {tr && (
                           <span className="text-[12px] text-ink-muted">
                             {tr.evaluable ? <> applies to <b className="text-ink">{tr.total}</b> user{tr.total === 1 ? '' : 's'}{tr.sample?.length ? <> — {tr.sample.join(', ')}</> : null}</>

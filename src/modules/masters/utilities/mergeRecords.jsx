@@ -8,8 +8,11 @@
 import React, { useState } from 'react';
 import { RPT_tdStyle, RPT_thStyle } from '../../../core/styles';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 
 export function MergeRecordsUtility(){
+  // View-only accounts cannot merge records — the confirm action is disabled with a reason.
+  const vo = isViewOnly();
   const [masterType, setMasterType] = useState("Customers");
   const [source, setSource] = useState("L T Group (CUST-AMD-00012)");
   const [target, setTarget] = useState("");
@@ -81,7 +84,7 @@ export function MergeRecordsUtility(){
 
         <div style={{marginTop:18,display:"flex",justifyContent:"flex-end",gap:8}}>
           <button style={{padding:"9px 18px",background:"#fff",border:"1px solid #cdd1d8",color:"#5b616e",borderRadius:6,fontSize:12,fontWeight:600,cursor:"pointer"}}>Cancel</button>
-          <button style={{padding:"9px 22px",background:"#dc2626",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>⚠ Confirm Merge</button>
+          <button disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{padding:"9px 22px",background:vo?"#e69a9a":"#dc2626",color:"#fff",border:"none",borderRadius:6,fontSize:13,fontWeight:700,cursor:vo?"not-allowed":"pointer"}}>⚠ Confirm Merge</button>
         </div>
       </div>
 

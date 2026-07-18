@@ -5,6 +5,7 @@ import { isOwner } from './utils/owner';
 import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { LIMIT_BRANCHES, symbolFor, effectiveValue, overrideValue, hasOverride, overrideCount, cleanLimitValues } from './utils/branchLimits';
 import { SkeletonCards } from '../../shell/primitives';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 
 // ─── Control Panel · Limits & Thresholds → BRANCH-WISE editor ────────────────
 // Pick a branch, edit its thresholds. The Owner saves live (self-approved); everyone
@@ -13,6 +14,9 @@ import { SkeletonCards } from '../../shell/primitives';
 export function BranchLimitsEditor({ go, branch: controlledBranch, onBranchChange }) {
   const qc = useQueryClient();
   const owner = isOwner();
+  // View-only accounts may review thresholds but never save or propose a change — the Save
+  // button is pre-disabled with the shared reason instead of a live button that only 403s.
+  const vo = isViewOnly();
   const q = useQuery({ queryKey: ['tk', 'limits'], queryFn: () => getLimits(), staleTime: 30_000 });
   const store = q.data?.store || { default: {}, branches: {} };
   const fields = q.data?.fields || [];
@@ -128,8 +132,8 @@ export function BranchLimitsEditor({ go, branch: controlledBranch, onBranchChang
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={save} disabled={saving || q.isLoading}
-          className={`rounded-brand px-4 py-2 text-[13px] font-semibold text-white transition-colors ${saving || q.isLoading ? 'cursor-not-allowed bg-ink-subtle' : 'bg-success hover:bg-success/90'}`}>
+        <button type="button" onClick={save} disabled={saving || q.isLoading || vo} title={vo ? VIEW_ONLY_REASON : undefined}
+          className={`rounded-brand px-4 py-2 text-[13px] font-semibold text-white transition-colors ${saving || q.isLoading || vo ? 'cursor-not-allowed bg-ink-subtle' : 'bg-success hover:bg-success/90'}`}>
           {saving ? 'Saving…' : owner ? `Save ${meta.label} thresholds` : `Submit ${meta.label} for approval`}
         </button>
         {go && <button type="button" onClick={() => go('/tk/limits')} className="text-[12px] text-ink-muted underline">Open full editor</button>}

@@ -12,6 +12,7 @@ import { confirmDialog } from '../../../core/ux/confirm';
 import { Snowflake, Lock, CheckCircle2, PenLine } from 'lucide-react';
 import { C, card, money, aBtn } from '../../accountantWorkspace/shared';
 import { getLedgerFreeze, freezeLedger, unfreezeLedger, signCertificate } from '../api';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 
 const pill = (bg, color) => ({ padding: '2px 9px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, background: bg, color, whiteSpace: 'nowrap' });
 const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
@@ -21,21 +22,27 @@ const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${Str
 // DISABLED (and reasons out) until every entry is reconciled — clicking it freezes;
 // clicking Un-Frozen while frozen releases the soft lock. Certified locks the whole tab.
 function FreezeTab({ frozen, canFreeze, busy, onFreeze, onUnfreeze }) {
-  const seg = (active, label, blocked, onClick, activeBg, blockedTitle) => (
-    <button type="button" role="tab" aria-selected={active} disabled={busy || active || blocked}
-      title={blocked && !active ? blockedTitle : ''}
-      onClick={active || blocked ? undefined : onClick}
+  // View-only: the write segment (the one you'd click to flip state) is disabled
+  // with the reason, never a live tab that only 403s server-side.
+  const vo = isViewOnly();
+  const seg = (active, label, blocked, onClick, activeBg, blockedTitle) => {
+    const blk = blocked || vo;
+    return (
+    <button type="button" role="tab" aria-selected={active} disabled={busy || active || blk}
+      title={!active ? (vo ? VIEW_ONLY_REASON : (blocked ? blockedTitle : '')) : ''}
+      onClick={active || blk ? undefined : onClick}
       style={{
         padding: '5px 13px', minHeight: 28, minWidth: 82, fontSize: 11, fontWeight: 800,
         border: 'none', borderRadius: 7, transition: 'background .15s,color .15s',
-        cursor: (active || blocked || busy) ? 'default' : 'pointer',
+        cursor: (active || blk || busy) ? (vo && !active ? 'not-allowed' : 'default') : 'pointer',
         background: active ? activeBg : 'transparent',
-        color: active ? '#fff' : (blocked ? '#aeb3bd' : C.dim),
+        color: active ? '#fff' : (blk ? '#aeb3bd' : C.dim),
         boxShadow: active ? '0 1px 2px rgba(16,18,22,0.18)' : 'none',
       }}>
       {label}
     </button>
   );
+  };
   return (
     <div role="tablist" aria-label="Freeze state"
       style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 9, background: '#eef1f5', border: `1px solid ${C.border}`, opacity: busy ? 0.6 : 1 }}>
@@ -75,6 +82,7 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
   // error) or a { connected:false } payload both mean "can't read status" — treat
   // them the same so the panel never shows a bare/greyed control with no reason.
   const ok = !!st && st.connected !== false;
+  const vo = isViewOnly();
 
   const doFreeze = async () => {
     if (!st?.canFreeze) return;
@@ -173,7 +181,7 @@ export default function ReconFreezePanel({ branch, code, name, ledgerLabel, defa
             onFreeze={doFreeze} onUnfreeze={doUnfreeze} />
         )}
         {ok && st.frozen && !st.certified && st.nextSigner && (
-          <button onClick={doSign} disabled={busy} style={{ ...aBtn(C.green), opacity: busy ? 0.6 : 1 }}>
+          <button onClick={doSign} disabled={busy || vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.green), opacity: (busy || vo) ? 0.6 : 1, ...(vo ? { cursor: 'not-allowed' } : {}) }}>
             <PenLine size={12} style={{ verticalAlign: -2 }} /> Sign as {st.nextSigner}
           </button>
         )}

@@ -32,8 +32,8 @@ export function ChangeRequestList({ items = [], onAct, slaHours = SLA_DEFAULT_HO
               </div>
             </div>
             <Badge tone={slaTone(cr.sla.state)} size="sm">{SLA_LABEL[cr.sla.state]}</Badge>
-            <Button type="button" variant="success" size="sm" onClick={() => onAct && onAct(cr._id, 'approve')}>Approve</Button>
-            <Button type="button" variant="danger" size="sm" onClick={() => onAct && onAct(cr._id, 'reject')}>Reject</Button>
+            <Button type="button" variant="success" size="sm" write onClick={() => onAct && onAct(cr._id, 'approve')}>Approve</Button>
+            <Button type="button" variant="danger" size="sm" write onClick={() => onAct && onAct(cr._id, 'reject')}>Reject</Button>
           </li>
         ))}
       </ul>

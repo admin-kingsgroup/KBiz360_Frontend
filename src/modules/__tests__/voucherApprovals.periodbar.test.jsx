@@ -13,7 +13,7 @@ jest.mock('../../core/useAccounting', () => ({
   useApproveAll: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   branchCode: jest.fn(() => 'BOM'),
 }));
-jest.mock('../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})), getAuthToken: jest.fn(() => 'open') }));
+jest.mock('../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})), getAuthToken: jest.fn(() => 'open'), isViewOnly: () => false }));
 jest.mock('../../core/styles', () => ({ bc: () => ({ cur: '₹' }) }));
 jest.mock('../../core/data', () => ({ CONSOLIDATED_LABEL: 'TK Head Office Group' }));
 // Heavy / irrelevant children → inert.

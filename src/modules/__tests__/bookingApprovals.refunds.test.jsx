@@ -12,6 +12,8 @@ const mockRejectAsync = jest.fn(() => Promise.resolve());
 const mockConfirm = jest.fn(() => Promise.resolve({ confirmed: true, reason: 'wrong fare' }));
 
 jest.mock('../../core/api', () => ({
+  isViewOnly: () => false,
+  VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.',
   apiGet: (...a) => mockApiGet(...a),
   apiPost: (...a) => mockApiPost(...a),
   apiPut: jest.fn(() => Promise.resolve({})),

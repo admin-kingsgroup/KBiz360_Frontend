@@ -20,12 +20,14 @@ import {
 } from '../../../core/useClientReco';
 import { parseClientStatement } from '../../../core/clientStatementParse';
 import { C, card, money, brLabel, Shell, th, td, rnum, Table, aBtn, Tile, SecTitle, Row } from '../../accountantWorkspace/shared';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 import { ReconMatcher, wbBadge, downloadCSV } from './shared';
 import ReconFreezePanel from './ReconFreezePanel';
 import { Skeleton } from '../../../shell/primitives';
 
 export function ClientReco({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
+  const vo = isViewOnly();   // view-only user: write actions disabled with a reason
   const [client, setClient] = useState('');           // '' = workbench view
   const [tab, setTab] = useState('statement');        // 'statement' | 'internal'
   const [q, setQ] = useState('');
@@ -75,8 +77,8 @@ export function ClientReco({ branch, setRoute }) {
       <Shell title="Client Reconciliation" sub={`${brLabel(branch)} · pick a client to reconcile — or scan every account's status below`}
         right={
           <>
-            <button disabled={autoAll.isPending} onClick={() => autoAll.mutate({ branch: branch?.code || branch })}
-              style={{ ...aBtn(C.blue), opacity: autoAll.isPending ? 0.6 : 1 }} title="Auto-match every client with open lines">
+            <button disabled={autoAll.isPending || vo} onClick={() => autoAll.mutate({ branch: branch?.code || branch })}
+              style={{ ...aBtn(C.blue), opacity: (autoAll.isPending || vo) ? 0.6 : 1, ...(vo ? { cursor: 'not-allowed' } : {}) }} title={vo ? VIEW_ONLY_REASON : 'Auto-match every client with open lines'}>
               {autoAll.isPending ? 'Matching all…' : 'Auto-match all'}</button>
             <div style={{ ...card, padding: '6px 12px', fontSize: 12, fontWeight: 700, color: C.dark }}>{list.totals?.clients || 0} clients · {money(cur, list.totals?.bookOwed)} receivable</div>
           </>
@@ -134,7 +136,7 @@ export function ClientReco({ branch, setRoute }) {
       right={
         <>
           <button onClick={() => setClient('')} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>← All clients</button>
-          {tab === 'statement' && <button disabled={auto.isPending} onClick={() => auto.mutate({ client, branch: branch?.code || branch })} style={{ ...aBtn(C.blue), opacity: auto.isPending ? 0.6 : 1 }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>}
+          {tab === 'statement' && <button disabled={auto.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={() => auto.mutate({ client, branch: branch?.code || branch })} style={{ ...aBtn(C.blue), opacity: (auto.isPending || vo) ? 0.6 : 1, ...(vo ? { cursor: 'not-allowed' } : {}) }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>}
           {tab === 'statement' && stmt.length > 0 && <button onClick={exportStatement} style={aBtn(C.dark)}>Export CSV</button>}
           {setRoute && <button onClick={() => setRoute('/receipts')} style={aBtn(C.amber)}>Record Receipt</button>}
         </>
@@ -165,9 +167,9 @@ export function ClientReco({ branch, setRoute }) {
             <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} placeholder={'2026-05-01, INV-77, 1000, 0, May tour invoice\n2026-05-10, , 0, 400, payment received'}
               style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 6, padding: 8, fontSize: 12, fontFamily: 'monospace' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <button disabled={!parsed.length || imp.isPending} onClick={doImport} style={{ ...aBtn(C.green), opacity: !parsed.length || imp.isPending ? 0.6 : 1 }}>
+              <button disabled={!parsed.length || imp.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={doImport} style={{ ...aBtn(C.green), opacity: (!parsed.length || imp.isPending || vo) ? 0.6 : 1, ...(vo ? { cursor: 'not-allowed' } : {}) }}>
                 <Plus size={12} /> {imp.isPending ? 'Importing…' : `Import ${parsed.length} row${parsed.length === 1 ? '' : 's'}`}</button>
-              {stmt.length > 0 && <button onClick={() => clear.mutate({ client, branch })} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}` }}>Clear all imported</button>}
+              {stmt.length > 0 && <button onClick={() => clear.mutate({ client, branch })} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}`, ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : {}) }}>Clear all imported</button>}
               <span style={{ fontSize: 11, color: C.dim }}>Duplicates and blank rows are skipped automatically.</span>
             </div>
           </div>

@@ -21,6 +21,7 @@ import { confirmDialog } from '../../../core/ux/confirm';
 import { Kbd } from '../../../core/ux/widgets.jsx';
 import { PageLayout } from '../../../shell/PageLayout';
 import { Modal, Button, Select, Input, LoadingState, ErrorState } from '../../../shell/primitives';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 
 const DARK = '#1a1c22', BLUE = '#2563eb', DIM = '#5b616e', RED = '#dc2626', GREEN = '#16a34a';
 
@@ -170,7 +171,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
       footer={
         <>
           <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" size="sm" disabled={saving || missing.length > 0} loading={saving} onClick={submit} title="Save (Ctrl/Cmd+Enter)">
+          <Button write variant="primary" size="sm" disabled={saving || missing.length > 0} loading={saving} onClick={submit} title="Save (Ctrl/Cmd+Enter)">
             {saving ? 'Saving…' : <>Save <Kbd>⌃↵</Kbd></>}
           </Button>
         </>
@@ -205,6 +206,9 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   const pg = usePager(rows);
   const cols = fields.filter((f) => f.table !== false);
   const isDerivedRow = (r) => !r.id || String(r.id).startsWith('derived:');
+  // View-only accounts see the row write actions (Edit / Deactivate / Delete) DISABLED
+  // with a reason instead of live buttons that only 403 on the server.
+  const vo = isViewOnly();
   // An empty list must say WHY it is empty, not just that it is. "No records yet" is a
   // lie when rowFilter hid every row — the records exist, they're just out of scope
   // (e.g. a per-branch master viewed from a branch that owns none). `emptyMessage` may
@@ -355,7 +359,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
         <>
           <Button variant="secondary" size="sm" icon={Download} onClick={exportSheet} disabled={rows.length === 0} title="Export all records to Excel">Export Excel</Button>
           <Button variant="secondary" size="sm" icon={Printer} onClick={printList} disabled={rows.length === 0} title="Print the current list">Print</Button>
-          {!readOnly && <Button variant="primary" size="sm" icon={Plus} onClick={openNew}>New</Button>}
+          {!readOnly && <Button write variant="primary" size="sm" icon={Plus} onClick={openNew}>New</Button>}
         </>
       }
       // Toolbar filters (Branch/Group/…) get their own full-width bordered bar —
@@ -387,13 +391,13 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
                     {readOnly || (lockedRow && lockedRow(r))
                       ? <span title="Locked" style={{ color: '#c2c8d6', fontSize: 13 }}>🔒</span>
                       : (<>
-                          <button onClick={() => openEdit(r)} title="Edit" style={{ background: 'none', border: 'none', cursor: 'pointer', color: BLUE, padding: 4 }}><Pencil size={14} /></button>
+                          <button onClick={() => openEdit(r)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Edit'} style={{ background: 'none', border: 'none', cursor: vo ? 'not-allowed' : 'pointer', color: vo ? '#c2c8d6' : BLUE, padding: 4 }}><Pencil size={14} /></button>
                           {hasActive && (r.active === false
-                            ? <button onClick={() => toggleActive(r)} title="Reactivate" style={{ background: 'none', border: 'none', cursor: 'pointer', color: GREEN, padding: 4 }}><RotateCcw size={14} /></button>
-                            : <button onClick={() => toggleActive(r)} title="Deactivate — keeps the record and its history; use instead of Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', padding: 4 }}><Ban size={14} /></button>)}
-                          <button onClick={() => del(r)} disabled={isDerivedRow(r)}
-                            title={isDerivedRow(r) ? "Can't delete — no master record exists yet (past transactions still reference this name). Edit to create one, or Deactivate." : 'Delete'}
-                            style={{ background: 'none', border: 'none', padding: 4, cursor: isDerivedRow(r) ? 'not-allowed' : 'pointer', color: isDerivedRow(r) ? '#c2c8d6' : RED }}>
+                            ? <button onClick={() => toggleActive(r)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Reactivate'} style={{ background: 'none', border: 'none', cursor: vo ? 'not-allowed' : 'pointer', color: vo ? '#c2c8d6' : GREEN, padding: 4 }}><RotateCcw size={14} /></button>
+                            : <button onClick={() => toggleActive(r)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Deactivate — keeps the record and its history; use instead of Delete'} style={{ background: 'none', border: 'none', cursor: vo ? 'not-allowed' : 'pointer', color: vo ? '#c2c8d6' : '#b45309', padding: 4 }}><Ban size={14} /></button>)}
+                          <button onClick={() => del(r)} disabled={isDerivedRow(r) || vo}
+                            title={vo ? VIEW_ONLY_REASON : (isDerivedRow(r) ? "Can't delete — no master record exists yet (past transactions still reference this name). Edit to create one, or Deactivate." : 'Delete')}
+                            style={{ background: 'none', border: 'none', padding: 4, cursor: (isDerivedRow(r) || vo) ? 'not-allowed' : 'pointer', color: (isDerivedRow(r) || vo) ? '#c2c8d6' : RED }}>
                             <Trash2 size={14} />
                           </button>
                         </>)}

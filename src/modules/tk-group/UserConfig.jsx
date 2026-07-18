@@ -6,6 +6,7 @@ import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { resolveUserLimit, hasUserBranchOverride, userDefaultLimit } from './utils/userLimits';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
 import { Skeleton } from '../../shell/primitives';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 
 // ─── Control Panel · User Configuration (real roster + per-user ceilings) ────
 // The live user list with role / branches / app access, and each user's approval
@@ -19,6 +20,9 @@ const AccessDot = ({ on, label }) => (
 export function UserConfig({ go, branch = 'default' }) {
   const qc = useQueryClient();
   const owner = isOwner();
+  // View-only accounts may read the roster and ceilings but never save or propose a change —
+  // each per-user Save button is pre-disabled with the shared reason.
+  const vo = isViewOnly();
   const rosterQ = useQuery({ queryKey: ['tk', 'roster'], queryFn: getRoster, staleTime: 60_000 });
   const limitsQ = useQuery({ queryKey: ['tk', 'userLimits'], queryFn: getUserLimits, staleTime: 30_000 });
   const roster = rosterQ.data || [];
@@ -112,8 +116,8 @@ export function UserConfig({ go, branch = 'default' }) {
                     </span>
                   </td>
                   <td className="p-2.5 text-center">
-                    <button type="button" onClick={() => save(u)} disabled={busy === u.email}
-                      className={`rounded-md px-2.5 py-1 text-[11px] font-semibold text-white ${busy === u.email ? 'bg-ink-subtle' : 'bg-success hover:bg-success/90'}`}>
+                    <button type="button" onClick={() => save(u)} disabled={busy === u.email || vo} title={vo ? VIEW_ONLY_REASON : undefined}
+                      className={`rounded-md px-2.5 py-1 text-[11px] font-semibold text-white ${busy === u.email || vo ? 'cursor-not-allowed bg-ink-subtle' : 'bg-success hover:bg-success/90'}`}>
                       {busy === u.email ? '…' : owner ? 'Save' : 'Propose'}
                     </button>
                   </td>

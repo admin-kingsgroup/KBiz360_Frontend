@@ -1,7 +1,7 @@
 // Accountant workspace — pure helpers + a render smoke test of two key screens.
 // api/crmApi use import.meta (no babel plugin under jest); useAccounting is mocked
 // so the screens render against fixed data with no network.
-jest.mock('../core/api', () => ({ apiGet: jest.fn(), apiPost: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
+jest.mock('../core/api', () => ({ isViewOnly: () => false, VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.', apiGet: jest.fn(), apiPost: jest.fn(), getAuthToken: jest.fn(() => 'open') }));
 jest.mock('../core/crmApi', () => ({ crmGet: jest.fn(), crmPost: jest.fn() }));
 // Real period engine (pure) but stub the inception query (it would hit the network).
 jest.mock('../core/period', () => ({ ...jest.requireActual('../core/period'), useInception: () => ({ data: { from: '2024-04-01' } }) }));

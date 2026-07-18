@@ -68,7 +68,7 @@ export function TargetsBudgets({ branches = DEFAULT_BRANCHES }) {
           <FormField label="Note (optional)" className="max-w-md">
             <Input aria-label="Note" value={note} onChange={(e) => setNote(e.target.value)} />
           </FormField>
-          <Button type="submit" variant="primary" size="sm" disabled={!valid} className="justify-self-start">
+          <Button type="submit" variant="primary" size="sm" write disabled={!valid} className="justify-self-start">
             Submit target
           </Button>
         </form>

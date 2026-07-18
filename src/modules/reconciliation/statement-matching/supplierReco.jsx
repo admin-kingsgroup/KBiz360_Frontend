@@ -22,11 +22,13 @@ import {
 } from '../../../core/useSupplierReco';
 import { parseSupplierStatement } from '../../../core/supplierStatementParse';
 import { C, card, money, brLabel, Shell, aBtn, Tile, SecTitle, Row } from '../../accountantWorkspace/shared';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 import { ReconMatcher } from './shared';
 import ReconFreezePanel from './ReconFreezePanel';
 
 export function SupplierReco({ branch, setRoute }) {
   const cur = (bc(branch) || {}).cur || '₹';
+  const vo = isViewOnly();   // view-only user: write actions disabled with a reason
   const age = useAgeing(branch).data || {};
   const suppliers = useMemo(() => (age.payables?.rows || []).map((r) => r.party).filter(Boolean), [age]);
   const [supplier, setSupplier] = useState('');
@@ -69,8 +71,8 @@ export function SupplierReco({ branch, setRoute }) {
             {!suppliers.length && <option value="">No suppliers with open balances</option>}
             {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-          <button disabled={!sel || auto.isPending} onClick={() => auto.mutate({ supplier: sel, branch: branch?.code || branch })}
-            style={{ ...aBtn(C.blue), opacity: !sel || auto.isPending ? 0.6 : 1 }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>
+          <button disabled={!sel || auto.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={() => auto.mutate({ supplier: sel, branch: branch?.code || branch })}
+            style={{ ...aBtn(C.blue), opacity: (!sel || auto.isPending || vo) ? 0.6 : 1, ...(vo ? { cursor: 'not-allowed' } : {}) }}>{auto.isPending ? 'Matching…' : 'Auto-match'}</button>
           {setRoute && <button onClick={() => setRoute('/payments')} style={aBtn(C.amber)}>Record Payment</button>}
         </>
       }>
@@ -95,10 +97,10 @@ export function SupplierReco({ branch, setRoute }) {
             <textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} placeholder={'2026-05-01, INV-77, 1000, 0, May airfare\n2026-05-10, , 0, 400, payment recd'}
               style={{ width: '100%', boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 6, padding: 8, fontSize: 12, fontFamily: 'monospace' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <button disabled={!parsed.length || imp.isPending} onClick={doImport}
-                style={{ ...aBtn(C.green), opacity: !parsed.length || imp.isPending ? 0.6 : 1 }}>
+              <button disabled={!parsed.length || imp.isPending || vo} title={vo ? VIEW_ONLY_REASON : undefined} onClick={doImport}
+                style={{ ...aBtn(C.green), opacity: (!parsed.length || imp.isPending || vo) ? 0.6 : 1, ...(vo ? { cursor: 'not-allowed' } : {}) }}>
                 <Plus size={12} /> {imp.isPending ? 'Importing…' : `Import ${parsed.length} row${parsed.length === 1 ? '' : 's'}`}</button>
-              {stmt.length > 0 && <button onClick={() => clear.mutate({ supplier: sel })} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}` }}>Clear all imported</button>}
+              {stmt.length > 0 && <button onClick={() => clear.mutate({ supplier: sel })} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.red), background: '#fff', color: C.red, border: `1px solid ${C.red}`, ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : {}) }}>Clear all imported</button>}
               <span style={{ fontSize: 11, color: C.dim }}>Duplicates and blank rows are skipped automatically.</span>
             </div>
           </div>

@@ -55,6 +55,19 @@ const BTN_SIZE = {
   lg: 'h-11 px-5 text-sm gap-2 rounded-lg',
 };
 
+// Dependency-free view-only read (the logged-in user + `viewOnly` flag are mirrored in
+// localStorage by LoginScreen/App). Kept INLINE rather than imported from core/api so this
+// low-level primitive — rendered by nearly every screen and test — never pulls core/api's
+// `import.meta.env` into every component's (and test's) module graph. Mirrors core/api.isViewOnly.
+export const VIEW_ONLY_REASON = 'View only — this account can review but cannot make changes.';
+function isViewOnly() {
+  try {
+    const raw = (typeof localStorage !== 'undefined' && localStorage.getItem('kb360-user')) || 'null';
+    const u = JSON.parse(raw);
+    return !!(u && u.viewOnly);
+  } catch { return false; }
+}
+
 export function Button({
   variant = 'secondary',
   size = 'md',
@@ -62,17 +75,25 @@ export function Button({
   iconRight: IconRight,
   loading = false,
   block = false,
+  write = false,
   className = '',
   children,
   type = 'button',
   disabled,
+  title,
   ...rest
 }) {
   const iconSize = size === 'xs' ? 13 : size === 'lg' ? 18 : 15;
+  // Opt-in view-only gate: a WRITE button (create / edit / save / delete / approve / post …) is
+  // pre-disabled with a reason for a view-only user — never a live button that only 403s on the
+  // server ("disable with a reason, never a live no-op"). Non-write buttons (nav / filters / view)
+  // are untouched, so this is fully backward-compatible: only `<Button write>` opts in.
+  const voBlocked = write && isViewOnly();
   return (
     <button
       type={type}
-      disabled={disabled || loading}
+      disabled={disabled || loading || voBlocked}
+      title={voBlocked ? VIEW_ONLY_REASON : title}
       aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center font-semibold whitespace-nowrap select-none',

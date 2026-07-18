@@ -5,7 +5,7 @@
 // Single nested sheet: Group › Sub-group › Ledger › Entry (collapsible).
 import React, { useMemo, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost } from '../../core/api';
+import { apiGet, apiPost, isViewOnly } from '../../core/api';
 import { AuditTrail } from '../../core/AuditTrail';
 import { JvBlock } from '../../core/voucher/JvBlock';
 import { VoucherView } from '../reportsFinancial/pnlTally';
@@ -82,6 +82,13 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // Revoking un-posts a posted voucher — restricted to approver-level roles (stricter
   // than approving). The server enforces this too; this just gates the button.
   const isApprover = /super.?admin|director|senior\s+finance\s+manager|sr\.?\s*accounts\s+executive/i.test(currentUser?.role || '');
+  // View-only accounts (e.g. a view-only Director) may browse the queue but not act. Every write
+  // button below is pre-DISABLED with a reason (never a live button that only 403s — the team's
+  // "never leave a screen silent / disable-with-reason" rule). The ONE exception is the Director/
+  // Owner escalation sign-off, which a view-only Director IS allowed to give (mirrors the server's
+  // read-only exemption for those review actions).
+  const vo = isViewOnly();
+  const VO_REASON = 'View only — this account can review vouchers but cannot change them.';
   // Three-level chain (Check → Verify → Approve): live assignee config + cache handle
   // for refreshing the queue after a Check/Verify (which don't go through the hooks).
   const chainCfg = useApprovalChain();
@@ -343,11 +350,30 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // read-only treatment. Non-locked vouchers keep the normal Delete.
   const adminDeleteBtn = (e, style, title) => {
     if (!isAdmin) return null;
+    if (vo) return <button disabled title={VO_REASON} aria-label={VO_REASON} style={{ ...style, background: '#cfd6e4', color: '#6b7280', border: 'none', cursor: 'not-allowed' }}>Delete</button>;
     const parent = voucherParent(e);
     if (parent) return <button disabled title={`Driven by ${parent.label}${parent.ref ? ' ' + parent.ref : ''} — reverse it from its parent file, not here`} style={{ ...style, background: '#cfd6e4', color: '#6b7280', border: 'none', cursor: 'not-allowed' }}>🔒 Delete</button>;
     return <button onClick={() => doDelete(e.id)} disabled={busy} title={title} style={style}>Delete</button>;
   };
-  const actionCell = (e) => (
+  // View-only action cell — a disabled "View only" indicator (reason on hover) in place of every
+  // write button, EXCEPT the Director/Owner escalation sign-off, which a view-only Director may
+  // still give. Shared by both the flat list + the grouped (tree) render paths.
+  const voAction = (e) => {
+    if (status === 'pending') {
+      const na = nextActionFor(e, chainCfg);
+      if (na.action === 'director' || na.action === 'owner') {
+        return (
+          <button onClick={() => doReview(e.id, na.action)} disabled={busy || !na.allowed} title={na.hint} aria-label={na.hint}
+            style={{ ...ABTN(na.allowed ? C.gold : '#cfd6e4', true), cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>
+        );
+      }
+    }
+    return <span title={VO_REASON} aria-label={VO_REASON} style={{ fontSize: 10, fontWeight: 700, color: C.dim, cursor: 'not-allowed' }}>👁 View only</span>;
+  };
+  const actionCell = (e) => {
+    // View-only: actionable vouchers show a disabled "View only" indicator instead of live buttons.
+    if (vo && (status === 'pending' || status === 'approved')) return voAction(e);
+    return (
     status === 'pending' ? (
       <>
         <StageTracker e={e} />
@@ -388,7 +414,8 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
         >Edit &amp; resubmit</button>
       </>
     )
-  );
+    );
+  };
   // "Revoked — was posted" chip: an entry that was approved then revoked back to Pending
   // (vs a freshly-entered one). Shows who/why on hover from the live revoke trail.
   const RevokedChip = ({ e }) => (e.revokedAt ? <span title={`Revoked${e.revokedBy ? ' by ' + e.revokedBy : ''}${e.revokeReason ? ' — ' + e.revokeReason : ''}`} style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: '#FBF3DE', color: '#8a6d12', border: '1px solid #e3cd97', whiteSpace: 'nowrap' }}>⟲ Revoked</span> : null);
@@ -554,7 +581,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
         {status !== 'pending' && (
           <PeriodBar key={status} branch={branch} compact defaultPreset={presetFor(status)} onChange={setRange} />
         )}
-        {status === 'pending' && counts.pending.n > 0 && (
+        {status === 'pending' && counts.pending.n > 0 && !vo && (
           <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: 8 }}>
             {sel.size > 0 && (
               <>
@@ -677,7 +704,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                                         <td style={{ ...num, padding: '5px 8px', color: C.blue, borderBottom: '1px solid #dfe2e7' }}>{x.drAmt ? money(x.drAmt) : ''}</td>
                                         <td style={{ ...num, padding: '5px 8px', color: C.red, borderBottom: '1px solid #dfe2e7' }}>{x.crAmt ? money(x.crAmt) : ''}</td>
                                         <td style={{ padding: '5px 8px', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid #dfe2e7' }}>
-                                          {status === 'pending' ? (
+                                          {(vo && (status === 'pending' || status === 'approved')) ? voAction(e) : status === 'pending' ? (
                                             <>
                                               <button onClick={() => setEditId(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.blue, border: `1px solid ${C.blue}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Edit</button>
                                               {(() => {

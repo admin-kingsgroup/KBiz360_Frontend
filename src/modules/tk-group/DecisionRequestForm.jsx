@@ -64,7 +64,7 @@ export function DecisionRequestForm({ onSubmit }) {
           >
             Needs: {hint}
           </span>
-          <Button type="submit" variant="accent" size="sm" disabled={!valid}>
+          <Button type="submit" variant="accent" size="sm" write disabled={!valid}>
             Submit decision
           </Button>
         </div>

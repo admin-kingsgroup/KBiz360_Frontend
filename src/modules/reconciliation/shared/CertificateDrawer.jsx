@@ -58,7 +58,7 @@ function SnapshotForm({ cert, books, onFreeze, busy, error }) {
       </div>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       <div className="flex flex-wrap gap-2">
-        <Button variant="primary" loading={busy} disabled={stmt === '' || !books} onClick={() => onFreeze({ statementBalance: Number(stmt), adjustments: Number(adj) || 0 })}>
+        <Button write variant="primary" loading={busy} disabled={stmt === '' || !books} onClick={() => onFreeze({ statementBalance: Number(stmt), adjustments: Number(adj) || 0 })}>
           Freeze snapshot (Rule 02)
         </Button>
         {scr && (
@@ -147,12 +147,12 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
           <Badge tone={meta.tone} dot>{meta.label}</Badge>
           <div className="flex gap-2">
             {canSign?.ok && (
-              <Button variant="primary" icon={Stamp} loading={signM.isPending} onClick={() => signM.mutate()}>
+              <Button write variant="primary" icon={Stamp} loading={signM.isPending} onClick={() => signM.mutate()}>
                 Sign — {prog.next?.role} · {prog.next?.action}
               </Button>
             )}
             {tier?.mode === 'physical' && signedFully && cert.status !== 'locked' && openExceptions(cert) === 0 && (
-              <Button variant="success" icon={ShieldCheck} loading={scanM.isPending} onClick={() => scanM.mutate('')}>
+              <Button write variant="success" icon={ShieldCheck} loading={scanM.isPending} onClick={() => scanM.mutate('')}>
                 Upload signed scan → Lock (Rule 05)
               </Button>
             )}
@@ -229,7 +229,7 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
                       <option value="internal">Internal</option>
                     </Select>
                   </FormField>
-                  <Button icon={FileUp} loading={attachM.isPending} disabled={!attLabel.trim()}
+                  <Button write icon={FileUp} loading={attachM.isPending} disabled={!attLabel.trim()}
                     onClick={() => { attachM.mutate({ label: attLabel, source: attSource, file: attFile }); setAttLabel(''); setAttFile(null); }}>
                     Attach
                   </Button>
@@ -277,7 +277,7 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
                     ? <CheckCircle2 size={16} className="shrink-0 text-success" aria-hidden="true" />
                     : <AlertTriangle size={16} className="shrink-0 text-warning" aria-hidden="true" />}
                   <span className={`flex-1 ${e.resolved ? 'text-ink-subtle line-through' : 'text-ink'}`}>{e.text}</span>
-                  {!e.resolved && cert.status !== 'locked' && <Button size="xs" variant="ghost" loading={exResolve.isPending} onClick={() => exResolve.mutate(e._id)}>Resolve</Button>}
+                  {!e.resolved && cert.status !== 'locked' && <Button write size="xs" variant="ghost" loading={exResolve.isPending} onClick={() => exResolve.mutate(e._id)}>Resolve</Button>}
                 </li>
               ))}
             </ul>
@@ -286,7 +286,7 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
                 <FormField label="Raise an exception" className="flex-1">
                   <Input value={exText} onChange={(e) => setExText(e.target.value)} placeholder="e.g. 1 cheque unpresented beyond 90 days" />
                 </FormField>
-                <Button variant="secondary" loading={exAdd.isPending} disabled={!exText.trim()} onClick={() => { exAdd.mutate(exText); setExText(''); }}>Add</Button>
+                <Button write variant="secondary" loading={exAdd.isPending} disabled={!exText.trim()} onClick={() => { exAdd.mutate(exText); setExText(''); }}>Add</Button>
               </div>
             )}
           </section>

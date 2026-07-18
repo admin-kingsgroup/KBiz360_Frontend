@@ -13,6 +13,7 @@ import { usePager } from '../../../core/ux/pager';
 import { useMobile } from '../../../core/hooks';
 import { clickable } from '../../../core/ux/clickable';
 import { C, card, money, th, td, rnum, Table, aBtn, SecTitle } from '../../accountantWorkspace/shared';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
 
 export const STATUS_TONE = { reconciled: C.green, partial: C.gold, exception: C.red, unreconciled: C.dim };
 export const recoBadge = (s) => ({ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: STATUS_TONE[s] || C.dim, textTransform: 'capitalize' });
@@ -43,6 +44,7 @@ export function downloadCSV(filename, rows) {
 export function ReconMatcher({ cur, book, stmt, bookSign, statementTitle, matchHint,
   onMatch, onGroup, onUnmatch, onDispute, onClearException, onDelete, busy }) {
   const mob = useMobile();
+  const vo = isViewOnly();   // view-only user: write actions disabled with a reason
   const [selBooks, setSelBooks] = useState([]);   // book legs → one line (N:1 split)
   const [selStmt, setSelStmt] = useState(null);   // one statement line
   const [search, setSearch] = useState('');
@@ -108,7 +110,7 @@ export function ReconMatcher({ cur, book, stmt, bookSign, statementTitle, matchH
               : <span style={{ color: C.red, fontWeight: 700 }}> · Δ {money(cur, Math.abs(variance))} → Partial</span>)}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={commit} disabled={!canMatch} style={{ ...aBtn(C.green), opacity: canMatch ? 1 : 0.5 }}>Match{selBooks.length > 1 ? ` ${selBooks.length}` : ''}</button>
+            <button onClick={commit} disabled={!canMatch || vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.green), opacity: (canMatch && !vo) ? 1 : 0.5, ...(vo ? { cursor: 'not-allowed' } : {}) }}>Match{selBooks.length > 1 ? ` ${selBooks.length}` : ''}</button>
             <button onClick={clearSel} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Clear</button>
           </div>
         </div>
@@ -168,12 +170,12 @@ export function ReconMatcher({ cur, book, stmt, bookSign, statementTitle, matchH
                     <td style={td}><span style={recoBadge(s.status)}>{s.status}{s.variance ? ` · Δ${money(cur, Math.abs(s.variance))}` : ''}</span>{s.matchedVno ? <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{s.matchedVno}</div> : null}</td>
                     <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
                       {(s.status === 'reconciled' || s.status === 'partial')
-                        ? <button onClick={(e) => { e.stopPropagation(); onUnmatch(s); }} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>Unmatch</button>
+                        ? <button onClick={(e) => { e.stopPropagation(); onUnmatch(s); }} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : {}) }}>Unmatch</button>
                         : (<>
                             {s.status === 'exception'
-                              ? <button onClick={(e) => { e.stopPropagation(); onClearException(s); }} title="Clear dispute" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}` }}>↺</button>
-                              : <button onClick={(e) => { e.stopPropagation(); onDispute(s); }} style={aBtn(C.red)}>Dispute</button>}
-                            <button onClick={(e) => { e.stopPropagation(); onDelete(s); }} title="Delete this line" style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5 }}>✕</button>
+                              ? <button onClick={(e) => { e.stopPropagation(); onClearException(s); }} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Clear dispute'} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : {}) }}>↺</button>
+                              : <button onClick={(e) => { e.stopPropagation(); onDispute(s); }} disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined} style={{ ...aBtn(C.red), ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : {}) }}>Dispute</button>}
+                            <button onClick={(e) => { e.stopPropagation(); onDelete(s); }} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Delete this line'} style={{ ...aBtn(C.dim), background: '#fff', color: C.dim, border: `1px solid ${C.border}`, marginLeft: 5, ...(vo ? { cursor: 'not-allowed', opacity: 0.5 } : {}) }}>✕</button>
                           </>)}
                     </td>
                   </tr>

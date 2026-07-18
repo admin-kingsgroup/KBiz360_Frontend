@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // core/api.js reads import.meta.env at module scope (Vite-only) — mock before use.
 jest.mock('../../../core/api', () => ({
+  isViewOnly: () => false,
+  VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.',
   apiGet: jest.fn(() => Promise.resolve([])),
   apiPost: jest.fn(() => Promise.resolve({})),
   apiPut: jest.fn(() => Promise.resolve({})),
