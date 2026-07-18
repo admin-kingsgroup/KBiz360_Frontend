@@ -49,6 +49,6 @@ export const PAY_METHODS = ['', 'Bank Transfer', 'BSP NEFT', 'NEFT/RTGS', 'Chequ
 export const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD'];
 export const ADDR_TYPES = ['Billing', 'Shipping', 'Registered Office', 'Head Office', 'Branch', 'Other'];
 
-// Customer classification.
-export const CUST_TYPES = ['', 'Corporate · Premium', 'Corporate · Standard', 'Individual', 'Travel Agent', 'Government'];
+// Customer classification — the business's four customer kinds (2026-07-18).
+export const CUST_TYPES = ['', 'B2C Reference', 'B2C Meta', 'B2B', 'B2E'];
 export const CUST_SOURCES = ['', 'Direct Referral', 'Cold Outreach', 'Digital Marketing', 'Walk-in', 'Existing Client'];
