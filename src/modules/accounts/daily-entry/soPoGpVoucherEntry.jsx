@@ -778,54 +778,6 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // rule exists to enable, on a document the server would have accepted.
   const originate = useCanOriginate(brCode, interBranch ? 'inb' : 'booking');
   const blockedNew = originate.blocked && !editing;
-  // EVERY entry field is mandatory (2026-07-17) — no voucher is created with a blank.
-  // The list below names exactly what's missing so the footer can say it next to the
-  // disabled Save button instead of leaving the user to hunt. That includes Remarks +
-  // Tally Refs — required wherever the save path persists them (the INB payload keeps
-  // only saleTallyRef, as `reference`, so remarks/purTallyRef stay optional there).
-  const missingFields = (() => {
-    const miss = [];
-    if (!date) miss.push('SPG Date');
-    if (!travelDate) miss.push('Travel / Departure Date');
-    if (spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && !String(headerRef || '').trim()) miss.push(spec.headerLabel);
-    if (interBranch) {
-      if (!toBranch) miss.push('To Branch');
-      if (crossCcy && !(fxRateNum > 0)) miss.push('Deal FX Rate');
-    } else {
-      if (!clientType) miss.push('Client Type');
-      if (!hasCustLedger) miss.push('Client Ledger');
-      // isB2C is declared further down (render scope) — same test inlined here.
-      if (/b2c/i.test(customer.ledgerGroup || '') && !customer.name.trim()) miss.push('Customer (Bill to)');
-    }
-    if (!isNoSupp && !hasSuppLedger) miss.push(interBranch ? 'Supplier ledger (airline / cost)' : 'Supplier ledger (Pay to)');
-    if (needsScope) miss.push('Package type (International / Domestic)');
-    lines.forEach((l, i) => {
-      const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign });
-      const row = lines.length > 1 ? ` (line ${i + 1})` : '';
-      if (!String(l.fn || '').trim()) miss.push(`${spec.idCols[0].label}${row}`);
-      if (!String(l.sn || '').trim()) miss.push(`${spec.idCols[1].label}${row}`);
-      if (spec.sectors) {
-        // Flight: the line's refs sync FROM its sector rows, so require the rows
-        // themselves — every segment fully described (incl. its travel date).
-        (l.sectors || []).forEach((s, j) => {
-          const seg = (l.sectors.length > 1 || lines.length > 1) ? ` (line ${i + 1} · segment ${j + 1})` : '';
-          spec.sectorCols.forEach((col) => { if (!String(s[col.key] || '').trim()) miss.push(`${col.label}${seg}`); });
-        });
-      } else {
-        // Module reference fields (Package/Ref, Hotel/Conf No, Country/Passport…) —
-        // typed on the Sales grid, echoed read-only on the Purchase grid.
-        spec.idCols.slice(2).forEach((col) => { if (!String(l[col.key] || '').trim()) miss.push(`${col.label}${row}`); });
-      }
-      // Per-passenger sale value — every line must carry an amount. INB spreads the
-      // deal's fares/Service Fee across lines its own way, so the aggregate
-      // `totals.so.total > 0` gate below covers value there instead.
-      if (!interBranch && !(c.finalSales > 0)) miss.push(`Sale amount${row}`);
-    });
-    if (!interBranch && !remarks.trim()) miss.push('Remarks');
-    if (!saleTallyRef.trim()) miss.push('Sales Tally Ref');
-    if (!interBranch && !isNoSupp && !purTallyRef.trim()) miss.push('Purchase Tally Ref');
-    return miss;
-  })();
   // Legacy fare carry-over: rows captured BEFORE a module's fare columns were removed
   // (insurance → service-only, 2026-07-18) hold money the grid can no longer show —
   // re-saving would silently re-price the booking/deal without it. Block the save and
@@ -835,7 +787,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       .reduce((t, k) => t + num(l[k]), 0), 0)) : 0;
 
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
-  const canSave = !blockedNew && legacyFareCarry === 0 && missingFields.length === 0 && (interBranch
+  const canSave = !blockedNew && legacyFareCarry === 0 && (interBranch
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope && (!crossCcy || fxRateNum > 0))  // INB: counterparty + sale value + Int'l/Domestic for Flights/Holiday + FX rate on a cross-currency deal
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
       && (isNoSupp || (totals.po.total > 0 && hasSuppLedger))));
@@ -1362,8 +1314,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* Header fields */}
       <div style={{ ...card, marginBottom: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 11 }}>
-          <FL label="SPG Date *"><SmartDateInput value={date} onChange={setDate} style={inp} /></FL>
-          <FL label="Travel / Departure Date *"><SmartDateInput value={travelDate} onChange={setTravelDate} style={inp} title="When the customer travels — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
+          <FL label="SPG Date"><SmartDateInput value={date} onChange={setDate} style={inp} /></FL>
+          <FL label="Travel / Departure Date"><SmartDateInput value={travelDate} onChange={setTravelDate} style={inp} title="When the customer travels — type e.g. 20.03.2026 → 20/03/2026; drives the Upcoming Travel dashboard" /></FL>
           {/* An INB deal's counterparty is ALWAYS the To Branch below, so Client Type has no filter
               target (the customer PartyPicker it narrows is replaced by that dropdown) and no
               payload destination (inbBody sends no clientType). Stated and locked rather than
@@ -1375,7 +1327,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               alone would leave the screen saying "Inter Branch" while the math billed TCS like a
               retail sale, so TCS is suppressed by the `interBranch` ctx flag instead — never by
               faking a clientType ('INTER BRANCH' is not 'B2B', so isB2B() would be false anyway). */}
-          <FL label={interBranch ? 'Client Type' : 'Client Type *'}>
+          <FL label="Client Type">
             {interBranch ? (
               <>
                 {/* readOnly as well as disabled: React warns on a `value` with no onChange unless
@@ -1401,7 +1353,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             )}
           </FL>
           {spec.headerLabel && spec.headerLabel !== 'Sector / Airline' && (
-            <FL label={spec.headerLabel + ' *'}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
+            <FL label={spec.headerLabel}><input value={headerRef} onChange={(e) => setHeaderRef(e.target.value)} placeholder={spec.headerLabel} style={inp} /></FL>
           )}
           {interBranch ? (
             <>
@@ -1705,20 +1657,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
-        {/* Required wherever the save path persists them; the INB payload carries only
-            saleTallyRef (as `reference`), so remarks/purTallyRef stay optional there. */}
-        <FL label={interBranch ? 'Remarks' : 'Remarks *'}><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder={interBranch ? 'optional' : 'required'} /></FL>
-        <FL label="Sales Tally Ref *"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="required" /></FL>
-        {!isNoSupp && <FL label={interBranch ? 'Purchase Tally Ref' : 'Purchase Tally Ref *'}><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder={interBranch ? 'optional' : 'required'} /></FL>}
+        <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
+        <FL label="Sales Tally Ref"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>
+        {!isNoSupp && <FL label="Purchase Tally Ref"><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>}
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
-        )}
-        {/* Every field is mandatory — name exactly what's missing next to the disabled
-            Save button, instead of a dead grey button the user has to puzzle out. */}
-        {missingFields.length > 0 && !saving && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#b42318', alignSelf: 'center', maxWidth: 560, textAlign: 'right' }}>
-            ⚠ Required: {missingFields.slice(0, 6).join(' · ')}{missingFields.length > 6 ? ` · +${missingFields.length - 6} more` : ''}
-          </span>
         )}
         <button disabled={!canSave} onClick={() => save()} className="max-tablet:min-h-[44px]"
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7 }}>
