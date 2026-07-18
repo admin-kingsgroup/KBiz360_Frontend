@@ -47,3 +47,24 @@ describe('buildRefundReissueBody', () => {
     expect(b.taxAmt).toBe(0);
   });
 });
+
+describe('buildRefundReissueBody — partial-by-ticket refund', () => {
+  const { buildRefundReissueBody } = require('../fields/refundBody');
+  const base = { date: '2026-07-18', party: 'Anubhav Client', counterParty: 'Emirates BSP', gstMode: 'intra', gstPct: 18, againstInvoice: 'SV/1' };
+
+  test('refund with partialAmount rides it into the body (fares-at-cost, income cleared)', () => {
+    const b = buildRefundReissueBody({ ...base, supplierAmt: 5250, partialAmount: 5250 }, { branchCode: 'BOM' }, 'refund');
+    expect(b.partialAmount).toBe(5250);
+    expect(b.total).toBe(5250);          // supplierAmt with no retained income = customer refund
+  });
+
+  test('no selection → partialAmount pinned to 0 (full reversal path)', () => {
+    const b = buildRefundReissueBody({ ...base, supplierAmt: 1000 }, { branchCode: 'BOM' }, 'refund');
+    expect(b.partialAmount).toBe(0);
+  });
+
+  test('reissue never takes the partial path', () => {
+    const b = buildRefundReissueBody({ ...base, supplierAmt: 1000, partialAmount: 400 }, { branchCode: 'BOM' }, 'reissue');
+    expect(b.partialAmount).toBe(0);
+  });
+});

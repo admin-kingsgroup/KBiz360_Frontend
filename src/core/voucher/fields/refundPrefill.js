@@ -113,10 +113,10 @@ export function poSnapForView(po = {}, rows = []) {
 // reversal (`sectors` + `sectorRef`) so the voucher records exactly what it reverses.
 export function ticketSectors(rows = []) {
   const out = [];
-  (Array.isArray(rows) ? rows : []).forEach((r) => (Array.isArray(r && r.sectors) ? r.sectors : []).forEach((s) => {
+  (Array.isArray(rows) ? rows : []).forEach((r, rowIdx) => (Array.isArray(r && r.sectors) ? r.sectors : []).forEach((s) => {
     // skip the blank seed row a fresh grid line carries
     if (!String((s && (s.sector || s.ticketNo || s.pnr || s.flightNo)) || '').trim()) return;
-    out.push({ fn: (r && r.fn) || '', sn: (r && r.sn) || '', sector: s.sector || '', airline: s.airline || '', flightNo: s.flightNo || '', ticketNo: s.ticketNo || '', pnr: s.pnr || '', travelDate: s.travelDate || '' });
+    out.push({ rowIdx, fn: (r && r.fn) || '', sn: (r && r.sn) || '', sector: s.sector || '', airline: s.airline || '', flightNo: s.flightNo || '', ticketNo: s.ticketNo || '', pnr: s.pnr || '', travelDate: s.travelDate || '' });
   }));
   return out;
 }

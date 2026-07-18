@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FL, inp, bc } from '../../styles';
-import { isVatBranch } from '../../voucherSpecs';
+import { isVatBranch, VSPECS, fareSum } from '../../voucherSpecs';
 import { todayISO } from '../../dates';
 import { SmartDateInput } from '../../ux/SmartDateInput';
 import { VPlaceOfSupply } from '../../../modules/transactions';
@@ -8,7 +8,7 @@ import { LedgerPicker } from '../LedgerPicker';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money, money2, r2 } from '../ui';
-import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv, clientNetFromJv, ticketSectors } from './refundPrefill';
+import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv, clientNetFromJv, ticketSectors, sectorRefOf } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
 import { JvBlock } from '../JvBlock';
 
@@ -106,6 +106,10 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   // 0..n-1 = an additional purchase leg. One refund voucher per leg; for a full-folder
   // refund the preparer processes each leg in turn.
   const [legIdx, setLegIdx] = useState(-1);
+  // Partial-by-ticket refund: which of the target PO's tickets (row indices) are in
+  // this refund. null = ALL (a full refund — today's behaviour); a subset switches
+  // the body onto the engine's partial path (fares-at-cost, rest of folder stands).
+  const [pickedRows, setPickedRows] = useState(null);
 
   async function fetchLink() {
     const link = linkInput.trim();
@@ -115,10 +119,11 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
       const b = await apiGet('/api/booking-orders/by-link', { link, branch: branchCode || branch });
       setBooking(b);
       setLegIdx(-1); // default to the primary leg
+      setPickedRows(null); // fresh fetch → full refund until tickets are unticked
       // Lock-fill the invoice refs + carry over the refundable amounts (supplier fare,
       // our Service Charge - 2 margin, commission reversal) — but NOT our service charge / its
       // GST nor the supplier service fee / its GST (those are retained, not refunded).
-      patch(refundPrefillFromBooking(b, state, isRefund));   // honours the Commission-Reversal toggle; refund never retains SO SVC2
+      patch({ ...refundPrefillFromBooking(b, state, isRefund), partialAmount: '' });   // honours the Commission-Reversal toggle; refund never retains SO SVC2
       // Also pull the original booking's JV (Sale + Purchase posting legs) to show below.
       if (b?.id) { try { setBookingJv(await apiGet('/api/booking-orders/' + b.id + '/journal')); } catch { setBookingJv(null); } }
     } catch (e) {
@@ -134,8 +139,9 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   function selectLeg(idx) {
     if (!booking) return;
     setLegIdx(idx);
+    setPickedRows(null); // re-target → back to a full refund of that PO
     const fresh = { commissionReversal: reverseCommission };
-    patch(idx < 0 ? refundPrefillFromBooking(booking, fresh, isRefund) : refundPrefillFromLeg(booking.purchases[idx], booking, fresh));
+    patch({ ...(idx < 0 ? refundPrefillFromBooking(booking, fresh, isRefund) : refundPrefillFromLeg(booking.purchases[idx], booking, fresh)), partialAmount: '' });
   }
 
   // When opening an EXISTING refund/reissue (againstInvoice already set), auto-load the
@@ -272,10 +278,36 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
 
       {/* The picked PO's segments — what this reversal actually reverses. Shown for
           single-PO folders too (the ticket being refunded should always be visible),
-          and stamped onto the saved reversal (sectors/sectorRef via the prefill). */}
+          and stamped onto the saved reversal (sectors/sectorRef via the prefill).
+          On a multi-ticket PO a REFUND can untick tickets → PARTIAL refund: only the
+          selected tickets' fares reverse at cost via the engine's partial path
+          (partialAmount); the rest of the folder stands. Retained charges & the
+          commission clawback don't apply on a partial, so those fields are cleared. */}
       {(() => {
-        const targetSectors = booking ? ticketSectors(legIdx < 0 ? booking.rows : booking.purchases?.[legIdx]?.rows) : [];
+        const targetRows = booking ? (legIdx < 0 ? (booking.rows || []) : ((booking.purchases?.[legIdx] || {}).rows || [])) : [];
+        const targetSectors = ticketSectors(targetRows);
         if (!targetSectors.length) return null;
+        const targetModule = legIdx < 0 ? booking.module : ((booking.purchases?.[legIdx] || {}).module || 'SF');
+        const sp = VSPECS[targetModule] || VSPECS.SF;
+        const rowIdxs = [...new Set(targetSectors.map((x) => x.rowIdx))];
+        const multi = isRefund && rowIdxs.length > 1;
+        const selected = pickedRows === null ? rowIdxs : pickedRows;
+        const isSel = (ri) => selected.includes(ri);
+        const toggleRow = (ri) => {
+          const next = isSel(ri) ? selected.filter((i) => i !== ri) : [...selected, ri].sort((a, b) => a - b);
+          if (!next.length) return;                             // at least one ticket stays in
+          if (next.length === rowIdxs.length) { setPickedRows(null); selectLeg(legIdx); return; } // all back on → full prefill
+          setPickedRows(next);
+          const sel = targetRows.filter((_, i) => next.includes(i));
+          const fares = r2(sel.reduce((s, r) => s + fareSum(sp, r), 0));
+          const secs = targetSectors.filter((x) => next.includes(x.rowIdx));
+          patch({
+            supplierAmt: fares, partialAmount: fares,
+            serviceCharge: '', markup: '', supplierSvc: '', supplierGst: '',
+            supplierCancel: '', supplierCancelGst: '', incentiveAmt: '', incentiveGst: '', incentiveTds: '',
+            sectors: secs, sectorRef: sectorRefOf(secs),
+          });
+        };
         const secTd = { padding: '5px 12px', fontSize: 11.5, borderBottom: '1px solid #eef1f5' };
         return (
           <div style={{ marginBottom: 14, padding: 11, background: '#F7FAFF', border: '1px solid #d8e0ea', borderRadius: 8 }}>
@@ -284,24 +316,39 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', minWidth: 560 }}>
-                <thead><tr>{['Passenger', 'Sector', 'Airline', 'Flight', 'Ticket No', 'PNR', 'Travel date'].map((h) => (
+                <thead><tr>{[...(multi ? ['Refund?'] : []), 'Passenger', 'Sector', 'Airline', 'Flight', 'Ticket No', 'PNR', 'Travel date'].map((h) => (
                   <th key={h} style={{ padding: '4px 12px', fontSize: 9.5, fontWeight: 800, letterSpacing: '.4px', color: '#5b616e', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #d8e0ea' }}>{h}</th>
                 ))}</tr></thead>
                 <tbody>
-                  {targetSectors.map((s, i) => (
-                    <tr key={i}>
-                      <td style={{ ...secTd, fontWeight: 700 }}>{`${s.fn} ${s.sn}`.trim() || '—'}</td>
-                      <td style={{ ...secTd, fontWeight: 700 }}>{s.sector || '—'}</td>
-                      <td style={secTd}>{s.airline || '—'}</td>
-                      <td style={secTd}>{s.flightNo || '—'}</td>
-                      <td style={secTd}>{s.ticketNo || '—'}</td>
-                      <td style={{ ...secTd, color: '#A07828', fontWeight: 700 }}>{s.pnr || '—'}</td>
-                      <td style={secTd}>{s.travelDate || '—'}</td>
-                    </tr>
-                  ))}
+                  {targetSectors.map((s, i) => {
+                    const first = i === 0 || targetSectors[i - 1].rowIdx !== s.rowIdx;
+                    const span = targetSectors.filter((x) => x.rowIdx === s.rowIdx).length;
+                    const off = multi && !isSel(s.rowIdx);
+                    return (
+                      <tr key={i} style={off ? { opacity: 0.45 } : undefined}>
+                        {multi && first && (
+                          <td rowSpan={span} style={{ ...secTd, textAlign: 'center' }}>
+                            <input type="checkbox" checked={!off} onChange={() => toggleRow(s.rowIdx)} title="Include this ticket in the refund" />
+                          </td>
+                        )}
+                        <td style={{ ...secTd, fontWeight: 700 }}>{`${s.fn} ${s.sn}`.trim() || '—'}</td>
+                        <td style={{ ...secTd, fontWeight: 700 }}>{s.sector || '—'}</td>
+                        <td style={secTd}>{s.airline || '—'}</td>
+                        <td style={secTd}>{s.flightNo || '—'}</td>
+                        <td style={secTd}>{s.ticketNo || '—'}</td>
+                        <td style={{ ...secTd, color: '#A07828', fontWeight: 700 }}>{s.pnr || '—'}</td>
+                        <td style={secTd}>{s.travelDate || '—'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+            {pickedRows !== null && (
+              <p style={{ margin: '8px 0 0', fontSize: 11, fontWeight: 600, color: '#8a6d00' }}>
+                ✂ Partial refund — only the selected tickets&apos; fares reverse, at cost ({money(cur, +state.partialAmount || 0)}), via the Sales&nbsp;Refunds / Purchase&nbsp;Refunds contra heads. The rest of the folder stands. Retained charges &amp; commission clawback don&apos;t apply on a partial, so those fields were cleared.
+              </p>
+            )}
           </div>
         );
       })()}

@@ -2075,6 +2075,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       // Ticket/sector stamp — which PO's segments this reversal targets (set by the
       // Link-No fetch / leg picker; round-trips so an edit re-opens with it intact).
       sectors: Array.isArray(r.sectors) ? r.sectors : [], sectorRef: r.sectorRef || '',
+      partialAmount: r.partialAmount ?? '',
       remarks: (editing && editBooking.remarks) || '',
     };
   });
@@ -2114,6 +2115,9 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
         // Ticket/sector stamp — the targeted PO's segments (reversal is Mixed, so the
         // snapshot stores as-is and the RF/RI records exactly which ticket it reverses).
         sectors: Array.isArray(state.sectors) ? state.sectors : [], sectorRef: state.sectorRef || '',
+        // Partial-by-ticket refund (subset of the PO's tickets unticked in the
+        // segments table) — the spawned RF voucher takes the engine's partial path.
+        partialAmount: +state.partialAmount || 0,
         againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
       };
       const payload = {
