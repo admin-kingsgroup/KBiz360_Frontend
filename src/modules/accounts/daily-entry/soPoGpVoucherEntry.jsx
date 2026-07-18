@@ -278,6 +278,29 @@ export function legToPayload(leg, brCode, noVat, foreign = false) {
   };
 }
 
+// ── Flight N-PO legs → single-SO fold (pure; unit-tested) ─────────────────────
+// One journey bought as several tickets is still ONE customer invoice: each billable
+// FLIGHT leg's fares pass through to the sale at cost. The fold adds them to
+// so.lineTotal AND so.total (keeping total = lineTotal + gst + otherTaxesGst + tcs +
+// roundOff exactly true) and into the matching pass-through fare HEADS, so the posted
+// Sales voucher bills — and balances — the whole journey. Sale GST is untouched:
+// fares are untaxed pass-throughs; GST rides only on SVC2/Service Fee.
+// `legs` items are { leg, sp } (the leg + its module spec).
+export const clubbedLegFares = (legs) => round2(legs.reduce((s, x) => s + fareSum(x.sp, x.leg.line), 0));
+export function clubLegsIntoSo(so, legs) {
+  const legFares = clubbedLegFares(legs);
+  if (!(legFares > 0)) return so;
+  const heads = (so.heads || []).map((h) => ({ ...h }));
+  legs.forEach((x) => (x.sp.fareCols || []).forEach((col) => {
+    const amt = num(x.leg.line[col.key]);
+    if (!amt) return;
+    const hit = heads.find((h) => h.key === col.key);
+    if (hit) hit.amt = round2(hit.amt + amt);
+    else heads.push({ key: col.key, label: col.label, amt: round2(amt) });
+  }));
+  return { ...so, lineTotal: round2(num(so.lineTotal) + legFares), total: round2(num(so.total) + legFares), heads };
+}
+
 // A leg actually carries money. Keyed off the LEG's OWN module spec (fareSum sums that spec's
 // fare columns) — never a hardcoded `base`, which silently skipped any leg whose cost sits in a
 // different column. Misc is [Base Fare, Taxes], so a TAX-ONLY leg (e.g. a seat-booking charge
@@ -328,7 +351,7 @@ function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs
     <div style={{ ...card, marginTop: 14, marginBottom: 14, borderColor: '#cdb46a' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <strong style={{ fontSize: 13, color: '#6b5a1e' }}>➕ Additional Purchases (N-PO)</strong>
-        <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add another Flight or a Misc cost leg' : 'Holiday package — add any component (flight/hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
+        <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add another Flight (its fares club into the single SO) or a Misc cost leg' : 'Holiday package — add any component (flight/hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
         <div style={{ marginLeft: 'auto' }}>
           <DropdownMenu
             ariaLabel="Add purchase leg"
@@ -371,9 +394,9 @@ function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs
           return (
             <div key={i} style={{ marginBottom: 12, border: '1px solid #e6c9d2', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'linear-gradient(180deg, ' + PO_BAR + ' 0%, #6f1830 100%)' }}>
-                <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.6px', color: '#fff', background: 'rgba(255,255,255,.18)', padding: '2px 8px', borderRadius: 999 }}>PO #{i + 1}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.6px', color: '#fff', background: 'rgba(255,255,255,.18)', padding: '2px 8px', borderRadius: 999 }}>PO #{i + 2}</span>
                 <strong style={{ fontSize: 12, color: '#fff', letterSpacing: '1px', textTransform: 'uppercase' }}>{spec.name} Purchase Order</strong>
-                <span style={{ marginLeft: 'auto', fontSize: 10.5, color: 'rgba(255,255,255,.75)' }}>same Link No · separate supplier invoice</span>
+                <span style={{ marginLeft: 'auto', fontSize: 10.5, color: 'rgba(255,255,255,.75)' }}>same Link No · fares bill on the single SO · separate supplier invoice</span>
                 <button type="button" onClick={() => del(i)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#fff', fontSize: 16, lineHeight: 1 }} title="Remove leg">×</button>
               </div>
               <div style={{ padding: 12 }}>
@@ -502,7 +525,7 @@ function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-              <strong style={{ fontSize: 12 }}>PO #{i + 1}</strong>
+              <strong style={{ fontSize: 12 }}>PO #{i + 2}</strong>
               <select value={leg.module} onChange={(e) => setModule(i, e.target.value)} disabled={locked} style={{ ...cell, width: 'auto', ...(locked ? { background: '#eef1f5', color: '#9197a3', cursor: 'not-allowed' } : {}) }}>
                 {allowed.map((m) => <option key={m} value={m}>{VSPECS[m].name}</option>)}
               </select>
@@ -832,8 +855,36 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     return s + (num(po.total) - num(po.roundOff) - num(po.gst) - num(po.tcs) - num(po.incentiveAmt));
   }, 0);
   const hasExtraLegs = Math.abs(extraLegNet) > 0.005;
-  const folderGpTotal = Math.round((num(totals.gp.total) - extraLegNet) * 100) / 100;
-  const folderGpPct = num(totals.so.total) > 0 ? Math.round((folderGpTotal / num(totals.so.total)) * 10000) / 100 : 0;
+
+  // ── Flight N-PO legs CLUB into the single SO ─────────────────────────────────
+  // One itinerary bought as several tickets (BOM–DXB + DXB–FIH + FIH–DAR, each its
+  // own supplier PO) is still ONE customer invoice: every additional FLIGHT leg's
+  // fares pass through to the sale at cost — folded into so.lineTotal/total AND the
+  // matching pass-through fare heads, so the posted Sales voucher bills (and
+  // balances) the full journey. Sale GST is untouched: fares are untaxed
+  // pass-throughs; GST rides only on Service Charge - 2 / Service Fee, entered once
+  // on the passenger's main row. Flight-parent only — a Holiday package already
+  // PRICES its components in the main grid, so clubbing component POs there would
+  // double-bill. Never on INB (SVF-only model; the INB payload carries no `so`).
+  // Keyed by index into extraPOs so screen labels match the leg cards ("PO #2"…).
+  const clubbedLegs = (interBranch || isNoSupp || moduleCode !== 'SF') ? [] : extraPOs
+    .map((leg, n) => ({ leg, n, sp: VSPECS[leg.module] || VSPECS.SM }))
+    .filter((x) => x.sp.sectors && legFilled(x.leg));
+  const legSaleFares = clubbedLegFares(clubbedLegs);
+  const soAll = clubLegsIntoSo(totals.so, clubbedLegs);
+  // Row match for the SO grid: a leg clubs into the SO row of ITS passenger
+  // (First/Surname, case-insensitive); a leg whose passenger isn't on the main grid
+  // renders as its own locked SO row instead — never clubbed into the wrong person.
+  const paxKey = (fn, sn) => `${String(fn || '').trim().toLowerCase()}|${String(sn || '').trim().toLowerCase()}`;
+  const legRowMatch = clubbedLegs.map((x) => {
+    const k = paxKey(x.leg.line.fn, x.leg.line.sn);
+    return { ...x, rowIndex: k === '|' ? -1 : lines.findIndex((l) => paxKey(l.fn, l.sn) === k) };
+  });
+  const soLegsForRow = (i) => legRowMatch.filter((x) => x.rowIndex === i);
+  const soOrphanLegs = legRowMatch.filter((x) => x.rowIndex < 0);
+
+  const folderGpTotal = Math.round((num(totals.gp.total) + legSaleFares - extraLegNet) * 100) / 100;
+  const folderGpPct = num(soAll.total) > 0 ? Math.round((folderGpTotal / num(soAll.total)) * 10000) / 100 : 0;
 
   // ── Markup-rule default (Masters ▸ Service Charge - 2 / Rate Sheet) ─────────
   // The ACTIVE Percentage rule for this module (an exact module rule beats an
@@ -1091,7 +1142,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name) },
         gstMode: saleGstMode, packageType: hasPackage ? packageType : '',
         headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
-        po: { ...totals.po, gstMode: purGstMode }, so: { ...totals.so, gstMode: saleGstMode },
+        po: { ...totals.po, gstMode: purGstMode }, so: { ...soAll, gstMode: saleGstMode },
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks, saleTallyRef, purTallyRef,
         // N-PO: additional purchase legs (empty unless Flight+Misc / Holiday components).
@@ -1196,8 +1247,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const poCols = 2 + refKeys.length + spec.fareCols.length + 5;
 
   // Sectors sub-table for a passenger line — editable on the Purchase grid,
-  // read-only ("fetched & locked") on the Sales grid.
-  const sectorBlock = (l, li, readOnly, colSpan) => {
+  // read-only ("fetched & locked") on the Sales grid. `extraGroups` renders the
+  // clubbed Flight N-PO legs' sectors after the main grid (SO only), so the single
+  // invoice shows the WHOLE journey; `tag` overrides the locked badge text.
+  const sectorBlock = (l, li, readOnly, colSpan, extraGroups = [], tag = '') => {
     const grid = (
       <>
         <table style={{ borderCollapse: 'collapse' }}>
@@ -1234,9 +1287,25 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <div style={{ border: '1px solid #ece4cf', borderRadius: 10, background: '#fffdf7', padding: '10px 14px 12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 800, letterSpacing: '.4px', color: GOLD_DEEP, textTransform: 'uppercase', marginBottom: 8 }}>
                 🔒 Sectors
-                <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '.4px', textTransform: 'uppercase', background: '#FBF3DE', color: GOLD_DEEP, padding: '2px 7px', borderRadius: 999 }}>from Purchase · locked</span>
+                <span style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '.4px', textTransform: 'uppercase', background: '#FBF3DE', color: GOLD_DEEP, padding: '2px 7px', borderRadius: 999 }}>{tag || 'from Purchase · locked'}</span>
               </div>
               {grid}
+              {extraGroups.filter((g) => (g.sectors || []).length).map((g, gi) => (
+                <div key={gi} style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed #ece4cf' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '.4px', color: GOLD_DEEP, textTransform: 'uppercase', marginBottom: 4 }}>✈ {g.label}</div>
+                  <table style={{ borderCollapse: 'collapse' }}><tbody>
+                    {g.sectors.map((s, si) => (
+                      <tr key={si}>
+                        {spec.sectorCols.map((sc) => (
+                          <td key={sc.key} style={{ padding: '6px 16px' }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: s[sc.key] ? (sc.kind === 'pnr' ? GOLD : '#3A3A3A') : '#b9b9b9', fontStyle: s[sc.key] ? 'normal' : 'italic' }}>{s[sc.key] || `No ${sc.label}`}</span>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody></table>
+                </div>
+              ))}
             </div>
           ) : (
             <div style={{ border: '1px dashed #ecd5dc', borderRadius: 10, background: '#fffdfb', padding: '10px 14px 12px' }}>
@@ -1715,6 +1784,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 // TCS (Intl packages, u/s 206C(1G)) is a booking-level charge on the sale incl GST;
                 // show each line's share only when it actually applies (totals.so.tcs > 0).
                 const lineTcs = (spec.tcs && totals.so.tcs > 0) ? c.finalSales * tcsRate / 100 : 0;
+                // Flight N-PO legs matched to THIS passenger — their fares club into this
+                // row's cells + total, and their sectors render under this row's block.
+                const rowLegs = soLegsForRow(i);
+                const rowLegFares = round2(rowLegs.reduce((s, x) => s + fareSum(x.sp, x.leg.line), 0));
                 return (
                   <React.Fragment key={i}>
                   <tr>
@@ -1727,29 +1800,52 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     ))}
                     {spec.fareCols.map((col) => (isNoSupp
                       ? <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>
-                      : <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(l[col.key])}</td>))}
+                      : <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(num(l[col.key]) + rowLegs.reduce((s, x) => s + num(x.leg.line[col.key]), 0))}</td>))}
                     {!interBranch && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
                     {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(pkg ? c.salesGST : c.gstMk)}</td>}
                     {showTcsCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(lineTcs)}</td>}
-                    <td style={{ ...tdC, fontWeight: 800, color: DR, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales + lineTcs)}</td>
+                    <td style={{ ...tdC, fontWeight: 800, color: DR, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales + lineTcs + rowLegFares)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
                   </tr>
-                  {spec.sectors && sectorBlock(l, i, true, soCols)}
+                  {spec.sectors && sectorBlock(l, i, true, soCols, rowLegs.map((x) => ({ label: `From Flight PO #${x.n + 2}${x.leg.supplier.name ? ` · ${x.leg.supplier.name}` : ''}`, sectors: x.leg.line.sectors || [] })))}
                   </React.Fragment>
                 );
               })}
+              {/* Flight N-PO legs whose passenger is NOT on the main grid — billed on this
+                  same single invoice, so they render as their own LOCKED rows (fares
+                  pass through at cost; service charges stay on the main rows). */}
+              {soOrphanLegs.map((x) => (
+                <React.Fragment key={'npo-' + x.n}>
+                  <tr>
+                    {spec.idCols.map((col) => (
+                      <td key={col.key} style={{ ...tdC, textAlign: 'left', padding: 3, background: '#faf7ef', ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: x.leg.line[col.key] ? DARK : '#b9b9b9', fontStyle: x.leg.line[col.key] ? 'normal' : 'italic' }}>{x.leg.line[col.key] || `No ${col.label}`}</span>
+                      </td>
+                    ))}
+                    {spec.fareCols.map((col) => <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(x.leg.line[col.key])}</td>)}
+                    {!interBranch && <td style={{ ...tdAuto, width: 95 }}>—</td>}
+                    {!pkg && <td style={{ ...tdAuto, width: 95 }}>—</td>}
+                    {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(0)}</td>}
+                    {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(0)}</td>}
+                    {showTcsCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(0)}</td>}
+                    <td style={{ ...tdC, fontWeight: 800, color: DR, background: '#faf7ef', width: 110 }}>{fmt(fareSum(x.sp, x.leg.line))}</td>
+                    <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }} title="Remove it on its PO card below" />
+                  </tr>
+                  {spec.sectors && sectorBlock(x.leg.line, 'npo' + x.n, true, soCols, [], `from Flight PO #${x.n + 2} · locked`)}
+                </React.Fragment>
+              ))}
             </tbody>
             <tfoot><tr>
               <td style={{ ...soTf, textAlign: 'left' }}>TOTAL</td>
               {spec.idCols.slice(1).map((c) => <td key={c.key} style={soTf} />)}
-              {spec.fareCols.map((c) => <td key={c.key} style={soTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
+              {spec.fareCols.map((c) => <td key={c.key} style={soTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0) + clubbedLegs.reduce((s, x) => s + num(x.leg.line[c.key]), 0))}</td>)}
               {!interBranch && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
               {!pkg && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
               {!pkg && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={soTf}>{fmt(pkg ? totals.so.gst + totals.so.otherTaxesGst : totals.so.otherTaxesGst)}</td>}
               {showTcsCol && <td style={soTf}>{fmt(totals.so.tcs)}</td>}
-              <td style={{ ...soTf, color: DR }}>{fmt(totals.so.total)}{num(totals.so.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.so.roundOff > 0 ? '+' : ''}{fmt(totals.so.roundOff)}</span> : null}</td><td style={soTf} />
+              <td style={{ ...soTf, color: DR }}>{fmt(soAll.total)}{num(soAll.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {soAll.roundOff > 0 ? '+' : ''}{fmt(soAll.roundOff)}</span> : null}</td><td style={soTf} />
             </tr></tfoot>
           </table>
         </div>
@@ -1785,13 +1881,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* ③ Gross Profit */}
       <Section n="3" badge={interBranch ? 'INGP' : 'GP'} name={interBranch ? 'Inter-Branch Gross Profit' : 'Gross Profit'} sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
-          <GpCard k={'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
+          <GpCard k={'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(soAll.total)} color={DARK} bg="#FFFDF7" />
           <GpCard k={'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
           <GpCard k={hasExtraLegs ? 'Gross Profit · all POs' : 'Gross Profit'} v={cur + ' ' + fmt(hasExtraLegs ? folderGpTotal : totals.gp.total)} color={DR} pct={(hasExtraLegs ? folderGpPct : totals.gp.pct) + '% margin'} bg="#FCF3DE" />
         </div>
         {hasExtraLegs && (
           <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 7, background: '#FCF3DE', border: '1px solid #cdb46a', color: '#6b5a1e', fontSize: 11.5 }}>
-            Gross Profit above is the <b>whole folder</b> — it nets the {extraLegsFilled.length} additional purchase leg{extraLegsFilled.length > 1 ? 's' : ''} (−{cur} {fmt(extraLegNet)} net cost) booked under this Link No. The per-passenger table below is the <b>primary</b> sale/purchase only.
+            Gross Profit above is the <b>whole folder</b> — it nets the {extraLegsFilled.length} additional purchase leg{extraLegsFilled.length > 1 ? 's' : ''} (−{cur} {fmt(extraLegNet)} net cost{legSaleFares > 0 ? <>, +{cur} {fmt(legSaleFares)} flight fares billed on this SO</> : null}) booked under this Link No. The per-passenger table below is the <b>primary</b> sale/purchase only.
           </div>
         )}
         {totals.so.tcs > 0 && (
