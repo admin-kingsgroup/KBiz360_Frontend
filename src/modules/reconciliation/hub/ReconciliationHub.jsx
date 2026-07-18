@@ -90,8 +90,10 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
   // Weekly cycles carry a Friday deadline — surface it (and whether it's overdue).
   const today = new Date().toISOString().slice(0, 10);
   const tierRows = (pendingData?.rows || []).filter((r) => r.tier === tierKey);
-  const dueRow = tierRows.find((r) => !r.upcoming) || tierRows[0];
-  const overdue = !!(dueRow && dueRow.dueOn && dueRow.dueOn < today && done < total);
+  // A 'superseded' weekly row (its month is certified — Covered by Month-End) is
+  // not overdue; skip it when picking the due-row and computing overdue.
+  const dueRow = tierRows.find((r) => !r.upcoming && r.state !== 'superseded') || tierRows.find((r) => !r.upcoming) || tierRows[0];
+  const overdue = !!(dueRow && dueRow.state !== 'superseded' && dueRow.dueOn && dueRow.dueOn < today && done < total);
 
   // Attention list — flatten the scope tree, keep only ledgers that still need
   // something, most urgent first (exceptions / non-zero difference → not started).

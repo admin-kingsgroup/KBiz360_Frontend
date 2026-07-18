@@ -120,7 +120,7 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
                   const st = pendingStateMeta(r);
                   const busy = gen.isPending && gen.variables?.tier === r.tier && gen.variables?.period === r.period;
                   return (
-                    <tr key={`${r.tier}:${r.period}`} className={r.upcoming ? 'bg-info-soft/30' : undefined}>
+                    <tr key={`${r.tier}:${r.period}`} className={r.upcoming ? 'bg-info-soft/30' : r.state === 'superseded' ? 'opacity-60' : undefined}>
                       <td className={cellCls}>
                         <span className="font-semibold text-ink">{r.label}</span>
                         {r.note ? <div className="text-xs text-ink-subtle">{r.note}</div> : null}

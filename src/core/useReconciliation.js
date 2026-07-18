@@ -50,14 +50,18 @@ export function useReconPending(branch) {
   });
 }
 
-// Nav-pill badge input: how many reconciliation items across ALL tiers still need
-// work this period, and whether any weekly cycle is past its Friday (→ red). Derived
-// from the pending board so it matches the queue screen and the bell exactly.
-export function useReconNavCount(branch) {
-  const { data } = useReconPending(branch);
-  const rows = (data && data.rows) || [];
-  const today = new Date().toISOString().slice(0, 10);
-  const live = rows.filter((r) => !r.upcoming && r.state !== 'closed');
+// Pure: pending-board rows → { pending, overdue } for the nav pill. 'superseded' (the
+// week's month is already certified — Covered by Month-End) is excluded like 'closed',
+// so the pill matches the Queue tile, the Reports board and the bell exactly.
+export function navCountFromRows(rows = [], today = new Date().toISOString().slice(0, 10)) {
+  const live = (rows || []).filter((r) => !r.upcoming && r.state !== 'closed' && r.state !== 'superseded');
   const overdue = live.filter((r) => r.tier === 'weekly' && r.dueOn && r.dueOn < today).length;
   return { pending: live.length, overdue };
+}
+
+// Nav-pill badge input: how many reconciliation items across ALL tiers still need
+// work this period, and whether any weekly cycle is past its Friday (→ red).
+export function useReconNavCount(branch) {
+  const { data } = useReconPending(branch);
+  return navCountFromRows((data && data.rows) || []);
 }

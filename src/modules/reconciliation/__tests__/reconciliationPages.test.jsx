@@ -14,6 +14,7 @@ jest.mock('../api', () => ({
     rows: [
       { tier: 'year', period: 'FY2025-26', label: 'Year-End Closing — FY2025-26 (Apr 2025 – Mar 2026)', state: 'not-started', done: 0, total: 0 },
       { tier: 'month', period: '2026-04', label: 'Month-End Closing — April 2026', state: 'not-started', done: 0, total: 0 },
+      { tier: 'weekly', period: '2026-W25', label: 'Weekly Certification — 2026-W25', dueOn: '2026-06-19', state: 'superseded', done: 0, total: 13 }, // month certified → Covered by Month-End
       { tier: 'weekly', period: '2026-W29', label: 'Weekly Certification — 2026-W29', dueOn: '2026-07-17', upcoming: true, state: 'not-started', done: 0, total: 0 },
     ],
   })),
@@ -154,6 +155,11 @@ describe('ReconReportsPage · render (one report per tier)', () => {
     expect(screen.queryByText(/Year-End Closing/)).not.toBeInTheDocument();   // other tiers live on their own reports
     expect(screen.queryByText(/Month-End Closing/)).not.toBeInTheDocument();
     expect(screen.getByText(/opens Fri/)).toBeInTheDocument();               // upcoming = no Generate button
+    // A superseded week reads "Covered by Month-End" (badge) with a "covered by Month-End"
+    // action instead of Generate/Open — not a red overdue.
+    expect(await screen.findByText(/Weekly Certification — 2026-W25/)).toBeInTheDocument();
+    expect(screen.getByText('Covered by Month-End')).toBeInTheDocument();     // status badge
+    expect(screen.getByText('covered by Month-End')).toBeInTheDocument();     // action cell (no Generate/Open)
     expect(await screen.findByText(/Cheque unpresented 90\+ days/)).toBeInTheDocument(); // open exceptions report
     // certNo appears in BOTH the register and the open-exceptions list
     expect(screen.getAllByText('WK/BOM/2026-W28/B1').length).toBeGreaterThanOrEqual(2);

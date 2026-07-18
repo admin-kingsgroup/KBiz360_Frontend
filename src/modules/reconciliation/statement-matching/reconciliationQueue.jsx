@@ -102,7 +102,7 @@ export function ReconciliationQueue({branch,setRoute}){
                     <td style={{padding:"8px 10px",textAlign:"right",fontFamily:"monospace",color:it.difference==null?"#9aa3bd":Math.abs(it.difference)<1?"#27500A":"#A32D2D"}}>{it.difference==null?"—":fmtINR(it.difference)}</td>
                     <td style={{padding:"8px 10px"}}><span style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:11,fontWeight:700,color:st.c,background:st.bg,padding:"3px 9px",borderRadius:20,whiteSpace:"nowrap"}}><span style={{width:7,height:7,borderRadius:"50%",background:st.dot}}/>{st.label}</span></td>
                     <td style={{padding:"8px 10px",color:it.waitingOn?"#0d1326":"#9aa3bd",fontWeight:it.waitingOn?600:400}}>{it.waitingOn||"—"}</td>
-                    <td style={{padding:"8px 10px",textAlign:"center"}}><button title="Open the weekly certificate register to reconcile & sign" onClick={()=>setRoute&&setRoute('/reconciliation/weekly')} style={{...btnGh,minHeight:28,fontSize:11}}>Reconcile</button></td>
+                    <td style={{padding:"8px 10px",textAlign:"center"}}><button title={it.superseded?"This week's month is certified — covered by the Month-End close":"Open the weekly certificate register to reconcile & sign"} onClick={()=>setRoute&&setRoute('/reconciliation/weekly')} style={{...btnGh,minHeight:28,fontSize:11}}>{it.superseded?"View":"Reconcile"}</button></td>
                   </tr>
                 );
               })}

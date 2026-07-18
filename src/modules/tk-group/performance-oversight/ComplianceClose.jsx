@@ -69,7 +69,9 @@ function ReconReadiness({ focus }) {
   const pendById = new Map(((p.data && p.data.byBranch) || []).map((b) => [b.branch, b.rows || []]));
   let rows = byBranchS.map((b) => {
     const prows = pendById.get(b.branch) || [];
-    const overdue = prows.filter((r) => r.tier === 'weekly' && !r.upcoming && r.state !== 'closed' && r.dueOn && r.dueOn < today).length;
+    // Exclude 'superseded' weeks (their month is certified — Covered by Month-End)
+    // as well as 'closed', so a certified month doesn't show as red-overdue here.
+    const overdue = prows.filter((r) => r.tier === 'weekly' && !r.upcoming && r.state !== 'closed' && r.state !== 'superseded' && r.dueOn && r.dueOn < today).length;
     return { branch: b.branch, wk: tierCount(b.tiers && b.tiers.weekly), mo: tierCount(b.tiers && b.tiers.month), overdue };
   });
   if (isFocused(focus)) rows = rows.filter((r) => r.branch === focus);
