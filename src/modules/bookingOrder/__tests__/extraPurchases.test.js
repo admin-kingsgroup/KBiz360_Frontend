@@ -19,9 +19,11 @@ const legOf = (module, over = {}) => ({
 });
 
 describe('ALLOWED_LEG_MODULES', () => {
-  test('Flight→2nd-flight/Misc; Holiday→any; Visa→2nd-visa/Misc/Insurance', () => {
+  test('Flight→2nd-flight/Misc; Holiday→non-flight components; Visa→2nd-visa/Misc/Insurance', () => {
     expect(ALLOWED_LEG_MODULES.SF).toEqual(['SF', 'SM']);
-    expect(ALLOWED_LEG_MODULES.SH).toEqual(['SF', 'SHT', 'SC', 'SV', 'SI', 'SM']);
+    // A package's flights are priced INSIDE the package — no separate Flight PO.
+    expect(ALLOWED_LEG_MODULES.SH).toEqual(['SHT', 'SC', 'SV', 'SI', 'SM']);
+    expect(ALLOWED_LEG_MODULES.SH).not.toContain('SF');
     expect(ALLOWED_LEG_MODULES.SV).toEqual(['SV', 'SM', 'SI']); // multi-country visa + add-ons
     expect(ALLOWED_LEG_MODULES.SHT).toBeUndefined();            // hotel/car/insurance/misc stay single-PO
     expect(ALLOWED_LEG_MODULES.SC).toBeUndefined();

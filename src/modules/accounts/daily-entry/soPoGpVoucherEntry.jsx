@@ -203,13 +203,14 @@ export function inbRowsFromDeal(spec, deal) {
 }
 
 // ── N-PO (Phase 2): additional purchase legs under one booking/Link No ────────
-// Flight (SF) may add another Flight PO or a Misc PO; Holiday (SH) may add legs
-// of ANY module type; Visa (SV) may add another Visa (multi-country), Misc
-// (courier/VFS) or Insurance. Each leg carries its own module/supplier/cost-centre/
+// Flight (SF) may add another Flight PO or a Misc PO; Holiday (SH) may add any
+// NON-FLIGHT component (a package's flights are priced inside the package — a
+// separate Flight PO there would double-carry them); Visa (SV) may add another
+// Visa (multi-country), Misc (courier/VFS) or Insurance. Each leg carries its own module/supplier/cost-centre/
 // ref/cost grid → its own Purchase voucher on approval; the sale stays single.
 // blank leg → dropped on save. MUST stay in sync with the backend mirror
 // (kbiz360-erp-backend shared/constants/bookingModules.js ALLOWED_LEG_MODULES).
-export const ALLOWED_LEG_MODULES = { SF: ['SF', 'SM'], SH: ['SF', 'SHT', 'SC', 'SV', 'SI', 'SM'], SV: ['SV', 'SM', 'SI'] };
+export const ALLOWED_LEG_MODULES = { SF: ['SF', 'SM'], SH: ['SHT', 'SC', 'SV', 'SI', 'SM'], SV: ['SV', 'SM', 'SI'] };
 // Leg modules whose ledger leaf + cost centre split Int'l vs Domestic (mirrors the
 // parent form's `hasPackage`) — such a leg must carry its own packageType.
 const multiLeafLeg = (m) => m === 'SF' || m === 'SH';
@@ -351,7 +352,7 @@ function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs
     <div style={{ ...card, marginTop: 14, marginBottom: 14, borderColor: '#cdb46a' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <strong style={{ fontSize: 13, color: '#6b5a1e' }}>➕ Additional Purchases (N-PO)</strong>
-        <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add another Flight (its fares club into the single SO) or a Misc cost leg' : 'Holiday package — add any component (flight/hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
+        <span style={{ fontSize: 11, color: '#9A9A9A' }}>{parentModule === 'SF' ? 'Flight may add another Flight (its fares club into the single SO) or a Misc cost leg' : 'Holiday package — add any component (hotel/car/visa/insurance/misc)'} · one Link No, separate supplier invoice each</span>
         <div style={{ marginLeft: 'auto' }}>
           <DropdownMenu
             ariaLabel="Add purchase leg"
