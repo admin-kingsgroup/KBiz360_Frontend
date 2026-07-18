@@ -321,7 +321,7 @@ export const legFilled = (leg) => {
   return (sp.fareCols || []).some((c) => num(leg.line[c.key]) !== 0) || num(leg.line.psvc) !== 0;
 };
 
-function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs, onChange, isForeign, supplyOf }) {
+function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs, onChange, isForeign, supplyOf, paxList = [] }) {
   const allowed = ALLOWED_LEG_MODULES[parentModule];
   if (!allowed) return null;
   const setLeg = (i, patch) => onChange(legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -406,6 +406,22 @@ function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs
                       {allowed.map((m) => <option key={m} value={m}>{VSPECS[m].name}</option>)}
                     </select>
                   </FL>
+                  {/* Passenger from the booking — clubbing into the SO matches by EXACT
+                      First/Surname, so picking beats re-typing (a typo silently makes an
+                      orphan row instead of clubbing). Free typing stays possible below. */}
+                  {paxList.filter((p) => (p.fn || p.sn)).length > 0 && (
+                    <FL label="Passenger (pick from booking)">
+                      <select
+                        value={(() => { const k = `${leg.line.fn || ''}|${leg.line.sn || ''}`; return paxList.some((p) => `${p.fn || ''}|${p.sn || ''}` === k) ? k : ''; })()}
+                        onChange={(e) => { const [fn, sn] = e.target.value.split('|'); if (fn || sn) setLeg(i, { line: { ...leg.line, fn, sn } }); }}
+                        style={{ ...inp, cursor: 'pointer' }}>
+                        <option value="">— type a new passenger below —</option>
+                        {paxList.filter((p) => (p.fn || p.sn)).map((p, pi) => (
+                          <option key={pi} value={`${p.fn || ''}|${p.sn || ''}`}>{`${p.fn || ''} ${p.sn || ''}`.trim()}</option>
+                        ))}
+                      </select>
+                    </FL>
+                  )}
                   <FL label="Supplier ledger (Pay to) *">
                     <PartyPicker branch={branch} kind="supplier" value={{ name: leg.supplier.name, group: leg.supplier.ledgerGroup }}
                       onChange={(v) => {
@@ -433,8 +449,9 @@ function ExtraPurchases({ parentModule, parentScope, branch, brCode, noVat, legs
                       <option value="Domestic">Domestic</option>
                     </select>
                   </FL>
-                  <FL label="Cost Centre">
-                    <input value={leg.costCenter} onChange={(e) => setLeg(i, { costCenter: e.target.value.toUpperCase() })} placeholder="Cost Centre" style={inp} />
+                  <FL label="Cost Centre (blank = auto)">
+                    <input value={leg.costCenter} onChange={(e) => setLeg(i, { costCenter: e.target.value.toUpperCase() })}
+                      placeholder={leg.packageType ? `auto: ${leg.packageType.toLowerCase().startsWith('int') ? 'FLT-INT' : 'FLT-DOM'}` : "auto from Int'l/Domestic"} style={inp} />
                   </FL>
                   <FL label="Supplier Inv. No (Tally ref)">
                     <input value={leg.purTallyRef} onChange={(e) => setLeg(i, { purTallyRef: e.target.value })} placeholder="Supplier Inv. No" style={inp} />
@@ -1943,7 +1960,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* N-PO: additional purchase legs (Flight +Misc / Holiday components) */}
       {!isNoSupp && ALLOWED_LEG_MODULES[moduleCode] && (
-        <ExtraPurchases parentModule={moduleCode} parentScope={hasPackage ? packageType : ''} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} isForeign={isForeignSupplier} supplyOf={supplySupplierOf} />
+        <ExtraPurchases parentModule={moduleCode} parentScope={hasPackage ? packageType : ''} branch={branch} brCode={brCode} noVat={effNoVat} legs={extraPOs} onChange={setExtraPOs} isForeign={isForeignSupplier} supplyOf={supplySupplierOf} paxList={lines.map((l) => ({ fn: l.fn || '', sn: l.sn || '' }))} />
       )}
 
       {/* ③ Gross Profit */}
