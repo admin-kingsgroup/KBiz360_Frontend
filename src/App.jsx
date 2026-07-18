@@ -15,7 +15,7 @@ import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
 import { lazyModule } from './core/lazyModule';
-import { isOwnerDashboardUser, topLevelPillHrefs } from './core/pageCatalog';
+import { isOwnerDashboardUser, topLevelPillHrefs, ALWAYS_VISIBLE } from './core/pageCatalog';
 import { canReachRoute, expandHidden } from './core/menus';
 
 /* ── Route-level code-splitting ───────────────────────────────────────────
@@ -367,7 +367,7 @@ export default function KB360App(){
     const hiddenPages = expandHidden(currentUser?.hidden);
     // Top-level pills are structural — never blocked by the deny-list (they can't be
     // hidden from the catalogue either), so a single-page pill like Approvals always works.
-    if(route!=="/dashboard" && route!=="/settings/page-access" && !topLevelPillHrefs().has(route) && hiddenPages.has(route)){
+    if(!ALWAYS_VISIBLE.has(route) && !topLevelPillHrefs().has(route) && hiddenPages.has(route)){
       return (
         <div style={{padding:30,maxWidth:560,margin:"40px auto",
           background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
@@ -641,9 +641,11 @@ export default function KB360App(){
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This consolidated all-branch dashboard is restricted to the group owner.</p>
           <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
         </div>;
-    // Governance & Exceptions — Approvals & Audit + Alerts as one owner board (two views).
-    // Non-owners keep the plain Alerts board (no central audit tab); alerts stays reachable.
-    if(route==="/dashboard/alerts")   return isOwnerDashboardUser(currentUser)
+    // Governance & Exceptions — Approvals & Audit + Alerts as one board (two tabs) for the
+    // roles that actually see it in the menu (Director / Super Admin = getMenu's `isDir`), so a
+    // Director opening it and clicking the Alerts tab STAYS in the two-tab board (no one-way
+    // exit). Every other role gets the plain Alerts board — never the central audit tab.
+    if(route==="/dashboard/alerts")   return (currentUser?.role === 'Director' || currentUser?.role === 'Super Admin')
       ? <GovernanceBoard view="alerts" branch={branch} setRoute={navigate}/>
       : <AlertsDashboard branch={branch} setRoute={navigate}/>;
     if(route==="/dashboards/audit")   return <GovernanceBoard view="approvals" branch={branch} setRoute={navigate}/>;

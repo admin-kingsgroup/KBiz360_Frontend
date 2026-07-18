@@ -12,9 +12,12 @@ import { ApprovalsAuditDash } from '../director/directorDash';
  * visible view (deep-linkable, active-nav highlight works); the toggle navigates between them.
  * Both sub-views keep their FULL content and honour the top-right branch selector.
  *
- * ACCESS: this wrapper is owner-facing. App.jsx renders the plain Alerts board (no audit tab)
- * for NON-owners hitting /dashboard/alerts, so a branch user is never shown the central
- * Approvals & Audit surface — the alerts feed stays reachable for them exactly as before.
+ * ACCESS: App.jsx shows this board (both tabs) to Director / Super Admin — the roles that see
+ * "Governance & Exceptions" in the menu — on BOTH /dashboards/audit and /dashboard/alerts, so
+ * the Alerts tab is never a one-way exit. Every other role gets the plain Alerts board on
+ * /dashboard/alerts (never the central Approvals & Audit tab). Direct-URL /dashboards/audit is
+ * menu-gated + BE-enforced like the rest of the director suite (not route-gated here) — see the
+ * defense-in-depth note about RESTRICTED_ROLE_DENY_SEGMENTS omitting the 'dashboards' segment.
  */
 const TABS = [
   ['approvals', 'Approvals & Audit', '/dashboards/audit'],

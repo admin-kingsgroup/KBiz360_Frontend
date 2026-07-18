@@ -47,7 +47,17 @@ export function isOwnerDashboardUser(user) {
 // excluded from the catalogue (can't be toggled) and never pruned.
 // '/dashboard/owner' is gated by EMAIL (owner only) at the route + menu level, not
 // by the page-visibility catalogue — so it's always-visible here (never toggled).
-export const ALWAYS_VISIBLE = new Set(['/dashboard', '/dashboard/owner', '/settings/page-access']);
+export const ALWAYS_VISIBLE = new Set([
+  '/dashboard', '/dashboard/owner', '/settings/page-access',
+  // Folded dashboard sub-views (tabs of a parent board) — reachable only via their parent
+  // board's in-page tab/drill after the 23→12 consolidation, so they must never be
+  // independently hidden: a STALE pre-consolidation deny-list entry on one of these would
+  // otherwise strand the tab on "Page not available" with no catalogue row left to restore it.
+  '/dashboard/cockpit', '/dashboard/alerts',
+  '/dashboards/yoy', '/dashboards/expenses', '/dashboards/cash-forecast',
+  '/dashboards/module-gp', '/dashboards/supplier',
+  '/dashboards/sales-target', '/dashboards/gp-target', '/dashboards/collections-target', '/dashboards/budget-expense',
+]);
 
 // Is this value a menu node?  { label, children[] } or a leaf { label, href }.
 function isMenuNode(v) {

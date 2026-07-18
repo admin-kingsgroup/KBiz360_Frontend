@@ -1,6 +1,7 @@
-// The "AD Dashboards" group (formerly "Overview": My Dashboard / Alerts / Capital vs
-// Investment) is Super-Admin-only. Directors keep the rest of the Dashboards dropdown
-// (Financials / Business / Targets / Control) but not the AD Dashboards group.
+// The "AD Dashboards" group (formerly "Overview": My Dashboard / Capital vs Investment /
+// Performance) is Super-Admin-only. Directors keep the rest of the Dashboards dropdown
+// (Financials / Business / Control) but not the AD Dashboards group. (Targets group + Alerts
+// were folded away in the 23→12 consolidation.)
 import { getMenu } from '../menus';
 
 const SUPER_ADMIN = { role: 'Super Admin', email: 'someone@kingsgroupco.com' };

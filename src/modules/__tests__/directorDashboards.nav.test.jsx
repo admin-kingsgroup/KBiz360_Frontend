@@ -124,7 +124,7 @@ describe('Previously drill-dead dashboards now navigate', () => {
 describe('Performance vs Target — consolidated dashboard', () => {
   test('renders all five target tiles under one header (Collections folded in from the retired Targets menu group)', () => {
     render(<PerformanceDash branch={'BOM'} go={jest.fn()} />);
-    expect(screen.getByText('TGT VS Sales/GP/EX/NP')).toBeInTheDocument();
+    expect(screen.getByText('TGT VS Sales/GP/Coll/EX/NP')).toBeInTheDocument();
     expect(screen.getByText('Sales vs Target')).toBeInTheDocument();
     expect(screen.getByText('GP vs Target')).toBeInTheDocument();
     expect(screen.getByText('Collections vs Target')).toBeInTheDocument();
@@ -150,6 +150,14 @@ describe('Performance vs Target — consolidated dashboard', () => {
   test('warns when no Nett Profit target is set (empty totals)', () => {
     render(<PerformanceDash branch={'BOM'} go={jest.fn()} />);
     expect(screen.getByText(/No Nett Profit target set/i)).toBeInTheDocument();
+  });
+
+  test('a tile with no target shows "No target set" — never a contradictory ▲ ahead over a red 0% gauge', () => {
+    // Empty mocks ⇒ every tile (incl. the new Collections tile) has no target. Each must show
+    // the neutral "No target set" hint, not a green "ahead" variance against a target of 0.
+    render(<PerformanceDash branch={'BOM'} go={jest.fn()} />);
+    expect(screen.getAllByText('No target set')).toHaveLength(5);
+    expect(screen.queryByText(/ahead$/)).toBeNull();
   });
 
   test('module table toggles Sales ⇄ GP', () => {

@@ -799,7 +799,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     // tab; /dashboard/alerts stays live as the tab target + deep-link (e.g. Key Alerts drill).
     {label:"My Dashboard", href:"/dashboard"},
     {label:"Capital vs Investment", href:"/dashboards/capital"},
-    {label:"TGT VS Sales/GP/EX/NP", href:"/dashboards/performance"},
+    {label:"TGT VS Sales/GP/Coll/EX/NP", href:"/dashboards/performance"},
   ]},
   {label:"Financials", children:[
     {divider:true, label:"P&L & Growth"},
@@ -823,7 +823,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     {label:"Customers & Suppliers", href:"/dashboards/customer-value"},
     {label:"Branch & Group Performance", href:"/dashboards/branch"},
   ]},
-  // "Targets" group folded into the consolidated "TGT VS Sales/GP/EX/NP" board
+  // "Targets" group folded into the consolidated "TGT VS Sales/GP/Coll/EX/NP" board
   // (/dashboards/performance): its five tiles — Sales, GP, Collections, Budget,
   // Nett Profit — each drill into the standalone /dashboards/*-target routes, which
   // stay alive as deep-dive views (see PerformanceDash). No separate menu group needed.
@@ -836,7 +836,10 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
 // The Owner Dashboard (consolidated all-branch) is owner-only and REPLACES the role-scoped
 // "My Dashboard" for the owner: its governance widgets now carry everything My Dashboard
 // showed, so the owner sees a single home. Only the owner email gets this swap (the route is
-// email-gated in App.jsx too, which also redirects /dashboard → /dashboard/owner for them).
+// email-gated in App.jsx too, which renders the Owner Cockpit in place at /dashboard for them —
+// note the menu entry points at /dashboard/owner, so the owner's landing on /dashboard shows
+// the right board but doesn't highlight this menu item; canonicalising the landing is a small
+// follow-up, deliberately not done in this pass).
 // The owner is a Super Admin, so this group is never stripped for them (see dashboardsFor).
 function withOwnerDashboard(menu){
   const overview = menu.children[0];
@@ -845,7 +848,7 @@ function withOwnerDashboard(menu){
     // region "Cockpit" view (formerly a separate /dashboard/cockpit menu entry) is now
     // reached by the in-page Overview/Cockpit toggle. /dashboard/cockpit still deep-links there.
     {label:"AD Dashboard (All)", href:"/dashboard/owner"},   // replaces "My Dashboard" for the owner
-    ...overview.children.slice(1),                                        // Alerts, Capital, … (My Dashboard dropped)
+    ...overview.children.slice(1),                                        // Capital vs Investment, TGT/Performance (My Dashboard dropped; Alerts folded into Governance)
   ]};
   return {...menu, children:[newOverview, ...menu.children.slice(1)]};
 }

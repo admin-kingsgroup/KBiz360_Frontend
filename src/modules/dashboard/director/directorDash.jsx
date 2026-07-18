@@ -850,7 +850,8 @@ export function PerformanceDash({ branch, go }) {
   const noNpTarget = !ld && !nT.target;
 
   const Tile = ({ t, bcur }) => {
-    const tone = toneOf(t);
+    const noTarget = !ld && !t.target;                  // no goal set yet → don't imply ahead/behind or alarm-red
+    const tone = noTarget ? C.dim : toneOf(t);
     const favUp = (t.variance || 0) >= 0;               // positive variance is favourable for ALL four (budget's is budget−actual)
     const open = go && t.route ? () => go(t.route) : undefined;
     return (
@@ -867,7 +868,9 @@ export function PerformanceDash({ branch, go }) {
         </div>
         <div className="mt-0.5 flex items-center justify-between">
           <span className="text-[10.5px] text-ink-muted">{t.aLabel} / {t.tLabel}</span>
-          {!ld && <span className="text-[11px] font-bold" style={{ color: favUp ? C.green : C.red }}>{favUp ? '▲' : '▼'} {money(bcur, Math.abs(t.variance || 0))} {favUp ? t.fav : t.unfav}</span>}
+          {!ld && (noTarget
+            ? <span className="text-[11px] font-bold text-ink-muted">No target set</span>
+            : <span className="text-[11px] font-bold" style={{ color: favUp ? C.green : C.red }}>{favUp ? '▲' : '▼'} {money(bcur, Math.abs(t.variance || 0))} {favUp ? t.fav : t.unfav}</span>)}
         </div>
       </div>
     );
@@ -921,7 +924,7 @@ export function PerformanceDash({ branch, go }) {
 
   return (
     <div style={{ margin: 12 }}>
-      <Toolbar title="TGT VS Sales/GP/EX/NP" sub={`Sales · GP · Collections · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
+      <Toolbar title="TGT VS Sales/GP/Coll/EX/NP" sub={`Sales · GP · Collections · Budget · Nett Profit — all vs target · ${range.label}`} branch={branch} p={p} />
       {anySplit
         ? curList.map((c) => <div key={c.currency}><CurHead symbol={c.symbol} currency={c.currency} />{tilesRow(buildTiles(entryFor(salesSplit, c.currency).totals || {}, entryFor(gpSplit, c.currency).totals || {}, entryFor(npSplit, c.currency).totals || {}, entryFor(budSplit, c.currency).totals || {}, entryFor(collSplit, c.currency).totals || {}), c.symbol)}</div>)
         : tilesRow(buildTiles(salesQ.data?.totals || {}, gpQ.data?.totals || {}, nT, budQ.data?.totals || {}, collQ.data?.totals || {}), cur)}
@@ -1227,7 +1230,8 @@ export function DirectorDash({ which, branch, setRoute }) {
   // Sales & GP board folds Module/Product GP in as a tab (shares /dashboards/{sales,module-gp}).
   if (which === 'sales' || which === 'module-gp') return <SalesGpBoard which={which} branch={branch} go={go} />;
   if (which === 'tax') return <TaxComplianceDash branch={branch} go={go} />;
-  if (which === 'audit') return <ApprovalsAuditDash branch={branch} go={go} />;
+  // NB: 'audit' is intentionally NOT handled here — /dashboards/audit renders GovernanceBoard
+  // (App.jsx) which hosts ApprovalsAuditDash as its Approvals tab; DirectorDash never gets which='audit'.
   if (which === 'sales-target') return <VsTargetDash branch={branch} metric="sales" go={go} />;
   if (which === 'gp-target') return <VsTargetDash branch={branch} metric="gp" go={go} />;
   if (which === 'collections-target') return <VsTargetDash branch={branch} metric="collections" go={go} />;
