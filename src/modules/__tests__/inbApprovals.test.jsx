@@ -210,6 +210,40 @@ describe('INB SPG Approvals', () => {
     expect(mockApproveOne.mock.calls[0][0]).toMatchObject({ id: 'rf1' });
     useVoucherApprovals.mockReturnValue({ data: {} }); // restore default for any later test
   });
+
+  // An APPROVED INB refund is reversed only in OUR books — Push is the hand-off that lets
+  // it hit the buyer's books too (their INB Incoming lists it until they raise the match).
+  test('an approved INB refund shows Push; pushing posts /api/inter-branch/refund/push', async () => {
+    const { useVoucherApprovals } = require('../../core/useAccounting');
+    useVoucherApprovals.mockReturnValue({ isLoading: false, data: { entries: [
+      { id: 'rf1', vno: 'RF/BOM/26/0025', category: 'refund', inb: true, againstInvoice: 'INB/BOM/26/0195',
+        party: 'Travkings Tours and Travels DAR', total: 22811, status: 'approved', pushed: false, postable: true, errors: [], warnings: [] },
+    ] } });
+    mockApiGet.mockResolvedValue([]);
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Approved/ }));
+    expect(await screen.findByText('RF/BOM/26/0025')).toBeInTheDocument();
+    expect(screen.getByText(/in our books only/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Push$/ }));
+    await waitFor(() => expect(mockApiPost).toHaveBeenCalledWith('/api/inter-branch/refund/push', { vno: 'RF/BOM/26/0025' }));
+    useVoucherApprovals.mockReturnValue({ data: {} });
+  });
+
+  // Once pushed, the row is read-only and names the holder — no second Push.
+  test('a pushed INB refund shows "Pushed → <buyer>" instead of the Push button', async () => {
+    const { useVoucherApprovals } = require('../../core/useAccounting');
+    useVoucherApprovals.mockReturnValue({ isLoading: false, data: { entries: [
+      { id: 'rf1', vno: 'RF/BOM/26/0025', category: 'refund', inb: true, againstInvoice: 'INB/BOM/26/0195',
+        party: 'Travkings Tours and Travels DAR', total: 22811, status: 'approved', pushed: true, pushedTo: 'DAR', pushedAt: '2026-07-18', postable: true, errors: [], warnings: [] },
+    ] } });
+    mockApiGet.mockResolvedValue([]);
+    wrap(<InbApprovals branch={'BOM'} currentUser={{ role: 'Super Admin' }} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^Approved/ }));
+    expect(await screen.findByText('RF/BOM/26/0025')).toBeInTheDocument();
+    expect(screen.getByText(/Pushed → DAR/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Push$/ })).toBeNull();
+    useVoucherApprovals.mockReturnValue({ data: {} });
+  });
 });
 
 // ─── INB must stay reachable from the Approvals toggle ────────────────────────────────

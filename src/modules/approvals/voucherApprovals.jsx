@@ -1238,6 +1238,21 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     catch (err) { toast((err && err.message) || 'Reject failed', 'error'); }
     finally { setBusy(false); }
   };
+  // Push an APPROVED INB refund → the hand-off to the buyer branch, mirroring the deal
+  // Push. Approve already reversed OUR books; Push surfaces the refund in the buyer's
+  // INB Incoming ("Incoming refunds") so they raise + approve the matching refund
+  // against their own SO/PO/GP — nothing changes in their books until they do.
+  const doPushRefund = async (e) => {
+    const { confirmed } = await confirmDialog({ title: `Push refund ${e.vno}?`, message: 'Offers this refund to the buyer branch. Their INB Incoming lists it until they raise the matching refund against their own SO/PO/GP — nothing is posted in their books until they approve their side.', confirmLabel: 'Push' });
+    if (!confirmed) return;
+    setBusy(true);
+    try {
+      const r = await apiPost('/api/inter-branch/refund/push', { vno: e.vno });
+      toast(`Pushed ${e.vno} → ${(r && r.pushedTo) || 'buyer branch'} — awaiting their matching refund`, 'success');
+      qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['inb'] });
+    } catch (err) { toast(`${e.vno}: ${(err && err.message) || 'push failed'}`, 'error'); }
+    finally { setBusy(false); }
+  };
 
   const tab = (k, label) => {
     // 'edited' has its own feed (INB legs, not deals) — subtotal it per currency the same way,
@@ -1451,7 +1466,18 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                           {isApprover && <button disabled={busy} onClick={() => doRejectRefund(e)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
                           {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: C.red }}>blocked</span>}
                         </td>
-                      : <td style={{ padding: '7px 12px', color: C.dim }}>{e.status}</td>}
+                      : <td style={{ padding: '7px 12px', color: C.dim, whiteSpace: 'nowrap' }}>
+                          {/* Approved: our books are reversed — Push hands the refund to the buyer
+                              branch so it can hit THEIR books too (mirrors the deal Push above). */}
+                          {e.status === 'approved' && e.pushed
+                            ? <span title={`Pushed to ${e.pushedTo || 'the buyer branch'} — they raise the matching refund against their own SO/PO/GP`}>⇪ Pushed → {e.pushedTo || 'buyer'} {fmtDate(e.pushedAt) || ''}</span>
+                            : e.status === 'approved' && isApprover
+                              ? <>
+                                  <button disabled={busy} onClick={() => doPushRefund(e)} title="Push → offer this refund to the buyer branch so they reverse their side too" style={{ marginRight: 8, padding: '5px 12px', background: C.blue, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 800, cursor: 'pointer' }}>⇪ Push</button>
+                                  <span style={{ fontSize: 11 }}>approved — in our books only</span>
+                                </>
+                              : e.status}
+                        </td>}
                   </tr>
                 ))}
               </tbody>
