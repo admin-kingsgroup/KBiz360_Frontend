@@ -280,6 +280,57 @@ export function InboundInterBranch({ branch, setRoute, currentUser }) {
       <div style={{ fontSize: 11, color: C.dim, marginTop: 8 }}>
         Cost shown in your book currency at the deal's frozen rate; the seller's figures are reference only. To fix a wrong cost, revoke the converted SO/PO/GP so the deal can be corrected at source and re-pushed.
       </div>
+
+      {/* Incoming REFUNDS — the seller reversed an INB deal in THEIR books and Pushed the
+          refund to us. Our books still carry the original figures until WE raise + approve
+          our own matching refund against the SO/PO/GP we converted the deal into — that is
+          the action an unmatched row is asking for. Hidden while empty: refunds are the
+          exception, not the daily flow. */}
+      {(data.refunds || []).length > 0 && (
+        <div style={{ ...card, overflowX: 'auto', marginTop: 16 }}>
+          <div style={{ padding: '10px 12px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <span style={{ fontWeight: 800, color: C.dark, fontSize: 13 }}>Incoming refunds <span style={{ fontWeight: 700, color: C.dim, fontSize: 11 }}>— the seller reversed a deal; match it in your books</span></span>
+            {data.totals && data.totals.refundsAwaiting > 0 && <span style={{ fontSize: 11.5, fontWeight: 800, color: C.amber }}>{data.totals.refundsAwaiting} awaiting your matching refund</span>}
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
+            <thead><tr>
+              <th style={th}>Refund Vch (seller)</th><th style={th}>From</th><th style={th}>Reverses (INB)</th><th style={th}>Your SO/PO/GP</th>
+              <th style={{ ...th, textAlign: 'right' }}>Amount (your ccy)</th><th style={th}>Status</th>
+            </tr></thead>
+            <tbody>
+              {(data.refunds || []).map((rf) => {
+                const sym = CCY_SYM[rf.ccy] || symOf(rf.toBranch);
+                return (
+                  <tr key={rf.vno}>
+                    <td style={{ ...td, fontFamily: 'monospace', fontWeight: 700 }}>
+                      {rf.vno}
+                      <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>{rf.category === 'reissue' ? 'RI' : 'RF'}</span>
+                      <div style={{ fontFamily: 'system-ui', fontSize: 10.5, color: C.dim }}>pushed {rf.pushedAt ? String(rf.pushedAt).slice(0, 10) : ''}</div>
+                    </td>
+                    <td style={td}>{rf.fromBranch}</td>
+                    <td style={{ ...td, fontFamily: 'monospace', fontSize: 11, color: C.dim }}>{rf.inbLinkNo}</td>
+                    <td style={{ ...td, fontFamily: 'monospace', fontSize: 11 }}>{rf.buyerBookingNo || '—'}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{sym}{r2(rf.amountInBranch).toLocaleString(localeOf(sym), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style={td}>
+                      {rf.matched
+                        ? <span style={{ color: C.green, fontWeight: 800, fontSize: 11.5 }}>✓ matched — refund raised in your books</span>
+                        : <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span style={{ color: C.amber, fontWeight: 800, fontSize: 11.5 }}>⚠ not in your books yet</span>
+                            <button type="button" onClick={() => setRoute && setRoute('/bookings/new')}
+                              title={`Raise a Refund on the SO/PO/GP screen against ${rf.buyerBookingNo || 'your converted booking'} to mirror ${rf.fromBranch}'s ${rf.vno}`}
+                              style={{ padding: '4px 9px', fontSize: 11, fontWeight: 700, border: `1px solid ${C.blue}`, borderRadius: 6, cursor: 'pointer', color: C.blue, background: '#fff' }}>Raise matching refund →</button>
+                          </div>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div style={{ padding: '8px 12px', fontSize: 11, color: C.dim, borderTop: `1px solid ${C.border}` }}>
+            The selling branch has already reversed its side (each branch reverses its own books in its own currency). Raise your Refund/Reissue against your own SO/PO/GP{(data.refunds || []).some((r) => r.buyerBookingNo) ? ' (booking shown above)' : ''} and approve it through your normal queue — that clears the row to ✓ matched.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

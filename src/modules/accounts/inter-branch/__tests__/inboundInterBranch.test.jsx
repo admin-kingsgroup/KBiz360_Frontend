@@ -255,3 +255,47 @@ test('DOES steer to Approved when that is the only real work', () => {
   render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
   expect(screen.getByText('BKG/AMD/26/0108')).toBeInTheDocument();
 });
+
+// ─── Incoming refunds — the seller reversed a deal and PUSHED the refund to us ─────────
+// Our books still carry the original figures until WE raise + approve the matching refund;
+// the section is that worklist. Hidden entirely while there are none (refunds are the
+// exception, not the daily flow).
+describe('Incoming refunds', () => {
+  const refundFeed = (refunds) => mockInbound.mockReturnValue({
+    isLoading: false,
+    data: {
+      rows: [], refunds,
+      totals: { total: 0, pending: 0, converted: 0, approved: 0, deleted: 0, edited: 0, refunds: refunds.length, refundsAwaiting: refunds.filter((r) => !r.matched).length },
+    },
+  });
+  const RF = {
+    vno: 'RF/BOM/26/0025', category: 'refund', date: '2026-04-17', pushedAt: '2026-07-18T05:00:00.000Z',
+    inbLinkNo: 'INB/BOM-DAR/26/0195', fromBranch: 'BOM', toBranch: 'DAR',
+    amount: 22811, amountInBranch: 22811, ccy: 'USD', buyerBookingNo: 'BKG/DAR/26/0031', matched: false,
+  };
+
+  test('an unmatched pushed refund is listed with a "Raise matching refund" action', () => {
+    refundFeed([RF]);
+    render(<InboundInterBranch branch="DAR" setRoute={mockSetRoute} currentUser={{}} />);
+    expect(screen.getByText('Incoming refunds', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('RF/BOM/26/0025')).toBeInTheDocument();
+    expect(screen.getByText('INB/BOM-DAR/26/0195')).toBeInTheDocument();
+    expect(screen.getByText(/not in your books yet/)).toBeInTheDocument();
+    expect(screen.getByText(/1 awaiting your matching refund/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Raise matching refund/ }));
+    expect(mockSetRoute).toHaveBeenCalledWith('/bookings/new');
+  });
+
+  test('a matched refund shows ✓ and offers no action', () => {
+    refundFeed([{ ...RF, matched: true }]);
+    render(<InboundInterBranch branch="DAR" setRoute={mockSetRoute} currentUser={{}} />);
+    expect(screen.getByText(/matched — refund raised in your books/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Raise matching refund/ })).toBeNull();
+  });
+
+  test('the section is hidden when there are no incoming refunds', () => {
+    feed([ROW]);
+    render(<InboundInterBranch branch="AMD" setRoute={mockSetRoute} currentUser={{}} />);
+    expect(screen.queryByText('Incoming refunds', { exact: false })).toBeNull();
+  });
+});
