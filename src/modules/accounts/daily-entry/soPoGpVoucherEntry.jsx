@@ -1849,6 +1849,74 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tr></tfoot>
           </table>
         </div>
+        {/* Per-passenger rollup — the ONE invoice broken out passenger-wise. A passenger
+            may span several rows (multi-ticket, same supplier) AND carry clubbed Flight
+            POs (other suppliers); this groups all of it by First/Surname so each person
+            reads as one figure before the invoice total. Hidden for a single passenger
+            (the row itself already says it). */}
+        {(() => {
+          const byPax = new Map();
+          lines.forEach((l) => {
+            const k = paxKey(l.fn, l.sn);
+            const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign });
+            const lineTcs = (spec.tcs && totals.so.tcs > 0) ? c.finalSales * tcsRate / 100 : 0;
+            const e = byPax.get(k) || { name: `${l.fn || ''} ${l.sn || ''}`.trim() || '—', tickets: 0, fares: 0, svc2: 0, svf: 0, gst: 0, total: 0 };
+            e.tickets += 1;
+            e.fares = round2(e.fares + fareSum(spec, l));
+            e.svc2 = round2(e.svc2 + num(l.markup));
+            e.svf = round2(e.svf + num(l.ssvc));
+            e.gst = round2(e.gst + c.salesGST);
+            e.total = round2(e.total + c.finalSales + lineTcs);
+            byPax.set(k, e);
+          });
+          // Clubbed Flight POs count toward THEIR passenger (fares at cost, no GST).
+          legRowMatch.forEach((x) => {
+            const src = x.rowIndex >= 0 ? lines[x.rowIndex] : x.leg.line;
+            const k = paxKey(src.fn, src.sn);
+            const f = fareSum(x.sp, x.leg.line);
+            const e = byPax.get(k) || { name: `${src.fn || ''} ${src.sn || ''}`.trim() || '—', tickets: 0, fares: 0, svc2: 0, svf: 0, gst: 0, total: 0 };
+            e.tickets += 1;
+            e.fares = round2(e.fares + f);
+            e.total = round2(e.total + f);
+            byPax.set(k, e);
+          });
+          const pax = [...byPax.values()];
+          if (pax.length < 2) return null;
+          return (
+            <div style={{ marginTop: 10, border: '1px solid #d8e0ea', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ padding: '7px 12px', background: '#F4F7FB', borderBottom: '1px solid #d8e0ea', fontSize: 10.5, fontWeight: 800, letterSpacing: '.5px', color: SO_BAR, textTransform: 'uppercase' }}>
+                Per-passenger totals — one invoice
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 640 }}>
+                  <thead><tr>
+                    <th style={{ ...thA, ...thL }}>Passenger</th><th style={thA}>Tickets</th><th style={thA}>Fares</th>
+                    {!interBranch && <th style={thA}>Service Charge - 2</th>}{!pkg && <th style={thA}>Service Fee</th>}
+                    <th style={thA}>{taxLabel}</th><th style={thA}>Total</th>
+                  </tr></thead>
+                  <tbody>
+                    {pax.map((p, i) => (
+                      <tr key={i}>
+                        <td style={{ ...tdC, textAlign: 'left', fontWeight: 700 }}>{p.name}</td>
+                        <td style={tdC}>{p.tickets}</td>
+                        <td style={tdC}>{fmt(p.fares)}</td>
+                        {!interBranch && <td style={tdC}>{fmt(p.svc2)}</td>}{!pkg && <td style={tdC}>{fmt(p.svf)}</td>}
+                        <td style={tdC}>{fmt(p.gst)}</td>
+                        <td style={{ ...tdC, fontWeight: 800, color: DR }}>{fmt(p.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr>
+                    <td style={{ ...soTf, textAlign: 'left' }}>INVOICE TOTAL</td><td style={soTf} /><td style={soTf} />
+                    {!interBranch && <td style={soTf} />}{!pkg && <td style={soTf} />}
+                    <td style={soTf} />
+                    <td style={{ ...soTf, color: DR }}>{fmt(soAll.total)}</td>
+                  </tr></tfoot>
+                </table>
+              </div>
+            </div>
+          );
+        })()}
         {/* Markup-rule hint: the applied Service Charge - 2 % (vs fares) against the
             rule's default and GP floor. Purely advisory — the cells stay editable. */}
         {!interBranch && markupRule && (() => {
