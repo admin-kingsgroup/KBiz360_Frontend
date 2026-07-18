@@ -106,26 +106,6 @@ export function poSnapForView(po = {}, rows = []) {
   return { ...po, lines: merged };
 }
 
-// ── Ticket / sector traceability ──────────────────────────────────────────────
-// Every PO carries its tickets' sectors (primary PO → booking.rows, an N-PO Flight
-// leg → leg.rows). A refund/reissue targets ONE PO, so surfacing that PO's segments
-// lets the preparer pick BY TICKET, and the same snapshot is stamped onto the
-// reversal (`sectors` + `sectorRef`) so the voucher records exactly what it reverses.
-export function ticketSectors(rows = []) {
-  const out = [];
-  (Array.isArray(rows) ? rows : []).forEach((r, rowIdx) => (Array.isArray(r && r.sectors) ? r.sectors : []).forEach((s) => {
-    // skip the blank seed row a fresh grid line carries
-    if (!String((s && (s.sector || s.ticketNo || s.pnr || s.flightNo)) || '').trim()) return;
-    out.push({ rowIdx, fn: (r && r.fn) || '', sn: (r && r.sn) || '', sector: s.sector || '', airline: s.airline || '', flightNo: s.flightNo || '', ticketNo: s.ticketNo || '', pnr: s.pnr || '', travelDate: s.travelDate || '' });
-  }));
-  return out;
-}
-// Compact one-line reference ("BOM-DXB EK 501 TKT 0981… + DXB-NBO KQ 311 …") for the
-// default narration and the stored reversal stamp.
-export const sectorRefOf = (secs = []) => secs
-  .map((s) => [s.sector, s.flightNo || s.airline, s.ticketNo ? `TKT ${s.ticketNo}` : ''].filter(Boolean).join(' '))
-  .filter(Boolean).join(' + ');
-
 // N-PO (Phase 4): prefill a refund against ONE additional purchase leg of a folder.
 // Mirrors refundPrefillFromBooking but sourced from the leg: the supplier-refundable
 // amount + the commission clawback come from the LEG's po, the supplier is the leg's
@@ -139,11 +119,9 @@ export function refundPrefillFromLeg(leg, b, state = {}) {
   const supplierRefund = r2(num(po.total) - num(po.serviceCharge) - num(po.gst));
   const reverse = state.commissionReversal !== false;
   const sup = leg?.supplier || {};
-  const secs = ticketSectors(leg?.rows);
   return {
     againstInvoice: b?.saleVno || '',
     againstPurchase: leg?.purchaseVno || '',
-    sectors: secs, sectorRef: sectorRefOf(secs),
     supplierAmt: supplierRefund,
     markup: '',                                            // leg has no separate sale margin (pass-through)
     incentiveAmt: reverse ? blank(r2(num(po.incentiveAmt))) : '',
@@ -166,11 +144,9 @@ export function refundPrefillFromBooking(b, state = {}, isRefund = true) {
   // Commission Reversal toggle (refund only): when explicitly OFF the original
   // commission / its GST / TDS are NOT reversed on the refund, so never fill them.
   const reverse = state.commissionReversal !== false;
-  const secs = ticketSectors(b?.rows);
   return {
     againstInvoice: b?.saleVno || '',
     againstPurchase: b?.purchaseVno || '',
-    sectors: secs, sectorRef: sectorRefOf(secs),
     supplierAmt: supplierRefund,
     // REFUND → blank: the original SO SVC2 is refunded to the client in full by the
     // sale reversal, so it is NOT retained as our refund-markup (that would re-charge

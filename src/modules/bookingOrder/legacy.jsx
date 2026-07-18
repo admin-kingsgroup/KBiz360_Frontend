@@ -36,10 +36,10 @@ import { toast } from '../../core/ux/toast';
 import { confirmDialog } from '../../core/ux/confirm';
 import { invalidateBooks } from '../../core/useAccounting';
 import {
-  rowsForEdit, inbRowsFromDeal, ALLOWED_LEG_MODULES, legToPayload, legsFromEdit, legFilled, clubLegsIntoSo, clubbedLegFares, SoPoGpVoucherEntry,
+  rowsForEdit, inbRowsFromDeal, ALLOWED_LEG_MODULES, legToPayload, legsFromEdit, legFilled, SoPoGpVoucherEntry,
 } from '../accounts/daily-entry/soPoGpVoucherEntry';
 
-export { rowsForEdit, inbRowsFromDeal, ALLOWED_LEG_MODULES, legToPayload, legsFromEdit, legFilled, clubLegsIntoSo, clubbedLegFares, SoPoGpVoucherEntry };
+export { rowsForEdit, inbRowsFromDeal, ALLOWED_LEG_MODULES, legToPayload, legsFromEdit, legFilled, SoPoGpVoucherEntry };
 export { BookingApprovals } from '../approvals/bookingApprovals';
 
 export function PendingBookings({ branch, setRoute }) {

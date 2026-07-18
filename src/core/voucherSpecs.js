@@ -146,11 +146,7 @@ export const VSPECS = {
       { key: 'fn', label: 'First Name' }, { key: 'sn', label: 'Surname' },
       { key: 'plan', label: 'Plan', kind: 'tkt' }, { key: 'pol', label: 'Policy No', kind: 'pnr' },
     ],
-    // Owner's call (2026-07-18): the premium is NOT entered on the grid — insurance
-    // books service-only (SVC2 + Service Fee on sale; Supplier Service + incentive on
-    // purchase). No fare columns. Legacy bookings' stored Base Fare/Taxes heads still
-    // post fine (heads are stored on the booking, and their seeded ledgers remain).
-    fareCols: [],
+    fareCols: [{ key: 'base', label: 'Base Fare' }, { key: 'tax', label: 'Taxes' }],
     seed: [
       { fn: 'SARA', sn: 'KHAN', plan: 'Schengen 30D', pol: 'INS8890', base: 1800, tax: 0, psvc: 0, markup: 400, ssvc: 100 },
     ],

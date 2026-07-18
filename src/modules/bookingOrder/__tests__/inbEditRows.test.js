@@ -52,22 +52,3 @@ describe('inbRowsFromDeal — rebuild the INB edit grid from a reconstructed dea
     expect(row.ssvc).toBe(0);
   });
 });
-
-describe('inbRowsFromDeal — legacy fares carry over when a module lost its fare columns', () => {
-  const { inbRowsFromDeal } = require('../legacy.jsx');
-  const { VSPECS } = require('../../../core/voucherSpecs.js');
-
-  test('Insurance (service-only, no fare cols): a legacy Base Fare line rides on line.base — not dropped', () => {
-    const deal = { fareLines: [{ desc: 'Base Fare', amt: 1805.30 }, { desc: 'Taxes', amt: 90 }], serviceFee: 250, passenger: 'ANUBHAV KUMAR' };
-    const [line] = inbRowsFromDeal(VSPECS.SI, deal);
-    expect(line.base).toBe(1805.30);   // carried on the legacy key → legacyFareCarry gate can see it
-    expect(line.tax).toBe(90);
-    expect(line.ssvc).toBe(250);
-  });
-
-  test('a module that still has the column maps normally (no legacy path)', () => {
-    const deal = { fareLines: [{ desc: 'Base Fare', amt: 4000 }], serviceFee: 100, passenger: 'A B' };
-    const [line] = inbRowsFromDeal(VSPECS.SF, deal);
-    expect(line.base).toBe(4000);
-  });
-});
