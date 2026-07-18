@@ -4,7 +4,7 @@ import { CheckCircle2, Circle, FileUp, ShieldCheck, AlertTriangle, Stamp, Lock, 
 import { getCertificate, freezeSnapshot, addAttachment, addException, resolveException, signCertificate, attachScan, getAttachmentUrl, scrutinizeStatement } from '../api';
 import { parseStatementFile } from '../statementParse';
 import { ScrutinyView } from './ScrutinyView';
-import { tierOf, statusMeta, sourceMeta, chainProgress, fmtAmt, openExceptions } from '../utils';
+import { tierOf, statusMeta, sourceMeta, chainProgress, chainForCert, fmtAmt, openExceptions } from '../utils';
 import { Drawer, Badge, Button, Input, Select, FormField, LoadingState, EmptyState, ErrorState } from '../../../shell/primitives';
 
 // ─── Certificate Drawer — one ledger, one certificate ───────────────────────
@@ -133,6 +133,9 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
 
   if (!id) return null;
   const tier = cert ? tierOf(cert.tier) : null;
+  // The RESOLVED chain for this cert — a month statement ledger carries the
+  // branch-freeze step, so the drawer shows the same ladder the server enforces.
+  const chain = cert ? chainForCert(cert) : [];
   const prog = cert ? chainProgress(cert) : null;
   const frozen = !!cert?.snapshot?.frozenAt;
   const signedFully = cert && prog.done >= prog.total;
@@ -295,7 +298,7 @@ export function CertificateDrawer({ id, branch, onClose, setRoute }) {
           <section>
             <h3 className="kbiz-section-title mb-2">Signature chain — {tier.mode === 'digital' ? 'digital in ERP' : 'physical (wet-sign → scan back)'}</h3>
             <ol className="grid gap-2">
-              {tier.chain.map((step, i) => {
+              {chain.map((step, i) => {
                 const sig = cert.signatures[i];
                 const isNext = i === prog.done;
                 return (

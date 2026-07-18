@@ -16,23 +16,23 @@ function allHrefs(node, out = []) {
 }
 
 describe('Reconciliation · top-level pill', () => {
-  test('BRANCH pill = freeze-only (Daily & Weekly) + statement matching — NO certification, NO month+', () => {
+  test('BRANCH pill = freeze (Daily, Weekly & the Monthly bank/client/supplier freeze) + statement matching — NO Quarter/Year', () => {
     expect(MENU_RECONCILIATION.label).toBe('Statement Reconciliation');
     expect(allHrefs(MENU_RECONCILIATION)).toEqual([
-      // Freeze — the branch deliverable (Daily & Weekly only)
-      '/reconciliation/daily', '/reconciliation/weekly',
+      // Freeze — the branch deliverable (Daily, Weekly & the Monthly statement freeze)
+      '/reconciliation/daily', '/reconciliation/weekly', '/reconciliation/monthly',
       // Reconciliation Hub — full-view dashboard for the freeze tiers
-      '/reconciliation/hub/daily', '/reconciliation/hub/weekly',
+      '/reconciliation/hub/daily', '/reconciliation/hub/weekly', '/reconciliation/hub/monthly',
       // Statement Matching
       '/accounts/client-reco', '/bank-reco', '/finance/reco-queue',
       '/accounts/supplier-reco', '/accounts/interbranch-reco', '/reconciliation/match-guide',
       // Reports — one per freeze tier
-      '/reconciliation/reports/daily', '/reconciliation/reports/weekly',
+      '/reconciliation/reports/daily', '/reconciliation/reports/weekly', '/reconciliation/reports/monthly',
       // Govern
       '/reconciliation/rulebook',
     ]);
-    // No certification / month+ leaks onto the branch surface.
-    ['/reconciliation/monthly', '/reconciliation/quarterly', '/reconciliation/yearly']
+    // Quarter/Year certification never leaks onto the branch surface.
+    ['/reconciliation/quarterly', '/reconciliation/yearly', '/reconciliation/hub/quarterly', '/reconciliation/hub/yearly']
       .forEach((h) => expect(allHrefs(MENU_RECONCILIATION)).not.toContain(h));
   });
 
@@ -86,7 +86,9 @@ describe('Reconciliation · top-level pill', () => {
     expect(crumbsFor('/reconciliation/hub/weekly').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Reconciliation Hub', 'Weekly Reconciliation']);
     expect(crumbsFor('/reconciliation/weekly').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Freeze', 'Weekly Freeze']);
     expect(crumbsFor('/reconciliation/reports/monthly').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Reports', 'Monthly Report']);
-    expect(crumbsFor('/reconciliation/monthly').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Certification', 'Monthly Certification']);
+    // Monthly is now a BRANCH freeze deliverable (under the Freeze sub-head); the
+    // TK Group cockpit still surfaces the same route as "Monthly Certification".
+    expect(crumbsFor('/reconciliation/monthly').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Freeze', 'Monthly Freeze']);
     expect(crumbsFor('/reconciliation/rulebook').map((c) => c.label)).toEqual(['Statement Reconciliation', 'Govern', 'Rule Book & Process']);
     // The Tally Reconciliation pill (now grouped Tie-Out / Vouchers / Help).
     expect(crumbsFor('/tally-reconciliation/monthly').map((c) => c.label)).toEqual(['Tally Reconciliation', 'Tie-Out', 'Monthly Tie-Out']);

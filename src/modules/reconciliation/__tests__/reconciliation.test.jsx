@@ -5,6 +5,7 @@ import {
   fmtAmt, currencyOf, openExceptions, GOLDEN_RULES, ROLE_MATRIX,
   pendingStateMeta, fmtDue, periodOptions, visibleTiers, canEditCycleConfig, branchCodeOf,
   classifyOptionsFor, classificationLabel, MATCH_TYPE_LABELS, BANK_CLASSIFY, PARTY_CLASSIFY,
+  chainForCert, isStatementLedgerCert, tierSignersLabel,
 } from '../utils';
 
 describe('reconciliation · tiers', () => {
@@ -25,11 +26,30 @@ describe('reconciliation · tiers', () => {
   test('unknown tier falls back to the first tier (never crashes a row)', () => {
     expect(tierOf('nope').key).toBe('daily');
   });
-  test('Branch Accountant sees the DAILY & WEEKLY freeze tiers ONLY; central roles see all five', () => {
-    expect(visibleTiers('Branch Accountant').map((t) => t.key)).toEqual(['daily', 'weekly']);
+  test('Branch Accountant sees Daily, Weekly & Monthly (the branch freeze tiers); central roles see all five', () => {
+    expect(visibleTiers('Branch Accountant').map((t) => t.key)).toEqual(['daily', 'weekly', 'month']);
     ['Sr. Accounts Executive', 'Senior Finance Manager', 'Director', 'Super Admin', undefined].forEach((r) => {
       expect(visibleTiers(r)).toHaveLength(5);
     });
+  });
+
+  test('chainForCert: a MONTH statement ledger (bank/client/supplier) carries the branch-freeze step; other heads keep the AE-first chain', () => {
+    const bankCert = { tier: 'month', ledger: { subGroup: 'Bank Accounts' } };
+    const debtorCert = { tier: 'month', ledger: { subGroup: 'Sundry Debtors' } };
+    const capitalCert = { tier: 'month', ledger: { subGroup: 'Capital Account' } };
+    expect(isStatementLedgerCert(bankCert)).toBe(true);
+    expect(isStatementLedgerCert(debtorCert)).toBe(true);
+    expect(isStatementLedgerCert(capitalCert)).toBe(false);
+    expect(chainForCert(bankCert).map((s) => s.role)).toEqual(['Branch Accountant', 'AE', 'FM', 'Director', 'Owner']);
+    expect(chainForCert(capitalCert).map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner']);
+    // Quarter never splits; weekly is its own branch chain.
+    expect(chainForCert({ tier: 'quarter', ledger: { subGroup: 'Bank Accounts' } }).map((s) => s.role)).toEqual(['AE', 'FM', 'Director', 'Owner']);
+    expect(chainForCert({ tier: 'weekly', ledger: { subGroup: 'Bank Accounts' } }).map((s) => s.role)).toEqual(['Branch Accountant', 'AE', 'FM']);
+    // chainProgress on a month bank cert reflects the 5-step ladder.
+    expect(chainProgress({ ...bankCert, signatures: [{ role: 'Branch Accountant' }] })).toMatchObject({ done: 1, total: 5 });
+    expect(chainProgress({ ...bankCert, signatures: [{ role: 'Branch Accountant' }] }).next.role).toBe('AE');
+    expect(tierSignersLabel('month')).toMatch(/Branch Accountant/);
+    expect(tierSignersLabel('weekly')).toBe('Branch Accountant → AE → FM');
   });
   test('cycle CONFIG is FM/Director/Owner only — AE and Branch Accountant cannot reshape the scope', () => {
     ['Senior Finance Manager', 'FM', 'Director', 'Owner', 'Super Admin', 'super_admin'].forEach((r) => {
@@ -141,13 +161,15 @@ describe('reconciliation · rule book content', () => {
     expect(GOLDEN_RULES).toHaveLength(8);
     expect(GOLDEN_RULES.map((r) => r.n)).toEqual(['01', '02', '03', '04', '05', '06', '07', '08']);
   });
-  test('role matrix: Branch Accountant freezes daily & weekly only; Owner locks the month', () => {
+  test('role matrix: Branch Accountant freezes daily, weekly & the monthly statement heads; Owner locks the month', () => {
     const ba = ROLE_MATRIX.find((r) => r.role === 'Branch Accountant');
     expect([ba.daily, ba.weekly]).toEqual(['Freeze', 'Freeze']);
-    expect([ba.month, ba.quarter, ba.year]).toEqual(['—', '—', '—']);
+    expect(ba.month).toMatch(/Freeze/);            // bank/client/supplier freeze at the branch
+    expect([ba.quarter, ba.year]).toEqual(['—', '—']);
     expect(ROLE_MATRIX.find((r) => r.role === 'Owner').month).toBe('Lock');
-    // AE is the month-end maker (freeze); external Statutory/Auditor rows are removed.
-    expect(ROLE_MATRIX.find((r) => r.role === 'AE').month).toBe('Freeze');
+    // AE VERIFIES the branch monthly freeze and prepares the other heads; external
+    // Statutory/Auditor rows remain removed.
+    expect(ROLE_MATRIX.find((r) => r.role === 'AE').month).toMatch(/Verify/);
     expect(ROLE_MATRIX.find((r) => r.role === 'Auditor')).toBeUndefined();
   });
 });

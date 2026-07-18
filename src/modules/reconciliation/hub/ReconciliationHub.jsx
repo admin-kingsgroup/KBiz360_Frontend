@@ -74,7 +74,7 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
       <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
         <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Reconciliation</h1>
         <EmptyState title="Central closing tier"
-          hint="The Branch Accountant watches the WEEKLY cycle only — Month-End, Quarterly and Year-End are overseen from TK Group Central by AE / FM / Director / Owner."
+          hint="The Branch Accountant watches the Daily, Weekly and Monthly cycles — Quarterly and Year-End are overseen from TK Group Central by AE / FM / Director / Owner."
           action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/hub/weekly')}>Open Weekly Reconciliation</Button>} />
       </div>
     );

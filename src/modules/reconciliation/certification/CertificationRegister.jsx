@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2, LayoutDashboard } from 'lucide-react';
 import { getTree, getSummary, getPending, generateCertificates } from '../api';
 import { useCockpitFocus } from '../../../store/cockpitFocus';
-import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, certPathFor, hubPathFor, reportPathFor, tierMenuName, isSoftTier } from '../utils';
+import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, certPathFor, hubPathFor, reportPathFor, tierMenuName, isSoftTier, tierSignersLabel } from '../utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../../shell/primitives';
 import { CertificateDrawer } from '../shared/CertificateDrawer';
 import { CycleLedgerDrawer } from './CycleLedgerDrawer';
@@ -56,8 +56,11 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
   const tier = tierOf(tierKey);
   // Daily & Weekly are FREEZE-ONLY (branch); Month/Quarter/Year are CERTIFIED (TK
   // Group). The workbench is the same page — only the wording differs by family.
+  // Month-End is a certification tier, but the BRANCH does the bank/client/supplier
+  // freeze — so for a Branch Accountant the month register is a freeze workbench.
   const soft = isSoftTier(tierKey);
-  const registerNoun = soft ? 'Freeze' : 'Certification';
+  const isBA = /accountant/i.test(String(currentUser?.role || ''));
+  const registerNoun = (soft || (tierKey === 'month' && isBA)) ? 'Freeze' : 'Certification';
 
   // Follow the app-wide branch selector — the module must never show a
   // different branch than the rest of the ERP (branch-isolation convention).
@@ -101,7 +104,7 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
       <div className="mx-auto w-full grid gap-4 px-4 py-4 tablet:px-6 tablet:py-5 desktop:px-8">
         <h1 className="kbiz-page-title">{tierMenuName(tierKey)} Certification</h1>
         <EmptyState title="Central closing tier"
-          hint="The Branch Accountant works the Daily & Weekly freeze only — Month-End, Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner."
+          hint="The Branch Accountant works the Daily & Weekly freeze and the monthly bank / client / supplier freeze — Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner."
           action={<Button variant="secondary" onClick={() => setRoute && setRoute('/reconciliation/weekly')}>Open Weekly Freeze</Button>} />
       </div>
     );
@@ -143,13 +146,16 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
         <TierCard tier={tier} counts={summary?.tiers?.[tierKey]} period={summary?.periods?.[tierKey]} />
       </div>
       {tiers.length < TIERS.length && (
-        <p className="text-xs text-ink-subtle">Daily &amp; Weekly are freeze-only — Month-End, Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner.</p>
+        <p className="text-xs text-ink-subtle">The branch freezes Daily, Weekly and the monthly bank / client / supplier reconciliations — Quarterly and Year-End closings are worked from TK Group Central by AE / FM / Director / Owner.</p>
+      )}
+      {tierKey === 'month' && isBA && (
+        <p className="text-xs text-ink-subtle">You freeze the branch <b>bank, client and supplier</b> reconciliations here; TK Group certifies them (AE → FM → Director → Owner). The month’s other heads (tax, loans, capital, assets) are prepared at TK Group Central.</p>
       )}
 
       {/* register */}
       <PageSection
         title={`${tier.label} — ${branch} · ${period || ''}`}
-        subtitle={`${tier.scope} · Signers: ${tier.chain.map((s) => s.role).join(' → ')}`}
+        subtitle={`${tier.scope} · Signers: ${tierSignersLabel(tierKey)}`}
         actions={options.length > 1 && (
           <label className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
             Period

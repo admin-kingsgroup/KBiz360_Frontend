@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Snowflake, FileUp, Scale, PenLine, LockKeyhole, ListChecks, Layers, Users, ShieldCheck } from 'lucide-react';
 import { getRulebook } from '../api';
-import { TIERS, GOLDEN_RULES, ROLE_MATRIX, branchCodeOf } from '../utils';
+import { TIERS, GOLDEN_RULES, ROLE_MATRIX, ROLE_MATRIX_MONTH_NOTES, branchCodeOf } from '../utils';
 import { PageSection, Badge, Button, cn } from '../../../shell/primitives';
 
 // ─── Reconciliation Rule Book ────────────────────────────────────────────────
@@ -72,7 +72,7 @@ export function RuleBookPage({ branch, setRoute }) {
       </PageSection>
 
       {/* 2 · roles */}
-      <PageSection icon={Users} title="2 · Roles — who does what" subtitle="Branch Accountant freezes Daily & Weekly; AE approves those and freezes Month+; FM verifies (and is the sole editor in an Owner-opened correction window); only the Owner locks and re-opens.">
+      <PageSection icon={Users} title="2 · Roles — who does what" subtitle="Branch Accountant freezes Daily & Weekly and the monthly bank/client/supplier reconciliations; AE approves those and verifies the branch monthly freeze (and freezes the other month heads + Quarter/Year); FM verifies (and is the sole editor in an Owner-opened correction window); only the Owner locks and re-opens.">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] border-collapse">
             <thead><tr>
@@ -86,7 +86,7 @@ export function RuleBookPage({ branch, setRoute }) {
                   <td className={cellCls}>{r.duty}</td>
                   {['daily', 'weekly', 'month', 'quarter', 'year'].map((k) => (
                     <td key={k} className={cellCls}>
-                      {(!r[k] || r[k] === '—') ? <span className="text-ink-subtle">—</span> : <Badge tone={r[k] === 'Freeze' ? 'info' : 'success'} size="sm">{r[k]}</Badge>}
+                      {(!r[k] || r[k] === '—') ? <span className="text-ink-subtle">—</span> : <Badge tone={/freeze/i.test(r[k]) ? 'info' : 'success'} size="sm">{r[k]}</Badge>}
                     </td>
                   ))}
                 </tr>
@@ -94,6 +94,7 @@ export function RuleBookPage({ branch, setRoute }) {
             </tbody>
           </table>
         </div>
+        <p className="mt-2 text-xs text-ink-subtle">{ROLE_MATRIX_MONTH_NOTES}</p>
       </PageSection>
 
       {/* 3 · process */}

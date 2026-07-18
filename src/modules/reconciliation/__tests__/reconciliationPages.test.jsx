@@ -93,10 +93,17 @@ describe('CertificationRegister · render (tier-locked sign-off pages — the me
     expect(screen.getByText(/worked from TK Group Central/i)).toBeInTheDocument();
   });
 
-  test('Branch Accountant on a central tier URL: guarded, not broken', async () => {
+  test('Branch Accountant on Monthly: a freeze workbench (NOT guarded), H1 says "Monthly Freeze"', async () => {
+    wrap(<CertificationRegister branch="BOM" tier="month" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
+    expect(await screen.findByText('Monthly Freeze')).toBeInTheDocument();        // freeze wording for the BA (not "Certification")
+    expect(screen.queryByText('Central closing tier')).not.toBeInTheDocument();   // monthly is a branch deliverable now
+    expect(screen.getByText(/bank, client and supplier/i)).toBeInTheDocument();   // the branch-scope note
+  });
+
+  test('Branch Accountant on a central tier URL (Quarter): guarded, not broken', async () => {
     wrap(<CertificationRegister branch="BOM" tier="quarter" setRoute={() => {}} currentUser={{ role: 'Branch Accountant' }} />);
     expect(await screen.findByText('Central closing tier')).toBeInTheDocument();
-    expect(screen.getByText(/Daily & Weekly freeze only/i)).toBeInTheDocument();
+    expect(screen.getByText(/Quarterly and Year-End closings are worked from TK Group Central/i)).toBeInTheDocument();
     expect(screen.queryByText('ICICI Bank A/c')).not.toBeInTheDocument();     // no register leaks
   });
 });

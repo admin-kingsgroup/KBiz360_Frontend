@@ -87,6 +87,39 @@ export const tierOf = (key) => TIERS.find((t) => t.key === key) || TIERS[0];
 export const isSoftTier = (key) => key === 'daily' || key === 'weekly';
 export const isHardTier = (key) => key === 'month' || key === 'quarter' || key === 'year';
 
+// ── Month-End: branch freeze vs Group certify (per-ledger chain) ─────────────
+// Mirrors the backend chainFor: a MONTH statement ledger (bank/client/supplier —
+// the heads with a reconciliation screen) is FROZEN at the branch by the Branch
+// Accountant, then certified at TK Group — so its chain gains a Branch-Accountant
+// "Prepared" step and the AE's step becomes a verify of that freeze. Every other
+// month head (tax/loans/capital/assets) keeps the tier's AE-first chain. Statement
+// ledgers are identified by their resolved SYSTEM sub-group (what the cert stores).
+export const MONTH_STATEMENT_CHAIN = [
+  { role: 'Branch Accountant', action: 'Prepared' },
+  { role: 'AE', action: 'Verified' },
+  { role: 'FM', action: 'Verified' },
+  { role: 'Director', action: 'Certified' },
+  { role: 'Owner', action: 'Locked' },
+];
+const STATEMENT_SUBGROUPS = new Set(['Bank Accounts', 'Bank OD Accounts', 'Sundry Debtors', 'Sundry Creditors']);
+export function isStatementLedgerCert(cert = {}) {
+  return STATEMENT_SUBGROUPS.has(String(cert?.ledger?.subGroup || '').trim());
+}
+/** The signing chain for THIS certificate — the tier's chain, except a MONTH
+ *  statement-ledger cert runs on MONTH_STATEMENT_CHAIN (branch freeze → Group
+ *  certify). Authoritative copy lives on the backend (getCertificate.chain). */
+export function chainForCert(cert = {}) {
+  if (cert?.tier === 'month' && isStatementLedgerCert(cert)) return MONTH_STATEMENT_CHAIN;
+  return tierOf(cert?.tier).chain;
+}
+/** Signer summary for a tier's register subtitle. Month splits by ledger type. */
+export function tierSignersLabel(tierKey) {
+  if (tierKey === 'month') {
+    return 'Branch Accountant → AE → FM → Director → Owner (bank/client/supplier, frozen at branch) · AE → FM → Director → Owner (other heads, at TK Group)';
+  }
+  return tierOf(tierKey).chain.map((s) => s.role).join(' → ');
+}
+
 // Each tier is its OWN menu entry + page now. THREE per-tier page families, each
 // chosen from the menu (never from tabs inside a page):
 //   • Reconciliation Hub  → /reconciliation/hub/<tier>      — full-view dashboard
@@ -102,10 +135,13 @@ export const reportPathFor = (tierKey) => `/reconciliation/reports/${TIER_PATHS[
 export const tierMenuName = (tierKey) => ({ daily: 'Daily', weekly: 'Weekly', month: 'Monthly', quarter: 'Quarterly', year: 'Yearly' }[tierKey] || 'Weekly');
 
 /** Tiers a role may see/work. The Branch Accountant handles the DAILY & WEEKLY
- *  freeze only — Month/Quarter/Year certification is done from TK Group Central by
- *  AE/FM/Director/Owner (the backend enforces the same rule on writes). */
+ *  freeze AND the MONTHLY bank/client/supplier freeze — Quarter/Year certification
+ *  is done from TK Group Central by AE/FM/Director/Owner (the backend enforces the
+ *  same rule on writes; within the month register the BA can only freeze the
+ *  statement heads, the other heads are gated with a reason). */
 export function visibleTiers(role) {
-  return /accountant/i.test(String(role || '')) ? TIERS.filter((t) => isSoftTier(t.key)) : TIERS;
+  if (!/accountant/i.test(String(role || ''))) return TIERS;
+  return TIERS.filter((t) => isSoftTier(t.key) || t.key === 'month');
 }
 
 /** The weekly cycle CONFIG (wallets/gateways joining the cycle) is a control:
@@ -143,9 +179,10 @@ export function tierProgress(counts = {}) {
   return { total, done, pct: total ? Math.round((done / total) * 100) : 0 };
 }
 
-/** Signature progress on one certificate: "2 / 4 · next: FM". */
+/** Signature progress on one certificate: "2 / 4 · next: FM". Uses the cert's
+ *  RESOLVED chain (a month statement ledger has the branch-freeze step). */
 export function chainProgress(cert) {
-  const chain = tierOf(cert?.tier).chain;
+  const chain = chainForCert(cert);
   const done = (cert?.signatures || []).length;
   const next = chain[done] || null;
   return { done, total: chain.length, next };
@@ -224,7 +261,7 @@ export const GOLDEN_RULES = [
   { n: '01', title: 'One ledger, one certificate', text: 'Each ledger is reconciled and certified on its own at every tier it applies to. A period locks only when ALL its ledgers are signed.' },
   { n: '02', title: 'Freeze before sign', text: 'Balances are snapshot-frozen and every uploaded statement is hash-tied to that snapshot — the signature always points at the exact figures reconciled.' },
   { n: '03', title: 'No sign on open exceptions', text: 'A certificate cannot be signed while its reconciliation shows an unresolved exception. Unresolved items escalate up the tiers.' },
-  { n: '04', title: 'Branch freezes, Group certifies', text: 'Daily & Weekly are FREEZE-ONLY at the branch (Branch Accountant freezes; AE — and FM, weekly — approve). There is no certification and nothing hard-locks at branch level. Month/Quarter/Year certification is done at TK Group Central.' },
+  { n: '04', title: 'Branch freezes, Group certifies', text: 'Daily & Weekly are FREEZE-ONLY at the branch (Branch Accountant freezes; AE — and FM, weekly — approve). At Month-End the Branch Accountant ALSO freezes the branch bank / client / supplier reconciliations; TK Group then certifies them (AE verifies → FM verifies → Director certifies → Owner locks). The month’s other heads (tax, loans, capital, assets) and all Quarter/Year certification are prepared and certified at TK Group Central. Nothing hard-locks at branch level.' },
   { n: '05', title: 'Physical = scan back', text: 'Month/Quarter/Year are wet-signed on paper, then the signed scan is uploaded — that upload is what fires the period lock.' },
   { n: '06', title: 'Branch-wise, never mixed', text: 'Every reconciliation is per branch. TK Group certifies each branch on its own; balances are never merged across branches. Tally Reconciliation is a TK Group Central activity only.' },
   { n: '07', title: 'Delegation, not bottleneck', text: 'If the Director is unavailable, the Owner signs the certify step in his place (within approval limits) so a close is never stuck.' },
@@ -233,9 +270,12 @@ export const GOLDEN_RULES = [
 
 // Who-does-what rows for the Rule Book roles table.
 export const ROLE_MATRIX = [
-  { role: 'Branch Accountant', who: 'At each branch', duty: 'Freezes every cycle ledger daily & weekly (reconciles + prepares); no certification', daily: 'Freeze', weekly: 'Freeze', month: '—', quarter: '—', year: '—' },
-  { role: 'AE', who: 'Accounts Executive', duty: 'Approves the daily/weekly freeze at Group; freezes (prepares) the Month/Quarter/Year close', daily: 'Approve', weekly: 'Verify', month: 'Freeze', quarter: 'Freeze', year: 'Freeze' },
+  { role: 'Branch Accountant', who: 'At each branch', duty: 'Freezes every cycle ledger daily & weekly, and the monthly bank/client/supplier reconciliations, at the branch (reconciles + prepares); no certification', daily: 'Freeze', weekly: 'Freeze', month: 'Freeze¹', quarter: '—', year: '—' },
+  { role: 'AE', who: 'Accounts Executive', duty: 'Approves the daily/weekly freeze at Group; verifies the branch monthly freeze and prepares the month’s other heads; freezes (prepares) the Quarter/Year close', daily: 'Approve', weekly: 'Verify', month: 'Verify¹ / Freeze²', quarter: 'Freeze', year: 'Freeze' },
   { role: 'FM', who: 'Sr. Finance Manager', duty: 'Approves weekly; verifies the Month/Quarter/Year close; the sole editor in an Owner-opened correction window', daily: '—', weekly: 'Approve', month: 'Verify', quarter: 'Verify', year: 'Verify' },
   { role: 'Director', who: 'Director', duty: 'Certifies the Month/Quarter/Year close', daily: '—', weekly: '—', month: 'Certify', quarter: 'Certify', year: 'Certify' },
   { role: 'Owner', who: 'Owner · Super Admin', duty: 'Locks the close (final); the ONLY role that can re-open a locked period', daily: '—', weekly: '—', month: 'Lock', quarter: 'Lock', year: 'Lock' },
 ];
+// Footnotes for the month column: ¹ bank/client/supplier (frozen at the branch);
+// ² the month's other heads (tax/loans/capital/assets, prepared at TK Group).
+export const ROLE_MATRIX_MONTH_NOTES = '¹ bank / client / supplier — frozen at the branch, then verified at TK Group.  ² the month’s other heads (tax, loans, capital, assets) — prepared at TK Group Central.';

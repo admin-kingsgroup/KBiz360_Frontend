@@ -664,22 +664,26 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
 
 // Reconciliation — the BRANCH surface is FREEZE-ONLY: Daily & Weekly freeze (no
 // certification — that is done at TK Group Central) plus the statement-matching
-// screens. Month/Quarter/Year certification and Tally Reconciliation are NOT on the
-// branch surface; they live in the TK Group Central cockpit (modules/tk-group/cockpit.js).
-// Branch-wise throughout.
+// screens. The MONTHLY bank/client/supplier freeze is a BRANCH deliverable too
+// (the Branch Accountant freezes; TK Group certifies). Quarter/Year certification
+// and Tally Reconciliation are NOT on the branch surface; they live in the TK Group
+// Central cockpit (modules/tk-group/cockpit.js). Branch-wise throughout.
 export const MENU_RECONCILIATION = {label:"Statement Reconciliation", icon:ArrowLeftRight, children:[
-  // Freeze — the per-ledger Daily & Weekly freeze register (the branch deliverable).
-  // Daily: Branch Accountant freezes → AE approves. Weekly: BA freezes → AE → FM
-  // approve (approvals happen at TK Group Central). No certification, no hard lock.
+  // Freeze — the per-ledger freeze register (the branch deliverable). Daily: BA
+  // freezes → AE approves. Weekly: BA → AE → FM approve. Monthly: BA freezes the
+  // bank/client/supplier reconciliations → TK Group certifies (approvals happen at
+  // TK Group Central). No hard lock at branch level — the Owner's lock does that.
   {label:"Freeze", children:[
-    {label:"Daily Freeze",  href:"/reconciliation/daily"},
-    {label:"Weekly Freeze", href:"/reconciliation/weekly"},
+    {label:"Daily Freeze",   href:"/reconciliation/daily"},
+    {label:"Weekly Freeze",  href:"/reconciliation/weekly"},
+    {label:"Monthly Freeze", href:"/reconciliation/monthly"},
   ]},
   // Reconciliation Hub — the read-only FULL VIEW / dashboard of a freeze tier:
   // every cycle ledger + its live status and the attention list.
   {label:"Reconciliation Hub", children:[
-    {label:"Daily Reconciliation",  href:"/reconciliation/hub/daily"},
-    {label:"Weekly Reconciliation", href:"/reconciliation/hub/weekly"},
+    {label:"Daily Reconciliation",   href:"/reconciliation/hub/daily"},
+    {label:"Weekly Reconciliation",  href:"/reconciliation/hub/weekly"},
+    {label:"Monthly Reconciliation", href:"/reconciliation/hub/monthly"},
   ]},
   // Statement matching — all line-level import/match screens live under
   // Reconciliation (tax recon stays under the regime-aware Taxation pill).
@@ -693,8 +697,9 @@ export const MENU_RECONCILIATION = {label:"Statement Reconciliation", icon:Arrow
   ]},
   // One report per freeze tier — pending freezes and open exceptions.
   {label:"Reports", children:[
-    {label:"Daily Report",  href:"/reconciliation/reports/daily"},
-    {label:"Weekly Report", href:"/reconciliation/reports/weekly"},
+    {label:"Daily Report",   href:"/reconciliation/reports/daily"},
+    {label:"Weekly Report",  href:"/reconciliation/reports/weekly"},
+    {label:"Monthly Report", href:"/reconciliation/reports/monthly"},
   ]},
   {label:"Govern", children:[
     {label:"Rule Book & Process", href:"/reconciliation/rulebook"},
@@ -733,9 +738,10 @@ export const MENU_TALLY_RECON = {label:"Tally Reconciliation", icon:Scale, child
   ]},
 ]};
 
-// The branch Statement Reconciliation pill is already FREEZE-ONLY (Daily & Weekly)
-// with no Month/Quarter/Year to hide, so the Branch-Accountant view is identical to
-// the branch pill. Kept as a named export for the callers/tests that reference it.
+// The branch Statement Reconciliation pill is FREEZE-scoped (Daily, Weekly and the
+// Monthly bank/client/supplier freeze) — Quarter/Year certification never appears on
+// the branch surface, so the Branch-Accountant view is identical to the branch pill.
+// Kept as a named export for the callers/tests that reference it.
 export const MENU_RECONCILIATION_WEEKLY_ONLY = MENU_RECONCILIATION;
 
 // One unified approval screen (SO/PO/GP + Vouchers, each Pending/Approved/Rejected/Deleted).
@@ -998,8 +1004,9 @@ export function roleMenuRoots(branch, currentUser){
   // accountant variant (no Branch MIS / Inter Branch / Period Close / Accounts
   // Master — see MENU_ACCOUNTS_BRANCH_ACCOUNTANT).
   // Branch scope is still enforced by the top-right switcher.
-  // Reconciliation: the Branch Accountant PREPARES the weekly certificates, so
-  // the module pill is part of their workspace too (AE/FM/Director sign above).
+  // Reconciliation: the Branch Accountant FREEZES the Daily & Weekly cycles and
+  // the Monthly bank/client/supplier reconciliations, so the module pill is part
+  // of their workspace (AE/FM/Director/Owner certify above at TK Group Central).
   return [MENU_ACCOUNTS_BRANCH_ACCOUNTANT, MENU_RECONCILIATION_WEEKLY_ONLY, MENU_APPROVALS, MENU_DECISIONS, MENU_SUPPORT];
 }
 
