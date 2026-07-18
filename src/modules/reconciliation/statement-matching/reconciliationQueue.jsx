@@ -24,6 +24,9 @@ const RECO_QUEUE_TIERS = [
 // Facts → the row's colour badge + sort rank. Overdue floats to the top, done sinks;
 // untouched "pending" ranks above part-worked rows so the most work-to-do is visible.
 function recoRowState(it){
+  // A week whose month is already certified is covered by the Month-End close —
+  // it is not "overdue", it's done via the month (navy, sinks to the bottom).
+  if(it.superseded) return { label:'Covered by Month-End', c:'#0d1326', bg:'#e7e9f0', dot:'#0d1326', rank:5 };
   if(it.overdue) return { label:'Overdue', c:'#A32D2D', bg:'#FCEBEB', dot:'#A32D2D', rank:0 };
   if(it.status==='signed'||it.status==='locked') return { label:'Reconciled', c:'#27500A', bg:'#EAF3DE', dot:'#27500A', rank:4 };
   if(it.status==='reconciled') return { label:'Ready to sign', c:'#185FA5', bg:'#E6F1FB', dot:'#185FA5', rank:3 };
@@ -116,7 +119,7 @@ export function ReconciliationQueue({branch,setRoute}){
 
       {/* Legend — one colour language across the queue, the bell and the cockpit tile. */}
       <div style={{display:"flex",flexWrap:"wrap",gap:14,margin:"10px 2px 0",fontSize:10.5,color:"#5a6691"}}>
-        {[["#A32D2D","Overdue — past Friday"],["#9aa3bd","Pending / not started"],["#d4a437","In progress"],["#185FA5","Ready to sign"],["#27500A","Reconciled"]].map(([c,l])=>(
+        {[["#A32D2D","Overdue — past Friday"],["#9aa3bd","Pending / not started"],["#d4a437","In progress"],["#185FA5","Ready to sign"],["#27500A","Reconciled"],["#0d1326","Covered by Month-End"]].map(([c,l])=>(
           <span key={l} style={{display:"inline-flex",alignItems:"center",gap:5}}><span style={{width:8,height:8,borderRadius:"50%",background:c}}/>{l}</span>
         ))}
       </div>

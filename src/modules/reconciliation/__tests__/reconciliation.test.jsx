@@ -113,11 +113,13 @@ describe('reconciliation · progress math', () => {
 });
 
 describe('reconciliation · pending board display', () => {
-  test('pendingStateMeta: upcoming/in-progress/pending/closed tones', () => {
+  test('pendingStateMeta: upcoming/in-progress/pending/closed/superseded tones', () => {
     expect(pendingStateMeta({ upcoming: true })).toMatchObject({ tone: 'info', label: 'Upcoming' });
     expect(pendingStateMeta({ state: 'in-progress' })).toMatchObject({ tone: 'warning' });
     expect(pendingStateMeta({ state: 'not-started' })).toMatchObject({ tone: 'danger', label: 'Pending' });
     expect(pendingStateMeta({ state: 'closed' })).toMatchObject({ tone: 'navy' });
+    // A weekly cycle whose month is certified → "Covered by Month-End", not overdue.
+    expect(pendingStateMeta({ state: 'superseded' })).toMatchObject({ tone: 'info', label: 'Covered by Month-End' });
   });
   test('periodOptions: backlog periods first, then current; deduped; upcoming excluded', () => {
     const rows = [

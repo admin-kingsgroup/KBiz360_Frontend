@@ -29,6 +29,12 @@ export async function getPending({ branch } = {}) {
   return (await apiGet('/api/reconciliation/pending', { branch })) || { rows: [] };
 }
 
+// Weekly coverage for a Month-End close — the month's weekly cycles, signed vs
+// skipped (the Month-End register's soft "weeks skipped" warning).
+export async function getWeeklyCoverage({ branch, period } = {}) {
+  return (await apiGet('/api/reconciliation/weekly-coverage', { branch, period })) || { weeks: [], unsigned: 0 };
+}
+
 // TK Group Central approval inbox — every frozen cert awaiting a signature, tagged
 // with the role it waits on (+ `me` = the signed-in role). THROWS on failure — a
 // dead backend must never read as "no approvals pending" on a compliance board.

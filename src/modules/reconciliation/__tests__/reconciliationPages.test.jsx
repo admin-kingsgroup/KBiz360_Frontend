@@ -41,6 +41,7 @@ jest.mock('../api', () => ({
       snapshot: { frozenAt: null }, ledger: { name: 'HDFC Bank A/c', code: 'B2', parentGroup: 'Current Assets', subGroup: 'Bank Accounts' } },
   ])),
   getRulebook: jest.fn(() => Promise.resolve({ periods: { weekly: '2026-W28', month: '2026-07', quarter: 'CY2026-Q3', year: 'CY2026' } })),
+  getWeeklyCoverage: jest.fn(() => Promise.resolve({ month: '2026-07', weeks: [], unsigned: 0 })),
   getCertificate: jest.fn(() => Promise.resolve(null)),
   generateCertificates: jest.fn(() => Promise.resolve({ created: 3, total: 9 })),
   freezeSnapshot: jest.fn(), addAttachment: jest.fn(), addException: jest.fn(),
@@ -76,6 +77,18 @@ describe('CertificationRegister · render (tier-locked sign-off pages — the me
     expect(await screen.findByText('Monthly Certification')).toBeInTheDocument(); // same words the user clicked
     expect(screen.getByText('Month-End')).toBeInTheDocument();                     // the tier's formal name on the card
     expect(screen.queryByText('Weekly')).not.toBeInTheDocument();
+  });
+
+  test('monthly page WARNS (soft) when weekly cycles were skipped', async () => {
+    const { getWeeklyCoverage } = require('../api');
+    getWeeklyCoverage.mockResolvedValueOnce({ month: '2026-07', unsigned: 2, weeks: [
+      { period: '2026-W27', signed: true }, { period: '2026-W28', signed: false }, { period: '2026-W29', signed: false },
+    ] });
+    wrap(<CertificationRegister branch="BOM" tier="month" setRoute={() => {}} currentUser={{ role: 'Super Admin' }} />);
+    const warn = await screen.findByTestId('weekly-coverage-warning');
+    expect(warn.textContent).toMatch(/2 of 3 weekly cycles for 2026-07 weren.t frozen/);
+    expect(warn.textContent).toContain('2026-W28');
+    expect(warn.textContent).toContain('2026-W29');
   });
 
   test('branch prop as an OBJECT (the real app shape) scopes to that branch — no in-page picker', async () => {

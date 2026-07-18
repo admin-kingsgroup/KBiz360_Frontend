@@ -239,10 +239,13 @@ export function periodOptions(tierKey, currentPeriod, pendingRows = []) {
   return out.filter((o, i) => out.findIndex((x) => x.value === o.value) === i);
 }
 
-/** Pending-closings row state → badge tone + label. */
+/** Pending-closings row state → badge tone + label. A weekly cycle whose month is
+ *  already certified is 'superseded' — it reads "Covered by Month-End" (info), never
+ *  a red overdue, and doesn't count toward the pending/overdue tally. */
 export function pendingStateMeta(row = {}) {
   if (row.upcoming) return { tone: 'info', label: 'Upcoming' };
   if (row.state === 'closed') return { tone: 'navy', label: 'Closed' };
+  if (row.state === 'superseded') return { tone: 'info', label: 'Covered by Month-End' };
   if (row.state === 'in-progress') return { tone: 'warning', label: 'In progress' };
   return { tone: 'danger', label: 'Pending' };
 }

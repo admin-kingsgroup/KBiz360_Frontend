@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, RefreshCcw, ChevronRight, CalendarClock, Settings2, LayoutDashboard } from 'lucide-react';
-import { getTree, getSummary, getPending, generateCertificates } from '../api';
+import { getTree, getSummary, getPending, generateCertificates, getWeeklyCoverage } from '../api';
 import { useCockpitFocus } from '../../../store/cockpitFocus';
 import { BRANCHES, branchCodeOf, TIERS, tierOf, statusMeta, tierProgress, chainProgress, fmtAmt, currencyOf, periodOptions, visibleTiers, canEditCycleConfig, certPathFor, hubPathFor, reportPathFor, tierMenuName, isSoftTier, tierSignersLabel } from '../utils';
 import { PageSection, Badge, Button, EmptyState, LoadingState, ErrorState, Select } from '../../../shell/primitives';
@@ -94,6 +94,16 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
   const groups = treeData?.groups || [];
   const empty = !isLoading && !isError && groups.length === 0;
 
+  // Month-End only: warn (soft, never blocking) when weekly cycles of this month
+  // were skipped — the close still certifies the closing balances, but the
+  // intra-month settlement-cycle checks for those weeks are skipped.
+  const { data: coverage } = useQuery({
+    queryKey: ['recon-certs', 'weekly-coverage', branch, period || ''],
+    queryFn: () => getWeeklyCoverage({ branch, period }),
+    enabled: tierAllowed && tierKey === 'month' && !!period,
+  });
+  const skippedWeeks = (coverage?.weeks || []).filter((w) => !w.signed).map((w) => w.period);
+
   const gen = useMutation({
     mutationFn: () => generateCertificates({ branch, tier: tierKey, period }),
     onSuccess: () => {
@@ -154,6 +164,12 @@ export function CertificationRegister({ branch: appBranch, setRoute, currentUser
       )}
       {tierKey === 'month' && isBA && (
         <p className="text-xs text-ink-subtle">You freeze the branch <b>bank, client and supplier</b> reconciliations here; TK Group certifies them (AE → FM → Director → Owner). The month’s other heads (tax, loans, capital, assets) are prepared at TK Group Central.</p>
+      )}
+      {tierKey === 'month' && (coverage?.unsigned || 0) > 0 && (
+        <div className="rounded-brand border border-warning/40 bg-warning-soft/40 px-4 py-3 text-sm text-warning" data-testid="weekly-coverage-warning">
+          <span className="font-semibold">{coverage.unsigned} of {coverage.weeks.length} weekly cycle{coverage.weeks.length === 1 ? '' : 's'} for {period} weren’t frozen</span>
+          {' — '}the Month-End close still certifies the closing balances, but the intra-month settlement-cycle checks (BSP / IATA / TripJack, FM sign-off) for {skippedWeeks.join(', ')} are skipped. Freeze those weeks first if you want the weekly control on record.
+        </div>
       )}
 
       {/* register */}

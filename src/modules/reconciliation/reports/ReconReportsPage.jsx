@@ -131,11 +131,13 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
                       <td className={`${cellCls} tabular-nums`}>{r.total ? `${r.done} / ${r.total}` : '—'}</td>
                       <td className={cellCls}><Badge tone={st.tone} size="sm" dot>{st.label}</Badge></td>
                       <td className={cellCls}>
-                        {r.state === 'not-started' && !r.upcoming
-                          ? <Button size="xs" variant="secondary" loading={busy} onClick={() => gen.mutate({ tier: r.tier, period: r.period })}>Generate</Button>
-                          : r.upcoming
-                            ? <span className="text-xs text-ink-subtle">opens {fmtDue(r).replace(' (upcoming)', '')}</span>
-                            : <Button size="xs" variant="ghost" onClick={() => setRoute && setRoute(certPathFor(tierKey))}>Open</Button>}
+                        {r.state === 'superseded'
+                          ? <span className="text-xs text-ink-subtle">covered by Month-End</span>
+                          : r.state === 'not-started' && !r.upcoming
+                            ? <Button size="xs" variant="secondary" loading={busy} onClick={() => gen.mutate({ tier: r.tier, period: r.period })}>Generate</Button>
+                            : r.upcoming
+                              ? <span className="text-xs text-ink-subtle">opens {fmtDue(r).replace(' (upcoming)', '')}</span>
+                              : <Button size="xs" variant="ghost" onClick={() => setRoute && setRoute(certPathFor(tierKey))}>Open</Button>}
                       </td>
                     </tr>
                   );
