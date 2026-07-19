@@ -187,7 +187,9 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const localCcy = (opts && opts.localCurrency) || '';
   const converting = fx !== 1 && !!localCcy;
   const LOCAL_SYM = { KES: 'KSh ', TZS: 'TSh ', CDF: 'FC ' };
-  const baseCur = prof.cur_sym || (bc(branch) || {}).cur || '₹';
+  // Never fall back to ₹ on a USD (Africa/VAT) branch — derive from the regime so a missing/
+  // stale company profile can't print '₹' under a "(USD)" header.
+  const baseCur = prof.cur_sym || (isVat ? '$' : ((bc(branch) || {}).cur || '₹'));
   const cur = converting ? (LOCAL_SYM[localCcy] || `${localCcy} `) : baseCur;
   const curCode = converting ? localCcy : (isVat ? 'USD' : 'INR');
   // fx-aware money formatter — shadows the module n2 so EVERY amount in this invoice
@@ -228,7 +230,10 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
 
   const party = {
     name: billToName || '',
-    gstin: raw.gstin || m.gstin || '',
+    // Regime-aware tax id: VAT (Africa) parties store their VAT registration in `vatRegNo`
+    // and hide `gstin`, so source it from there (falls back to gstin). India keeps GSTIN.
+    // The party block prints this under the regime label ("VAT Reg No" vs "GSTIN").
+    gstin: isVat ? (raw.vatRegNo || m.vatRegNo || raw.gstin || m.gstin || '') : (raw.gstin || m.gstin || ''),
     pan: raw.pan || m.pan || (isVat ? '' : panFromGstin(raw.gstin || m.gstin || '')),
     address: raw.address || mAddr || '',
     email: raw.email || m.email || '',
