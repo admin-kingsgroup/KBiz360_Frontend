@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiGet } from '../../../core/api';
 import { RULE_BOOK, ruleBookStats, RULE_GROUP_LABEL } from '../utils/ruleBook.data';
 import { ruleRegime, ruleAppliesTo, REGIME_LABEL, regimeStats } from '../utils/ruleBranches';
 import { ResponsiveGrid, Badge, Input } from '../../../shell/primitives';
@@ -18,17 +20,39 @@ const GROUP_FILTERS = [
   { id: 'ops', label: 'Operations' },
 ];
 
+// Regroup the flat GET /api/rules registry into the RULE_BOOK shape the view renders.
+// regime is preserved only when explicit ('' → undefined so ruleRegime() derives it from
+// the text, exactly as with the bundled data). Returns null when there is nothing to show
+// (so the caller falls back to the bundled RULE_BOOK).
+function regroupRegistry(items) {
+  if (!items || !items.length) return null;
+  const map = new Map();
+  const order = [];
+  for (const it of items) {
+    if (!map.has(it.domain)) {
+      map.set(it.domain, { id: it.domain, group: it.group, title: it.domainTitle, blurb: it.domainBlurb || '', rules: [] });
+      order.push(it.domain);
+    }
+    map.get(it.domain).rules.push({ t: it.title, r: it.sourceRef, regime: it.regime || undefined });
+  }
+  return order.map((id) => map.get(id));
+}
+
 export function RuleBook() {
   const [q, setQ] = useState('');
   const [group, setGroup] = useState('all');
   const [branch, setBranch] = useState('all'); // 'all' | 'common' | branch code
-  const stats = useMemo(() => ruleBookStats(), []);
-  const rStats = useMemo(() => regimeStats(RULE_BOOK), []);
+  // Read the Rule Book live from the DB registry; fall back to the bundled data so the tab
+  // still renders if the endpoint is unavailable (older backend / offline / cold DB).
+  const { data: reg } = useQuery({ queryKey: ['tk', 'rules-registry'], queryFn: () => apiGet('/api/rules').catch(() => null), staleTime: 300_000 });
+  const book = useMemo(() => regroupRegistry(reg && reg.items) || RULE_BOOK, [reg]);
+  const stats = useMemo(() => ruleBookStats(book), [book]);
+  const rStats = useMemo(() => regimeStats(book), [book]);
   const indiaCodes = useMemo(() => BRANCHES.filter((b) => b.country === 'India').map((b) => b.code), []);
 
   const term = q.trim().toLowerCase();
   const domains = useMemo(() => {
-    return RULE_BOOK
+    return book
       .filter((d) => group === 'all' || d.group === group)
       .map((d) => {
         let rules = term
@@ -39,7 +63,7 @@ export function RuleBook() {
         return { ...d, rules };
       })
       .filter((d) => d.rules.length > 0);
-  }, [term, group, branch, indiaCodes]);
+  }, [book, term, group, branch, indiaCodes]);
 
   const shown = domains.reduce((n, d) => n + d.rules.length, 0);
 
