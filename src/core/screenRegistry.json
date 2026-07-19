@@ -136,7 +136,6 @@
     "/masters/approval-limits": 134,
     "/masters/bank-accounts": 135,
     "/masters/budgets": 136,
-    "/masters/bulk-import": 137,
     "/masters/chart-builder": 138,
     "/masters/cost-categories": 139,
     "/masters/cost-centers": 140,
@@ -364,6 +363,7 @@
   "retired": {
     "/finance/comments-demo": 76,
     "/finance/module-sp-register": 86,
+    "/masters/bulk-import": 137,
     "/masters/customer-detail-demo": 143,
     "/reports/meta-demo": 235
   }

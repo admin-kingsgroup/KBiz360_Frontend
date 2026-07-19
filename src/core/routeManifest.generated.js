@@ -140,7 +140,6 @@ export const APP_ROUTES = [
   "/masters/approval-limits",
   "/masters/bank-accounts",
   "/masters/budgets",
-  "/masters/bulk-import",
   "/masters/chart-builder",
   "/masters/cost-categories",
   "/masters/cost-centers",

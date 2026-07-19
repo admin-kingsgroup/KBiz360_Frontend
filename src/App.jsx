@@ -52,7 +52,7 @@ import { tallyReconRoutes } from './modules/tally-reconciliation/routes';
 const MIGRATED_FEATURE_ROUTES = [...financeRoutes, ...supportRoutes, ...reconciliationRoutes, ...tallyReconRoutes];
 const { BankingApiSettings, DelegationsManager, GroupDashboard, StatutoryFilingRegister } = lazyModule(() => import('./modules/ho-control'));
 const { EmployeeAdvances, EmployeeMasterTabbed, ExpenseBudget, Feedback360, GratuityEstimateView, HRPortal, HrAttendance, HrEmployees, HrLeave, HrPayroll, HrPayslips, HrShifts, LeaveApply, MyForm16, MyPayslip, PerformanceReview, PfEsiChallan, ReimbursementClaim, SalaryRevision, SkillMatrix } = lazyModule(() => import('./modules/hr'));
-const { ApprovalLimitsMaster, BankAccountMaster, BulkImportMaster, CurrencyMaster, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
+const { ApprovalLimitsMaster, BankAccountMaster, CurrencyMaster, MasterChangeQueue, MastersAirlines, MastersCustomers, MastersForex, MastersHotels, MastersSubAgents, MastersSuppliers, MastersTaxRates, MergeRecordsUtility, NumberingSeriesMaster, PassportManager, ProjectMaster, Supplier360, Customer360, TourCodeMaster, VendorAdvances, VendorTermsMaster } = lazyModule(() => import('./modules/masters'));
 const { CustomerMasterTabbed, SupplierMasterTabbed } = lazyModule(() => import('./modules/masters/mastersParties'));
 const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, CustomReportBuilder, DestinationIntelligence, MisReport, RatioAnalysis, ReportBranch, ReportCF, ReportCommission, ReportExpenseBgt, ReportGP, ReportPackagePnL, ReportViewerTabbed, RPT_TaxSummary, RPT_TaxRateSummary, SavedReportViews, ScheduleIIIBS, ScheduledReports, VarianceAnalysis } = lazyModule(() => import('./modules/reports'));
 const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
@@ -602,7 +602,6 @@ export default function KB360App(){
     if(route==="/finance/outstanding")   return <Navigate to="/reports/rec" replace/>;
     if(route==="/finance/print-preview")   return <PrintPreviewDemo/>;
     if(route==="/finance/auto-linked")     return <AutoLinkedVouchers/>;
-    if(route==="/masters/bulk-import")          return <BulkImportMaster/>;
     if(route==="/masters/merge")                return <MergeRecordsUtility/>;
     if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch} setRoute={navigate}/>;
     if(route==="/masters/currency")       return <CurrencyMaster setRoute={navigate}/>;
