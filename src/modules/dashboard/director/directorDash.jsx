@@ -127,18 +127,17 @@ export function ExecutiveOverview({ branch, go }) {
   const dNet = rNet ? deltaPct(rNet.cy, rNet.ly) : null;
   const dSales = rSales ? deltaPct(rSales.cy, rSales.ly) : null;
 
-  // alert feed
+  // alert feed — SINGLE-BRANCH money alerts here (one currency). In Group/ALL scope the
+  // merged net/gp/cash blend ₹ + $, so those alerts are rebuilt PER BRANCH after
+  // perBranchKpis is computed (below), each in its own currency. Fallback runs last.
   const alerts = [];
-  if (net < 0) alerts.push(['bad', `Net loss this period: ${money(cur, net)}`]);
-  if (gp < 0) alerts.push(['bad', `Gross loss: ${money(cur, gp)}`]);
-  if (!balanced && (assetTotal || liabTotal)) alerts.push(['bad', `Balance Sheet out of balance by ${money(cur, bsDiff)}`]);
-  if (cash < 0) alerts.push(['bad', `Negative cash/bank balance: ${money(cur, cash)}`]);
-  if (arOverdue > 0) alerts.push(['warn', `Receivables overdue 90+ days: ${money(cur, arOverdue)}`]);
-  if (pend > 0) alerts.push(['warn', `${pend} approval(s) pending (${money(cur, pendAmt)}) — awaiting your sign-off`]);
-  if (!alerts.length) {
-    if (coreError) alerts.push(['bad', 'Couldn’t load some figures — this view may be incomplete. Try refreshing.']);
-    else if (coreLoading) alerts.push(['warn', <Skeleton style={{ display: 'inline-block', height: 10, width: 180, verticalAlign: 'middle' }} />]);
-    else alerts.push(['good', 'No exceptions — books look healthy for this period.']);
+  if (!isAll) {
+    if (net < 0) alerts.push(['bad', `Net loss this period: ${money(cur, net)}`]);
+    if (gp < 0) alerts.push(['bad', `Gross loss: ${money(cur, gp)}`]);
+    if (!balanced && (assetTotal || liabTotal)) alerts.push(['bad', `Balance Sheet out of balance by ${money(cur, bsDiff)}`]);
+    if (cash < 0) alerts.push(['bad', `Negative cash/bank balance: ${money(cur, cash)}`]);
+    if (arOverdue > 0) alerts.push(['warn', `Receivables overdue 90+ days: ${money(cur, arOverdue)}`]);
+    if (pend > 0) alerts.push(['warn', `${pend} approval(s) pending (${money(cur, pendAmt)}) — awaiting your sign-off`]);
   }
 
   // ── Per-branch money KPIs (Group/ALL scope only) ──
@@ -179,6 +178,24 @@ export function ExecutiveOverview({ branch, go }) {
       };
     });
   }, [isAll, mpl.byBranch, pl.byBranch, trial.byBranch, bs.byBranch, age.byBranch, tax.byBranch]); // isAll included so a branch↔ALL switch recomputes
+
+  // Group/ALL scope: money exception alerts PER BRANCH, each in its OWN currency — never a
+  // merged cross-currency ₹ sum (a merged net could also hide one branch's loss behind
+  // another's profit). Pending approvals is a group-wide COUNT (its ₹ amount would blend).
+  if (isAll) {
+    perBranchKpis.forEach((b) => {
+      if (b.net < 0) alerts.push(['bad', `${b.code}: net loss ${money(b.cur, b.net)}`]);
+      if (b.gp < 0) alerts.push(['bad', `${b.code}: gross loss ${money(b.cur, b.gp)}`]);
+      if (b.cash < 0) alerts.push(['bad', `${b.code}: negative cash/bank ${money(b.cur, b.cash)}`]);
+      if (b.arOverdue > 0) alerts.push(['warn', `${b.code}: receivables overdue 90+ days ${money(b.cur, b.arOverdue)}`]);
+    });
+    if (pend > 0) alerts.push(['warn', `${pend} approval(s) pending — awaiting your sign-off`]);
+  }
+  if (!alerts.length) {
+    if (coreError) alerts.push(['bad', 'Couldn’t load some figures — this view may be incomplete. Try refreshing.']);
+    else if (coreLoading) alerts.push(['warn', <Skeleton style={{ display: 'inline-block', height: 10, width: 180, verticalAlign: 'middle' }} />]);
+    else alerts.push(['good', 'No exceptions — books look healthy for this period.']);
+  }
 
   return (
     <div style={{ margin: 12 }}>

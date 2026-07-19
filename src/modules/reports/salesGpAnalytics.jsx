@@ -112,18 +112,103 @@ const TABS = [
   { id: 'interbranch', label: 'Inter Branch' },
 ];
 
+/* One branch's analysis (own currency, own tab/drill state). The consolidated view renders
+   one of these per branch (invoices filtered to the branch); revenue/cost/GP are NEVER summed
+   across branch currencies. The Inter-Branch tab keeps the module ₹ `money` (INR elimination). */
+function BranchGpSection({ invoices, cur, branch, view, onVoucher, gpRows, pnlGross, from, to, heading }) {
+  const [tab, setTab] = useState('category');
+  const [drill, setDrill] = useState(null);
+  const money = (n) => compactAmt(n || 0, { currency: cur });
+  const totals = invoices.reduce((a, x) => ({ sale: a.sale + x.sale, cost: a.cost + x.cost }), { sale: 0, cost: 0 });
+  totals.gp = totals.sale - totals.cost;
+  const catSummary = useMemo(() => {
+    const present = [...CATS];
+    const extra = [...new Set(invoices.map((i) => i.category))].filter((c) => !present.includes(c));
+    return [...present, ...extra].map((cat) => {
+      const rows = invoices.filter((i) => i.category === cat);
+      const sale = rows.reduce((s, r) => s + r.sale, 0);
+      const cost = rows.reduce((s, r) => s + r.cost, 0);
+      const custs = new Set(rows.filter((r) => r.sale > 0).map((r) => r.customer)).size;
+      const txns = rows.filter((r) => r.sale > 0).length;
+      return { cat, sale, cost, gp: sale - cost, gpPct: pct(sale - cost, sale), txns, customers: custs, avg: txns ? sale / txns : 0 };
+    }).filter((c) => CATS.includes(c.cat) || c.sale || c.cost);
+  }, [invoices]);
+  const recon = { gpRevenue: gpRows.reduce((s, r) => s + (r.sale || 0), 0), gpCost: gpRows.reduce((s, r) => s + (r.cost || 0), 0), pnlGross };
+  const revOk = !gpRows.length || Math.abs(recon.gpRevenue - totals.sale) < 1;
+  const costOk = !gpRows.length || Math.abs(recon.gpCost - totals.cost) < 1;
+  return (
+    <div style={{ marginBottom: heading ? 26 : 0 }}>
+      {heading && (
+        <div className="mb-2 flex items-baseline gap-2 border-b-2 pb-1" style={{ borderColor: '#d4a437' }}>
+          <span className="text-[15px] font-extrabold text-ink">{heading}</span><span className="text-[12px] font-bold text-ink-muted">· {cur}</span>
+        </div>
+      )}
+      <div className="mb-3 rounded-brand border border-l-4 border-surface-border p-4" style={{ borderLeftColor: revOk && costOk ? '#3fb7a3' : '#d97706', background: revOk && costOk ? '#f4faf0' : '#fffaf0' }}>
+        <p className="text-[11.5px] leading-relaxed text-ink">
+          <b>Reconciliation</b> · Revenue {money(totals.sale)} {revOk ? '✔' : `⚠ vs Invoice-GP ${money(recon.gpRevenue)}`} ·
+          Cost {money(totals.cost)} {costOk ? '✔' : `⚠ vs Invoice-GP ${money(recon.gpCost)}`} ·
+          Gross Profit {money(totals.gp)}{recon.pnlGross != null ? ` · P&L GP ${money(recon.pnlGross)}` : ''}
+          {recon.pnlGross != null && Math.abs(recon.pnlGross - totals.gp) > 1 ? ' ⚠ (P&L GP includes supplier incentives & direct expenses)' : ''}
+        </p>
+      </div>
+      <ResponsiveGrid min="220px" gap="md" className="mb-3.5">
+        {catSummary.map((c) => {
+          const clr = CAT_CLR[c.cat] || '#5b616e';
+          return (
+            <button key={c.cat} onClick={() => { setTab('category'); setDrill({ dim: 'category', key: c.cat, label: c.cat }); }}
+              className="rounded-brand border border-t-[3px] border-surface-border bg-surface p-4 text-left shadow-sm transition hover:shadow-card" style={{ borderTopColor: clr }}>
+              <div className="flex items-baseline justify-between">
+                <p className="text-[11px] font-extrabold" style={{ color: clr }}>{c.cat}</p>
+                <span className="text-[11px] font-bold" style={{ color: gpColor(c.gpPct) }}>GP {pctStr(c.gp, c.sale)}</span>
+              </div>
+              <p className="mt-1.5 text-xl font-extrabold tabular-nums text-ink">{money(c.sale)}</p>
+              <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-ink-muted">
+                <span>Cost {money(c.cost)}</span>
+                <span className="font-bold" style={{ color: gpColor(c.gpPct) }}>GP {money(c.gp)}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-ink-subtle">
+                <span>{c.txns} txns</span><span>{c.customers} customers</span><span>Avg {money(c.avg)}</span>
+              </div>
+            </button>
+          );
+        })}
+      </ResponsiveGrid>
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {TABS.map((t) => (
+          <button key={t.id} onClick={() => { setTab(t.id); setDrill(null); }} className={segCls(tab === t.id)}>{t.label}</button>
+        ))}
+      </div>
+      {view === 'detailed' ? (
+        <InvoiceTable title="All Transactions" invoices={drill ? invoices.filter((i) => matchDrill(i, drill)) : invoices} onVoucher={onVoucher} drill={drill} clearDrill={() => setDrill(null)} money={money} />
+      ) : (
+        <>
+          {tab === 'interbranch'
+            ? <InterBranchTab branch={branch} from={from} to={to} invoices={invoices} onVoucher={onVoucher} />
+            : <AnalysisTab tab={tab} invoices={invoices} catSummary={catSummary} onDrill={(d) => setDrill(d)} money={money} />}
+          {drill && tab !== 'interbranch' && (
+            <InvoiceTable title={`${drill.label} — transactions`} invoices={invoices.filter((i) => matchDrill(i, drill))} onVoucher={onVoucher} drill={drill} clearDrill={() => setDrill(null)} money={money} />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function SalesGpAnalytics({ branch }) {
   // GP/sales figures are in the active branch's currency → format with it ($ for
   // NBO/DAR/FBM). The module-level `money` stays ₹ for the Inter-Branch tab, whose
   // elimination balances are INR control accounts. (Shadows it within this component.)
   const cur = (bc(branch) || {}).cur || '₹';
   const money = (n) => compactAmt(n || 0, { currency: cur });
+  // Consolidated (All-branches) scope: revenue/cost/GP cannot be summed across branch
+  // currencies (₹ India + $ Africa), and this report has no per-branch currency split (it
+  // is built from raw vouchers), so it is branch-scoped — a clear pick-a-branch notice
+  // replaces the (otherwise blended) figures. Per-branch sales/GP live on the dashboards.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
   const [preset, setPreset] = useState('all');
   const [from, setFrom] = useState(ALL_TIME_FROM);     // default: inception → today (data may sit in a prior FY)
   const [to, setTo]     = useState(todayISO());
-  const [tab, setTab]   = useState('category');
   const [view, setView] = useState('summary');          // summary | detailed
-  const [drill, setDrill] = useState(null);             // { dim, key, label } → invoice list
   const [voucher, setVoucher] = useState(null);         // { id }
 
   const applyPreset = (id) => {
@@ -198,29 +283,15 @@ export function SalesGpAnalytics({ branch }) {
   const { invoices, totals } = model;
   const hasData = invoices.length > 0;
 
-  /* ── per-category KPI summary ── */
-  const catSummary = useMemo(() => {
-    const present = [...CATS];
-    const extra = [...new Set(invoices.map((i) => i.category))].filter((c) => !present.includes(c));
-    return [...present, ...extra].map((cat) => {
-      const rows = invoices.filter((i) => i.category === cat);
-      const sale = rows.reduce((s, r) => s + r.sale, 0);
-      const cost = rows.reduce((s, r) => s + r.cost, 0);
-      const custs = new Set(rows.filter((r) => r.sale > 0).map((r) => r.customer)).size;
-      const txns = rows.filter((r) => r.sale > 0).length;
-      return { cat, sale, cost, gp: sale - cost, gpPct: pct(sale - cost, sale), txns, customers: custs, avg: txns ? sale / txns : 0 };
-    }).filter((c) => CATS.includes(c.cat) || c.sale || c.cost);
-  }, [invoices]);
-
-  /* ── reconciliation ── */
+  /* ── per-branch grouping (consolidated) — each branch analysed in its OWN currency ── */
   const gpRows = gpQ.data?.rows || [];
-  const recon = {
-    gpRevenue: gpRows.reduce((s, r) => s + (r.sale || 0), 0),
-    gpCost: gpRows.reduce((s, r) => s + (r.cost || 0), 0),
-    pnlGross: pnlQ.data?.grossProfit,
-  };
-  const revOk = !gpRows.length || Math.abs(recon.gpRevenue - totals.sale) < 1;
-  const costOk = !gpRows.length || Math.abs(recon.gpCost - totals.cost) < 1;
+  const pnlGrossOf = (code) => (Array.isArray(pnlQ.data?.byBranch) ? pnlQ.data.byBranch.find((b) => b.branch === code)?.grossProfit : undefined);
+  const branchGroups = isAll
+    ? [...new Set(invoices.map((i) => i.branch))].filter(Boolean).sort().map((code) => ({
+        branch: code, invoices: invoices.filter((i) => i.branch === code),
+        gpRows: gpRows.filter((r) => (r.branch || '') === code), pnlGross: pnlGrossOf(code),
+      }))
+    : null;
 
   /* ── exports ── */
   const exportCols = [
@@ -269,49 +340,6 @@ export function SalesGpAnalytics({ branch }) {
         <button onClick={() => setView('detailed')} className={segCls(view === 'detailed')}>Detailed</button>
       </div>
 
-      {/* reconciliation banner */}
-      {hasData && (
-        <div className="mb-3 rounded-brand border border-l-4 border-surface-border p-4" style={{ borderLeftColor: revOk && costOk ? '#3fb7a3' : '#d97706', background: revOk && costOk ? '#f4faf0' : '#fffaf0' }}>
-          <p className="text-[11.5px] leading-relaxed text-ink">
-            <b>Reconciliation</b> · Revenue {money(totals.sale)} {revOk ? '✔' : `⚠ vs Invoice-GP ${money(recon.gpRevenue)}`} ·
-            Cost {money(totals.cost)} {costOk ? '✔' : `⚠ vs Invoice-GP ${money(recon.gpCost)}`} ·
-            Gross Profit {money(totals.gp)}{recon.pnlGross != null ? ` · P&L GP ${money(recon.pnlGross)}` : ''}
-            {recon.pnlGross != null && Math.abs(recon.pnlGross - totals.gp) > 1 ? ' ⚠ (P&L GP includes supplier incentives & direct expenses)' : ''}
-          </p>
-        </div>
-      )}
-
-      {/* category KPI cards */}
-      <ResponsiveGrid min="220px" gap="md" className="mb-3.5">
-        {catSummary.map((c) => {
-          const clr = CAT_CLR[c.cat] || '#5b616e';
-          return (
-            <button key={c.cat} onClick={() => { setTab('category'); setDrill({ dim: 'category', key: c.cat, label: c.cat }); }}
-              className="rounded-brand border border-t-[3px] border-surface-border bg-surface p-4 text-left shadow-sm transition hover:shadow-card" style={{ borderTopColor: clr }}>
-              <div className="flex items-baseline justify-between">
-                <p className="text-[11px] font-extrabold" style={{ color: clr }}>{c.cat}</p>
-                <span className="text-[11px] font-bold" style={{ color: gpColor(c.gpPct) }}>GP {pctStr(c.gp, c.sale)}</span>
-              </div>
-              <p className="mt-1.5 text-xl font-extrabold tabular-nums text-ink">{money(c.sale)}</p>
-              <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-ink-muted">
-                <span>Cost {money(c.cost)}</span>
-                <span className="font-bold" style={{ color: gpColor(c.gpPct) }}>GP {money(c.gp)}</span>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-ink-subtle">
-                <span>{c.txns} txns</span><span>{c.customers} customers</span><span>Avg {money(c.avg)}</span>
-              </div>
-            </button>
-          );
-        })}
-      </ResponsiveGrid>
-
-      {/* analysis tab bar */}
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => { setTab(t.id); setDrill(null); }} className={segCls(tab === t.id)}>{t.label}</button>
-        ))}
-      </div>
-
       {loading && <LoadingState label="Crunching the books…" />}
       {!loading && !hasData && (
         <EmptyState
@@ -319,20 +347,12 @@ export function SalesGpAnalytics({ branch }) {
           hint="Adjust the date range, or post sale/purchase vouchers — the segment comes from each customer's party sub-group (B2C Meta / B2C Ref / B2B / B2E)."
         />
       )}
-
-      {!loading && hasData && view === 'detailed' && (
-        <InvoiceTable title="All Transactions" invoices={drill ? invoices.filter((i) => matchDrill(i, drill)) : invoices} onVoucher={setVoucher} drill={drill} clearDrill={() => setDrill(null)} money={money} />
-      )}
-
-      {!loading && hasData && view === 'summary' && (
-        <>
-          {tab === 'interbranch'
-            ? <InterBranchTab branch={branch} from={from} to={to} invoices={invoices} onVoucher={setVoucher} />
-            : <AnalysisTab tab={tab} invoices={invoices} catSummary={catSummary} onDrill={(d) => setDrill(d)} money={money} />}
-          {drill && tab !== 'interbranch' && (
-            <InvoiceTable title={`${drill.label} — transactions`} invoices={invoices.filter((i) => matchDrill(i, drill))} onVoucher={setVoucher} drill={drill} clearDrill={() => setDrill(null)} money={money} />
-          )}
-        </>
+      {!loading && hasData && (isAll
+        ? branchGroups.map((g) => (
+            <BranchGpSection key={g.branch} invoices={g.invoices} cur={(bc({ code: g.branch }) || {}).cur || '₹'} branch={{ code: g.branch }}
+              view={view} onVoucher={setVoucher} gpRows={g.gpRows} pnlGross={g.pnlGross} from={from} to={to} heading={g.branch} />
+          ))
+        : <BranchGpSection invoices={invoices} cur={cur} branch={branch} view={view} onVoucher={setVoucher} gpRows={gpRows} pnlGross={pnlQ.data?.grossProfit} from={from} to={to} heading={null} />
       )}
     </PageLayout>
   );

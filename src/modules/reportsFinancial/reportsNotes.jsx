@@ -232,14 +232,67 @@ function DrillModal({ ledger, branch, to, cur, onClose }) {
   );
 }
 
-/* ── main report ──────────────────────────────────────────────────────── */
-export function NotesToFinancials({ branch }) {
-  const cur = (bc(branch) && bc(branch).cur) || '₹';
-  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
-  const [view, setView] = useState('summary');
+/* ── one branch's notes (own currency, own expand/drill state) ──────────── */
+// Renders the reconciliation panel + full note schedule for ONE data slice, in `cur`.
+// The consolidated view renders one of these per branch (from each hook's byBranch slice);
+// a single branch renders one. Note totals are NEVER combined across branch currencies.
+function BranchNotes({ bs, pl, tb, ageing, cur, branch, to, detailed, periodLabel, heading }) {
   const [open, setOpen] = useState({});
   const [openG, setOpenG] = useState({});
   const [drill, setDrill] = useState(null);
+  const { notes, recon } = useMemo(() => buildNotes({ bs, pl, tb, ageing }), [bs, pl, tb, ageing]);
+  const toggleG = (k) => setOpenG((s) => ({ ...s, [k]: s[k] === false ? true : false }));
+  const isOpen = (no) => detailed || !!open[no];
+  return (
+    <div style={{ marginBottom: heading ? 26 : 0 }}>
+      {heading && (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '2px 2px 12px', borderBottom: `2px solid ${GOLD}`, paddingBottom: 4 }}>
+          <span style={{ fontWeight: 800, fontSize: 15, color: INK }}>{heading}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: MUTE }}>· {cur}</span>
+        </div>
+      )}
+      <ReconPanel recon={recon} cur={cur} />
+      {!notes.length && <EmptyState title="No ledger balances in this period." />}
+      {notes.map((n) => {
+        const expanded = isOpen(n.no);
+        return (
+          <div key={n.no} className="mb-3 rounded-brand border border-l-[3px] border-surface-border bg-surface p-4 shadow-card" style={{ borderLeftColor: n.section === 'Income' || n.section === 'Expenses' ? GOLD : INK }}>
+            <div {...clickable(() => setOpen((s) => ({ ...s, [n.no]: !s[n.no] })))} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+              <span style={{ minWidth: 34, height: 34, borderRadius: '50%', background: INK, color: GOLD, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>{n.no}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: INK }}>{detailed ? '' : expanded ? '▾ ' : '▸ '}{n.title}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: MUTE }}>{n.narrative}</p>
+              </div>
+              <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: INK }}>{compactAmt(n.total, { currency: cur })} <span style={{ fontSize: 10, color: MUTE }}>{n.side}</span></p>
+                <span style={{ fontSize: 9.5, color: MUTE, background: '#f2f4fa', border: `1px solid ${LINE}`, borderRadius: 3, padding: '1px 6px' }}>↺ {n.reconcilesTo}</span>
+              </div>
+            </div>
+            {expanded && (
+              <div style={{ marginTop: 10 }}>
+                {n.ageing && <AgeingBlock ageing={n.ageing} cur={cur} onDrill={setDrill} />}
+                <NoteTable note={n} cur={cur} openG={openG} toggleG={toggleG} detailed={detailed} onDrill={setDrill} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <p style={{ fontSize: 10.5, color: MUTE, marginTop: 14, lineHeight: 1.6 }}>
+        Notes are generated from the live double-entry engine and tie back to the Trial Balance, Profit &amp; Loss and Balance Sheet for the selected period. Balance-sheet figures are shown as at {to ? fmtDate(to) : 'the latest posting'}; income &amp; expense figures cover {periodLabel.toLowerCase()}. Click any ledger to drill into its vouchers.
+      </p>
+      {drill && <DrillModal ledger={drill} branch={branch} to={to} cur={cur} onClose={() => setDrill(null)} />}
+    </div>
+  );
+}
+
+/* ── main report ──────────────────────────────────────────────────────── */
+export function NotesToFinancials({ branch }) {
+  const cur = (bc(branch) && bc(branch).cur) || '₹';
+  // Consolidated (All-branches): render one notes set PER BRANCH, each in its own currency
+  // from the byBranch slices — note totals are NEVER combined across branch currencies.
+  const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
+  const [range, setRange] = useState(() => periodRange('cfy', { branch }));
+  const [view, setView] = useState('summary');
 
   const period = range;
   const { from, to } = period;
@@ -250,19 +303,23 @@ export function NotesToFinancials({ branch }) {
   const qTb = useTrialBalance(branch, { from, to });
   const qAg = useAgeing(branch);
 
-  const { notes, recon } = useMemo(
-    () => buildNotes({ bs: qBs.data, pl: qPl.data, tb: qTb.data, ageing: qAg.data }),
-    [qBs.data, qPl.data, qTb.data, qAg.data],
-  );
-
   const loading = qBs.isLoading || qPl.isLoading || qTb.isLoading;
   const err = qBs.error || qPl.error || qTb.error;
   const empty = !loading && !qBs.data && !qPl.data;
 
-  const doExcel = () => { try { exportToExcel(`notes-to-financials-${period.label}`.replace(/\s+/g, '-'), EXPORT_COLS, notesToRows(notes)); toast('Downloading Excel export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
+  const sliceFor = (data, code) => (Array.isArray(data?.byBranch) ? data.byBranch.find((b) => b.branch === code) : null) || null;
+  const branchCodes = isAll
+    ? [...new Set([qBs.data, qPl.data, qTb.data, qAg.data].flatMap((data) => (Array.isArray(data?.byBranch) ? data.byBranch.map((b) => b.branch) : [])))].filter(Boolean).sort()
+    : [];
+
+  // Export: per-branch (branch-prefixed) in ALL, else the single set.
+  const exportRows = isAll
+    ? branchCodes.flatMap((code) => notesToRows(buildNotes({ bs: sliceFor(qBs.data, code), pl: sliceFor(qPl.data, code), tb: sliceFor(qTb.data, code), ageing: sliceFor(qAg.data, code) }).notes).map((r) => ({ branch: code, ...r })))
+    : notesToRows(buildNotes({ bs: qBs.data, pl: qPl.data, tb: qTb.data, ageing: qAg.data }).notes);
+  const exportCols = isAll ? [{ key: 'branch', label: 'Branch' }, ...EXPORT_COLS] : EXPORT_COLS;
+
+  const doExcel = () => { try { exportToExcel(`notes-to-financials-${period.label}`.replace(/\s+/g, '-'), exportCols, exportRows); toast('Downloading Excel export…', 'success'); } catch (e) { toast('Export failed: ' + (e?.message || e), 'error'); } };
   const doPrint = () => openPrintPreview({ selector: 'main', title: 'Notes to Financial Statements', recommend: 'portrait' });
-  const toggleG = (k) => setOpenG((s) => ({ ...s, [k]: s[k] === false ? true : false }));
-  const isOpen = (no) => detailed || !!open[no];
 
   return (
     <PageLayout
@@ -292,44 +349,15 @@ export function NotesToFinancials({ branch }) {
       )}
       {empty && <EmptyState title="No posted books for this selection yet" hint="Record vouchers to generate the notes." />}
 
-      {!loading && !err && !empty && (
-        <>
-          <ReconPanel recon={recon} cur={cur} />
-
-          {!notes.length && <EmptyState title="No ledger balances in this period." />}
-
-          {notes.map((n) => {
-            const expanded = isOpen(n.no);
-            return (
-              <div key={n.no} className="mb-3 rounded-brand border border-l-[3px] border-surface-border bg-surface p-4 shadow-card" style={{ borderLeftColor: n.section === 'Income' || n.section === 'Expenses' ? GOLD : INK }}>
-                <div {...clickable(() => setOpen((s) => ({ ...s, [n.no]: !s[n.no] })))} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-                  <span style={{ minWidth: 34, height: 34, borderRadius: '50%', background: INK, color: GOLD, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>{n.no}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: INK }}>{detailed ? '' : expanded ? '▾ ' : '▸ '}{n.title}</p>
-                    <p style={{ margin: '2px 0 0', fontSize: 11, color: MUTE }}>{n.narrative}</p>
-                  </div>
-                  <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: INK }}>{compactAmt(n.total, { currency: cur })} <span style={{ fontSize: 10, color: MUTE }}>{n.side}</span></p>
-                    <span style={{ fontSize: 9.5, color: MUTE, background: '#f2f4fa', border: `1px solid ${LINE}`, borderRadius: 3, padding: '1px 6px' }}>↺ {n.reconcilesTo}</span>
-                  </div>
-                </div>
-                {expanded && (
-                  <div style={{ marginTop: 10 }}>
-                    {n.ageing && <AgeingBlock ageing={n.ageing} cur={cur} onDrill={setDrill} />}
-                    <NoteTable note={n} cur={cur} openG={openG} toggleG={toggleG} detailed={detailed} onDrill={setDrill} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          <p style={{ fontSize: 10.5, color: MUTE, marginTop: 14, lineHeight: 1.6 }}>
-            Notes are generated from the live double-entry engine and tie back to the Trial Balance, Profit &amp; Loss and Balance Sheet for the selected period. Balance-sheet figures are shown as at {to ? fmtDate(to) : 'the latest posting'}; income &amp; expense figures cover {period.label.toLowerCase()}. Click any ledger to drill into its vouchers.
-          </p>
-        </>
+      {!loading && !err && !empty && (isAll
+        ? (branchCodes.length === 0
+            ? <EmptyState title="No branch data for this period." hint="Record vouchers to generate the notes." />
+            : branchCodes.map((code) => (
+                <BranchNotes key={code} bs={sliceFor(qBs.data, code)} pl={sliceFor(qPl.data, code)} tb={sliceFor(qTb.data, code)} ageing={sliceFor(qAg.data, code)}
+                  cur={(bc({ code }) && bc({ code }).cur) || '₹'} branch={{ code }} to={to} detailed={detailed} periodLabel={period.label} heading={code} />
+              )))
+        : <BranchNotes bs={qBs.data} pl={qPl.data} tb={qTb.data} ageing={qAg.data} cur={cur} branch={branch} to={to} detailed={detailed} periodLabel={period.label} heading={null} />
       )}
-
-      {drill && <DrillModal ledger={drill} branch={branch} to={to} cur={cur} onClose={() => setDrill(null)} />}
     </PageLayout>
   );
 }

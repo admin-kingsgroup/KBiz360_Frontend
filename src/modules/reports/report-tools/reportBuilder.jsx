@@ -83,7 +83,7 @@ export function CustomReportBuilder({ branch, setRoute }) {
     header: c.label,
     num: !!c.num,
     render: c.num ? (r) => fmtN(r[c.key]) : undefined,
-    footer: c.num ? () => fmtN(result.totals[c.key]) : (i === 0 ? () => 'Total' : undefined),
+    footer: c.num ? () => (result.totals[c.key] == null ? '—' : fmtN(result.totals[c.key])) : (i === 0 ? () => 'Total' : undefined),
   })) : []), [result]);
 
   const exportCsv = () => result && exportToExcel(
@@ -147,6 +147,11 @@ export function CustomReportBuilder({ branch, setRoute }) {
           {result.truncated && (
             <p className="mb-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-[12px] font-semibold text-[#854F0B]">
               Row cap hit — showing the first {result.rows.length.toLocaleString('en-IN')} rows (totals cover the shown rows only). Narrow the period or add a grouping.
+            </p>
+          )}
+          {result.crossCurrencyTotals && (
+            <p className="mb-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-[12px] font-semibold text-[#854F0B]">
+              Money totals hidden — this All-branches result spans branch currencies (₹ India + $ Africa) and cannot be summed into one figure. Group by <b>Branch</b>, or pick a specific branch, for accurate money totals. (Counts are still totalled.)
             </p>
           )}
           <DataTable
