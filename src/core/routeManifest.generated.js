@@ -358,6 +358,7 @@ export const APP_ROUTES = [
   "/tk/roles",
   "/tk/rules",
   "/tk/scorecard",
+  "/tk/screens",
   "/tk/targets",
   "/tk/tax-desk",
   "/tk/user-rules",

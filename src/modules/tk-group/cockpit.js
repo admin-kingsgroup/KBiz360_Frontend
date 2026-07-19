@@ -196,6 +196,8 @@ export function controlCockpitMenu(focus, currentUser) {
       { label: 'Monitoring', children: [
         { label: 'Branch Cockpit', href: '/tk/branch-cockpit' },
         { label: 'Audit Trail', href: '/tk/audit' },
+        // Owner-only: the index of every screen (stable #number) with a live preview.
+        ...(isOwner ? [{ label: 'Screen Directory', href: '/tk/screens' }] : []),
       ] },
     ] },
 

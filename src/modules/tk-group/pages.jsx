@@ -38,6 +38,7 @@ import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
 import { SettingsUsers } from '../settings/legacy';
 import { PageAccessControl } from '../settings/pageAccess';
+import { ScreenDirectory } from './screen-directory/ScreenDirectory';
 
 const BRANCH_CODES = ['ALL', ...BRANCHES.map((b) => b.code).filter(Boolean)];
 
@@ -59,6 +60,14 @@ export function TkMyRolePage() {
   return (
     <Page title="My Role" subtitle="Your responsibilities, authority and what currently needs you — in the TK Group control model.">
       <MyRole />
+    </Page>
+  );
+}
+
+export function TkScreenDirectoryPage() {
+  return (
+    <Page title="Screen Directory" subtitle="Every screen in the app by its stable number, with a live preview. Look up a screen from a support report and see it exactly as users do." maxWidth="max-w-[1800px]">
+      <ScreenDirectory />
     </Page>
   );
 }

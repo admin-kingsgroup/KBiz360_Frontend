@@ -72,7 +72,7 @@ const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFi
 const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
-const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkAdoptionPage, TkIntegrityPage, TkModulesPage, TkHealthScorecardPage, TkRulesPage, TkUserRulesPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
+const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkAdoptionPage, TkIntegrityPage, TkModulesPage, TkHealthScorecardPage, TkRulesPage, TkUserRulesPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkScreenDirectoryPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
 import { useHideStatements } from './modules/tk-group/useHideStatements';
 import { isStatementHref } from './modules/tk-group/utils/statements';
 import { isCockpitRoute } from './modules/tk-group/cockpit';
@@ -152,11 +152,16 @@ export default function KB360App(){
      versus the furthest index reached this session — faithfully matching the
      old linear-stack-with-cursor behaviour. ── */
   const rrNavigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   // Normalise trailing slash(es): some hosts serve "/dashboard/" (live) while
   // dev serves "/dashboard". Every route check below matches the no-slash form,
   // so a trailing slash would fall through to <Placeholder>. Keep root "/" intact.
   const route = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  // Embedded preview mode (?embed=1) — used by the Screen Directory to load any screen
+  // in an iframe with the app chrome (app-bar, breadcrumb, badge) stripped. It also
+  // suppresses the TK-central group-mode redirect below, so a branch screen can be
+  // previewed even while the owner's session is in the consolidated ALL mode.
+  const embed = new URLSearchParams(search || '').has('embed');
   const histIdx = (typeof window !== 'undefined' && window.history.state && typeof window.history.state.idx === 'number')
     ? window.history.state.idx : 0;
   const maxIdxRef = useRef(histIdx);
@@ -195,15 +200,15 @@ export default function KB360App(){
   // branch focused they may work in that branch's ERP (opBranch drives it), so don't
   // bounce those routes back to the Control Tower.
   useEffect(()=>{
-    if (isCentral && inGroupMode && !branchFocused && route && !isCockpitRoute(route)) navigate('/tk/control-tower');
-  }, [branch, currentUser, route, navigate, focus, isCentral, inGroupMode, branchFocused]);
+    if (!embed && isCentral && inGroupMode && !branchFocused && route && !isCockpitRoute(route)) navigate('/tk/control-tower');
+  }, [branch, currentUser, route, navigate, focus, isCentral, inGroupMode, branchFocused, embed]);
 
   /* Persist the current route so a refresh / re-open returns you here.
      Never persist the bare root "/": it is the live host's entry URL, not a real
      destination. Persisting it would clobber the saved route BEFORE the restore
      effect below reads it (this effect runs first on mount), leaving the user
      stranded on "/" → <Placeholder> on every live load. */
-  useEffect(()=>{ if(route==="/") return; try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route]);
+  useEffect(()=>{ if(embed || route==="/") return; try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route, embed]);
 
   /* Persist the selected branch so a refresh keeps you on it (restored above). */
   useEffect(()=>{ try{ localStorage.setItem("kb360-branch", branch==="ALL"?"ALL":(branch?.code||"")); }catch{ /* ignore */ } },[branch]);
@@ -541,6 +546,16 @@ export default function KB360App(){
     if(route==="/tk/receivables-payables") return <TkArapPage/>;
     if(route==="/tk/hr-control")         return <TkHRControlPage/>;
     if(route==="/tk/roles")              return <TkRolesPage/>;
+    // Screen Directory — the owner's index of every screen (by stable #number) with a
+    // live preview. Super-Admin only, both in the menu and by direct URL.
+    if(route==="/tk/screens")            return ['Super Admin','super_admin'].includes(currentUser?.role||'')
+      ? <TkScreenDirectoryPage/>
+      : <div style={{padding:30,maxWidth:560,margin:"40px auto",background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
+          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Screen Directory</h2>
+          <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>This screen index is restricted to the Super Admin.</p>
+          <button onClick={()=>navigate("/dashboard")} style={{background:"#0d1326",color:"#fff",border:"none",padding:"10px 22px",borderRadius:6,fontWeight:600,cursor:"pointer"}}>← Back to Dashboard</button>
+        </div>;
     if(route==="/tk/limits")             return <TkLimitsPage/>;
     if(route==="/hr/portal")               return <HRPortal setRoute={navigate}/>;
     if(route==="/hr/leave-apply")          return <LeaveApply/>;
@@ -867,6 +882,7 @@ export default function KB360App(){
         branch={branch} setBranch={setBranch}
         route={route} setRoute={navigate}
         currentUser={currentUser} setCurrentUser={setUser}
+        embed={embed}
         subBar={<ContextBar branch={branch} route={route}/>}
       >
         {/* App-wide Tally Export / Print / PDF toolbar — shown on every report,

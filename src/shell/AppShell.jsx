@@ -399,7 +399,7 @@ function FySelector() {
   );
 }
 
-export function AppShell({ branch, setBranch, route, setRoute, currentUser, setCurrentUser, subBar, children }) {
+export function AppShell({ branch, setBranch, route, setRoute, currentUser, setCurrentUser, subBar, children, embed }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showNotif, setShowNotif] = useState(false);
   const mobileDrawerRef = useRef(null);
@@ -445,6 +445,13 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
   // on close) and let the global Esc handler close it via the modal stack.
   useFocusTrap(mobileDrawerRef, { active: mobileOpen });
   useEffect(() => { if (!mobileOpen) return undefined; return pushModal(() => setMobileOpen(false)); }, [mobileOpen]);
+
+  // Embedded preview (Screen Directory iframe): render ONLY the screen content — no
+  // app-bar, breadcrumb, alert banner or screen badge — so the preview shows just the
+  // page, and previewing a screen inside the directory can't nest the whole chrome.
+  if (embed) {
+    return <div className="h-screen overflow-y-auto bg-surface-alt">{children}</div>;
+  }
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-surface-alt">

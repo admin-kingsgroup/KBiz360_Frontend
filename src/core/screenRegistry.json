@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "next": 362,
+  "next": 363,
   "screens": {
     "/": 1,
     "/accounting/intercompany": 2,
@@ -354,6 +354,7 @@
     "/tk/roles": 350,
     "/tk/rules": 351,
     "/tk/scorecard": 352,
+    "/tk/screens": 362,
     "/tk/targets": 353,
     "/tk/tax-desk": 354,
     "/tk/user-rules": 355,
