@@ -19,11 +19,15 @@ export function LoginScreen({ onSignIn }) {
   const [showPwd, setShowPwd] = useState(false);
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState('');
+  // A login blocked by a numbered access LAW (ACCS-GATE-01/02: Books access disabled / no grant)
+  // carries a ruleId in the error body. RuleBlockHost isn't mounted pre-auth, so surface the
+  // number here so the user can quote it to an administrator.
+  const [errorRuleId, setErrorRuleId] = useState('');
   const mob = useMobile();
 
   const handleSubmit = async () => {
     if (!email.trim() || !password) { setError('Enter your email and password.'); return; }
-    setSigning(true); setError('');
+    setSigning(true); setError(''); setErrorRuleId('');
     // Abort after 15s so a hung/unreachable backend never spins forever.
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15000);
@@ -35,7 +39,11 @@ export function LoginScreen({ onSignIn }) {
         signal: ctrl.signal,
       });
       const json = await resp.json().catch(() => null);
-      if (!resp.ok) throw new Error((json && json.message) || `Sign in failed (${resp.status})`);
+      if (!resp.ok) {
+        const err = new Error((json && json.message) || `Sign in failed (${resp.status})`);
+        if (json && json.ruleId) err.ruleId = json.ruleId;   // e.g. ACCS-GATE-01/02
+        throw err;
+      }
       const data = json && 'data' in json ? json.data : json;
       if (!data?.user) throw new Error('Unexpected response from server.');
       // Role + branches come straight from the DB user record (returned by the API).
@@ -51,6 +59,7 @@ export function LoginScreen({ onSignIn }) {
       } catch { /* ignore */ }
       onSignIn(mergedUser); // unmounts this screen → main app
     } catch (e) {
+      setErrorRuleId(e.ruleId || '');
       setError(e.name === 'AbortError'
         ? `Could not reach the server (${API_BASE}). Check your connection / API URL and try again.`
         : (e.message || 'Sign in failed.'));
@@ -145,7 +154,15 @@ export function LoginScreen({ onSignIn }) {
           </div>
 
           {error && (
-            <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 7, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 12, fontWeight: 600 }}>⚠ {error}</div>
+            <div style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 7, background: '#FCEBEB', border: '1px solid #F7C1C1', color: '#A32D2D', fontSize: 12, fontWeight: 600 }}>
+              <div>⚠ {error}</div>
+              {errorRuleId && (
+                <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, fontWeight: 800, background: '#A32D2D', color: '#fff', padding: '1px 7px', borderRadius: 5 }}>Rule {errorRuleId}</span>
+                  <span style={{ fontWeight: 500 }}>Quote this rule number to your administrator.</span>
+                </div>
+              )}
+            </div>
           )}
 
           <button onClick={handleSubmit} disabled={signing}
