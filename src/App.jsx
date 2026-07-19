@@ -625,7 +625,8 @@ export default function KB360App(){
     // ── Inter-Branch (INB) · the two mirror pipelines ──────────────────────────────
     // INCOMING — deals another branch pushed TO us (InbLink.toBranch = me). '/accounts/
     // inb-inbound' is the legacy path, kept working so existing links/bookmarks don't 404.
-    if(route==="/inb/incoming" || route==="/accounts/inb-inbound") return <InboundInterBranch branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/inb/incoming") return <InboundInterBranch branch={branch} setRoute={navigate} currentUser={currentUser}/>;
+    if(route==="/accounts/inb-inbound") return <Navigate to="/inb/incoming" replace/>;  // legacy alias → canonical (bookmarks kept working)
     if(route==="/accounts/inb-register")   return <InterBranchRegister branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-matrix")     return <InterBranchMatrix branch={branch} setRoute={navigate}/>;
     if(route==="/accounts/inb-counterparty") return <InterBranchCounterpartyLedger branch={branch} setRoute={navigate}/>;
@@ -794,7 +795,8 @@ export default function KB360App(){
     //   (overlapping read-only viewers) — were removed here.
     if(route==="/masters/groups")        return <GroupsMaster/>;                 // Groups door — Create/Alter/Display groups & sub-groups (3-tier)
     if(route==="/masters/ledgers")       return <LedgersMaster branch={branch}/>;// Ledgers door — live CRUD (cascading Group ▸ Sub-Group)
-    if(route==="/masters/accounts-tree" || route==="/masters/chart-builder") return <AccountsTreeView branch={branch} setRoute={navigate} setBranch={setBranch}/>;  // Chart of Accounts (Display): Primary Group ▸ Group ▸ Sub-Group ▸ Ledger tree
+    if(route==="/masters/accounts-tree") return <AccountsTreeView branch={branch} setRoute={navigate} setBranch={setBranch}/>;  // Chart of Accounts (Display): Primary Group ▸ Group ▸ Sub-Group ▸ Ledger tree
+    if(route==="/masters/chart-builder") return <Navigate to="/masters/accounts-tree" replace/>;  // legacy alias → canonical
     if(route==="/masters/voucher-types")   return <VoucherTypesMaster/>;
     if(route==="/masters/cost-categories") return <CostCategoriesMaster/>;
     if(route==="/masters/budgets")         return <BudgetsMaster branch={branch}/>;
@@ -812,7 +814,7 @@ export default function KB360App(){
     if(route==="/settings/integrations")return <ApiKeySettings/>;
     if(route==="/tax/form26as")         return <Form26AS branch={branch}/>;
     if(route==="/reports/client-statement") return <ClientStatement branch={branch}/>;
-    if(route==="/reports/cashbook")         return <CashBookLive branch={branch}/>;  /* legacy alias — Cash Book now lives under Finance ▸ Books */
+    if(route==="/reports/cashbook")         return <Navigate to="/finance/cash-book" replace/>;  /* legacy alias → canonical Finance ▸ Books */
     if(route==="/accounting/year-close")    return <YearEndClose branch={branch}/>;
     if(route==="/reports/destination")      return <DestinationIntelligence branch={branch}/>;
     if(route==="/reports/package-pl")       return <PackagePnL branch={branch}/>;
