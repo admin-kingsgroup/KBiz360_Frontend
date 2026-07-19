@@ -28,7 +28,7 @@ export function HrEmployees({branch}){
   const brScope=branch==="ALL"?"":(branch?.code||"");
   const empQ=useMasterList('employees', brScope?{branch:brScope}:{});
   const emps=(empQ.data||[]).map(fromEmpDTO);
-  const {create,update,remove}=useMasterMutations('employees');
+  const {create,update}=useMasterMutations('employees');
   /* Active shifts for the assignment picker: those for the form's branch + the all-branch ('') ones. */
   const shifts=((useMasterList('shifts', {active:true}).data)||[]).map(fromShiftDTO).filter(s=>s.active);
   // HR org masters (LIVE 2026-07-10) — departments/designations/grades drive the
@@ -53,15 +53,10 @@ export function HrEmployees({branch}){
     if(selected&&form._id) update.mutate({id:form._id,body:payload},opts);
     else create.mutate(payload,opts);
   };
-  const deleteEmp=()=>{
-    if(!form._id) return;
-    if(!window.confirm(`Delete ${form.name}? This cannot be undone.`)) return;
-    remove.mutate(form._id,{ onSuccess:()=>{ toast("Employee deleted"); closeModal(); },
-      onError:(err)=>toast(err?.message||"Delete failed","error") });
-  };
-  /* Safe alternative to Delete: flips the employee to Inactive (full payload — the
-     backend validator needs empId/name/branch on every PUT). Record, payroll and
-     attendance history stay; Reactivate reverses it. */
+  /* Removing an employee = DEACTIVATE (soft). There is no hard delete: payroll, attendance
+     and leave history reference the employee, so the record is never destroyed. Flips to
+     Inactive (full payload — the backend validator needs empId/name/branch on every PUT);
+     they drop out of the active roster and payroll. Reactivate reverses it. */
   const toggleEmpStatus=()=>{
     if(!form._id) return;
     const next=form.status==="Inactive"?"Active":"Inactive";
@@ -286,10 +281,8 @@ export function HrEmployees({branch}){
               <div style={{display:"flex",gap:8}}>{selected&&(<>
                 <button onClick={toggleEmpStatus} disabled={update.isPending||vo}
                   style={{...btnGh,color:form.status==="Inactive"?"#27500A":"#854F0B",borderColor:form.status==="Inactive"?"#27500A":"#854F0B",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}
-                  title={vo?VIEW_ONLY_REASON:"Keeps the record and its payroll/attendance history — use instead of Delete"}>
-                  {update.isPending?"Saving…":form.status==="Inactive"?"Reactivate":"Deactivate"}</button>
-                <button onClick={deleteEmp} disabled={remove.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined}
-                  style={{...btnGh,color:"#A32D2D",borderColor:"#A32D2D",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>{remove.isPending?"Deleting…":"Delete"}</button>
+                  title={vo?VIEW_ONLY_REASON:"Removes the employee from the active roster & payroll, keeping the record and its payroll/attendance history. Reactivate any time."}>
+                  {update.isPending?"Saving…":form.status==="Inactive"?"Reactivate":"Deactivate (remove)"}</button>
               </>)}</div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={closeModal} style={btnGh}>Cancel</button>
