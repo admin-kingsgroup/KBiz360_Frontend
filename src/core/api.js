@@ -58,6 +58,13 @@ export function isApprover() {
   } catch { return false; }
 }
 
+// The logged-in user's role string (mirrors the localStorage user other gates read).
+// Deep components use it to pre-disable role-gated actions (e.g. approving a leave request
+// is a manager decision) instead of prop-drilling currentUser. '' when unknown.
+export function currentRole() {
+  try { return String((JSON.parse(localStorage.getItem(USER_KEY) || 'null') || {}).role || ''); } catch { return ''; }
+}
+
 export function getAuthToken() {
   // Order: real SSO token (localStorage) → dev token → 'open' placeholder.
   // The 'open' placeholder is non-empty so the data hooks (enabled: !!token) still

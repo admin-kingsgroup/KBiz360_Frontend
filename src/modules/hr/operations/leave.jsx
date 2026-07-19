@@ -8,11 +8,19 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { fromEmpDTO } from '../employeeMap';
 import { fromLeaveDTO, toLeavePayload, leaveDays, fromLeaveBalanceDTO, toLeaveBalancePayload, takenFor } from '../hrMaps';
 import { toast } from '../../../core/ux/toast';
+import { currentRole } from '../../../core/api';
 import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
 import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
+// Approving / rejecting a leave is a manager decision (mirrors the backend gate in
+// leaveRequests.route.js: canonical Owner / Director / Finance Manager / General / Branch
+// Manager). Others may still apply and cancel their own, but not decide.
+const LEAVE_MANAGER_RX = /super.?admin|owner|director|finance\s*manager|general\s*manager|\bgm\b|branch\s*manager|\bbm\b/i;
+const LEAVE_APPROVER_REASON = 'Only a manager (Branch / General Manager, Finance Manager, Director or Owner) can approve or reject a leave request.';
+
 export function HrLeave({branch}){
   const vo=isViewOnly();
+  const canDecide=LEAVE_MANAGER_RX.test(currentRole());
   const mob=useMobile();
   const brScope=branch==="ALL"?"":(branch?.code||"");
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
@@ -106,10 +114,10 @@ export function HrLeave({branch}){
                 <td style={{padding:"8px 12px",color:"#384677",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.reason}</td>
                 <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:999,fontWeight:700,background:STATUS_BG[l.status],color:STATUS_CLR[l.status]}}>{l.status}</span></td>
                 <td style={{padding:"8px 12px"}}>
-                  {l.status==="Pending"&&<div style={{display:"flex",gap:4}}>
+                  {l.status==="Pending"&&(canDecide?<div style={{display:"flex",gap:4}}>
                     <button onClick={()=>approve(l)} disabled={update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,padding:"2px 7px",fontSize:9,background:"#27500A",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>✓ Approve</button>
                     <button onClick={()=>reject(l)}  disabled={update.isPending||vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnGh,padding:"2px 7px",fontSize:9,color:"#A32D2D",...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>✗ Reject</button>
-                  </div>}
+                  </div>:<span title={LEAVE_APPROVER_REASON} style={{fontSize:9,color:"#8b94b3",fontStyle:"italic",cursor:"help"}}>manager approval</span>)}
                 </td>
               </tr>
             ))}</tbody>
