@@ -12,6 +12,7 @@ import { HealthScorecard } from './control-configuration/HealthScorecard';
 import { RulesManager } from './control-configuration/RulesManager';
 import { UserRulesManager } from './control-configuration/UserRulesManager';
 import { RuleBook } from './control-configuration/RuleBook';
+import { AuthorityAdmin } from './control-configuration/AuthorityAdmin';
 import { BranchCockpit } from './control-configuration/BranchCockpit';
 import { AuditTrail } from './control-configuration/AuditTrail';
 import { TargetsBudgets } from './control-configuration/TargetsBudgets';
@@ -164,6 +165,7 @@ export function TkIntegrityPage() {
 // Rules & Requests (/tk/user-rules → TkUserRulesPage), so it is no longer a tab here.
 const RULES_TABS = [
   { id: 'erp', label: 'ERP Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate the rules the Control Tower monitors. New rules land Inactive (Draft) and do nothing until you Test them on live data and Activate. System rules (🔒) are enforced in code and read-only.' },
+  { id: 'authority', label: 'Approval Authority', subtitle: 'OWNER ONLY. Who verifies, approves and signs (Director / Owner) on the three-level approval chain. Read live by the chain from the DB — a change applies immediately (no deploy) and is audited. These were previously invisible hardcoded fallbacks.' },
   { id: 'book', label: 'Rule Book', subtitle: 'Read-only reference of every Accounts & Operations rule the ERP enforces in code — searchable, filterable by Accounts / Operations, each citing the file that enforces it. Documentation only; nothing here is evaluated on live data.' },
 ];
 
@@ -183,7 +185,9 @@ export function TkRulesPage({ owner, initialTab = 'erp' }) {
           </button>
         ))}
       </div>
-      {tab === 'erp' ? <RulesManager canManage={!!owner} /> : <RuleBook />}
+      {tab === 'erp' ? <RulesManager canManage={!!owner} />
+        : tab === 'authority' ? <AuthorityAdmin canManage={!!owner} />
+        : <RuleBook />}
     </Page>
   );
 }
