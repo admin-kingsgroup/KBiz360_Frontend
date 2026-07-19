@@ -121,7 +121,9 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
   // P&L, Balance Sheet, Cash Position & Audit Trail are account reports — they
   // live under the Accounts pill now (Accounts ▸ Branch MIS / Books & Scrutiny).
   {label:"Financial Statements", children:[
+    {label:"Balance Sheet (Schedule III)", href:"/reports/schedule3-bs"},
     {label:"Cash Flow Statement", href:"/reports/cf"},
+    {label:"Cash Flow (Direct Method)", href:"/reports/cf-direct"},
     {label:"Report Viewer (9-Tab View)", href:"/reports/viewer"},
     {label:"Inter-branch Elimination", href:"/reports/interbranch"},
     {label:"Notes to Financial Statements", href:"/reports/fs-notes"},
@@ -160,6 +162,7 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Ratio Analysis", href:"/reports/ratios"},
   ]},
   {label:"Compliance & Tax", children:[
+    {label:"MSME Ageing (MSMED Act)", href:"/reports/msme-aging"},
     {label:"Variance Analysis", href:"/reports/variance"},
     // GST/VAT Summary, Statutory Dues Calendar & Tax Filing Status Board are tax
     // reports — they live under the regime-aware Taxation pill (see core/data.js).
