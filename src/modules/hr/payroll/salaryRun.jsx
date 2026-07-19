@@ -18,7 +18,6 @@ export function HrPayroll({branch}){
   // month's payroll run — which drives the dashboard KPI — couldn't be opened).
   const PERIODS=(()=>{const out=[];const d=new Date();for(let i=0;i<6;i++){const dt=new Date(d.getFullYear(),d.getMonth()-i,1);out.push({v:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`,l:dt.toLocaleString("en",{month:"short"})+" "+dt.getFullYear()});}return out;})();
   const [period,setPeriod]=useState(PERIODS[0].v);
-  const [journalPosted,setJournalPosted]=useState(false);
 
   /* Server-side payroll engine (/api/payroll-runs/register): the register lines
      are COMPUTED AND PERSISTED by the backend from config-driven statutory rates
@@ -33,6 +32,10 @@ export function HrPayroll({branch}){
   const processMut=useProcessPayroll();
   const runPending=processMut.isPending;
   const vo=isViewOnly();
+  // The server posts the payroll journal automatically at Process time (PENDING → approval chain);
+  // surface the REAL voucher number (or any posting error) rather than a mock flag.
+  const jvVno=processMut.data?.jvVno||reg.run?.jvVno||"";
+  const jvError=processMut.data?.jvError||"";
 
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const DUE_DATE=challanDueDate(period);
@@ -46,17 +49,18 @@ export function HrPayroll({branch}){
       onError:e=>toast(e?.message||"Could not process payroll","error")});
   };
 
-  /* ── PAYROLL JOURNAL ENTRIES ─────────────────────────── */
+  /* ── PAYROLL JOURNAL ENTRIES ─────────────────────────────────────────────
+     Mirrors EXACTLY what the server posts (payrollPosting.buildPayrollJv): Dr Salaries
+     & Wages (gross − LWP, since unpaid-leave days aren't earned and aren't a payable);
+     Cr the statutory payables + net Salary Payable. Employer PF/ESI are a challan
+     remittance (see the PF/ESI tab), NOT booked here — so preview == posted voucher. */
   const journalEntries=[
-    {side:"Dr",ledger:"Salaries & Wages",          amount:totals.gross,  note:"Gross salary expense"},
-    {side:"Cr",ledger:"Employee PF Payable",        amount:totals.empPF,  note:`Employee PF ${rates?.pf?.employeePct??12}% of basic`},
-    {side:"Dr",ledger:"Employer PF Contribution",   amount:totals.empPFr, note:"Employer PF expense"},
-    {side:"Cr",ledger:"PF Payable",                 amount:totals.empPF+totals.empPFr, note:"Total PF to EPFO by 15th"},
-    {side:"Dr",ledger:"Employer ESI Contribution",  amount:totals.empESIr,note:`Employer ESI ${rates?.esi?.employerPct??3.25}%`},
-    {side:"Cr",ledger:"ESI Payable",                amount:totals.empESI+totals.empESIr,note:"Total ESI to ESIC by 15th"},
-    {side:"Cr",ledger:"Professional Tax Payable",   amount:totals.profTax,note:"Prof Tax — Maharashtra"},
-    {side:"Cr",ledger:"TDS Payable (194C)",         amount:totals.tds,    note:"TDS on salaries — deposit by 7th"},
-    {side:"Cr",ledger:"Salary Payable",             amount:totals.net,    note:"Net salary — pay by 1st"},
+    {side:"Dr",ledger:"Salaries & Wages",          amount:totals.gross-totals.lwpDed, note:totals.lwpDed>0?"Gross salary earned (net of LWP)":"Gross salary expense"},
+    {side:"Cr",ledger:"PF Payable",                amount:totals.empPF,  note:`Employee PF ${rates?.pf?.employeePct??12}% of basic`},
+    {side:"Cr",ledger:"ESI Payable",               amount:totals.empESI, note:"Employee ESI withheld"},
+    {side:"Cr",ledger:"Professional Tax Payable",  amount:totals.profTax,note:"Prof Tax — Maharashtra"},
+    {side:"Cr",ledger:"TDS Payable",               amount:totals.tds,    note:"TDS on salaries"},
+    {side:"Cr",ledger:"Salary Payable",            amount:totals.net,    note:"Net salary — payable to staff"},
   ];
   const jDr=journalEntries.filter(e=>e.side==="Dr").reduce((s,e)=>s+e.amount,0);
   const jCr=journalEntries.filter(e=>e.side==="Cr").reduce((s,e)=>s+e.amount,0);
@@ -299,14 +303,13 @@ export function HrPayroll({branch}){
               </tr></tfoot>
             </table>
           </div>
-          {journalPosted
-            ?<div style={{padding:"10px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center"}}>✔ Payroll Journal JV/{period}/001 posted to accounts · All ledgers updated</div>
-            :<div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
-              <button onClick={()=>setJournalPosted(true)} disabled={!processed||!balanced||vo} title={vo?VIEW_ONLY_REASON:undefined}
-                style={{...btnG,background:processed&&balanced?"#185FA5":"#bfc3d6",opacity:!processed||!balanced?0.6:1,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>
-                📒 Post Payroll Journal {!processed?"(Process first)":!balanced?"(Check balance)":""}
-              </button>
-            </div>}
+          {jvError
+            ?<div style={{padding:"10px",borderRadius:9,background:"#FCEBEB",border:"1px solid #F7C1C1",fontSize:11,color:"#A32D2D",fontWeight:600}}>⚠ Payroll journal was not posted: {jvError} · Re-process the month to retry.</div>
+            :jvVno
+              ?<div style={{padding:"10px",borderRadius:9,background:"#EAF3DE",fontSize:11,color:"#27500A",fontWeight:700,textAlign:"center"}}>✔ Payroll Journal <span style={{fontFamily:"monospace"}}>{jvVno}</span> posted — pending approval. Review it in the Approvals queue to post it to the books.</div>
+              :processed
+                ?<div style={{padding:"10px",borderRadius:9,background:"#eef0f5",fontSize:11,color:"#5a6691",textAlign:"center"}}>No payroll journal to post for this month.</div>
+                :<div style={{padding:"10px",borderRadius:9,background:"#eef0f5",fontSize:11,color:"#5a6691",textAlign:"center"}}>Process payroll to post the journal automatically — it goes to the Approvals queue as a pending voucher.</div>}
         </div>
       )}
     </div>
