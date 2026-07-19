@@ -12,6 +12,7 @@ import React, { useState, useEffect } from 'react';
 import { Hash, Copy, Bug } from 'lucide-react';
 import { useNav } from '../core/ux/nav';
 import { toastSuccess } from '../core/ux/toast';
+import { pushModal } from '../core/ux/modalStore';
 import { screenTag, screenBreadcrumb, buildIssueToken, issueTitle } from '../core/screenNumber';
 import { setSupportPrefill } from '../core/supportPrefill';
 
@@ -52,12 +53,13 @@ export function ScreenBadge({ currentUser, branch, route: routeProp, navigate: n
     navigate('/support/tickets');
   };
 
-  // Escape closes the popover (keyboard users can't reach the outside-click overlay).
+  // Register in the shared modal stack while open, so the app's global Esc handler
+  // closes THIS popover via closeTopModal() (which then returns true and STOPS) —
+  // instead of a raw window listener that let Esc also fall through to the ContextBar's
+  // Esc→goBack, navigating the user off the screen. Matches <Modal> / the mobile drawer.
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return pushModal(() => setOpen(false));
   }, [open]);
 
   const iconBtn = {

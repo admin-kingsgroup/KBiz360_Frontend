@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { ScreenBadge } from '../ScreenBadge';
 import { takeSupportPrefill } from '../../core/supportPrefill';
+import { closeTopModal, modalCount } from '../../core/ux/modalStore';
 import registry from '../../core/screenRegistry.json';
 
 // Use a real, registered route so the test tracks the live registry.
@@ -29,6 +30,20 @@ describe('ScreenBadge', () => {
     expect(token).toContain(`Screen #${NO}`);
     expect(token).toContain(ROUTE);
     expect(token).toContain('BOM');
+  });
+
+  test('popover joins the modal stack so Esc closes it (and does not trigger goBack)', () => {
+    const before = modalCount();
+    render(<ScreenBadge {...props} navigate={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`\\b${NO}\\b`) })); // open
+    expect(screen.getByText(/Report an issue/i)).toBeInTheDocument();
+    expect(modalCount()).toBe(before + 1); // registered while open
+
+    let handled;
+    act(() => { handled = closeTopModal(); }); // exactly what the global Esc handler calls
+    expect(handled).toBe(true);                 // → ContextBar's Esc returns early, no goBack
+    expect(screen.queryByText(/Report an issue/i)).toBeNull(); // popover closed
+    expect(modalCount()).toBe(before);          // deregistered on close
   });
 
   test('Report seeds the support prefill and navigates to the ticket page', () => {
