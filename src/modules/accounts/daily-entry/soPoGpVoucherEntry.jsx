@@ -64,6 +64,7 @@ import { STATE_NAMES } from '../../../core/partyEnums';
 import { useFormKeys } from '../../../core/ux/forms';
 import { toast } from '../../../core/ux/toast';
 import { confirmDialog } from '../../../core/ux/confirm';
+import { useNavGuard } from '../../../core/ux/navGuard';
 import { clickable } from '../../../core/ux/clickable';
 import { listKeyNav } from '../../../core/ux/listKeys';
 import { usePager, Pager } from '../../../core/ux/pager';
@@ -931,6 +932,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, customer, supplier, lines, remarks]);
+
+  // In-app unsaved-changes guard: same "unsaved booking data" protection for clicks /
+  // drills that navigate WITHIN the SPA (beforeunload only covers a full browser
+  // close/refresh). App.jsx's navigate() prompts before leaving when this returns true.
+  useNavGuard(() => !result && isDirty());
 
   // Reversal modules (Refund / Reissue) render a dedicated entry instead of the fare
   // grid — same module bar, but the original-invoice link + supplier-refund + retained

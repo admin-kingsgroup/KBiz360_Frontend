@@ -102,7 +102,8 @@ import { NavContext } from './core/ux/nav';
 import { ToastHost } from './core/ux/toast';
 import { RuleBlockHost } from './core/ux/ruleBlock';
 import { GlobalFetchBar } from './core/ux/GlobalFetchBar';
-import { ConfirmHost } from './core/ux/confirm';
+import { ConfirmHost, confirmDialog } from './core/ux/confirm';
+import { isGuardDirty, clearNavGuard } from './core/ux/navGuard';
 import { ContextBar } from './shell/ContextBar';
 import { LedgerSwitcher } from './shell/LedgerSwitcher';
 import { LedgerModalHost } from './core/LedgerModalHost';
@@ -175,7 +176,18 @@ export default function KB360App(){
   // P&L / Balance Sheet are blocked even by direct URL (dormant until the flag is on).
   const hideStatements = useHideStatements(currentUser);
   const mob=useMobile();
-  const navigate = useCallback((r)=>{ if(r && r!==window.location.pathname) rrNavigate(r); }, [rrNavigate]);
+  const navigate = useCallback((r, opts)=>{
+    if(!r || r===window.location.pathname) return;
+    // Unsaved-changes guard: if the active screen registered a dirty form (useNavGuard),
+    // confirm before leaving so an accidental click/drill-out can't silently discard it.
+    // opts.force bypasses it (e.g. a dead session on auth-expiry).
+    if(!(opts && opts.force) && isGuardDirty()){
+      confirmDialog({ title:'Leave this screen?', message:'You have unsaved changes that will be lost.', confirmLabel:'Leave', cancelLabel:'Stay', danger:true })
+        .then((res)=>{ if(res && res.confirmed){ clearNavGuard(); rrNavigate(r); } });
+      return;
+    }
+    rrNavigate(r);
+  }, [rrNavigate]);
   const goBack = useCallback(()=>rrNavigate(-1), [rrNavigate]);
   const goForward = useCallback(()=>rrNavigate(1), [rrNavigate]);
   const navValue={ route, navigate, goBack, goForward, canBack:histIdx>0, canForward:histIdx<maxIdxRef.current };
@@ -334,7 +346,7 @@ export default function KB360App(){
   /* ── Any API call that 401s / 403s (expired or invalid token) signs the user
      out and lands them on the login screen — instead of showing broken data. */
   useEffect(()=>{
-    const onExpired=()=>{ setUser(null); navigate("/dashboard"); };
+    const onExpired=()=>{ setUser(null); navigate("/dashboard", { force:true }); };  // dead session — never prompt the unsaved-changes guard
     window.addEventListener("kbiz:auth-expired", onExpired);
     return ()=> window.removeEventListener("kbiz:auth-expired", onExpired);
   },[]);
