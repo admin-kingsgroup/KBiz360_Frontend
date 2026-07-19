@@ -69,7 +69,7 @@ const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/reportsFina
 const { ReconStatusPage } = lazyModule(() => import('./modules/recon-status'));
 const { Gstr2bPage } = lazyModule(() => import('./modules/gstr2b'));
 const { CapitalVsInvestmentLive } = lazyModule(() => import('./modules/reportsFinancial/capitalVsInvestment'));
-const { TrialBalanceLive, DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
+const { DayBookLive, CashBookLive, LedgerAcLive, RegisterLive, InvoiceGPLive } = lazyModule(() => import('./modules/accountingLive'));
 const { DashboardAccountant, CollectionsFollowup, SupplierReco, ClientReco, InterBranchReco, TallyReco, SuspenseClearing, MonthEndChecklist } = lazyModule(() => import('./modules/accountantWorkspace'));
 const { ReportPnLLive, ReportBSLive, ReceivablesLive, PayablesLive } = lazyModule(() => import('./modules/reportsFinancial'));
 const { TkMyRolePage, TkApprovalsPage, TkVoucherApprovalsPage, TkConfigReadinessPage, TkControlPanelPage, TkControlsPage, TkPeriodLockPage, TkDecisionsPage, TkControlTowerPage, TkAdoptionPage, TkIntegrityPage, TkModulesPage, TkHealthScorecardPage, TkRulesPage, TkUserRulesPage, TkBranchCockpitPage, TkAuditTrailPage, TkTargetsPage, TkMasterControlPage, TkGoLivePage, TkOnboardingPage, TkScorecardPage, TkExceptionsPage, TkCompliancePage, TkPerformancePage, TkInvestmentPage, TkProfitabilityPage, TkArapPage, TkHRControlPage, TkRolesPage, TkScreenDirectoryPage, TkLimitsPage, TkTaxDeskPage, TkAssetsPage, StagePipeline } = lazyModule(() => import('./modules/tk-group'));
@@ -719,7 +719,7 @@ export default function KB360App(){
     if(route==="/accounts/statistics") return <Statistics branch={branch} setRoute={navigate}/>;
     if(route==="/finance/cash-book")  return <CashBookLive branch={branch}/>;
     if(route==="/ledger")             return <LedgerAcLive branch={branch}/>;
-    if(route==="/trial-balance")      return <TrialBalanceLive branch={branch}/>;
+    if(route==="/trial-balance")      return <Navigate to="/finance/trial-balance" replace/>;  // legacy → migrated page (now has the ledger drill via openLedgerModal)
     // GST/VAT return prep is per-branch GSTIN — without `branch` these
     // aggregated every branch's tax for full-scope users.
     if(route==="/tax/gstr1")          return <TaxGstr1 branch={branch}/>;

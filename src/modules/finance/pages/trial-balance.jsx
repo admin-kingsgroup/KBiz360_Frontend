@@ -6,6 +6,7 @@ import { useTrialBalance } from '../hooks/use-trial-balance';
 import { useFinanceStore } from '../store/finance.store';
 import { ALL_TIME_FROM, CUR_FY, CUR_QUARTER, CUR_MONTH, todayISO, fmtDate } from '../../../core/dates';
 import { toastError } from '../../../core/ux/toast';
+import { openLedgerModal } from '../../../core/LedgerModalHost';
 import { localeOf } from '../../../core/format';
 import { bc } from '../../../core/styleTokens';
 
@@ -83,6 +84,7 @@ function TrialBalanceScope({ data, cur, view, from, to, isLoading, isError, erro
         isError={isError}
         error={error}
         onRetry={() => Promise.resolve(refetch?.()).catch(() => toastError('Retry failed — still unable to load the trial balance.'))}
+        onRowClick={(row) => row.ledger && openLedgerModal(row.ledger, { from, to })}
         searchable
         searchPlaceholder="Search ledger / group / code…"
         stickyHeader
