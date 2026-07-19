@@ -158,7 +158,7 @@ export function CertificateDrawer({ id, branch, onClose, setRoute, currentUser }
   const branchBlocked = !!(isBA && (!baMayPrepare || baHandedOff));
   const branchBlockReason = !baMayPrepare
     ? 'Prepared at TK Group Central — the branch freezes bank / client / supplier only.'
-    : 'This monthly reconciliation is now with TK Group — un-freeze it to make branch changes.';
+    : 'This monthly reconciliation is with TK Group — un-freeze it to correct before they certify; after that it re-opens only after the close.';
   // The signed scan-back LOCKS the period (the Owner's act at TK Group), never a
   // branch one — so a Branch Accountant never gets the Lock action.
   const lockReasonForBA = 'The signed scan-back locks the period — done at TK Group Central, not the branch.';

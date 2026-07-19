@@ -185,8 +185,8 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
                       // its own info tone so it doesn't read like the muted "—" empty cell.
                       const tone = covered ? 'text-info' : p.total === 0 ? 'text-ink-subtle' : p.done >= p.total ? 'text-success' : 'text-warning';
                       return (
-                        <td key={t.key} className="px-3 py-2 text-center tabular-nums">
-                          <span className={`font-semibold ${tone}`}>{covered ? 'covered' : p.total === 0 ? '—' : `${p.done}/${p.total}`}</span>
+                        <td key={t.key} className="px-3 py-2 text-center tabular-nums" title={covered ? 'Weeks subsumed by a certified Month-End close' : undefined}>
+                          <span className={`font-semibold ${tone}`}>{covered ? 'Covered' : p.total === 0 ? '—' : `${p.done}/${p.total}`}</span>
                         </td>
                       );
                     })}
