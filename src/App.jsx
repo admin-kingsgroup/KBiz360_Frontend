@@ -58,7 +58,7 @@ const { ClientConcentration, ClientStatement, ConsolidatedBS, ConsultantReport, 
 const { ApiKeySettings, ApprovalMatrixBuilder, ApprovalWorkflow, BrandingSettings, BulkUserOperations, CustomFieldsManager, DocTemplateEditor, EmailSMSTemplates, FieldAccessControl, GspIrpSettings, PermissionsMatrix, SettingsAudit, SettingsBranches, SettingsCompany, SettingsUsers } = lazyModule(() => import('./modules/settings'));
 const { PageAccessControl } = lazyModule(() => import('./modules/settings/pageAccess'));
 const { EWayBill, Form16AGenerator, Form26AS, GSTR1Prep, GSTR3BPrep, Gstr2aReco, Gstr9c, GstrRecon, TallyExport, TaxAudit3CD, TaxCalendar, TaxCalendarV2, TaxEInvoice, TaxGstr1, TaxGstr3b, TaxRcm, TaxReco, TaxTdsTcs, TaxVat } = lazyModule(() => import('./modules/taxation'));
-const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, PaymentVoucher, PrintPreviewDemo, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
+const { AdmRegister, AdmVoucher, AcmVoucher, AutoLinkedVouchers, BspCsvImport, BspSummary, ContraVoucher, DebitNoteVoucher, GdsPnrImport, JournalEntry, PaymentVoucher, PrintPreview, PurchaseCar, PurchaseExpenseVoucher, PurchaseFlight, PurchaseHoliday, PurchaseHotelVoucher, PurchaseInsurance, PurchaseMisc, PurchaseRefunds, PurchaseVisa, ReceiptVoucher, RecurringVouchers, RefundVoucher, RefundPartialVoucher, ReissueVoucher, SalesCancellation, SalesCar, SalesFlight, SalesHoliday, SalesHotel, SalesInsurance, SalesMisc, SalesVisa, TicketControlRegister, VoucherEntryTabbed } = lazyModule(() => import('./modules/transactions'));
 const { SoPoGpVoucherEntry } = lazyModule(() => import('./modules/bookingOrder'));
 const { UnifiedApprovals, InbOutgoing } = lazyModule(() => import('./modules/approvals'));
 const { PaymentVerificationLive } = lazyModule(() => import('./modules/payments'));
@@ -600,7 +600,7 @@ export default function KB360App(){
     // Retired: the combined Outstanding & On-Account screen is now split into the
     // Receivables / Payables 2-tab workbenches. Redirect old links to Receivables.
     if(route==="/finance/outstanding")   return <Navigate to="/reports/rec" replace/>;
-    if(route==="/finance/print-preview")   return <PrintPreviewDemo/>;
+    if(route==="/finance/print-preview")   return <PrintPreview/>;
     if(route==="/finance/auto-linked")     return <AutoLinkedVouchers/>;
     if(route==="/masters/merge")                return <MergeRecordsUtility/>;
     if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch} setRoute={navigate}/>;

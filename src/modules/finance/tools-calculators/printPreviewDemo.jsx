@@ -3,7 +3,7 @@
    BUSINESS SUB-MODULE REORG (2026-07-14): moved out of transactions/legacy.jsx
    into its business sub-module folder — MENU_FINANCE ▸ Tools & Calculators
    ▸ "Print Preview Before Saving" (href /finance/print-preview).
-   transactions/index.js re-exports PrintPreviewDemo (+ amountInWordsINR,
+   transactions/index.js re-exports PrintPreview (+ amountInWordsINR,
    used only by this screen) from here so App.jsx's barrel import needed
    zero changes.
 
@@ -40,7 +40,7 @@ export function amountInWordsINR(n){
   if(n)parts.push(_three(n));
   return parts.join(" ");
 }
-export function PrintPreviewDemo(){
+export function PrintPreview(){
   const [vnoInput,setVnoInput]=useState("");
   const [live,setLive]=useState(null);
   const [busy,setBusy]=useState(false);
