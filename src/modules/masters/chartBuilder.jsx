@@ -23,6 +23,7 @@ import { clickable } from '../../core/ux/clickable';
 import { listKeyNav } from '../../core/ux/listKeys';
 import { BRANCH_CODES, BRANCHES, CONSOLIDATED_LABEL } from '../../core/data';
 import { localeOf } from '../../core/format';
+import { bc } from '../../core/styles';
 
 const DARK = '#1a1c22', DIM = '#5b616e', BLUE = '#2563eb', GREEN = '#16a34a', GOLD = '#c2a04a', GREY = '#7b86a8';
 const TALLY_ORDER = [
@@ -499,7 +500,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
               </thead>
               <tbody>
                 {inactiveLedgers.map((l) => {
-                  const n = entriesFor(l), rm = removableOf(l, n);
+                  const n = entriesFor(l), rm = removableOf(l, n), oc = bc({ code: l.branch }).cur;
                   return (
                     <tr key={'IL' + l.id} style={{ borderBottom: '1px solid #dfe2e7', background: rm ? RED_TINT : undefined }}>
                       <td style={{ padding: '6px 12px', fontSize: 12, color: rm ? RED : DARK, fontWeight: 600 }}>{l.name}{rm ? badge('Removable', RED) : badge('Inactive', AMBER)}</td>
@@ -507,7 +508,7 @@ export function AccountsTreeView({ branch, setRoute, setBranch }) {
                       <td style={{ padding: '6px 12px', fontSize: 11.5, color: DIM }}>{l.subGroup || '—'}</td>
                       <td style={{ padding: '6px 12px' }}>{scopeBadge(l)}</td>
                       <td style={{ padding: '6px 12px', textAlign: 'right', fontSize: 12, fontWeight: 700, color: n ? AMBER : RED }}>{n}</td>
-                      <td style={{ padding: '6px 12px', textAlign: 'right', fontSize: 11.5, color: DIM }}>{Number(l.openingBalance || 0).toLocaleString('en-IN')} {l.drCr || ''}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'right', fontSize: 11.5, color: DIM }}>{oc + Number(l.openingBalance || 0).toLocaleString(localeOf(oc))} {l.drCr || ''}</td>
                     </tr>
                   );
                 })}

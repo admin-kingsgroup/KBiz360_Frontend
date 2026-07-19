@@ -9,7 +9,7 @@ import { _TICKET_CTRL } from '../../../core/helpers';
 import { useMobile } from '../../../core/hooks';
 import { clickable } from '../../../core/ux/clickable';
 import { Menu as StatusMenu } from '../../../core/ux/Menu';
-import { card, inp } from '../../../core/styles';
+import { bc, card, inp } from '../../../core/styles';
 
 export function TicketControlRegister({branch}){
   const mob=useMobile();
@@ -96,7 +96,7 @@ export function TicketControlRegister({branch}){
                 <td style={{padding:"8px 10px",color:"#5b616e",whiteSpace:"nowrap"}}>{t.issueDate}</td>
                 <td style={{padding:"8px 10px",color:"#5b616e",whiteSpace:"nowrap"}}>{t.travelDate}</td>
                 <td style={{padding:"8px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",fontWeight:600}}>
-                  {"₹"}{Number(t.fare).toLocaleString()}
+                  {bc({ code: t.branch }).cur}{Number(t.fare).toLocaleString()}
                 </td>
                 <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:STATUS_BG[t.bspStatus]||"#f4f5f7",color:STATUS_CLR[t.bspStatus]||"#5b616e"}}>{t.bspStatus}</span></td>
                 <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:STATUS_BG[t.status]||"#f4f5f7",color:STATUS_CLR[t.status]||"#5b616e"}}>{t.status}</span></td>

@@ -171,7 +171,7 @@ export function BspSummary({branch}){
           </div>
           <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
             <button onClick={()=>openLedgerModal(bspLedgerName)} title="Open in the unified Ledger view" style={{border:"1px solid #2a3556",background:"rgba(255,255,255,0.08)",color:"#e7ecfb",borderRadius:6,fontSize:11,fontWeight:700,padding:"6px 11px",cursor:"pointer"}}>📒 Open Ledger</button>
-            <LedgerActions d={stmt} cur="₹" branchLabel={brCode||"India"} from={from} to={to} variant="dark" />
+            <LedgerActions d={stmt} cur={cur} branchLabel={brCode||"India"} from={from} to={to} variant="dark" />
             <div style={{textAlign:"right"}}>
               <p style={{margin:0,fontSize:9,color:"#9197a3",textTransform:"uppercase",fontWeight:700}}>Outstanding payable</p>
               <p style={{margin:"2px 0 0",fontSize:16,fontWeight:800,color:closingPayable>=0?"#f3c9c9":"#bfe6cd"}}>{f(Math.abs(closingPayable))} {stmt?.closingSide||"Cr"}</p>
