@@ -1,0 +1,122 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   SHELL/SCREENBADGE.JSX
+   The "SCREEN #142" pill in the top bar — present on every screen. It gives each
+   screen a short, stable, spoken-aloud id so anyone can report a problem precisely
+   ("Screen #142 is broken") and a developer can jump straight to the code.
+   Click → a popover with the screen number, route and breadcrumb, plus:
+     • Copy report — copies a one-line issue token to the clipboard
+     • Report      — opens the Support ticket form pre-filled with this context
+   Reads the current route from NavContext; needs no per-screen wiring.
+   ════════════════════════════════════════════════════════════════════════════ */
+import React, { useState } from 'react';
+import { Hash, Copy, Bug } from 'lucide-react';
+import { useNav } from '../core/ux/nav';
+import { toastSuccess } from '../core/ux/toast';
+import { screenTag, screenBreadcrumb, buildIssueToken, issueTitle } from '../core/screenNumber';
+import { setSupportPrefill } from '../core/supportPrefill';
+
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; }
+  } catch { /* fall through to the legacy path */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
+}
+
+export function ScreenBadge({ currentUser, branch, route: routeProp, navigate: navProp }) {
+  const nav = useNav();
+  const route = routeProp || nav.route;
+  const navigate = navProp || nav.navigate;
+  const [open, setOpen] = useState(false);
+
+  const tag = screenTag(route);
+  const context = { route, branch, role: currentUser?.role, name: currentUser?.name || currentUser?.email };
+
+  const doCopy = async () => {
+    const ok = await copyText(buildIssueToken(context));
+    if (ok) toastSuccess(`Screen ${tag} details copied — paste it into your report.`);
+    setOpen(false);
+  };
+
+  const doReport = () => {
+    setSupportPrefill({ title: issueTitle(route), description: buildIssueToken(context) });
+    setOpen(false);
+    navigate('/support/tickets');
+  };
+
+  const iconBtn = {
+    display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+    background: 'transparent', border: '1px solid #d6dae2', borderRadius: 6,
+    padding: '7px 9px', color: '#3a4468', fontSize: 12.5, fontWeight: 600,
+    cursor: 'pointer', textAlign: 'left',
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title={`This screen is ${tag} — click to copy details or report an issue`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          background: open ? 'rgba(0,112,242,0.08)' : '#f3f5f9',
+          border: '1px solid #d6dae2', borderRadius: 6, padding: '4px 8px',
+          color: '#3a4468', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+          fontFamily: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace',
+          fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', lineHeight: 1,
+        }}
+      >
+        <Hash size={12} strokeWidth={2.5} />
+        {tag.replace('#', '')}
+      </button>
+
+      {open && (
+        <>
+          <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 598 }} onClick={() => setOpen(false)} />
+          <div
+            role="dialog"
+            aria-label={`Screen ${tag}`}
+            style={{
+              position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 599,
+              width: 280, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 10,
+              boxShadow: '0 8px 28px rgba(13,19,38,0.16)', padding: 14,
+              display: 'flex', flexDirection: 'column', gap: 10,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ fontSize: 18, fontWeight: 800, color: '#0d1326', letterSpacing: '-0.01em' }}>Screen {tag}</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#5a6691', lineHeight: 1.5, wordBreak: 'break-word' }}>
+              <div style={{ fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', color: '#3a4468' }}>{route}</div>
+              <div style={{ marginTop: 3 }}>{screenBreadcrumb(route)}</div>
+            </div>
+            <p style={{ margin: 0, fontSize: 11.5, color: '#727fa4', lineHeight: 1.5 }}>
+              Reporting a problem here? Copy the details or raise a ticket — the screen number, page and your branch are attached automatically.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <button type="button" onClick={doCopy} style={iconBtn}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f5f9'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                <Copy size={14} /> Copy report details
+              </button>
+              <button type="button" onClick={doReport}
+                style={{ ...iconBtn, background: '#0d1326', border: '1px solid #0d1326', color: '#fff', fontWeight: 700, justifyContent: 'center' }}>
+                <Bug size={14} /> Report an issue on this screen
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default ScreenBadge;

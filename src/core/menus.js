@@ -813,7 +813,7 @@ export const MENU_DASHBOARDS = {label:"Dashboards", icon:LayoutDashboard, childr
     // standalone entries; /dashboards/{yoy,expenses} stay live as tab targets + deep-links).
     {label:"Profitability (P&L)", href:"/dashboards/profitability"},
     {divider:true, label:"Balance & Cash"},
-    {label:"Balance Sheet", href:"/dashboards/balance-sheet"},
+    {label:"Balance Sheet Snapshot", href:"/dashboards/balance-sheet"},
     // Cash & Liquidity folds in the 13-week Cash Forecast as an in-page tab
     // (/dashboards/cash-forecast stays live as the tab target + deep-link).
     {label:"Cash & Liquidity", href:"/dashboards/cash"},

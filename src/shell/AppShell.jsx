@@ -39,6 +39,7 @@ import { useCockpitFocusStore } from '../store/cockpitFocus';
 import { FxRateChip } from './FxRateChip';
 import { NotifPanel } from './NotifPanel';
 import { UserMenu } from './UserMenu';
+import { ScreenBadge } from './ScreenBadge';
 import { useFocusTrap, getFocusable } from '../core/ux/focus';
 import { pushModal } from '../core/ux/modalStore';
 
@@ -494,6 +495,9 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
 
           {/* TK Group pending-approvals badge — central roles only, hidden at 0 (dormant-safe) */}
           <InboxBadgeLive currentUser={currentUser} setRoute={setRoute} />
+
+          {/* Stable screen number — click to copy report details or raise a ticket for THIS screen */}
+          <ScreenBadge currentUser={currentUser} branch={branch} route={route} navigate={setRoute} />
 
           <UserMenu currentUser={currentUser} setCurrentUser={setCurrentUser} setRoute={setRoute} onOpenNotifications={() => setShowNotif(true)} />
 

@@ -107,7 +107,6 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
   {label:"GSTR-1 Auto-Prep", href:"/tax/gstr-1-prep"},
   {label:"GSTR-3B Auto-Prep", href:"/tax/gstr-3b-prep"},
   {label:"Form 16A Generator", href:"/tax/form-16a"},
-  {label:"Tax Calendar & Reminders", href:"/tax/calendar"},
   /* — Tax & Statutory (moved here from the Accounts pill) — */
   {divider:true, label:"Tax & Statutory"},
   {label:"GST / VAT Summary (Return)", href:"/reports/tax-summary"},

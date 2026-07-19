@@ -30,6 +30,12 @@ const MIGRATED_TABLES = [
   path.join(ROOT, 'src/modules/support/routes/index.jsx'),
 ];
 const OUT = path.join(ROOT, 'src/core/routeManifest.generated.js');
+// Stable, append-only screen-number registry (route → #number). Seeded once from
+// APP_ROUTES, then FROZEN: existing numbers never change, removed routes are
+// tombstoned (kept in `retired`, number never reused), new routes get the next
+// free number. This is what powers the top-right "SCREEN #n" badge, so a bug
+// report ("Screen #142 is broken") always points to the same screen forever.
+const REG_OUT = path.join(ROOT, 'src/core/screenRegistry.json');
 
 // Pull every route literal + any migrated path/label out of the given sources.
 function extractRoutes(appSrc, tableSrcs) {
@@ -87,6 +93,43 @@ function generate() {
   return render(extractRoutes(appSrc, tableSrcs));
 }
 
+// ── Screen-number registry (append-only) ──────────────────────────────────────
+const sortByKey = (obj) => Object.keys(obj).sort().reduce((o, k) => ((o[k] = obj[k]), o), {});
+
+function emptyRegistry() {
+  return { version: 1, next: 1, screens: {}, retired: {} };
+}
+
+function loadRegistry() {
+  try { return JSON.parse(fs.readFileSync(REG_OUT, 'utf8')); }
+  catch { return emptyRegistry(); }
+}
+
+// Pure, deterministic: given the previous registry + the current route set, return
+// the next registry. Existing numbers are preserved; routes that vanished are moved
+// to `retired` (their number is kept, never reused); a route that reappears reclaims
+// its OWN retired number; genuinely new routes get the next free number in sorted
+// order (so a fresh checkout numbers identically). Exported for the guard test.
+function buildRegistry(prev, routes) {
+  const existing = prev && prev.screens ? prev : emptyRegistry();
+  const screens = {};
+  const retired = { ...(existing.retired || {}) };
+  const allNums = [...Object.values(existing.screens || {}), ...Object.values(retired)];
+  let next = Math.max(existing.next || 1, allNums.length ? Math.max(...allNums) + 1 : 1);
+  const active = new Set(routes);
+
+  // 1) Carry existing active routes forward; tombstone the ones that disappeared.
+  for (const [r, n] of Object.entries(existing.screens || {})) {
+    if (active.has(r)) screens[r] = n; else retired[r] = n;
+  }
+  // 2) Number the new routes deterministically (sorted); reclaim own retired number.
+  for (const r of routes.filter((x) => !(x in screens)).sort()) {
+    if (r in retired) { screens[r] = retired[r]; delete retired[r]; }
+    else { screens[r] = next++; }
+  }
+  return { version: 1, next, screens: sortByKey(screens), retired: sortByKey(retired) };
+}
+
 // Read sources & return the parsed manifest (used by the guard test).
 function manifest() {
   const appSrc = fs.readFileSync(APP_JSX, 'utf8');
@@ -96,8 +139,13 @@ function manifest() {
 
 if (require.main === module) {
   fs.writeFileSync(OUT, generate());
+  const { routes } = manifest();
+  const reg = buildRegistry(loadRegistry(), routes);
+  fs.writeFileSync(REG_OUT, JSON.stringify(reg, null, 2) + '\n');
   // eslint-disable-next-line no-console
-  console.log(`✓ route manifest written: ${path.relative(ROOT, OUT)} (${manifest().routes.length} routes)`);
+  console.log(`✓ route manifest written: ${path.relative(ROOT, OUT)} (${routes.length} routes)`);
+  // eslint-disable-next-line no-console
+  console.log(`✓ screen registry written: ${path.relative(ROOT, REG_OUT)} (${Object.keys(reg.screens).length} numbered, next #${reg.next})`);
 }
 
-module.exports = { extractRoutes, generate, manifest, OUT };
+module.exports = { extractRoutes, generate, manifest, OUT, REG_OUT, buildRegistry, loadRegistry };

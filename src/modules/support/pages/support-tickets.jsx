@@ -8,6 +8,7 @@ import { useTickets, useTicketSummary } from '../hooks/use-tickets';
 import { CreateTicketModal } from '../components/CreateTicketModal';
 import { TicketDetailDrawer } from '../components/TicketDetailDrawer';
 import { typeMeta, priorityMeta, statusMeta } from '../services/support.service';
+import { takeSupportPrefill } from '../../../core/supportPrefill';
 
 const fmtWhen = (d) => {
   if (!d) return '—';
@@ -32,8 +33,11 @@ const FILTERS = [
  * the detail drawer. Reached from the "Support" nav pill and the floating button.
  */
 export function SupportTicketsPage({ route }) {
+  // One-shot prefill handed over by the screen-number badge's "Report" action:
+  // open the Raise-Ticket dialog straight away, seeded with the screen context.
+  const [prefill] = useState(() => takeSupportPrefill());
   const [filter, setFilter] = useState('open');
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(!!prefill);
   const [selectedId, setSelectedId] = useState(null);
 
   const activeFilter = FILTERS.find((f) => f.key === filter) || FILTERS[0];
@@ -117,7 +121,7 @@ export function SupportTicketsPage({ route }) {
       />
 
       {createOpen && (
-        <CreateTicketModal route={route} onClose={() => setCreateOpen(false)} onCreated={(t) => setSelectedId(t?.id || null)} />
+        <CreateTicketModal route={route} initial={prefill} onClose={() => setCreateOpen(false)} onCreated={(t) => setSelectedId(t?.id || null)} />
       )}
       {selected && (
         <TicketDetailDrawer ticket={selected} onClose={() => setSelectedId(null)} />

@@ -18,13 +18,18 @@ const formatElapsed = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
  *
  * Props:
  *   route       — the current route (auto-captured as pageUrl + module)
+ *   initial     — optional {title, description} to pre-fill (e.g. from the screen-
+ *                 number badge's "Report" action, which seeds the screen context)
  *   onClose()   — dismiss the dialog
  *   onCreated(ticket) — optional; fired after a successful create
  */
-export function CreateTicketModal({ route, onClose, onCreated }) {
+export function CreateTicketModal({ route, initial, onClose, onCreated }) {
   const captureRoute = route || (typeof window !== 'undefined' ? window.location.pathname : '');
   const user = currentUser();
-  const [form, setForm] = useState({ title: '', type: 'bug', priority: 'medium', description: '', linkUrl: '' });
+  const [form, setForm] = useState({
+    title: initial?.title || '', type: 'bug', priority: 'medium',
+    description: initial?.description || '', linkUrl: '',
+  });
   const [touched, setTouched] = useState(false);
   const create = useCreateTicket();
   const uploadVoiceNote = useUploadTicketAttachment();
