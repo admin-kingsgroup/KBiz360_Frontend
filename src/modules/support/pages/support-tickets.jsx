@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
@@ -33,12 +33,24 @@ const FILTERS = [
  * the detail drawer. Reached from the "Support" nav pill and the floating button.
  */
 export function SupportTicketsPage({ route }) {
-  // One-shot prefill handed over by the screen-number badge's "Report" action:
-  // open the Raise-Ticket dialog straight away, seeded with the screen context.
-  const [prefill] = useState(() => takeSupportPrefill());
+  // One-shot prefill handed over by the screen-number badge's "Report" action: open the
+  // Raise-Ticket dialog seeded with the screen context — on mount (navigated here from
+  // another screen), OR live via the 'kbiz:support-prefill' event when Report is clicked
+  // while already on this page (where navigate() is a no-op and mount wouldn't re-run).
+  const [prefill, setPrefill] = useState(() => takeSupportPrefill());
+  const [prefillKey, setPrefillKey] = useState(0);
   const [filter, setFilter] = useState('open');
   const [createOpen, setCreateOpen] = useState(!!prefill);
   const [selectedId, setSelectedId] = useState(null);
+
+  useEffect(() => {
+    const onPrefill = () => {
+      const p = takeSupportPrefill();
+      if (p) { setPrefill(p); setPrefillKey((k) => k + 1); setCreateOpen(true); }
+    };
+    window.addEventListener('kbiz:support-prefill', onPrefill);
+    return () => window.removeEventListener('kbiz:support-prefill', onPrefill);
+  }, []);
 
   const activeFilter = FILTERS.find((f) => f.key === filter) || FILTERS[0];
   const { data, isLoading, isError, error, refetch } = useTickets(activeFilter.params);
@@ -95,7 +107,7 @@ export function SupportTicketsPage({ route }) {
     <PageLayout
       title="Support Tickets"
       subtitle={subtitle}
-      actions={<Button variant="primary" icon={Plus} onClick={() => setCreateOpen(true)}>Raise ticket</Button>}
+      actions={<Button variant="primary" icon={Plus} onClick={() => { setPrefill(null); setPrefillKey((k) => k + 1); setCreateOpen(true); }}>Raise ticket</Button>}
       filters={filters}
     >
       <DataTable
@@ -121,7 +133,13 @@ export function SupportTicketsPage({ route }) {
       />
 
       {createOpen && (
-        <CreateTicketModal route={route} initial={prefill} onClose={() => setCreateOpen(false)} onCreated={(t) => setSelectedId(t?.id || null)} />
+        <CreateTicketModal
+          key={prefillKey}
+          route={prefill?.route || route}
+          initial={prefill}
+          onClose={() => { setCreateOpen(false); setPrefill(null); }}
+          onCreated={(t) => setSelectedId(t?.id || null)}
+        />
       )}
       {selected && (
         <TicketDetailDrawer ticket={selected} onClose={() => setSelectedId(null)} />

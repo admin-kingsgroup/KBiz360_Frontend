@@ -8,7 +8,7 @@
      • Report      — opens the Support ticket form pre-filled with this context
    Reads the current route from NavContext; needs no per-screen wiring.
    ════════════════════════════════════════════════════════════════════════════ */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Hash, Copy, Bug } from 'lucide-react';
 import { useNav } from '../core/ux/nav';
 import { toastSuccess } from '../core/ux/toast';
@@ -45,10 +45,20 @@ export function ScreenBadge({ currentUser, branch, route: routeProp, navigate: n
   };
 
   const doReport = () => {
-    setSupportPrefill({ title: issueTitle(route), description: buildIssueToken(context) });
+    // Carry the reported screen's route so the ticket's pageUrl/module point at THIS
+    // screen, not the Support page the modal opens on.
+    setSupportPrefill({ title: issueTitle(route), description: buildIssueToken(context), route });
     setOpen(false);
     navigate('/support/tickets');
   };
+
+  // Escape closes the popover (keyboard users can't reach the outside-click overlay).
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
   const iconBtn = {
     display: 'flex', alignItems: 'center', gap: 6, width: '100%',

@@ -157,11 +157,15 @@ export default function KB360App(){
   // dev serves "/dashboard". Every route check below matches the no-slash form,
   // so a trailing slash would fall through to <Placeholder>. Keep root "/" intact.
   const route = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
-  // Embedded preview mode (?embed=1) — used by the Screen Directory to load any screen
-  // in an iframe with the app chrome (app-bar, breadcrumb, badge) stripped. It also
-  // suppresses the TK-central group-mode redirect below, so a branch screen can be
-  // previewed even while the owner's session is in the consolidated ALL mode.
-  const embed = new URLSearchParams(search || '').has('embed');
+  // Embedded preview mode — used by the Screen Directory to load any screen with the
+  // app chrome (app-bar, breadcrumb, badge) stripped. It also suppresses the TK-central
+  // group-mode redirect below, so a branch screen renders even while the owner's session
+  // is in the consolidated ALL mode. Triggered by an explicit ?embed=1 (so "Open in new
+  // tab" works at top level) OR whenever the app is actually running inside a frame (so
+  // navigating WITHIN the preview iframe — which drops the query — stays chrome-less, and
+  // a stray/bookmarked ?embed on a normal top-level tab can't strip a real user's chrome).
+  const isFramed = typeof window !== 'undefined' && (() => { try { return window.self !== window.top; } catch { return true; } })();
+  const embed = new URLSearchParams(search || '').get('embed') === '1' || isFramed;
   const histIdx = (typeof window !== 'undefined' && window.history.state && typeof window.history.state.idx === 'number')
     ? window.history.state.idx : 0;
   const maxIdxRef = useRef(histIdx);
@@ -210,8 +214,10 @@ export default function KB360App(){
      stranded on "/" → <Placeholder> on every live load. */
   useEffect(()=>{ if(embed || route==="/") return; try{ localStorage.setItem("kb360-route", route); }catch{ /* ignore */ } },[route, embed]);
 
-  /* Persist the selected branch so a refresh keeps you on it (restored above). */
-  useEffect(()=>{ try{ localStorage.setItem("kb360-branch", branch==="ALL"?"ALL":(branch?.code||"")); }catch{ /* ignore */ } },[branch]);
+  /* Persist the selected branch so a refresh keeps you on it (restored above). Skipped in
+     embed/preview mode: a preview iframe shares localStorage with the parent tab, so a
+     previewed screen that calls setBranch must not overwrite the parent's saved branch. */
+  useEffect(()=>{ if(embed) return; try{ localStorage.setItem("kb360-branch", branch==="ALL"?"ALL":(branch?.code||"")); }catch{ /* ignore */ } },[branch, embed]);
 
   /* On first load only, restore the last route: if we opened at the index path
      with a live session and a saved route, jump there once (replace, so it

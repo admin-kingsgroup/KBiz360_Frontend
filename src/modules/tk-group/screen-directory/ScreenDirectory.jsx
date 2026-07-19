@@ -95,6 +95,7 @@ export function ScreenDirectory() {
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
+              aria-pressed={filter === f.key}
               className={`rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 filter === f.key ? 'border-gold bg-gold-light/30 text-navy' : 'border-surface-border bg-surface text-ink-muted hover:bg-surface-alt'
               }`}
@@ -168,7 +169,8 @@ export function ScreenDirectory() {
                     className="flex h-8 items-center gap-1.5 rounded-md border border-surface-border px-2.5 text-xs font-medium text-ink-muted hover:bg-surface-alt">
                     <Copy size={14} /> Copy
                   </button>
-                  <button onClick={() => window.open(selected.route, '_blank', 'noopener')} title="Open in a new tab"
+                  <button onClick={() => window.open(`${selected.route}?embed=1`, '_blank', 'noopener')}
+                    title="Open this screen full-window in a new tab"
                     className="flex h-8 items-center gap-1.5 rounded-md border border-navy/15 bg-navy px-2.5 text-xs font-semibold text-white hover:bg-navy/90">
                     <ExternalLink size={14} /> Open
                   </button>

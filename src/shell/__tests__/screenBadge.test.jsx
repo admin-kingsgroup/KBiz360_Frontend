@@ -41,5 +41,6 @@ describe('ScreenBadge', () => {
     expect(prefill).toBeTruthy();
     expect(prefill.description).toContain(`Screen #${NO}`);
     expect(prefill.title).toContain(`#${NO}`);
+    expect(prefill.route).toBe(ROUTE); // reported screen's route flows to the ticket's pageUrl
   });
 });
