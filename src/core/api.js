@@ -160,7 +160,16 @@ client.interceptors.response.use(
       if (res.status === 403 && ((res.data && res.data.viewOnly === true) || /view-only/i.test(msg))) {
         try { window.dispatchEvent(new CustomEvent('kb:toast', { detail: { id: `vo-${Date.now()}`, msg: 'View only — changes are not allowed.', kind: 'error', ttl: 3200 } })); } catch { /* ignore */ }
       }
-      return Promise.reject(new Error(msg || `API ${res.status}: ${res.statusText || 'Request failed'}`));
+      const e = new Error(msg || `API ${res.status}: ${res.statusText || 'Request failed'}`);
+      // A law/rule block (thrown via ruleError on the server) names the rule that blocked
+      // the request. Carry the id on the error AND surface it so the user sees the number
+      // and can pull the rule's "why" from the registry (RuleBlockHost).
+      const ruleId = res.data && res.data.ruleId;
+      if (ruleId) {
+        e.ruleId = ruleId;
+        try { window.dispatchEvent(new CustomEvent('kb:rule-block', { detail: { msg, ruleId } })); } catch { /* ignore */ }
+      }
+      return Promise.reject(e);
     }
     // No response → network/timeout/CORS. Surface axios's own message.
     return Promise.reject(new Error(error.message || 'Network error'));

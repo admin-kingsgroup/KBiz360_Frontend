@@ -100,6 +100,7 @@ import { PrefsProvider } from './core/prefs';
 import { HotkeysProvider } from './core/ux/hotkeys';
 import { NavContext } from './core/ux/nav';
 import { ToastHost } from './core/ux/toast';
+import { RuleBlockHost } from './core/ux/ruleBlock';
 import { GlobalFetchBar } from './core/ux/GlobalFetchBar';
 import { ConfirmHost } from './core/ux/confirm';
 import { ContextBar } from './shell/ContextBar';
@@ -893,6 +894,7 @@ export default function KB360App(){
       <GlobalFetchBar/>
       <PrintPreviewHost/>
       <ToastHost/>
+      <RuleBlockHost/>
       <ConfirmHost/>
       <LedgerSwitcher branch={branch}/>
       <LedgerModalHost branch={branch}/>
