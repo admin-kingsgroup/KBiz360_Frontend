@@ -264,13 +264,41 @@ Run `npm install` in the project directory before building.
 ### Build fails with "Out of memory"
 Increase Node memory: `NODE_OPTIONS=--max-old-space-size=4096 npm run build`
 
-### SPA routes return 404 on refresh
-You forgot the SPA fallback (Step 6 for Amplify, custom error responses for CloudFront). Set them as documented above.
+### SPA routes return a **404 status** on refresh / deep-link
+The page still loads (Amplify falls back to `index.html` as the S3 *error document*),
+but every deep link, refresh, bookmark — **and the Screen Directory's live-preview
+iframes** (`/route?embed=1`) — answers with an HTTP **404 status** to browsers, bots,
+and uptime monitors. Observed live on `main.d3c7s4j5mgvl0k.amplifyapp.com` (2026-07):
+`/` → 200, but `/dashboard/`, `/reports/bs/?embed=1` → 404 (identical `index.html` body).
+The query string survives, so previews still render — the 404 is a status-code bug.
+
+Fix it with a proper SPA **200 rewrite** instead of the 404 error-document fallback:
+
+**Amplify Console** → App settings → **Rewrites and redirects** → add this **above** any
+other rule:
+
+| Source address | Target address | Type |
+|---|---|---|
+| `</^[^.]+$\|\.(?!(css\|gif\|ico\|jpg\|js\|png\|txt\|svg\|woff\|woff2\|ttf\|map\|json\|webp)$)([^.]+$)/>` | `/index.html` | **200 (Rewrite)** |
+
+**Or via CLI** (the app id is the `d…` label in the `…amplifyapp.com` subdomain):
+```bash
+bash scripts/fix-amplify-spa-rewrite.sh d3c7s4j5mgvl0k
+```
+It reads the app's current custom rules, ensures the SPA 200-rewrite is present
+(without clobbering existing redirects), and prints the change before applying.
+
+**CloudFront + S3 alternative:** distribution → **Error pages** → create custom error
+responses mapping **403** and **404** → `/index.html` with a **200** response code.
 
 ### Browser shows blank screen with no errors
 Check the browser console (F12). Common causes:
 - Missing public assets — verify `/kbiz360_appicon.png` is in `public/`
-- CSP headers blocking — check your CloudFront/Amplify response headers
+- CSP / X-Frame-Options blocking. Verified 2026-07: the Amplify FE sends **neither**,
+  so same-origin iframe framing (the **Screen Directory** live previews) works. If you
+  later add security headers (`customHttp.yml` or a CloudFront response-headers policy),
+  keep `Content-Security-Policy: frame-ancestors 'self'` — **never** `X-Frame-Options:
+  DENY`/`frame-ancestors 'none'`, or the Screen Directory previews render blank.
 
 ### CloudFront serves outdated content after a deploy
 You need to invalidate the cache:
