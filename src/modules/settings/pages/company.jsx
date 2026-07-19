@@ -153,8 +153,8 @@ function EditProfileModal({ profiles, initialCode = 'BOM', onClose }) {
             </FormField>
           )}
           {(form.taxType === 'VAT' || form.taxType === 'MULTI') && (
-            <FormField label="VAT rate (%)" className="col-span-2">
-              <Input type="number" value={form.vatRate} onChange={(e) => setForm((s) => ({ ...s, vatRate: e.target.value }))} />
+            <FormField label="VAT rate (%)" className="col-span-2" hint="Set in Masters ▸ Tax (VAT master) — the single source the posting engine bills with. Shown here read-only.">
+              <Input type="number" value={form.vatRate} readOnly title="Amend the VAT rate in Masters ▸ Tax (VAT master)" />
             </FormField>
           )}
         </div>

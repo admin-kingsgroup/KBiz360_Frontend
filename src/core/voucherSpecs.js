@@ -324,10 +324,11 @@ export const vatPctOf = (ctx) => r2(vatRateOf(ctx) * 100);
 // seller → IGST 18%; an Africa seller → its OWN branch rate (NBO/FBM 16, DAR 18), never a flat
 // 18%. Mirrors the backend's rate pick in inb.service.inbTaxTreatment — keep the two in step.
 // The name is IGST, not the generic "GST" caption: an inter-branch India supply is inter-state.
-// KNOWN GAP — the two sides mirror on the STATIC table only. An amended rate reaches the backend
-// via the VatRate master (registerVatRates → vatRateOf) but reaches this ctx via CompanyProfile
-// .vatRate, and nothing syncs the two. Amend a rate in Masters ▸ Tax and the server bills the new
-// rate while this returns the old one. Pinning the live path needs that wiring, not a test.
+// SINGLE SOURCE (was a known gap) — an amended rate reaches the posting engine via the VatRate
+// master (registerVatRates → vatRateOf), and it reaches this ctx via the branch config's
+// `vatRate`, which GET /api/company-profile now SERVES from that same vatRateOf
+// (companyProfile.route.js). So both bill the identical rate — amend it in Masters ▸ Tax and
+// both sides follow. (Amend it in Company Profile and it's read-only, pointing there.)
 // NB: this is the rate billed WHEN taxable — callers must not use it to decide IF tax applies
 // (a zero-rated export bills nothing; that's isTaxable/saleZeroRated).
 export const inbTaxOf = (ctx) => (isVatBranch(ctx && ctx.branch)
