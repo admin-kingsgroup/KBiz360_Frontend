@@ -77,7 +77,6 @@
     "/finance/auto-linked": 73,
     "/finance/bank-balance": 74,
     "/finance/cash-book": 75,
-    "/finance/comments-demo": 76,
     "/finance/contra-register": 77,
     "/finance/debit-note-register": 78,
     "/finance/interest-calc": 79,
@@ -87,7 +86,6 @@
     "/finance/module-purchase-register": 83,
     "/finance/module-register": 84,
     "/finance/module-sales-register": 85,
-    "/finance/module-sp-register": 86,
     "/finance/outstanding": 87,
     "/finance/payment-register": 88,
     "/finance/print-preview": 89,
@@ -144,7 +142,6 @@
     "/masters/cost-centers": 140,
     "/masters/credit-facilities": 141,
     "/masters/currency": 142,
-    "/masters/customer-detail-demo": 143,
     "/masters/customer-tabs": 144,
     "/masters/customers": 145,
     "/masters/doc-types": 146,
@@ -236,7 +233,6 @@
     "/reports/inb-sreg": 232,
     "/reports/interbranch": 233,
     "/reports/invoice-gp": 234,
-    "/reports/meta-demo": 235,
     "/reports/mis": 236,
     "/reports/msme-aging": 237,
     "/reports/package-pl": 238,
@@ -365,5 +361,10 @@
     "/transactions/voucher-tabs": 360,
     "/trial-balance": 361
   },
-  "retired": {}
+  "retired": {
+    "/finance/comments-demo": 76,
+    "/finance/module-sp-register": 86,
+    "/masters/customer-detail-demo": 143,
+    "/reports/meta-demo": 235
+  }
 }

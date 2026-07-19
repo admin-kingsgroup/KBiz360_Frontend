@@ -13,15 +13,14 @@ export const DEV_SCAN = {
   "tree": "FE",
   "filesScanned": 698,
   "counts": {
-    "total": 7,
+    "total": 6,
     "bySeverity": {
       "high": 4,
-      "medium": 1,
+      "medium": 0,
       "low": 2
     },
     "byCategory": {
       "placeholder": 4,
-      "routing": 1,
       "broken-code": 2
     }
   },
@@ -76,19 +75,6 @@ export const DEV_SCAN = {
       "file": "modules/reports/report-tools/metaDemo.jsx",
       "line": 5,
       "snippet": "return <NotWired title=\"Report Meta Features (Demo)\" note=\"Demo screen — it showcases report meta-features (comparatives, sparklines, drill-downs) and is not wired to live data.\"/>;",
-      "source": "build"
-    },
-    {
-      "id": "FE:modules/devControl/registry.js:75:registry-route-missing",
-      "tree": "FE",
-      "rule": "registry-route-missing",
-      "category": "routing",
-      "severity": "medium",
-      "title": "Registry route no longer exists",
-      "remark": "The developer registry lists this route for a feature, but the app can no longer render it. Update the registry entry or restore the route so deep-links from Dev Control work.",
-      "file": "modules/devControl/registry.js",
-      "line": 75,
-      "snippet": "/finance/comments-demo",
       "source": "build"
     },
     {

@@ -172,7 +172,6 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
     {label:"Custom Report Builder", href:"/reports/builder"},
     {label:"Saved Report Views", href:"/reports/saved-views"},
     {label:"Scheduled Email Reports", href:"/reports/scheduled"},
-    {label:"Meta Features Demo", href:"/reports/meta-demo"},
   ]}
 ]};
 
