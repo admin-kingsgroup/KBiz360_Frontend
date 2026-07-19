@@ -106,12 +106,12 @@ export function ReconReportsPage({ branch: appBranch, setRoute, currentUser, tie
           month: 'Month-End closings run from April 2026 onward.',
           quarter: 'Quarterly closings — India fiscal quarters (Jun/Sep/Dec/Mar) · Africa calendar quarters (Mar/Jun/Sep/Dec).',
           year: 'Year-End — India FY2025-26 (Apr–Mar) · Africa CY2025 (Jan–Dec).',
-        }[tierKey]} A row leaves this board only when every ledger certificate in it is ${tierKey === 'weekly' ? 'signed' : 'locked'}.`}>
+        }[tierKey]} A row leaves this board when every ledger certificate in it is ${tierKey === 'weekly' ? 'signed — or its month is certified (folded into “Covered by Month-End” below)' : 'locked'}.`}>
         {gen.isError && <p className="mb-3 text-sm text-danger">Couldn’t generate certificates: {gen.error?.message}</p>}
         {gen.isSuccess && gen.data && <p className="mb-3 text-sm text-success">Generated {gen.data.created ?? 0} certificate{(gen.data.created ?? 0) === 1 ? '' : 's'} for {gen.variables?.period} — open {tierMenuName(tierKey)} Certification to work them.</p>}
         {pendingLoading && <LoadingState label="Loading pending closings…" />}
         {pendingError && <ErrorState title="Couldn’t load the pending closings" message="The reconciliation service didn’t respond — this board may NOT be complete. Retry before relying on it." onRetry={() => refetchPending()} />}
-        {!pendingLoading && !pendingError && activePending.length === 0 && <EmptyState title="Nothing pending" hint="Every scheduled closing is complete for this branch." />}
+        {!pendingLoading && !pendingError && activePending.length === 0 && coveredPending.length === 0 && <EmptyState title="Nothing pending" hint="Every scheduled closing is complete for this branch." />}
         {!pendingError && activePending.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse">

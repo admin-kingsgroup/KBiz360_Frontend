@@ -181,7 +181,9 @@ export function ReconciliationHub({ branch: appBranch, setRoute, currentUser, ti
                     {TIERS.map((t) => {
                       const p = tierProgress(row.tiers?.[t.key]);
                       const covered = t.key === 'weekly' && wkCovered;
-                      const tone = covered ? 'text-ink-subtle' : p.total === 0 ? 'text-ink-subtle' : p.done >= p.total ? 'text-success' : 'text-warning';
+                      // 'covered' is a positive state (weeks subsumed by a certified month) — give it
+                      // its own info tone so it doesn't read like the muted "—" empty cell.
+                      const tone = covered ? 'text-info' : p.total === 0 ? 'text-ink-subtle' : p.done >= p.total ? 'text-success' : 'text-warning';
                       return (
                         <td key={t.key} className="px-3 py-2 text-center tabular-nums">
                           <span className={`font-semibold ${tone}`}>{covered ? 'covered' : p.total === 0 ? '—' : `${p.done}/${p.total}`}</span>

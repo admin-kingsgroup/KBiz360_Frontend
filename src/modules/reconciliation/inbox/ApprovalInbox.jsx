@@ -20,12 +20,13 @@ const headCls = 'px-3 py-2 text-left text-xs font-bold uppercase tracking-wider 
 const TONE = { daily: 'neutral', weekly: 'success', month: 'info', quarter: 'gold', year: 'warning' };
 
 // Does the signed-in user's role satisfy this chain signer? Mirrors the backend
-// normalizeRole + roleSatisfies (Owner ≡ Super Admin; the Owner may act a Director
-// step — Rule 07 — and break-glass the Branch-Accountant prepare step).
-export function roleActs(me, signer) {
+// normalizeRole + roleSatisfies/canSign (Owner ≡ Super Admin; the Owner may act a
+// Director step — Rule 07 — and break-glass the Branch-Accountant prepare step of a
+// MONTHLY statement freeze only, matching the cert-aware backend gate).
+export function roleActs(me, signer, tier) {
   const r = String(me || '').toLowerCase();
   const owner = /owner|super[\s_-]*admin/.test(r);
-  if (signer === 'Branch Accountant') return /branch\s*account/.test(r) || owner; // Owner break-glass
+  if (signer === 'Branch Accountant') return /branch\s*account/.test(r) || (owner && tier === 'month'); // Owner break-glass (month-only)
   if (signer === 'AE') return /account.*(exec|executive)|(^|[^a-z])ae([^a-z]|$)/.test(r);
   if (signer === 'FM') return /finance\s*manager|(^|[^a-z])fm([^a-z]|$)/.test(r);
   if (signer === 'Director') return /director/.test(r) || owner; // Rule 07 fallback
@@ -47,7 +48,7 @@ export function ApprovalInbox({ branch: appBranch, setRoute, currentUser }) {
   });
   const me = data?.me || currentUser?.role || '';
   const all = data?.items || [];
-  const mine = all.filter((i) => roleActs(me, i.waitingOn));
+  const mine = all.filter((i) => roleActs(me, i.waitingOn, i.tier));
   const shown = mineOnly ? mine : all;
   const branches = [...new Set(shown.map((i) => i.branch))].sort();
 
@@ -102,7 +103,7 @@ export function ApprovalInbox({ branch: appBranch, setRoute, currentUser }) {
                       <td className={`${cellCls} font-mono text-xs`}>{i.period}</td>
                       <td className={cellCls}>{fmtAmt(i.difference, b)}</td>
                       <td className={cellCls}>
-                        <Badge tone={roleActs(me, i.waitingOn) ? 'success' : 'neutral'} size="sm">{i.waitingOn}</Badge>
+                        <Badge tone={roleActs(me, i.waitingOn, i.tier) ? 'success' : 'neutral'} size="sm">{i.waitingOn}</Badge>
                         <span className="ml-1 text-xs text-ink-subtle">{i.action}</span>
                       </td>
                       <td className={cellCls}><Button variant="ghost" size="sm" icon={ChevronRight} onClick={() => { if (i.branch) setFocus(i.branch, BRANCHES); if (setRoute) setRoute(certPathFor(i.tier)); }}>Open</Button></td>

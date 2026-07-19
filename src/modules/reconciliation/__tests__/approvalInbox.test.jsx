@@ -29,9 +29,10 @@ describe('reconciliation · Approval Inbox (TK Group Central)', () => {
     expect(roleActs('Sr. Accounts Executive', 'AE')).toBe(true);
     expect(roleActs('Super Admin', 'Owner')).toBe(true);
     expect(roleActs('Super Admin', 'Director')).toBe(true);   // Rule 07 fallback
-    expect(roleActs('Super Admin', 'Branch Accountant')).toBe(true); // Owner break-glass (no BA at a branch)
-    expect(roleActs('Branch Accountant', 'Branch Accountant')).toBe(true);
-    expect(roleActs('Senior Finance Manager', 'Branch Accountant')).toBe(false); // Owner-only break-glass
+    expect(roleActs('Super Admin', 'Branch Accountant', 'month')).toBe(true);  // Owner break-glass — MONTH only
+    expect(roleActs('Super Admin', 'Branch Accountant', 'weekly')).toBe(false); // not the soft daily/weekly branch step
+    expect(roleActs('Branch Accountant', 'Branch Accountant', 'weekly')).toBe(true); // a real BA, any tier
+    expect(roleActs('Senior Finance Manager', 'Branch Accountant', 'month')).toBe(false); // Owner-only break-glass
     expect(roleActs('Director', 'Owner')).toBe(false);
     expect(roleActs('Branch Accountant', 'AE')).toBe(false);
   });
