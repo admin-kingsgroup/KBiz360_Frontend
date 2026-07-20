@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { BRANCH_CODES } from '../../../core/data';
 import {
-  GST_TREATMENTS, COUNTRIES, MSME_STATUS, TDS_SECTIONS,
+  GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
   CUST_TYPES, CUST_SOURCES, PAY_TERMS,
 } from '../../../core/partyEnums';
 import { branchCode } from '../../../core/useAccounting';
@@ -100,7 +100,15 @@ export const CustomersMaster = ({ branch } = {}) => {
       // treated as overseas (GST Treatment auto-set to 'Overseas'), same country-driven
       // logic as the Supplier master.
       { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false,
-        onSet: (v, next) => { next.gstTreatment = (v && v !== 'India') ? 'Overseas' : (next.gstTreatment === 'Overseas' ? '' : next.gstTreatment); } },
+        onSet: (v, next) => {
+          next.gstTreatment = (v && v !== 'India') ? 'Overseas' : (next.gstTreatment === 'Overseas' ? '' : next.gstTreatment);
+          next.state = (v && v !== 'India') ? 'Others' : '';   // India → pick a real state; else foreign 'Others'
+        } },
+      // State (place of supply) — REQUIRED for an India customer: the BE defaults a blank country
+      // to 'India' and then demands a state (it decides CGST/SGST vs IGST). Without this field an
+      // India B2C / no-GSTIN customer could not be created (hard 400). Hidden on VAT branches (no
+      // Indian place-of-supply). Mirrors the Supplier master.
+      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false, show: (f) => !isVatBranch(f.branch), required: (f) => !isVatBranch(f.branch) },
       { key: 'city', label: 'City', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text', required: true },
       { key: 'contact', label: 'Contact', type: 'text', table: false },
