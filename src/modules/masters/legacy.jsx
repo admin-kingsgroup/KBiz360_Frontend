@@ -36,9 +36,10 @@ export function MastersForex(){
   const { data: rates = [] } = useMasterList('forex-rates');
   const { create } = useMasterMutations('forex-rates');
   const [modal,setModal]=useState(false); useModalEsc(()=>setModal(false),modal);
-  // Default To to a non-INR currency so the From≠To guard isn't tripped by the
-  // initial INR→INR pair (the user only needs to type the rate).
-  const [form,setForm]=useState({from:"INR",to:(ACTIVE_CURRENCIES.find((c)=>c!=="INR")||"USD"),rate:0,source:"Manual"});
+  // Default the pair to X→INR (a non-INR From, To=INR) so the direction matches the rate
+  // placeholder magnitude ("e.g. 83.42" = 1 USD in ₹) and the X→INR convention Currency
+  // Master reads — preventing a reciprocal-magnitude entry. Still keeps From≠To.
+  const [form,setForm]=useState({from:(ACTIVE_CURRENCIES.find((c)=>c!=="INR")||"USD"),to:"INR",rate:0,source:"Manual"});
   const CURRENCIES=ACTIVE_CURRENCIES;
   const vo=isViewOnly();
 

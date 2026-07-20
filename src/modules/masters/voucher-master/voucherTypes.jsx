@@ -7,12 +7,12 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import React from 'react';
-import { MasterCrud } from '../shared/masterCrud';
+import { MasterCrud, ADMIN_WRITE_ROLES } from '../shared/masterCrud';
 
 const PARENT_TYPES = ['Payment', 'Receipt', 'Sales', 'Purchase', 'Journal', 'Contra', 'Debit Note'];
 
 export const VoucherTypesMaster = () => (
-  <MasterCrud title="Voucher Types" subtitle="Tally voucher-type master" resource="voucher-types"
+  <MasterCrud title="Voucher Types" subtitle="Tally voucher-type master" resource="voucher-types" writeRoles={ADMIN_WRITE_ROLES}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'parentType', label: 'Type of Voucher', type: 'select', options: PARENT_TYPES, required: true },

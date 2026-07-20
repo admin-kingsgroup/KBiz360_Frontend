@@ -24,7 +24,7 @@ import { useMasterList } from '../../core/useMasters';
 import { SourceBadge } from '../../core/LedgerLabel';
 import { branchCode } from '../../core/useAccounting';
 import { Select } from '../../shell/primitives';
-import { MasterCrud } from './shared/masterCrud';
+import { MasterCrud, ADMIN_WRITE_ROLES } from './shared/masterCrud';
 
 // Re-exported for backward compatibility — App.jsx and existing tests import
 // these directly from this file's path (a distinct lazy-loaded chunk, not the
@@ -63,7 +63,7 @@ export const validParentGroups = (groups = []) => {
 };
 
 export const CostCategoriesMaster = () => (
-  <MasterCrud title="Cost Categories" subtitle="Parallel cost-centre allocation sets" resource="cost-categories"
+  <MasterCrud title="Cost Categories" subtitle="Parallel cost-centre allocation sets" resource="cost-categories" writeRoles={ADMIN_WRITE_ROLES}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'allocateRevenue', label: 'Allocate Revenue Items', type: 'bool', default: true },
@@ -75,7 +75,7 @@ export const CostCategoriesMaster = () => (
 export const BudgetsMaster = ({ branch } = {}) => {
   const brc = branchCode(branch);
   return (
-  <MasterCrud title="Budgets" subtitle="Budget targets by period" resource="budgets"
+  <MasterCrud title="Budgets" subtitle="Budget targets by period" resource="budgets" writeRoles={ADMIN_WRITE_ROLES}
     rowFilter={(r) => !brc || !r.branch || r.branch === 'ALL' || r.branch === brc}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
@@ -90,7 +90,7 @@ export const BudgetsMaster = ({ branch } = {}) => {
 };
 
 export const ScenariosMaster = () => (
-  <MasterCrud title="Scenarios" subtitle="What-if views (actuals + provisional vouchers)" resource="scenarios"
+  <MasterCrud title="Scenarios" subtitle="What-if views (actuals + provisional vouchers)" resource="scenarios" writeRoles={ADMIN_WRITE_ROLES}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       { key: 'includeActuals', label: 'Include Actuals', type: 'bool', default: true },
@@ -218,10 +218,11 @@ export const LedgersMaster = ({ branch }) => {
   // A party ledger = one whose Group (or Sub-Group) is Sundry Debtors / Creditors.
   // The GSTIN / credit-terms / contact fields apply only to these.
   const isParty = (form) => /sundry\s+(debtors|creditors)/i.test(`${form?.group || ''} ${form?.subGroup || ''}`);
-  // A bank-account ledger (Group = Bank Accounts) also needs Bank Name / A/c No. / IFSC
-  // and an optional OD/credit limit — the Bank Account Master register reads them from
-  // here, so expose those fields for bank ledgers too, not only party ledgers.
-  const isBankAcct = (form) => /^\s*bank accounts\s*$/i.test(String(form?.group || ''));
+  // A bank-account ledger (Group = Bank Accounts, or an overdraft ledger under Bank OD
+  // Accounts) also needs Bank Name / A/c No. / IFSC and an optional OD/credit limit —
+  // the Bank Account Master register reads them from here, so expose those fields for
+  // bank & OD ledgers too, not only party ledgers.
+  const isBankAcct = (form) => /^\s*bank(\s+od)?\s+accounts\s*$/i.test(String(form?.group || ''));
   const isPartyOrBank = (form) => isParty(form) || isBankAcct(form);
 
   // Group + cascading Sub-Group LIST filters (default = show all). Pick a main group

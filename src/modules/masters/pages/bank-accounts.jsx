@@ -31,7 +31,7 @@ export function BankAccountMaster({ branch, setRoute }) {
   // instead of pulling every branch's bank ledgers and hiding rows in the browser.
   const { data: ledgers = [], isLoading, isError, error, refetch } = useMasterList('ledgers', filterBranch !== 'ALL' ? { branch: filterBranch } : {});
   const bankRows = useMemo(() => (ledgers || [])
-    .filter((l) => ['Bank Accounts', 'Cash-in-Hand'].includes(l.group))
+    .filter((l) => ['Bank Accounts', 'Bank OD Accounts', 'Cash-in-Hand'].includes(l.group))
     .map((l) => ({
       id: l._id || l.code,
       code: l.code || l._id || '',   // stable key for the deep-link edit (?edit=<code>)
@@ -40,7 +40,7 @@ export function BankAccountMaster({ branch, setRoute }) {
       branchAddr: l.subGroup || '',
       accountNo: l.bankAcNo || '',
       ifsc: l.bankIfsc || '',
-      type: l.group === 'Cash-in-Hand' ? 'Cash' : 'Bank',
+      type: l.group === 'Cash-in-Hand' ? 'Cash' : l.group === 'Bank OD Accounts' ? 'OD' : 'Bank',
       currency: l.currency || 'INR',
       openingBal: Number(l.openingBalance) || 0,
       limit: Number(l.creditLimit) || 0,
@@ -69,7 +69,7 @@ export function BankAccountMaster({ branch, setRoute }) {
   return (
     <PageLayout
       title="Bank Account Master"
-      subtitle="All bank accounts where Travkings holds money — per branch, per currency"
+      subtitle="All bank accounts & overdraft facilities — per branch, per currency"
       actions={
         <>
           <Button size="sm" variant="secondary" icon={Upload} onClick={() => setRoute && setRoute('/import')}>Import</Button>
