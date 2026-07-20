@@ -629,6 +629,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // `interBranch` rides the ctx so the SCREEN suppresses TCS exactly as the server does on an INB
   // leg (tcsAmt 0). It cannot be inferred from clientType — see the TCS gate in voucherSpecs.
   const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, supplierWhtRate: suppWhtRate, clientType, interBranch, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, inbZeroRated, suppForeign, suppWhtRate, clientType, interBranch, date, liveVatRate]);
+  // ── Insurance net-payable display (2026-07-20) ───────────────────────────────
+  // On Insurance the supplier commission often rivals the premium, so the GROSS PO
+  // total (SSC + GST, commission-blind) badly overstates what we actually pay the
+  // supplier AND leaves the GP tiles irreconcilable with the GP shown. Surface the
+  // NET figures the engine already computes and the books already post:
+  //  · poNetPayable — mirrors backend creditorNet (posting.builder.js): the amount
+  //    that credits the supplier ledger = gross − commission − commission GST + the
+  //    TDS we withhold (claimed, not paid). Uses the ROUNDED po.total so the screen
+  //    equals the ledger to the paisa (the invoice round-off rides inside gross).
+  //  · GP tiles read totals.gp.saleNet / costNet → Net Sales − Net Purchase = GP.
+  // Insurance-only (moduleCode 'SI') for now — other modules keep the gross display.
+  const isInsurance = moduleCode === 'SI';
+  const poNetPayable = num(totals.po.total) - num(totals.po.incentiveAmt) - num(totals.po.incentiveGst) + (suppForeign ? 0 : num(totals.po.incentiveTds));
   // Effective TCS 206C(1G) rate for this booking's date (5% up to 31-03-2026, else 2%).
   const tcsRate = spec.tcs ? tcs206cRate(spec, date) : 0;
   // The TCS COLUMN itself is hidden on an inter-branch deal — not just zeroed. 206C(1G) can never
@@ -1194,7 +1207,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <td style={poTf}>{pkg && !suppForeign ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
-            <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}{num(totals.po.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.po.roundOff > 0 ? '+' : ''}{fmt(totals.po.roundOff)}</span> : null}</td>
+            <td style={{ ...poTf, color: CR }}>
+              {isInsurance && num(totals.po.incentiveAmt) > 0
+                ? <>{fmt(poNetPayable)}<span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>net payable · gross {fmt(totals.po.total)} − comm {fmt(totals.po.incentiveAmt)}{num(totals.po.incentiveTds) ? ` + ${whtLabel} ${fmt(totals.po.incentiveTds)}` : ''}</span></>
+                : <>{fmt(totals.po.total)}{num(totals.po.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.po.roundOff > 0 ? '+' : ''}{fmt(totals.po.roundOff)}</span> : null}</>}
+            </td>
           </tr></tfoot>
         </table>
       </div>
@@ -1584,8 +1601,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* ③ Gross Profit */}
       <Section n="3" badge={interBranch ? 'INGP' : 'GP'} name={interBranch ? 'Inter-Branch Gross Profit' : 'Gross Profit'} sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
-          <GpCard k={'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
-          <GpCard k={'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
+          <GpCard k={isInsurance ? 'Net Sales (ex ' + taxLabel + ')' : 'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(isInsurance ? totals.gp.saleNet : totals.so.total)} color={DARK} bg="#FFFDF7" />
+          <GpCard k={isInsurance ? 'Net Purchase (ex ' + taxLabel + ')' : 'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(isInsurance ? totals.gp.costNet : totals.po.total)} color={CR} bg="#FFFAEC" />
           <GpCard k={hasExtraLegs ? 'Gross Profit · all POs' : 'Gross Profit'} v={cur + ' ' + fmt(hasExtraLegs ? folderGpTotal : totals.gp.total)} color={DR} pct={(hasExtraLegs ? folderGpPct : totals.gp.pct) + '% margin'} bg="#FCF3DE" />
         </div>
         {hasExtraLegs && (
