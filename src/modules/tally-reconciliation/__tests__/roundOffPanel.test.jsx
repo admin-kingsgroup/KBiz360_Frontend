@@ -82,6 +82,20 @@ test('skipped ledgers are disclosed with the reason they were left alone', async
   expect(screen.getByText(/exceeds the ₹0.50 rounding threshold/i)).toBeInTheDocument();
 });
 
+// The synthetic Profit & Loss A/c b/f can never be a settlement leg (no Ledger master → 422).
+// The BE hands it back in `skipped` as tolerated rounding; the panel must disclose it, by name,
+// in the "left for correction at source" list — never drop it silently into the eligible legs.
+test('the synthetic Profit & Loss A/c b/f is disclosed in the skipped list, not posted', async () => {
+  previewRoundOff.mockResolvedValue({ ...CLEARS,
+    skipped: [{ ledger: 'Profit & Loss A/c', diff: -0.01, status: 'rounding', reason: 'within the rounding tolerance — accepted as rounding, no settlement needed' }] });
+  mount();
+  expect(await screen.findByText(/1 ledger left for correction at source/i)).toBeInTheDocument();
+  expect(screen.getByText('Profit & Loss A/c')).toBeInTheDocument();
+  expect(screen.getByText(/within the rounding tolerance/i)).toBeInTheDocument();
+  // ...and it is NOT among the posting legs.
+  expect(screen.queryByRole('button', { name: /Reverse/i })).toBeNull();
+});
+
 test('AE can see the position but cannot post it', async () => {
   previewRoundOff.mockResolvedValue(CLEARS);
   mount(AE);

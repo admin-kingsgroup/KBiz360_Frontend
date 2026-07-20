@@ -163,6 +163,33 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText('▸ drill vouchers')).not.toBeInTheDocument();
   });
 
+  test('a synthetic Profit & Loss A/c b/f rounding residue (counts.rounding === 2) renders as Rounding, not off, and is not drillable', async () => {
+    // The screenshot case, on the board: the derived P&L b/f is tolerated as rounding alongside
+    // Round Off, so counts.rounding is 2. The KPI must read "2" (one chip, not two) and the P&L
+    // A/c orphan root + flat row must show the info "Rounding" badge, never a red "Off", and offer
+    // no drill (it has no Ledger master / voucher trail).
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-01', tier: 'month', periodEnd: '2026-01-31',
+      counts: { total: 3, tied: 1, rounding: 2, off: 0, onlyErp: 0, onlyTally: 0, offTotal: 0, absDiff: 0, absDiffRaw: 0.02, netProfitErp: 0, netProfitTally: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
+      rows: [
+        { ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 5000, tally: 5000, diff: 0, status: 'tied' },
+        { ledger: 'Round Off', code: 'L1156', group: 'Variable Expenses', parentGroup: 'Variable Expenses', statement: 'BS', nature: 'liability', erp: -0.01, tally: -0.02, diff: 0.01, status: 'rounding', rounding: true },
+        { ledger: 'Profit & Loss A/c', code: '', group: 'Profit & Loss A/c', parentGroup: 'Profit & Loss A/c', statement: 'BS', nature: 'liability', erp: 140700, tally: 140700.01, diff: -0.01, status: 'rounding', rounding: true },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    // Renders without breaking — as both the flat row and its own CoA-tree orphan root.
+    expect((await screen.findAllByText('Profit & Loss A/c')).length).toBeGreaterThanOrEqual(1);
+    // The Rounding treatment is surfaced (KPI chip + the two row badges) — shown, not hidden.
+    // With counts.rounding === 2 the grid still shows a SINGLE Rounding KPI (value 2), so there
+    // is no orphaned/duplicate chip; the badges ride on the Round Off + P&L A/c rows.
+    expect(screen.getAllByText('Rounding').length).toBeGreaterThanOrEqual(2);
+    // A tolerated rounding residue is NOT a defect: the P&L A/c row offers no voucher drill.
+    expect(screen.queryByText('▸ drill vouchers')).not.toBeInTheDocument();
+  });
+
   test('a Round-Off-only P&L residue reads "Rounding" in the footer, never a red "Off"', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({
@@ -1130,7 +1157,7 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     ]);
     wrap(<TallyCertRegister branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
     await screen.findByText('2026-01');
-    const cell = screen.getByTitle('Differs only by tolerated Round Off rounding');
+    const cell = screen.getByTitle('Differs only by tolerated sub-rupee rounding (Round Off / P&L b/f)');
     expect(cell.className).toMatch(/text-info/);
     expect(cell.className).not.toMatch(/text-danger/);
   });
