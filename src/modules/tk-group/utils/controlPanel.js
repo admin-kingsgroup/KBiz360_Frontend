@@ -164,35 +164,63 @@ export function digestSummary({ overview = {}, integrity = {}, inbox = {} } = {}
 }
 
 // ─── Power Console structure (pure data) ─────────────────────────────────────
-// Two RULE screens — Default Rules (always-on, read-only) and Configurable Rules (the
-// Owner's ON/OFF switches) — plus the enforcement tools and reference/oversight screens.
+// ONE console, organised by WHO governs each rule — the three governance planes,
+// plus an Oversight lens that reads across all of them:
+//   ① ERP Law          — locked, in code, read-only (the floor)
+//   ② Operational Rules — the Owner's switches / limits / matrix (ship OFF, fail-safe)
+//   ③ Owner & Authority — who verifies / approves / signs, delegation, break-glass
 // There is NO master switch: enforcement engages rule-by-rule. `key` matches the
-// component's screen router.
+// component's screen router. Approval Authority is converged HERE (plane ③) so authority
+// has one home — /tk/rules keeps only the Rule Book + Rules Manager.
 export const POWER_SCREENS = [
-  { group: 'Rules', items: [
-    { key: 'defaults',     label: 'Default Rules' },
+  { group: 'ERP Law', items: [
+    { key: 'defaults',     label: 'Law by Domain' },
+  ] },
+  { group: 'Operational Rules', items: [
     { key: 'configurable', label: 'Configurable Rules' },
     { key: 'grid',         label: 'All-Branches Grid' },
+    { key: 'matrix',       label: 'Enforcement Matrix' },
+    { key: 'limits',       label: 'Limits & Thresholds' },
+    { key: 'tester',       label: 'Policy Tester' },
   ] },
-  { group: 'Enforcement tools', items: [
-    { key: 'matrix',   label: 'Enforcement Matrix' },
-    { key: 'limits',   label: 'Limits & Thresholds' },
-    { key: 'tester',   label: 'Policy Tester' },
-  ] },
-  { group: 'Reference & oversight', items: [
+  { group: 'Owner & Authority', items: [
+    { key: 'authority',  label: 'Approval Authority' },
     { key: 'roles',      label: 'Role Capabilities' },
     { key: 'users',      label: 'User Configuration' },
     { key: 'masters',    label: 'Master & Onboarding' },
     { key: 'delegation', label: 'Delegation' },
     { key: 'breakglass', label: 'Break-Glass Access' },
-    { key: 'active',     label: 'Active Controls' },
-    { key: 'digest',     label: 'Daily Digest' },
-    { key: 'log',        label: 'Change Log / Audit' },
+  ] },
+  { group: 'Oversight', items: [
+    { key: 'active', label: 'Active Controls' },
+    { key: 'digest', label: 'Daily Digest' },
+    { key: 'log',    label: 'Change Log / Audit' },
   ] },
 ];
 
 /** Flat list of all screen keys (for the router / tests). */
 export const POWER_SCREEN_KEYS = POWER_SCREENS.flatMap((g) => g.items.map((i) => i.key));
+
+// ── Plane ① · ERP Law band ───────────────────────────────────────────────────
+// Roll the regrouped Rule Book (regroupRegistry() output, or the bundled RULE_BOOK) into
+// the read-only law band the Control Panel shows: per-domain law counts split into the
+// app's Accounts / Operations tracks, plus totals. Pure — the panel renders straight from
+// it, and the atomic rules stay one click away in the Rule Book. Counts are derived here,
+// never hand-typed, so the band can never drift from the registry.
+export function lawBand(book = []) {
+  const row = (d) => ({ id: d.id, title: d.title, count: (d.rules || []).length, group: d.group });
+  const accounts = book.filter((d) => d.group === 'accounts').map(row);
+  const ops = book.filter((d) => d.group === 'ops').map(row);
+  const sum = (rows) => rows.reduce((n, r) => n + r.count, 0);
+  // `all` sums EVERY domain (not just accounts+ops) so the headline count can't undercount if
+  // the registry ever carries a domain outside the two known tracks.
+  const all = book.reduce((n, d) => n + (d.rules || []).length, 0);
+  return {
+    accounts,
+    ops,
+    totals: { accounts: sum(accounts), ops: sum(ops), all, domains: book.length },
+  };
+}
 
 // ── Screen 1 · DEFAULT RULES — always enforced, not switchable (read-only) ────
 // The foundation locks that apply on day one, guard or no guard. maker≠approver and

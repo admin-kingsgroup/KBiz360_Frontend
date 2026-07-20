@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getFlagState, proposeFlags, setFlag, setManyFlags, flagImpact } from '../api/flags';
 import { withBranchToggled, isFlagOn } from '../utils/flags';
@@ -15,10 +15,12 @@ import { UserConfig } from '../UserConfig';
 import { ChangeLog } from '../ChangeLog';
 import { Delegation } from '../Delegation';
 import { BreakGlass } from '../BreakGlass';
+import { AuthorityAdmin } from './AuthorityAdmin';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
-import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges } from '../utils/controlPanel';
+import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
+import { RULE_BOOK, regroupRegistry } from '../utils/ruleBook.data';
 import { Badge } from '../../../shell/primitives';
-import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
+import { isViewOnly, VIEW_ONLY_REASON, apiGet } from '../../../core/api';
 
 // ─── TK GROUP CENTRAL · Control Panel ────────────────────────────────────────
 // Two rule screens — DEFAULT RULES (always-on foundation locks, read-only) and
@@ -72,6 +74,29 @@ function DefaultRow({ nm, ds }) {
     </div>
   );
 }
+// One track of the ERP-Law band: a domain roll-up (name + law count), each row opening the
+// full rules in the Rule Book. Read-only — laws are shown, never switched.
+function LawGroup({ title, sub, rows, count, onOpen }) {
+  return (
+    <div className="overflow-hidden rounded-brand border border-surface-border bg-surface shadow-sm">
+      <div className="flex items-center gap-2 border-b border-surface-border bg-surface-alt px-3.5 py-2.5">
+        <span className="text-[13px] font-semibold text-ink">{title}</span>
+        <span className="ml-auto font-mono text-[10px] font-bold uppercase tracking-wide text-ink-subtle">{rows.length} domains · {count} laws</span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-3.5 py-4 text-[12px] text-ink-subtle">No {sub} laws in the registry yet.</div>
+      ) : rows.map((d) => (
+        <button key={d.id} type="button" onClick={onOpen} title="Open in the Rule Book"
+          className="flex w-full items-center gap-3 border-t border-surface-border/60 px-3.5 py-2 text-left first:border-t-0 hover:bg-navy/5">
+          <span className="w-10 shrink-0 font-mono text-[10px] font-bold text-accent/80">{d.id}</span>
+          <span className="flex-1 truncate text-[12.5px] text-ink">{d.title}</span>
+          <Badge tone="neutral" size="sm">{d.count}</Badge>
+          <span className="text-[11px] text-ink-subtle">→</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 // Check → Verify → Approve reads as a pipeline, so each level gets its own accent.
 const CHAIN_COLORS = ['#2563eb', '#d97706', '#16a34a'];
 function ChainCard({ k, r, w, n }) {
@@ -119,6 +144,12 @@ export function ControlPanel({ setRoute }) {
   const [screen, setScreen] = useState('defaults');
   const [branch, setBranch] = useState('default');   // panel-wide branch scope for the controls
   const flagsQ = useQuery({ queryKey: ['tk', 'flags'], queryFn: getFlagState, staleTime: 30_000 });
+  // Plane ① · ERP Law band — read the enforced-rule registry (same key/fallback as the Rule
+  // Book, so both agree). regroupRegistry(null) → null → the bundled RULE_BOOK, so the band is
+  // never empty even if the endpoint is cold/unavailable.
+  const lawQ = useQuery({ queryKey: ['tk', 'rules-registry'], queryFn: () => apiGet('/api/rules').catch(() => null), staleTime: 300_000 });
+  const lawBook = useMemo(() => regroupRegistry(lawQ.data?.items) || RULE_BOOK, [lawQ.data]);
+  const band = useMemo(() => lawBand(lawBook), [lawBook]);
   const verify = useConfigValue('approval.verifyEmails').data;
   const approve = useConfigValue('approval.approveEmails').data;
   const v = approvalChainView({ verifyEmails: verify, approveEmails: approve, flags: flagsQ.data });
@@ -322,13 +353,31 @@ export function ControlPanel({ setRoute }) {
 
   const screenBody = () => {
     switch (screen) {
-      case 'defaults':
+      case 'defaults': {
+        const lawLive = !!(lawQ.data && lawQ.data.items && lawQ.data.items.length);
         return (
           <>
-            <p className="mb-4 mt-1 max-w-[80ch] text-[13.5px] text-ink-muted">The foundation locks that are <b>always enforced</b> and can’t be switched off — they apply on day one, before you engage anything else. Read-only.</p>
+            <p className="mb-1.5 mt-1 max-w-[82ch] text-[13.5px] text-ink-muted">
+              The <b>law floor</b> — <b>{band.totals.all}</b> rules the ERP enforces in code across <b>{band.totals.domains}</b> domains.
+              These are <b>always on and read-only</b>: they apply on day one and can’t be switched off. Rolled up by domain below;
+              click a domain for its individual rules, each citing the file that enforces it, in the{' '}
+              <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book')}>Rule Book</button>.
+            </p>
+            <p className="mb-4 flex items-center gap-1.5 text-[11px]">
+              {lawLive
+                ? <><span className="inline-block h-2 w-2 rounded-full bg-success" /><span className="text-ink-subtle">Live from the rules registry (<code>/api/rules</code>).</span></>
+                : <><span className="inline-block h-2 w-2 rounded-full bg-warning" /><span className="text-ink-subtle">Showing the built-in reference copy — the live registry didn’t load, so counts may lag the server.</span></>}
+            </p>
+            <div className="grid gap-4 tablet:grid-cols-2">
+              <LawGroup title={'📒 Accounts — financial law'} sub="Accounts" rows={band.accounts} count={band.totals.accounts} onOpen={() => go('/tk/rules?tab=book&track=accounts')} />
+              <LawGroup title={'⚙ Operations — process & control law'} sub="Operations" rows={band.ops} count={band.totals.ops} onOpen={() => go('/tk/rules?tab=book&track=ops')} />
+            </div>
+            <H3>Day-one foundation locks</H3>
+            <p className="mb-3 -mt-1 max-w-[82ch] text-[12.5px] text-ink-muted">The always-on essentials spelled out in plain language — the most governance-critical laws from the domains above.</p>
             <div className="grid gap-2.5 tablet:grid-cols-2">{DEFAULT_RULES.map((r, i) => <DefaultRow key={i} {...r} />)}</div>
           </>
         );
+      }
       case 'configurable':
         return (
           <>
@@ -439,6 +488,7 @@ export function ControlPanel({ setRoute }) {
       case 'digest': return <DailyDigest go={go} />;
       case 'limits': return <BranchLimitsEditor go={go} branch={branch} onBranchChange={setBranch} />;
       case 'users': return <UserConfig go={go} branch={branch} />;
+      case 'authority': return <AuthorityAdmin canManage={owner} />;
       case 'delegation': return <Delegation />;
       case 'breakglass': return <BreakGlass />;
       case 'log': return <ChangeLog go={go} />;

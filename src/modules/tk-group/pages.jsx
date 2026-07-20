@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MyRole } from './setup-roles/MyRole';
 import { ApprovalsInbox } from './approvals/ApprovalsInbox';
 import { FlagAdmin } from './control-configuration/FlagAdmin';
@@ -12,7 +13,6 @@ import { HealthScorecard } from './control-configuration/HealthScorecard';
 import { RulesManager } from './control-configuration/RulesManager';
 import { UserRulesManager } from './control-configuration/UserRulesManager';
 import { RuleBook } from './control-configuration/RuleBook';
-import { AuthorityAdmin } from './control-configuration/AuthorityAdmin';
 import { BranchCockpit } from './control-configuration/BranchCockpit';
 import { AuditTrail } from './control-configuration/AuditTrail';
 import { TargetsBudgets } from './control-configuration/TargetsBudgets';
@@ -172,17 +172,26 @@ export function TkIntegrityPage() {
 // (read-only reference of the rules enforced in code). Tabbed so they sit together
 // under Control & Configuration. User Rules Manager is its own separate entry under
 // Rules & Requests (/tk/user-rules → TkUserRulesPage), so it is no longer a tab here.
+// Approval Authority converged into the Control Panel (plane ③ · Owner & Authority), so
+// authority has a single home. This page keeps the reference + authoring surfaces only.
 const RULES_TABS = [
   { id: 'erp', label: 'ERP Rules Manager', subtitle: 'OWNER ONLY. Add, verify and activate the rules the Control Tower monitors. New rules land Inactive (Draft) and do nothing until you Test them on live data and Activate. System rules (🔒) are enforced in code and read-only.' },
-  { id: 'authority', label: 'Approval Authority', subtitle: 'OWNER ONLY. Who verifies, approves and signs (Director / Owner) on the three-level approval chain. Read live by the chain from the DB — a change applies immediately (no deploy) and is audited. These were previously invisible hardcoded fallbacks.' },
   { id: 'book', label: 'Rule Book', subtitle: 'Read-only reference of every Accounts & Operations rule the ERP enforces in code — searchable, filterable by Accounts / Operations, each citing the file that enforces it. Documentation only; nothing here is evaluated on live data.' },
 ];
 
 export function TkRulesPage({ owner, initialTab = 'erp' }) {
-  const [tab, setTab] = useState(RULES_TABS.some((t) => t.id === initialTab) ? initialTab : 'erp');
-  // Deep-links may target a specific tab; sync when the prop changes (the page does not
-  // remount on route change). In-page tab clicks are unaffected.
-  React.useEffect(() => { if (RULES_TABS.some((t) => t.id === initialTab)) setTab(initialTab); }, [initialTab]);
+  // ?tab=book deep-links straight to the Rule Book (e.g. from the Control Panel law band);
+  // an explicit initialTab prop is the fallback.
+  const [sp] = useSearchParams();
+  const urlTab = sp.get('tab');
+  const startTab = RULES_TABS.some((t) => t.id === urlTab) ? urlTab : initialTab;
+  const [tab, setTab] = useState(RULES_TABS.some((t) => t.id === startTab) ? startTab : 'erp');
+  // Sync when the deep-link tab (or the prop) changes; the page does not remount on route
+  // change. In-page tab clicks are unaffected (they don't touch the URL).
+  React.useEffect(() => {
+    const want = RULES_TABS.some((t) => t.id === urlTab) ? urlTab : initialTab;
+    if (RULES_TABS.some((t) => t.id === want)) setTab(want);
+  }, [urlTab, initialTab]);
   const meta = RULES_TABS.find((t) => t.id === tab) || RULES_TABS[0];
   return (
     <Page title={meta.label} subtitle={meta.subtitle}>
@@ -195,7 +204,6 @@ export function TkRulesPage({ owner, initialTab = 'erp' }) {
         ))}
       </div>
       {tab === 'erp' ? <RulesManager canManage={!!owner} />
-        : tab === 'authority' ? <AuthorityAdmin canManage={!!owner} />
         : <RuleBook />}
     </Page>
   );

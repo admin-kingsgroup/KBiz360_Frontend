@@ -378,7 +378,8 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const renderLedgerRow = (r, keyStr, indent = 16) => {
     const fixNeeded = r.needsRename || r.needsRegroup;
     const meta = (fixNeeded && r.status === 'tied') ? { tone: 'warning', label: 'Fix in Tally' } : statusMeta(r.status);
-    const off = r.status !== 'tied' && !r.synthetic;
+    // A tolerated Round Off rounding residue ('rounding') is not a defect — not drillable.
+    const off = r.status !== 'tied' && r.status !== 'rounding' && !r.synthetic;
     const drill = () => setDrill(r);
     const canModule = r.statement === 'PL' && r.erp != null && !r.synthetic && MODULE_HEADS.has(r.parentGroup) && r.hasModules;
     const mKey = modKey(r); const mShown = canModule && modOpen[mKey]; const mInfo = modData[mKey];
@@ -479,7 +480,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const renderModuleSlice = (r, keyStr) => {
     const meta = modBadge(r.status);
     const full = rows.find((x) => nkFE(x.ledger) === nkFE(r.ledger));
-    const canDrill = !!full && full.status !== 'tied' && !full.synthetic;   // verify only where the ledger is genuinely off
+    const canDrill = !!full && full.status !== 'tied' && full.status !== 'rounding' && !full.synthetic;   // verify only where the ledger is genuinely off (a tolerated rounding residue is not)
     const drill = () => { if (full) setDrill(full); };
     return (
       <tr key={keyStr}
@@ -745,6 +746,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         <Kpi label="In scope" value={counts.total || 0} />
         <Kpi label="Tied" value={counts.tied || 0} tone="success" />
         <Kpi label="Off" value={(counts.off || 0)} tone={(counts.off || 0) > 0 ? 'danger' : 'muted'} />
+        {(counts.rounding || 0) > 0 ? <Kpi label="Rounding" value={counts.rounding} tone="info" /> : null}
         <Kpi label="Only in ERP" value={counts.onlyErp || 0} tone={(counts.onlyErp || 0) > 0 ? 'warning' : 'muted'} />
         <Kpi label="Only in Tally" value={counts.onlyTally || 0} tone={(counts.onlyTally || 0) > 0 ? 'warning' : 'muted'} />
         <Kpi label="Fix in Tally" value={fixTotal} tone={fixTotal > 0 ? 'warning' : 'muted'} />

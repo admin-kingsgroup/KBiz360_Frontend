@@ -409,3 +409,26 @@ export function ruleBookStats(book = RULE_BOOK) {
 }
 
 export const RULE_GROUP_LABEL = { accounts: 'Accounts', ops: 'Operations' };
+
+// Regroup the flat GET /api/rules registry into the RULE_BOOK shape (one section per
+// domain). Shared by the Rule Book tab AND the Control Panel's ERP-Law band so both read
+// the domains identically. regime is preserved only when explicit ('' → undefined so
+// ruleRegime() derives it from the text, as with the bundled data). Returns null when
+// there is nothing to show, so the caller falls back to the bundled RULE_BOOK.
+export function regroupRegistry(items) {
+  if (!items || !items.length) return null;
+  const map = new Map();
+  const order = [];
+  for (const it of items) {
+    // Key on domainCode (the canonical mnemonic), NOT domain: flatten rows carry the letter
+    // (A, Q, N…) while curated rows carry the mnemonic (GST, APPR, RECON…) — same domain, so
+    // keying on `domain` split each into two identically-titled sections. domainCode unifies them.
+    const key = it.domainCode || it.domain;
+    if (!map.has(key)) {
+      map.set(key, { id: key, group: it.group, title: it.domainTitle, blurb: it.domainBlurb || '', rules: [] });
+      order.push(key);
+    }
+    map.get(key).rules.push({ t: it.title, r: it.sourceRef, regime: it.regime || undefined });
+  }
+  return order.map((id) => map.get(id));
+}

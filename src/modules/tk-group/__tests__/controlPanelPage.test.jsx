@@ -51,18 +51,28 @@ function renderWith(ui) {
 // No kb360-user in localStorage → isOwner() false → the propose-to-approve path.
 afterEach(() => { try { localStorage.clear(); } catch { /* ignore */ } });
 
-describe('Control Panel · two-screen model', () => {
-  test('opens on Default Rules, dormant, with the two rule screens + tools in the nav', async () => {
+describe('Control Panel · three-plane model', () => {
+  test('opens on Law by Domain (plane ①), dormant, with the three planes + Oversight in the nav', async () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     expect(await screen.findByText(/Control Panel/)).toBeInTheDocument();
     expect(await screen.findByText(/Everything OFF/)).toBeInTheDocument();   // resolves after the brief loading strip
-    // rule screens + a few tools across the groups ("Default Rules" is both the nav item
-    // and the active screen heading, so it appears twice)
-    expect(screen.getAllByText('Default Rules').length).toBeGreaterThanOrEqual(1);
+    // "Law by Domain" is both the nav item and the active screen heading, so it appears twice
+    expect(screen.getAllByText('Law by Domain').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Configurable Rules')).toBeInTheDocument();
     expect(screen.getByText('Enforcement Matrix')).toBeInTheDocument();
     expect(screen.getByText('User Configuration')).toBeInTheDocument();
     expect(screen.getByText('Break-Glass Access')).toBeInTheDocument();
+    // the three governance planes are the nav groups
+    expect(screen.getByText('ERP Law')).toBeInTheDocument();
+    expect(screen.getByText('Operational Rules')).toBeInTheDocument();
+    expect(screen.getByText('Owner & Authority')).toBeInTheDocument();
+    // Approval Authority is converged into the panel (plane ③)
+    expect(screen.getByText('Approval Authority')).toBeInTheDocument();
+    // plane ① renders the ERP-Law band — Accounts + Operations domain roll-ups (bundled
+    // RULE_BOOK fallback here, since apiGet is mocked to {}) plus the foundation locks
+    expect(screen.getByText(/Accounts — financial law/)).toBeInTheDocument();
+    expect(screen.getByText(/Operations — process & control law/)).toBeInTheDocument();
+    expect(screen.getByText('Day-one foundation locks')).toBeInTheDocument();
     // the master switch is gone
     expect(screen.queryByText('Master Switch')).not.toBeInTheDocument();
   });
@@ -75,7 +85,7 @@ describe('Control Panel · two-screen model', () => {
     expect(screen.queryByText(/Everything OFF/)).not.toBeInTheDocument();   // must not masquerade as dormant
   });
 
-  test('Default Rules screen lists always-on foundation locks (read-only)', async () => {
+  test('ERP Law (plane ①) screen lists always-on foundation locks (read-only)', async () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     expect(await screen.findByText('Negative-GP block')).toBeInTheDocument();
     expect(screen.getByText(/Maker cannot approve their own routed/)).toBeInTheDocument();
@@ -257,10 +267,13 @@ describe('Control Panel · two-screen model', () => {
     expect(await screen.findByTestId('control-change-log')).toBeInTheDocument();
   });
 
-  test('a Rule Book link routes to /tk/rules', async () => {
+  test('a Rule Book link routes to the Rule Book (status strip + the law-band deep-link)', async () => {
     const nav = jest.fn();
     renderWith(<ControlPanel setRoute={nav} />);
-    fireEvent.click(await screen.findByRole('button', { name: /Rule Book/ }));
-    expect(nav).toHaveBeenCalledWith('/tk/rules');
+    // Two affordances now: the status-strip "📖 Rule Book" (→ /tk/rules) and the plane-①
+    // band link (→ /tk/rules?tab=book). Either routes to the Rule Book.
+    const links = await screen.findAllByRole('button', { name: /Rule Book/ });
+    fireEvent.click(links[0]);
+    expect(nav).toHaveBeenCalledWith(expect.stringContaining('/tk/rules'));
   });
 });

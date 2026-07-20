@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../../core/api';
-import { RULE_BOOK, ruleBookStats, RULE_GROUP_LABEL } from '../utils/ruleBook.data';
+import { RULE_BOOK, ruleBookStats, RULE_GROUP_LABEL, regroupRegistry } from '../utils/ruleBook.data';
 import { ruleRegime, ruleAppliesTo, REGIME_LABEL, regimeStats } from '../utils/ruleBranches';
 import { ResponsiveGrid, Badge, Input } from '../../../shell/primitives';
 import { KpiTile } from '../../dashboard/components/cards/KpiTile';
@@ -20,31 +21,15 @@ const GROUP_FILTERS = [
   { id: 'ops', label: 'Operations' },
 ];
 
-// Regroup the flat GET /api/rules registry into the RULE_BOOK shape the view renders.
-// regime is preserved only when explicit ('' → undefined so ruleRegime() derives it from
-// the text, exactly as with the bundled data). Returns null when there is nothing to show
-// (so the caller falls back to the bundled RULE_BOOK).
-function regroupRegistry(items) {
-  if (!items || !items.length) return null;
-  const map = new Map();
-  const order = [];
-  for (const it of items) {
-    // Key on domainCode (the canonical mnemonic), NOT domain: flatten rows carry the letter
-    // (A, Q, N…) while curated rows carry the mnemonic (GST, APPR, RECON…) — same domain, so
-    // keying on `domain` split each into two identically-titled sections. domainCode unifies them.
-    const key = it.domainCode || it.domain;
-    if (!map.has(key)) {
-      map.set(key, { id: key, group: it.group, title: it.domainTitle, blurb: it.domainBlurb || '', rules: [] });
-      order.push(key);
-    }
-    map.get(key).rules.push({ t: it.title, r: it.sourceRef, regime: it.regime || undefined });
-  }
-  return order.map((id) => map.get(id));
-}
-
 export function RuleBook() {
   const [q, setQ] = useState('');
-  const [group, setGroup] = useState('all');
+  // Deep-link: the Control Panel law band opens the book pre-filtered to a track
+  // (?track=accounts|ops). Seed from it, then re-sync only when the URL track changes so a
+  // manual filter click (which doesn't touch the URL) is never fought.
+  const [sp] = useSearchParams();
+  const track = sp.get('track');
+  const [group, setGroup] = useState(track === 'accounts' || track === 'ops' ? track : 'all');
+  useEffect(() => { if (track === 'accounts' || track === 'ops') setGroup(track); }, [track]);
   const [branch, setBranch] = useState('all'); // 'all' | 'common' | branch code
   // Read the Rule Book live from the DB registry; fall back to the bundled data so the tab
   // still renders if the endpoint is unavailable (older backend / offline / cold DB).

@@ -1,4 +1,5 @@
-import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges } from '../utils/controlPanel';
+import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
+import { RULE_BOOK, ruleBookStats, regroupRegistry } from '../utils/ruleBook.data';
 
 describe('posture presets + copy-across-branches (pure)', () => {
   test('presetChanges: covers every configurable flag; preset flags ON, the rest OFF, for the scope', () => {
@@ -54,15 +55,54 @@ describe('postureGrid — all-branches bird\'s-eye', () => {
 });
 
 describe('Control Panel structure', () => {
-  test('two rule screens + tools, no master screen', () => {
-    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['Rules', 'Enforcement tools', 'Reference & oversight']);
+  test('three governance planes + Oversight, no master screen', () => {
+    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['ERP Law', 'Operational Rules', 'Owner & Authority', 'Oversight']);
+    // Plane ① is the read-only law screen; plane ② opens with the switch screens.
     expect(POWER_SCREEN_KEYS.slice(0, 3)).toEqual(['defaults', 'configurable', 'grid']);
     expect(POWER_SCREEN_KEYS).not.toContain('master');
-    expect(POWER_SCREEN_KEYS).toHaveLength(14);
+    expect(POWER_SCREEN_KEYS).toHaveLength(15);   // +1: Approval Authority converged into plane ③
+  });
+  test('Approval Authority is converged into plane ③ (Owner & Authority)', () => {
+    const auth = POWER_SCREENS.find((g) => g.group === 'Owner & Authority');
+    expect(auth.items.map((i) => i.key)).toContain('authority');
+    expect(auth.items.find((i) => i.key === 'authority').label).toBe('Approval Authority');
   });
   test('screen keys are unique and include the tools', () => {
     expect(new Set(POWER_SCREEN_KEYS).size).toBe(POWER_SCREEN_KEYS.length);
     for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log']) expect(POWER_SCREEN_KEYS).toContain(k);
+  });
+});
+
+describe('ERP Law band (plane ① · pure roll-up)', () => {
+  test('lawBand rolls the Rule Book into Accounts / Operations domain counts, totals derived', () => {
+    const b = lawBand(RULE_BOOK);
+    const stats = ruleBookStats(RULE_BOOK);
+    // Totals are derived from the registry, never hand-typed — so they can't drift.
+    expect(b.totals.all).toBe(stats.total);
+    expect(b.totals.accounts).toBe(stats.accounts);
+    expect(b.totals.ops).toBe(stats.ops);
+    expect(b.totals.domains).toBe(stats.domains);
+    // Every domain lands in exactly one track; row counts sum back to the group totals.
+    expect(b.accounts.length + b.ops.length).toBe(RULE_BOOK.length);
+    expect(b.accounts.reduce((n, r) => n + r.count, 0)).toBe(b.totals.accounts);
+    expect(b.ops.every((r) => r.id && r.title && typeof r.count === 'number')).toBe(true);
+  });
+  test('lawBand reads a live /api/rules registry identically to the bundled book (via regroupRegistry)', () => {
+    // Simulate a flat registry payload → regroup → band; counts must match the same items.
+    const items = [
+      { domainCode: 'GST', domain: 'A', group: 'accounts', domainTitle: 'Taxation — GST', title: 'r1', sourceRef: 'x:1' },
+      { domainCode: 'GST', domain: 'A', group: 'accounts', domainTitle: 'Taxation — GST', title: 'r2', sourceRef: 'x:2' },
+      { domainCode: 'APPR', domain: 'Q', group: 'ops', domainTitle: 'Approval Chain', title: 'r3', sourceRef: 'y:1' },
+    ];
+    const b = lawBand(regroupRegistry(items));
+    expect(b.totals.all).toBe(3);
+    expect(b.totals.accounts).toBe(2);
+    expect(b.totals.ops).toBe(1);
+    expect(b.accounts[0]).toMatchObject({ id: 'GST', count: 2 });
+  });
+  test('lawBand is safe on an empty book', () => {
+    expect(lawBand([]).totals).toEqual({ accounts: 0, ops: 0, all: 0, domains: 0 });
+    expect(lawBand().totals.all).toBe(0);
   });
   test('DEFAULT_RULES (always-on) carry name + description; include SoD + the DB-enforced invariants', () => {
     expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(44);   // 16 base + 13 audited + 4 lifecycle + 12 authority gates

@@ -144,6 +144,25 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText('HDFC Bank A/c')).not.toBeInTheDocument();
   });
 
+  test('a Round Off rounding residue shows the distinct Rounding badge + KPI, and is not a defect', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-01', tier: 'month', periodEnd: '2026-01-31',
+      counts: { total: 2, tied: 1, rounding: 1, off: 0, onlyErp: 0, onlyTally: 0, offTotal: 0, absDiff: 0, netProfitErp: 0, netProfitTally: 0 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 2 },
+      rows: [
+        { ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 5000, tally: 5000, diff: 0, status: 'tied' },
+        { ledger: 'Round Off', code: 'L1156', group: 'Variable Expenses', parentGroup: 'Variable Expenses', statement: 'BS', nature: 'liability', erp: -0.01, tally: -0.02, diff: 0.01, status: 'rounding', rounding: true },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    expect(await screen.findByText('Round Off')).toBeInTheDocument();
+    // Both the KPI chip and the row badge read "Rounding" — the residue is surfaced, not hidden.
+    expect(screen.getAllByText('Rounding').length).toBeGreaterThanOrEqual(2);
+    // It is NOT a defect: the row carries no drill affordance.
+    expect(screen.queryByText('▸ drill vouchers')).not.toBeInTheDocument();
+  });
+
   test('chart sub-group nesting + the ERP module drill (toggle ONLY where a real split exists)', async () => {
     const { getTieOut, getModuleBreakdown } = require('../api');
     getTieOut.mockResolvedValueOnce({
