@@ -1726,6 +1726,15 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   // View-only user: pre-disable the Save (commit) button with a reason. Collapses to the original when false.
   const vo = isViewOnly();
 
+  // Unsaved-changes guard: the reversal (RF/RI) form keeps its OWN state, which the
+  // fare-grid parent's guard (customer/supplier/lines) never sees — so without this,
+  // a half-entered refund/reissue could be navigated away and silently discarded. A
+  // snapshot compare vs the pristine seed; skipped once saved (`result`) or for a
+  // view-only user (nothing savable to lose). Never throws.
+  const pristineRef = useRef(null);
+  if (pristineRef.current === null) pristineRef.current = JSON.stringify(state);
+  useNavGuard(() => { try { return !result && !vo && JSON.stringify(state) !== pristineRef.current; } catch { return false; } });
+
   // Saving always lands the RF/RI booking in Pending — no save-and-approve from entry
   // (any user). It posts only when approved from the Pending queue.
   const save = async () => {

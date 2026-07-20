@@ -5,7 +5,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useEffect, useState, useRef, useCallback, Suspense } from 'react';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate, useBlocker } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
@@ -201,6 +201,18 @@ export default function KB360App(){
   // useBlocker in react-router 6 without a data router — so that one path stays uncovered.)
   const goBack = useCallback(()=>{ if(isGuardDirty()){ confirmLeave(()=>rrNavigate(-1)); return; } rrNavigate(-1); }, [rrNavigate, confirmLeave]);
   const goForward = useCallback(()=>{ if(isGuardDirty()){ confirmLeave(()=>rrNavigate(1)); return; } rrNavigate(1); }, [rrNavigate, confirmLeave]);
+  // Native browser Back/Forward (the chrome buttons) don't pass through navigate()/goBack(),
+  // so guard them with react-router's useBlocker: block a history navigation whenever a form
+  // is dirty, then reuse the same Leave/Stay confirm. In-app navigation already prompts AND
+  // clears the guard BEFORE it navigates, so isGuardDirty() reads false by the time the router
+  // runs shouldBlock for those — this path only ever fires for the browser's own buttons.
+  const backBlocker = useBlocker(()=>isGuardDirty());
+  useEffect(()=>{
+    if(backBlocker.state !== 'blocked') return;
+    confirmDialog({ title:'Leave this screen?', message:'You have unsaved changes that will be lost.', confirmLabel:'Leave', cancelLabel:'Stay', danger:true })
+      .then((res)=>{ if(res && res.confirmed){ clearNavGuard(); backBlocker.proceed(); } else { backBlocker.reset(); } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backBlocker.state]);
   const navValue={ route, navigate, goBack, goForward, canBack:histIdx>0, canForward:histIdx<maxIdxRef.current };
 
   // TK Group Central · in-cockpit branch Focus. The top selector holds the MODE (ALL);
