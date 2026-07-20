@@ -9,8 +9,9 @@
 import { buildBookingInvoice } from '../invoiceHtml';
 
 jest.mock('../referenceCache', () => ({ companyProfile: jest.fn(() => ({})), hsnSacFor: jest.fn(() => '') }));
-jest.mock('../styleTokens', () => ({ bc: () => ({ cur: '₹' }) }));
+jest.mock('../styleTokens', () => ({ bc: jest.fn(() => ({ cur: '₹' })) }));
 const { companyProfile, hsnSacFor } = require('../referenceCache');
+const { bc } = require('../styleTokens');
 
 const booking = {
   branch: 'BOM', module: 'SF', date: '2026-06-18', saleVno: 'BOM/0626/SF00920', linkNo: 'LK/BOM/00211', gstMode: 'intra',
@@ -132,7 +133,7 @@ describe('buildBookingInvoice — hidden-margin fold (everywhere)', () => {
 });
 
 describe('buildBookingInvoice — Africa VAT branch (NBO)', () => {
-  beforeEach(() => { companyProfile.mockReturnValue({}); hsnSacFor.mockReturnValue(''); });
+  beforeEach(() => { companyProfile.mockReturnValue({}); hsnSacFor.mockReturnValue(''); bc.mockReturnValue({ cur: '₹' }); });
   const nbo = {
     branch: 'NBO', module: 'SF', date: '2026-06-18', saleVno: 'NBO/0626/SF0001', linkNo: 'LK/NBO/0001',
     customer: { name: 'Safari Ltd', gstin: 'P051234567X', ledgerGroup: 'B2B' },
@@ -169,6 +170,22 @@ describe('buildBookingInvoice — Africa VAT branch (NBO)', () => {
     expect(html).toContain('NET TOTAL (USD)');
     expect(html).not.toContain('₹');   // regression: no rupee symbol anywhere on a USD invoice
     expect(html).toContain('$');       // amounts carry the USD symbol
+  });
+
+  test('the VAT-column % follows an amended VAT master (single source), not a hardcoded 16/18/16', () => {
+    bc.mockReturnValue({ cur: '₹', vatRate: 15 });   // Owner amended Kenya VAT 16 → 15 in Masters ▸ Tax
+    const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {});
+    expect(html).toContain('(15%)');    // caption follows the master…
+    expect(html).not.toContain('(16%)'); // …not the built-in constant
+  });
+
+  test('USD invoice spells the amount with international grouping — no Indian "Lakh"/"Crore"', () => {
+    const big = { ...nbo, so: { lineTotal: 145000, serviceCharge: 900, gst: 1000, otherTaxesGst: 0, total: 146900 }, rows: [{ fn: 'Amani', sn: 'K', base: 145000, k3: 0, tax: 0, markup: 900 }] };
+    const html = buildBookingInvoice(big, 'sale', { code: 'NBO' }, {});
+    expect(html).toContain('Amount in Words');
+    expect(html).not.toContain('Lakh');
+    expect(html).not.toContain('Crore');
+    expect(html).toMatch(/USD [A-Za-z ]*Thousand/);   // e.g. "USD One Hundred Forty Six Thousand …"
   });
 
   test('local-currency print converts every amount at the FX rate + footnote', () => {

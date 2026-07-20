@@ -62,11 +62,21 @@ const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // party has a GSTIN but no separately-captured PAN (not applicable to VAT/Africa nos.).
 const panFromGstin = (g) => { const s = String(g || '').trim(); return /^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z]/.test(s) ? s.slice(2, 12).toUpperCase() : ''; };
 
-function inWords(num) {
+function inWords(num, intl = false) {
   num = Math.round(num); if (num === 0) return 'Zero';
   const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
   const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
   const seg = (x) => { let s = ''; if (x > 99) { s += a[Math.floor(x / 100)] + ' Hundred '; x %= 100; } if (x > 19) { s += b[Math.floor(x / 10)] + ' '; x %= 10; } if (x > 0) s += a[x] + ' '; return s; };
+  if (intl) {
+    // International grouping (Billion / Million / Thousand) — for non-₹ invoices, so an Africa
+    // USD invoice reads "One Hundred Thirty Thousand", not the Indian "One Lakh Thirty Thousand".
+    let out = '';
+    const bn = Math.floor(num / 1000000000); num %= 1000000000;
+    const mn = Math.floor(num / 1000000); num %= 1000000;
+    const th = Math.floor(num / 1000); num %= 1000;
+    if (bn) out += seg(bn) + 'Billion '; if (mn) out += seg(mn) + 'Million '; if (th) out += seg(th) + 'Thousand '; if (num) out += seg(num);
+    return out.trim();
+  }
   let out = '', cr = Math.floor(num / 10000000); num %= 10000000;
   const lk = Math.floor(num / 100000); num %= 100000; const th = Math.floor(num / 1000); num %= 1000;
   if (cr) out += seg(cr) + 'Crore '; if (lk) out += seg(lk) + 'Lakh '; if (th) out += seg(th) + 'Thousand '; if (num) out += seg(num);
@@ -256,10 +266,15 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const refKeys = spec.idCols.slice(2);            // module reference fields (Ticket/PNR, Hotel/Conf, Country/Passport…)
   const isVatBr = isVatBranch(code);
   const effNoVat = isVatBr && !!booking.noVat;      // noVat only bites on Africa/VAT branches
-  const ctx = { branch: code, noVat: effNoVat };
-  // The GST rate shown in column headers — mirrors the voucher's getGstRate().
+  // VAT rate from the branch config (referenceCache → the VAT master, per 3D's single source);
+  // falls back to the built-in constant only if the config hasn't hydrated. So the printed % and
+  // the per-line VAT follow an amended VAT master exactly like the posting engine — no hardcoded
+  // 16/18/16 that could drift from what the server bills.
+  const cfgVatPct = (bc({ code }) || {}).vatRate;
+  const ctx = { branch: code, noVat: effNoVat, vatRate: (isVatBr && cfgVatPct != null) ? Number(cfgVatPct) : undefined };
+  // The GST/VAT rate shown in column headers — mirrors the voucher's getGstRate().
   const activeRate = effNoVat ? 0
-    : isVatBr ? (code === 'NBO' ? 16 : code === 'DAR' ? 18 : code === 'FBM' ? 16 : 18)
+    : isVatBr ? (cfgVatPct != null ? Number(cfgVatPct) : (code === 'NBO' ? 16 : code === 'DAR' ? 18 : code === 'FBM' ? 16 : 18))
       : pkg ? (spec.gstRate ? spec.gstRate * 100 : 5)
         : (spec.tax && spec.tax.rate != null ? spec.tax.rate : 18);
   // Flight sectors → one sub-row spanning the whole table, one chip-line per segment.
@@ -421,7 +436,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     </div>
     <div class="botrule"></div>
     <div class="botgrid">
-      <div class="botleft"><div class="lab2">Amount in Words</div><div class="words">${esc(curCode)} ${esc(inWords(Math.round(net * fx)))} Only</div>${converting ? `<div class="pay" style="margin-bottom:12px;font-style:italic">Converted at 1 USD = ${esc(Number(opts.fxRate).toFixed(2))} ${esc(localCcy)} (${esc(opts.fxDate || booking.date || '')})</div>` : ''}${payBlock}</div>
+      <div class="botleft"><div class="lab2">Amount in Words</div><div class="words">${esc(curCode)} ${esc(inWords(Math.round(net * fx), curCode !== 'INR'))} Only</div>${converting ? `<div class="pay" style="margin-bottom:12px;font-style:italic">Converted at 1 USD = ${esc(Number(opts.fxRate).toFixed(2))} ${esc(localCcy)} (${esc(opts.fxDate || booking.date || '')})</div>` : ''}${payBlock}</div>
       <div class="botright"><div class="for">For ${esc(company.name)}</div><div class="sigline"><div class="a">Authorised Signatory</div></div></div>
     </div>
     <div class="terms">${isSale
