@@ -19,7 +19,7 @@
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState, useEffect } from 'react';
-import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL, branchMainCurrency } from '../../core/data';
+import { ACTIVE_CURRENCIES, BRANCH_CODES, CONSOLIDATED_LABEL, branchMainCurrency, isBankLedgerGroup } from '../../core/data';
 import { useMasterList } from '../../core/useMasters';
 import { SourceBadge } from '../../core/LedgerLabel';
 import { branchCode } from '../../core/useAccounting';
@@ -218,11 +218,12 @@ export const LedgersMaster = ({ branch }) => {
   // A party ledger = one whose Group (or Sub-Group) is Sundry Debtors / Creditors.
   // The GSTIN / credit-terms / contact fields apply only to these.
   const isParty = (form) => /sundry\s+(debtors|creditors)/i.test(`${form?.group || ''} ${form?.subGroup || ''}`);
-  // A bank-account ledger (Group = Bank Accounts, or an overdraft ledger under Bank OD
-  // Accounts) also needs Bank Name / A/c No. / IFSC and an optional OD/credit limit —
-  // the Bank Account Master register reads them from here, so expose those fields for
-  // bank & OD ledgers too, not only party ledgers.
-  const isBankAcct = (form) => /^\s*bank(\s+od)?\s+accounts\s*$/i.test(String(form?.group || ''));
+  // A bank-account ledger (Group = Bank Accounts, or an overdraft ledger under any of the
+  // Bank OD groups) also needs Bank Name / A/c No. / IFSC and an optional OD/credit limit —
+  // the Bank Account Master register reads them from here, so expose those fields for bank
+  // & OD ledgers too, not only party ledgers. Group set shared via core/data so the editor
+  // and the register can never drift (covers the 'Bank OD A/c' / 'Bank OCC A/c' variants).
+  const isBankAcct = (form) => isBankLedgerGroup(form?.group);
   const isPartyOrBank = (form) => isParty(form) || isBankAcct(form);
 
   // Group + cascading Sub-Group LIST filters (default = show all). Pick a main group
