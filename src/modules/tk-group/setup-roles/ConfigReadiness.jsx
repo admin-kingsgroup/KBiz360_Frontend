@@ -57,7 +57,7 @@ export function ConfigReadiness() {
           zebra
         />
       </div>
-      <p className="text-xs text-ink-subtle">Read-only. Green % = share of control flags engaged. Controls are flipped on Control Flags (Owner-approved); this scoreboard climbs to 100% as go-live completes — nothing here enforces on its own.</p>
+      <p className="text-xs text-ink-subtle">Read-only. Green % = share of control flags engaged. Controls are flipped in the Control Panel (Owner Rules, Owner-approved); this scoreboard climbs to 100% as go-live completes — nothing here enforces on its own.</p>
     </div>
   );
 }

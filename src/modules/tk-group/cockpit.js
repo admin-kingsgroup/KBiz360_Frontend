@@ -180,9 +180,9 @@ export function controlCockpitMenu(focus, currentUser) {
         { label: 'Close Readiness & Integrity', href: '/tk/integrity' },
       ] },
       { label: 'Power Console', children: [
+        // Control Flags + Thresholds & Limits folded into the Control Panel (Owner Rules);
+        // their old routes /tk/controls · /tk/limits redirect there. Single front door.
         { label: 'Control Panel', href: '/tk/control-panel' },
-        { label: 'Control Flags', href: '/tk/controls' },
-        { label: 'Thresholds & Limits', href: '/tk/limits' },
       ] },
       { label: 'Rules & Requests', children: [
         // Owner-only: the rules engine, split into two entries — ERP monitoring rules and
