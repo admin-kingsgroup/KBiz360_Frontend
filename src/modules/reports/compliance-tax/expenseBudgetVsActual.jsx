@@ -126,9 +126,9 @@ export function ReportExpenseBgt({ branch, setRoute }) {
       actions={<Button size="sm" variant="secondary" icon={Pencil} onClick={() => setRoute && setRoute('/expense/budget')}>Edit Budget</Button>}
       filters={
         <>
-          <Select value={fy} onChange={(e) => setFy(e.target.value)} className="w-auto">{FY_LIST.map((ff2) => <option key={ff2.v} value={ff2.v}>{ff2.l}</option>)}</Select>
-          {(view === 'mtd' || view === 'ytd') && <Select value={selMonth} onChange={(e) => setSelMonth(e.target.value)} className="w-auto">{fyObj.keys.map((k, i) => <option key={k} value={k}>{fyObj.months[i]}</option>)}</Select>}
-          <Select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className="w-auto">{['All', ...new Set(EXP_LEDGERS.map((l) => l.group))].map((g) => <option key={g}>{g}</option>)}</Select>
+          <Select value={fy} onChange={(e) => setFy(e.target.value)} className="!w-auto flex-1 basis-0">{FY_LIST.map((ff2) => <option key={ff2.v} value={ff2.v}>{ff2.l}</option>)}</Select>
+          {(view === 'mtd' || view === 'ytd') && <Select value={selMonth} onChange={(e) => setSelMonth(e.target.value)} className="!w-auto flex-1 basis-0">{fyObj.keys.map((k, i) => <option key={k} value={k}>{fyObj.months[i]}</option>)}</Select>}
+          <Select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className="!w-auto flex-1 basis-0">{['All', ...new Set(EXP_LEDGERS.map((l) => l.group))].map((g) => <option key={g}>{g}</option>)}</Select>
           {viewToggle}
         </>
       }
