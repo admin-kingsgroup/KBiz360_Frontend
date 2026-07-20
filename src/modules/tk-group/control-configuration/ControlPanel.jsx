@@ -18,7 +18,7 @@ import { BreakGlass } from '../BreakGlass';
 import { AuthorityAdmin } from './AuthorityAdmin';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
 import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
-import { RULE_BOOK, regroupRegistry } from '../utils/ruleBook.data';
+import { lockedLawBook } from '../utils/ruleBook.data';
 import { Badge } from '../../../shell/primitives';
 import { isViewOnly, VIEW_ONLY_REASON, apiGet } from '../../../core/api';
 
@@ -148,7 +148,7 @@ export function ControlPanel({ setRoute }) {
   // Book, so both agree). regroupRegistry(null) → null → the bundled RULE_BOOK, so the band is
   // never empty even if the endpoint is cold/unavailable.
   const lawQ = useQuery({ queryKey: ['tk', 'rules-registry'], queryFn: () => apiGet('/api/rules').catch(() => null), staleTime: 300_000 });
-  const lawBook = useMemo(() => regroupRegistry(lawQ.data?.items) || RULE_BOOK, [lawQ.data]);
+  const lawBook = useMemo(() => lockedLawBook(lawQ.data?.items), [lawQ.data]);
   const band = useMemo(() => lawBand(lawBook), [lawBook]);
   const verify = useConfigValue('approval.verifyEmails').data;
   const approve = useConfigValue('approval.approveEmails').data;
@@ -358,9 +358,11 @@ export function ControlPanel({ setRoute }) {
         return (
           <>
             <p className="mb-1.5 mt-1 max-w-[82ch] text-[13.5px] text-ink-muted">
-              The <b>law floor</b> — <b>{band.totals.all}</b> rules the ERP enforces in code across <b>{band.totals.domains}</b> domains.
-              These are <b>always on and read-only</b>: they apply on day one and can’t be switched off. Rolled up by domain below;
-              click a domain for its individual rules, each citing the file that enforces it, in the{' '}
+              The <b>law floor</b> — <b>{band.totals.all}</b> locked laws the ERP enforces in code across <b>{band.totals.domains}</b> domains.
+              These are <b>always on and read-only</b>: they apply on day one and can’t be switched off. The Owner-set rules — who
+              approves, statutory rates — are operated in{' '}
+              <button type="button" className="font-semibold text-navy underline" onClick={() => setScreen('authority')}>Owner &amp; Authority</button>, not here.
+              Rolled up by domain below; click a domain for its individual rules, each citing the file that enforces it, in the{' '}
               <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book')}>Rule Book</button>.
             </p>
             <p className="mb-4 flex items-center gap-1.5 text-[11px]">

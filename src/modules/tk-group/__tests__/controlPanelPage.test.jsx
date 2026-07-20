@@ -65,7 +65,8 @@ describe('Control Panel · three-plane model', () => {
     // the three governance planes are the nav groups
     expect(screen.getByText('ERP Law')).toBeInTheDocument();
     expect(screen.getByText('Operational Rules')).toBeInTheDocument();
-    expect(screen.getByText('Owner & Authority')).toBeInTheDocument();
+    // Appears as the nav group header AND the plane-① intro's "operated in Owner & Authority" link
+    expect(screen.getAllByText('Owner & Authority').length).toBeGreaterThanOrEqual(1);
     // Approval Authority is converged into the panel (plane ③)
     expect(screen.getByText('Approval Authority')).toBeInTheDocument();
     // plane ① renders the ERP-Law band — Accounts + Operations domain roll-ups (bundled

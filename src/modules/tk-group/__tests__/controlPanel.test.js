@@ -1,5 +1,5 @@
 import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
-import { RULE_BOOK, ruleBookStats, regroupRegistry } from '../utils/ruleBook.data';
+import { RULE_BOOK, ruleBookStats, regroupRegistry, lockedLawBook } from '../utils/ruleBook.data';
 
 describe('posture presets + copy-across-branches (pure)', () => {
   test('presetChanges: covers every configurable flag; preset flags ON, the rest OFF, for the scope', () => {
@@ -103,6 +103,23 @@ describe('ERP Law band (plane ① · pure roll-up)', () => {
   test('lawBand is safe on an empty book', () => {
     expect(lawBand([]).totals).toEqual({ accounts: 0, ops: 0, all: 0, domains: 0 });
     expect(lawBand().totals.all).toBe(0);
+  });
+  test('lockedLawBook keeps only govern:locked laws — owner-set rules drop to plane ③', () => {
+    const items = [
+      { domainCode: 'GST', group: 'accounts', domainTitle: 'Tax', govern: 'locked', title: 'a', sourceRef: 'x:1' },
+      { domainCode: 'GST', group: 'accounts', domainTitle: 'Tax', govern: 'locked', title: 'b', sourceRef: 'x:2' },
+      { domainCode: 'APPR', group: 'ops', domainTitle: 'Approval authority', govern: 'owner', title: 'who verifies', sourceRef: 'y:1' },
+    ];
+    const band = lawBand(lockedLawBook(items));
+    expect(band.totals.all).toBe(2);          // the owner-set APPR who-rule is excluded
+    expect(band.totals.accounts).toBe(2);
+    expect(band.ops.length).toBe(0);          // its only ops domain was entirely owner-governed
+  });
+  test('lockedLawBook never blanks the band: regroups all when no govern tag, bundled when empty', () => {
+    const noGovern = [{ domainCode: 'GST', group: 'accounts', domainTitle: 'Tax', title: 'a', sourceRef: 'x:1' }];
+    expect(lockedLawBook(noGovern).length).toBe(1);   // older BE: fall back to all items, not blank
+    expect(lockedLawBook(undefined)).toBe(RULE_BOOK); // offline: bundled fallback
+    expect(lockedLawBook([])).toBe(RULE_BOOK);
   });
   test('DEFAULT_RULES (always-on) carry name + description; include SoD + the DB-enforced invariants', () => {
     expect(DEFAULT_RULES.length).toBeGreaterThanOrEqual(44);   // 16 base + 13 audited + 4 lifecycle + 12 authority gates

@@ -432,3 +432,16 @@ export function regroupRegistry(items) {
   }
   return order.map((id) => map.get(id));
 }
+
+// The ERP-Law band (Control Panel plane ①) shows only the LOCKED law floor — the immutable
+// laws. Owner-controlled rules (approval authority, statutory rates) are OPERATED in the
+// Owner & Authority plane, so they are not shown here as unchangeable law. Falls back to
+// regrouping ALL items when none carry a govern tag (older backend), then to the bundled
+// book — so the band is never blank.
+export function lockedLawBook(items, fallback = RULE_BOOK) {
+  if (items && items.length) {
+    const locked = items.filter((it) => it.govern === 'locked');
+    return regroupRegistry(locked.length ? locked : items) || fallback;
+  }
+  return fallback;
+}
