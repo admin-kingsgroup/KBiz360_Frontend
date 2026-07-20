@@ -575,7 +575,7 @@ export function ControlPanel({ setRoute }) {
             {owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
               : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
           </span>
-          <button type="button" onClick={() => go('/tk/rules')}
+          <button type="button" onClick={() => go('/tk/rules?tab=book')}
             className="ml-auto shrink-0 rounded-full border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">
             📖 Rule Book
           </button>
