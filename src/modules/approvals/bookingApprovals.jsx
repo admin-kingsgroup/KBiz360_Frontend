@@ -70,6 +70,12 @@ function groupBookings(rows, by) {
   return [...map.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)));
 }
 const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].total) || 0), 0);
+// Purchase SHOWN = what is actually payable to the supplier. For Insurance (SI) carrying a
+// supplier commission the payable is NET of that commission (mirrors backend creditorNet and
+// the SO/PO/GP entry screen's net-payable total); every other module shows the gross PO total.
+const poNetPay = (po) => (Number(po?.total) || 0) - (Number(po?.incentiveAmt) || 0) - (Number(po?.incentiveGst) || 0) + (Number(po?.incentiveTds) || 0);
+const poShown = (b) => (b && b.module === 'SI' && (Number(b?.po?.incentiveAmt) || 0) > 0 ? poNetPay(b.po) : (b?.po?.total || 0));
+const sumPo = (rows) => rows.reduce((s, b) => s + poShown(b), 0);
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
@@ -131,7 +137,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                 <tr style={{ background: '#eef1f8' }}>
                   <td colSpan={numStart} style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11.5, color: DARK }}>{g.label} <span style={{ color: '#9197a3', fontWeight: 600 }}>· {g.rows.length} bill{g.rows.length === 1 ? '' : 's'}</span></td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'so'))}</td>
-                  <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'po'))}</td>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumPo(g.rows))}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'gp'))}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{gpPctTxt(sumT(g.rows, 'gp'), sumT(g.rows, 'so'))}</td>
                   <td colSpan={cols.length - numStart - 4}></td>
@@ -161,7 +167,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                     </>
                   )}
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.so?.total)}</td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.po?.total)}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }} title={b.module === 'SI' && (Number(b?.po?.incentiveAmt) || 0) > 0 ? `net payable to supplier · gross ${fmt(b.po?.total)} less commission ${fmt(b.po?.incentiveAmt)}` : undefined}>{fmt(poShown(b))}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.gp?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{gpPctTxt(b.gp?.total || 0, b.so?.total || 0)}</td>
                   {mode !== 'pending' && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>}

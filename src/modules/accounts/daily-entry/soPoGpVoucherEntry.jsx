@@ -19,7 +19,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
-  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw,
+  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw, AlertTriangle,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCanOriginate } from '../../tk-group/useCanOriginate';
@@ -380,7 +380,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
               <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supp Comm/Inc Rcvd<br />
                 <input type="number" min="0" value={leg.line.incentive ?? ''} onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cell} /></label>
               {pkg && <span style={{ fontSize: 10, color: '#6b5a1e', fontStyle: 'italic', alignSelf: 'flex-end', paddingBottom: 8 }}>Supplier {isVatBranch(brCode) ? 'VAT' : 'GST'} auto-claimed as ITC</span>}
-              <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable {bc({ code: brCode }).cur}{fmt(po.total)}{num(po.gst) > 0 ? ` · ITC ${bc({ code: brCode }).cur}${fmt(po.gst)}` : ''}</div>
+              <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable {bc({ code: brCode }).cur}{fmt(num(po.total) - num(po.incentiveAmt) - num(po.incentiveGst) + num(po.incentiveTds))}{num(po.incentiveAmt) > 0 ? ` (gross ${bc({ code: brCode }).cur}${fmt(po.total)} − comm ${bc({ code: brCode }).cur}${fmt(po.incentiveAmt)})` : ''}{num(po.gst) > 0 ? ` · ITC ${bc({ code: brCode }).cur}${fmt(po.gst)}` : ''}</div>
             </div>
           </div>
         );
@@ -802,11 +802,17 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     s + ['base', 'k3', 'tax'].filter((k) => !(spec.fareCols || []).some((c) => c.key === k))
       .reduce((t, k) => t + num(l[k]), 0), 0)) : 0;
 
+  // Negative gross profit is a HARD server block (bookingOrders.service.assertGpNotNegative,
+  // 422) on BOTH create and edit — a booking cannot post at a loss. Mirror it on the FE so the
+  // user is stopped HERE, with a reason, instead of filling the whole form and eating a save-time
+  // 422. gp.total is already rounded (r2), so `< 0` matches the server's round-then-compare. The
+  // INB path enforces its own floor server-side (svf − discount), so gate only the regular path.
+  const gpNegative = num(totals.gp.total) < 0;
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
   const canSave = !blockedNew && legacyFareCarry === 0 && (interBranch
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope && (!crossCcy || fxRateNum > 0))  // INB: counterparty + sale value + Int'l/Domestic for Flights/Holiday + FX rate on a cross-currency deal
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
-      && (isNoSupp || (totals.po.total > 0 && hasSuppLedger))));
+      && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)) && !gpNegative));
   // View-only user: the Save (commit) button is pre-disabled with a reason — never a live
   // no-op that only 403s server-side. Collapses to the original when vo is false.
   const vo = isViewOnly();
@@ -1680,6 +1686,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         </div>
       )}
 
+      {gpNegative && !interBranchParty && (
+        <div style={{ ...card, background: '#fdecea', border: '1px solid #e6a99f', color: '#8a2418', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+          <span><b>Gross Profit is negative</b> — this booking is a loss of {cur} {fmt(Math.abs(num(totals.gp.total)))}. A booking cannot post at a loss, so <b>Save is blocked</b>. Raise the sale (SVC2 / Service Fee) or reduce the supplier cost so <b>Gross Profit is 0 or above</b>, then save.</span>
+        </div>
+      )}
+
       {/* Footer */}
       <div style={{ position: 'sticky', bottom: 0, background: '#FAFAF8', borderTop: '1px solid #dfe2e7', padding: '12px 0', display: 'flex', gap: 9, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -1692,7 +1705,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
         <button disabled={!canSave || vo} onClick={() => save()} className="max-tablet:min-h-[44px]"
-          title={vo ? VIEW_ONLY_REASON : undefined}
+          title={vo ? VIEW_ONLY_REASON : (gpNegative ? 'Gross Profit is negative — a booking cannot post at a loss. Adjust the sale / supplier cost so GP ≥ 0.' : undefined)}
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>
           {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes (Pending)' : 'Save voucher (Pending)')}
         </button>

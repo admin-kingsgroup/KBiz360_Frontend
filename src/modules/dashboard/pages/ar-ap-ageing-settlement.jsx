@@ -23,7 +23,7 @@ function ArApAgeingSettlementPage({ side, branch, currentUser, setRoute }) {
   const fmt = (n) => compactAmt(n, { currency: cur });
   const { data, isLoading, isError, error, refetch } = useAgeing(branch);
   const title = isRec ? 'Receivables — Ageing & Settlement' : 'Payables — Ageing & Settlement';
-  const subtitle = 'Bills · settled · unsettled · ageing by sub-group';
+  const subtitle = `Bills · settled · unsettled · ageing by ${isRec ? 'client type' : 'category'}`;
 
   if (isError && !data) {
     return <DashboardError error={error} onRetry={refetch} title={`Could not load ${title}.`} />;

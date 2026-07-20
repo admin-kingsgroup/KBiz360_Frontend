@@ -80,6 +80,39 @@ describe('buildSettlement — grouping by sub-group', () => {
   });
 });
 
+describe('buildSettlement — grouping by party attribute (groupKey)', () => {
+  // groupKey (Client Type / Category) is the new grouping dimension and WINS over the
+  // legacy subGroup. A blank groupKey folds into "Unclassified" (not "Direct / Others").
+  const r = (party, open, groupKey, subGroup = 'IGNORED') => ({
+    party, groupKey, subGroup, a7: open, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0,
+    total: open, onAccount: 0, net: open,
+  });
+  const rows = [r('DELTA', 40, 'B2B'), r('Global', 60, 'B2B'), r('Jignesh', 10, 'B2C Reference'), r('WalkIn', 15, '')];
+  const totals = { total: 125, onAccount: 0, net: 125 };
+
+  test('groups by the attribute, ignoring the sub-group', () => {
+    const m = buildSettlement('receivable', totals, rows);
+    expect(groupNames(m)).toContain('B2B');
+    expect(groupNames(m)).toContain('B2C Reference');
+    expect(groupNames(m)).not.toContain('IGNORED');   // subGroup is not used once groupKey is present
+    expect(grp(m, 'B2B').count).toBe(2);
+  });
+
+  test('a blank attribute folds into Unclassified, which sorts last', () => {
+    const m = buildSettlement('receivable', totals, rows);
+    expect(groupNames(m)).toContain('Unclassified');
+    expect(groupNames(m)[groupNames(m).length - 1]).toBe('Unclassified'); // sinks below larger B2C Reference
+    expect(grp(m, 'Unclassified').count).toBe(1);     // WalkIn
+  });
+
+  test('groupKey wins even when a legacy subGroup is also present', () => {
+    const m = buildSettlement('payable', { total: 50, onAccount: 0, net: 50 }, [
+      { party: 'Akbar', groupKey: 'Airline', subGroup: 'Supplier B2B', a7: 50, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, total: 50, onAccount: 0, net: 50 },
+    ]);
+    expect(groupNames(m)).toEqual(['Airline']);       // grouped by Category, not the sub-group
+  });
+});
+
 describe('buildSettlement — edge cases', () => {
   test('includes an on-account-only ledger (no open bills) so Receipt/Final still reconcile', () => {
     const rows = [
