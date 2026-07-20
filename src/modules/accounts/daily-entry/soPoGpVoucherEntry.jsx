@@ -406,34 +406,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // (unused) fare-grid hooks below stay safe; the reversal entry is rendered via an
   // early return before any of the fare-grid UI shows.
   const specRaw = VSPECS[moduleCode] || VSPECS.SF;
-  // A LEGACY voucher can carry fare-column money on keys the CURRENT spec no longer lists
-  // (an Insurance booking captured before the module went service-only, 2026-07-18 — its
-  // premium sits on base/k3/tax). Silently dropping those columns on the next save would
-  // DELETE that money from the books (the legacyFareCarry gate blocks exactly that re-save).
-  // Instead re-add precisely those columns as an EFFECTIVE spec, so the whole pipeline —
-  // grid, totals, per-component heads and postings — carries the premium through UNCHANGED.
-  // The fare is a pass-through (identical on sale + purchase) so GP is untouched, and the
-  // re-post reproduces the booking's original Base Fare / K3 / Taxes heads on their existing
-  // seeded ledgers. EDIT-only, and only for keys present-but-dropped → new/other vouchers
-  // (and every non-insurance module, which still lists these columns) are unaffected.
-  const legacyFareCols = useMemo(() => {
-    if (!editing) return [];
-    const CANON = [{ key: 'base', label: 'Base Fare' }, { key: 'k3', label: 'K3 Tax' }, { key: 'tax', label: 'Taxes' }];
-    const listed = new Set((specRaw.fareCols || []).map((c) => c.key));
-    const present = new Set();
-    (editBooking && Array.isArray(editBooking.rows) ? editBooking.rows : []).forEach((r) => CANON.forEach((c) => { if (num(r[c.key])) present.add(c.key); }));
-    return CANON.filter((c) => present.has(c.key) && !listed.has(c.key));
-  }, [editing, editBooking, specRaw]);
   // Africa/VAT branches don't levy India's K3 (airline) tax on international air — drop
   // the K3 fare column so the whole SO/PO/GP grid (header/body/footer/sectors/GP) hides
   // it consistently. K3 is always 0 there, so the totals & posted heads are unchanged.
-  const spec = useMemo(() => {
-    let s = isVatBranch(brCode) && (specRaw.fareCols || []).some((c) => c.key === 'k3')
-      ? { ...specRaw, fareCols: specRaw.fareCols.filter((c) => c.key !== 'k3') }
-      : specRaw;
-    if (legacyFareCols.length) s = { ...s, fareCols: [...(s.fareCols || []), ...legacyFareCols], legacyFareKeys: legacyFareCols.map((c) => c.key) };
-    return s;
-  }, [specRaw, brCode, legacyFareCols]);
+  const spec = isVatBranch(brCode) && (specRaw.fareCols || []).some((c) => c.key === 'k3')
+    ? { ...specRaw, fareCols: specRaw.fareCols.filter((c) => c.key !== 'k3') }
+    : specRaw;
 
   const [lines, setLines] = useState(() => {
     // Editing an INB deal → rebuild the single fare row from the reconstructed deal
@@ -1202,9 +1180,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   {refKeys.map((col) => <td key={col.key} style={{ ...tdAuto, textAlign: 'left', fontWeight: 700, color: col.kind === 'pnr' ? GOLD : '#3A3A3A', width: 120, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{l[col.key] || '—'}</td>)}
                   {spec.fareCols.map((col) => (
                     <td key={col.key} style={{ padding: '6px 3px', width: 60, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
-                      {(spec.legacyFareKeys || []).includes(col.key)
-                        ? <span title="Legacy premium — preserved from the original booking (read-only). To change it, revoke & re-enter under the service-only format." style={{ display: 'inline-block', width: '100%', textAlign: 'right', padding: '4px 4px', fontSize: 12, fontWeight: 600, color: '#8a6d1e', background: '#faf3de', borderRadius: 4 }}>{fmt(l[col.key])}</span>
-                        : <input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} />}
+                      <input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} />
                     </td>
                   ))}
                   <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
@@ -1694,15 +1670,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
 
       {/* Legacy fare carry-over — this file holds money in fare columns the module no
           longer has (e.g. an Insurance premium captured before insurance went
-          service-only). We re-add those columns as read-only (effective spec) so the
-          money is SEEN and carried through on save; only when detection can't reach the
-          fares (snapshot-only rebuild) does the hard block below still fire. */}
-      {legacyFareCols.length > 0 && (
-        <div style={{ ...card, background: '#eef6ee', border: '1px solid #b6d7b6', color: '#1f5a2e', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <Lock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-          <span><b>Legacy premium preserved.</b> This booking predates {spec.name} going service-only (18-07-2026) and carries {cur} {fmt(lines.reduce((s, l) => s + legacyFareCols.reduce((t, c) => t + num(l[c.key]), 0), 0))} in {legacyFareCols.map((c) => c.label).join(' / ')} — shown <b>read-only</b> and carried through unchanged on save (a pass-through, so GP is unaffected). You can edit the rest of the voucher and save without dropping that money. To restructure it as pure service-only, revoke & re-enter instead.</span>
-        </div>
-      )}
+          service-only). Re-saving would silently re-price it without that money. */}
       {legacyFareCarry > 0 && (
         <div style={{ ...card, background: '#fdecec', border: '1px solid #e8a6a6', color: '#8a1f1f', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
           <Lock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
