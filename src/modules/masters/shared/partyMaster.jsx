@@ -24,7 +24,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useMasterList, useMasterMutations } from '../../../core/useMasters';
-import { apiGet, getAuthToken } from '../../../core/api';
+import { apiGet, getAuthToken, isViewOnly } from '../../../core/api';
 import { bc } from '../../../core/styles';
 import { localeOf } from '../../../core/format';
 import { ADDR_TYPES, CURRENCIES } from '../../../core/partyEnums';
@@ -143,7 +143,7 @@ export function usePartyMaster(resource, side, brc) {
   // save) is the exact signal App.jsx's navigate() needs. Wiring it here in the shared
   // party engine covers BOTH the Customer and Supplier tabbed masters (12 tabs each) —
   // leaving a half-edited party now confirms before discarding it.
-  useNavGuard(() => dirty);
+  useNavGuard(() => dirty && !isViewOnly());
 
   return {
     list, rows, current, form, setField, setSelectedId, save,

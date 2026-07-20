@@ -30,10 +30,29 @@ describe('navGuard (module)', () => {
     expect(isGuardDirty()).toBe(false);
   });
 
-  test('last registration wins — one editable form at a time', () => {
-    setNavGuard(() => true);
+  test('ANY registered guard being dirty marks the app dirty (stack semantics)', () => {
     setNavGuard(() => false);
+    setNavGuard(() => true);
+    expect(isGuardDirty()).toBe(true);
+  });
+
+  // The core of the stacking fix: guarded surfaces can nest (a voucher drill over a
+  // dirty Party Master). Unregistering the TOP guard must NOT drop the underlying one —
+  // a single-slot design nulled it and silently lost the underlying form's protection.
+  test('unregistering a nested guard leaves the underlying one intact (stacking restore)', () => {
+    const offA = setNavGuard(() => true);   // form A (e.g. party master): dirty
+    const offB = setNavGuard(() => false);  // form B mounts on top: clean
+    expect(isGuardDirty()).toBe(true);      // A still counts — stack, not slot
+    offB();                                 // B unmounts (drill closed)
+    expect(isGuardDirty()).toBe(true);      // A's protection survives
+    offA();
     expect(isGuardDirty()).toBe(false);
+  });
+
+  test('a throwing guard does not mask a sibling dirty guard', () => {
+    setNavGuard(() => { throw new Error('boom'); });
+    setNavGuard(() => true);
+    expect(isGuardDirty()).toBe(true);
   });
 });
 
@@ -49,5 +68,26 @@ describe('useNavGuard (hook)', () => {
     expect(isGuardDirty()).toBe(true);
     unmount();
     expect(isGuardDirty()).toBe(false);
+  });
+
+  test('two mounted forms both count; unmounting the clean one keeps the dirty one armed', () => {
+    const a = render(<Form dirty />);
+    const b = render(<Form dirty={false} />);
+    expect(isGuardDirty()).toBe(true);
+    b.unmount();                     // close the second (clean) form
+    expect(isGuardDirty()).toBe(true); // first (dirty) form still guarded
+    a.unmount();
+    expect(isGuardDirty()).toBe(false);
+  });
+
+  test('a dirty form arms a browser beforeunload prompt; a clean/unmounted one does not', () => {
+    const fire = () => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+    const { rerender, unmount } = render(<Form dirty />);
+    expect(fire()).toBe(true);       // refresh/close on a dirty form → prompted
+    rerender(<Form dirty={false} />);
+    expect(fire()).toBe(false);      // clean form → no prompt
+    rerender(<Form dirty />);
+    unmount();
+    expect(fire()).toBe(false);      // listener removed on unmount
   });
 });

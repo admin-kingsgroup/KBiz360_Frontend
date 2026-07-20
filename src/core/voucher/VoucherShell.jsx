@@ -58,7 +58,9 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   // throws (a compare error must never block navigation).
   const pristineRef = React.useRef(null);
   if (pristineRef.current === null) pristineRef.current = JSON.stringify(state);
-  useNavGuard(() => { try { return !done && JSON.stringify(state) !== pristineRef.current; } catch { return false; } });
+  // `!isViewOnly()`: a view-only account can't save, so its edits are moot — don't
+  // false-arm the guard (and show "changes will be lost") for someone who changed nothing savable.
+  useNavGuard(() => { try { return !done && !isViewOnly() && JSON.stringify(state) !== pristineRef.current; } catch { return false; } });
 
   const createMut = useCreateVoucher();
   const updateMut = useUpdateVoucher();
@@ -76,7 +78,12 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const canSave = val.ok && !!branchCode && !saving && !viewOnly;
 
   const dismiss = () => (onClose || onBack || (() => {}))();
-  const reset = () => { setState(desc.initial(ctx)); setDone(false); setErr(''); };
+  // Reseed the SAME shape the create-mode pristine snapshot captured — `desc.initial()`
+  // omits the shell-added `sourceRef` key, so `setState(desc.initial(ctx))` alone left a
+  // freshly-blanked form reading falsely dirty (its JSON lacked "sourceRef" vs pristine),
+  // which spuriously prompted "unsaved changes" after ＋New Voucher / Reset / a closeOnSave
+  // reset (e.g. Debit Note). Mirror the useState seed so a blank form is genuinely clean.
+  const reset = () => { const s = desc.initial(ctx); setState({ ...s, sourceRef: s.sourceRef != null ? s.sourceRef : '' }); setDone(false); setErr(''); };
 
   const save = () => {
     if (!canSave) return;

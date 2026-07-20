@@ -1,33 +1,52 @@
 // ───────────────────────────────────────────────────────────────────────────
 // UNSAVED-CHANGES NAV GUARD
 // A screen with a dirty form registers a check via useNavGuard(() => isDirty()).
-// The app's navigate() (App.jsx) consults isGuardDirty() and asks the user to
-// confirm before leaving — so an accidental click / drill-out no longer silently
-// discards a half-filled voucher/master. Module-level (hook-free) so navigate()
-// can read it synchronously. Only ONE screen guards at a time (last mount wins),
-// which is correct: one editable form is on screen at a time.
+// The app's navigate()/goBack()/goForward() (App.jsx) consult isGuardDirty() and ask
+// the user to confirm before leaving — so an accidental click / drill-out no longer
+// silently discards a half-filled voucher/master. The hook also arms a browser
+// `beforeunload` prompt so a full-page refresh / tab close warns too (the in-app
+// guard only covers SPA navigation). Module-level (hook-free) so navigate() can read
+// it synchronously.
+//
+// A STACK of dirty-checks (not a single slot): guarded surfaces can NEST — an
+// app-level ledger/booking overlay can mount a second guarded form on top of a
+// still-mounted one (e.g. a voucher drill opened from the Party Master's "Open
+// Ledger"). With a single slot, unmounting the top form nulled the guard and silently
+// dropped the underlying form's protection. A stack keeps every mounted form's check
+// live, so isGuardDirty() is true when ANY of them has unsaved changes, and
+// unregistering one leaves the others intact.
 // ───────────────────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
 
-let guardFn = null;
+let guards = [];
 
-// Register a dirty-check; returns an unregister fn (call on unmount).
+// Register a dirty-check; returns an unregister fn (call on unmount). Removes only
+// THIS fn from the stack, so a nested form unmounting can't drop a sibling's guard.
 export function setNavGuard(fn) {
-  guardFn = fn;
-  return () => { if (guardFn === fn) guardFn = null; };
+  guards.push(fn);
+  return () => { guards = guards.filter((g) => g !== fn); };
 }
 
-export function clearNavGuard() { guardFn = null; }
+export function clearNavGuard() { guards = []; }
 
-// True when the active screen reports unsaved changes. Never throws.
+// True when ANY mounted guarded form reports unsaved changes. Never throws — a
+// compare error in one form must neither block navigation nor mask the others.
 export function isGuardDirty() {
-  try { return !!(guardFn && guardFn()); } catch { return false; }
+  return guards.some((fn) => { try { return !!fn(); } catch { return false; } });
 }
 
-// Register the current screen's dirty-check for its lifetime. `isDirtyFn` is read
-// live on each navigation (kept in a ref), so it always sees the latest state.
+// Register the current screen's dirty-check for its lifetime. `isDirtyFn` is read live
+// on each navigation (kept in a ref), so it always sees the latest state. Also arms a
+// `beforeunload` handler for the same check, so a browser refresh/close on a dirty
+// form prompts even though that path never hits the SPA navigate().
 export function useNavGuard(isDirtyFn) {
   const ref = useRef(isDirtyFn);
   ref.current = isDirtyFn;
-  useEffect(() => setNavGuard(() => { try { return !!ref.current?.(); } catch { return false; } }), []);
+  useEffect(() => {
+    const fn = () => { try { return !!ref.current?.(); } catch { return false; } };
+    const off = setNavGuard(fn);
+    const onBeforeUnload = (e) => { if (fn()) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => { off(); window.removeEventListener('beforeunload', onBeforeUnload); };
+  }, []);
 }

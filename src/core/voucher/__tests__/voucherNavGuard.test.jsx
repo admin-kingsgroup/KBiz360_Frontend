@@ -11,7 +11,8 @@ jest.mock('../../useAccounting', () => ({
   fetchRevokeCheck: jest.fn(() => Promise.resolve({ blocks: [], warnings: [], journalRows: 0 })),
 }));
 jest.mock('../../ux/confirm', () => ({ confirmDialog: jest.fn(() => Promise.resolve({ confirmed: false })) }));
-jest.mock('../../api', () => ({ isViewOnly: () => false, isApprover: () => true, VIEW_ONLY_REASON: 'View only' }));
+const mockViewOnly = jest.fn(() => false);
+jest.mock('../../api', () => ({ isViewOnly: () => mockViewOnly(), isApprover: () => true, VIEW_ONLY_REASON: 'View only' }));
 jest.mock('../../PrintPreview', () => ({ openPrintPreview: jest.fn() }));
 jest.mock('../../styles', () => ({
   B: {}, bc: () => ({ cur: '₹' }),
@@ -48,7 +49,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { VoucherShell } from '../VoucherShell';
 import { isGuardDirty, clearNavGuard } from '../../ux/navGuard';
 
-afterEach(() => clearNavGuard());
+afterEach(() => { clearNavGuard(); mockViewOnly.mockReturnValue(false); });
 
 describe('VoucherShell — unsaved-changes nav guard', () => {
   test('a blank voucher is not dirty; typing a field arms the guard', () => {
@@ -72,6 +73,26 @@ describe('VoucherShell — unsaved-changes nav guard', () => {
     fireEvent.change(screen.getByLabelText('narration'), { target: { value: 'y' } });
     expect(isGuardDirty()).toBe(true);
     unmount();
+    expect(isGuardDirty()).toBe(false);
+  });
+
+  // Regression: reset() reseeds the SAME shape the pristine snapshot captured (incl. the
+  // shell-added sourceRef key), so a freshly-blanked form is genuinely clean — no spurious
+  // "unsaved changes" prompt after Reset / ＋New Voucher / a closeOnSave reset.
+  test('after Reset, a blanked form is NOT falsely dirty', () => {
+    render(<VoucherShell category="payment" mode="create" branch="BOM" cur="₹" />);
+    fireEvent.change(screen.getByLabelText('narration'), { target: { value: 'typed' } });
+    expect(isGuardDirty()).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /^Reset$/i }));
+    expect(isGuardDirty()).toBe(false);
+  });
+
+  // A view-only account can't save, so its edits are moot — the guard must not false-arm
+  // (and threaten "changes will be lost") for someone who changed nothing savable.
+  test('a view-only user never arms the guard, even after typing', () => {
+    mockViewOnly.mockReturnValue(true);
+    render(<VoucherShell category="payment" mode="create" branch="BOM" cur="₹" />);
+    fireEvent.change(screen.getByLabelText('narration'), { target: { value: 'anything' } });
     expect(isGuardDirty()).toBe(false);
   });
 });

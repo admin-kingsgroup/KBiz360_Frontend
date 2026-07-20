@@ -176,20 +176,31 @@ export default function KB360App(){
   // P&L / Balance Sheet are blocked even by direct URL (dormant until the flag is on).
   const hideStatements = useHideStatements(currentUser);
   const mob=useMobile();
+  // Unsaved-changes guard: when the active screen registered a dirty form (useNavGuard),
+  // confirm before leaving so an accidental click / drill-out / Back can't silently
+  // discard it. `leavingRef` is a re-entrancy latch — a second nav fired while the
+  // confirm is still open must NOT stack another dialog (ConfirmHost queues, so two
+  // prompts would surface, the 2nd landing on an already-changed route). One prompt at a
+  // time; on "Leave" we re-check the guard, clear it, then run the deferred navigation.
+  const leavingRef = useRef(false);
+  const confirmLeave = useCallback((doNav)=>{
+    if(leavingRef.current) return;         // a leave-prompt is already open — ignore repeats
+    leavingRef.current = true;
+    confirmDialog({ title:'Leave this screen?', message:'You have unsaved changes that will be lost.', confirmLabel:'Leave', cancelLabel:'Stay', danger:true })
+      .then((res)=>{ leavingRef.current = false; if(res && res.confirmed){ clearNavGuard(); doNav(); } });
+  }, []);
   const navigate = useCallback((r, opts)=>{
     if(!r || r===window.location.pathname) return;
-    // Unsaved-changes guard: if the active screen registered a dirty form (useNavGuard),
-    // confirm before leaving so an accidental click/drill-out can't silently discard it.
-    // opts.force bypasses it (e.g. a dead session on auth-expiry).
-    if(!(opts && opts.force) && isGuardDirty()){
-      confirmDialog({ title:'Leave this screen?', message:'You have unsaved changes that will be lost.', confirmLabel:'Leave', cancelLabel:'Stay', danger:true })
-        .then((res)=>{ if(res && res.confirmed){ clearNavGuard(); rrNavigate(r); } });
-      return;
-    }
+    // opts.force bypasses the guard (e.g. a dead session on auth-expiry).
+    if(!(opts && opts.force) && isGuardDirty()){ confirmLeave(()=>rrNavigate(r)); return; }
     rrNavigate(r);
-  }, [rrNavigate]);
-  const goBack = useCallback(()=>rrNavigate(-1), [rrNavigate]);
-  const goForward = useCallback(()=>rrNavigate(1), [rrNavigate]);
+  }, [rrNavigate, confirmLeave]);
+  // Back / Forward (ContextBar ‹ › arrows, Esc-to-go-back, Alt+←/→) also route through
+  // the guard — the Esc handler's own contract is "never lose work by navigating away".
+  // (The browser's own Back button can't be intercepted under BrowserRouter — no
+  // useBlocker in react-router 6 without a data router — so that one path stays uncovered.)
+  const goBack = useCallback(()=>{ if(isGuardDirty()){ confirmLeave(()=>rrNavigate(-1)); return; } rrNavigate(-1); }, [rrNavigate, confirmLeave]);
+  const goForward = useCallback(()=>{ if(isGuardDirty()){ confirmLeave(()=>rrNavigate(1)); return; } rrNavigate(1); }, [rrNavigate, confirmLeave]);
   const navValue={ route, navigate, goBack, goForward, canBack:histIdx>0, canForward:histIdx<maxIdxRef.current };
 
   // TK Group Central · in-cockpit branch Focus. The top selector holds the MODE (ALL);
