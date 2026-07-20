@@ -17,7 +17,7 @@ import { Delegation } from '../Delegation';
 import { BreakGlass } from '../BreakGlass';
 import { AuthorityAdmin } from './AuthorityAdmin';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
-import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
+import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, engageCautions, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
 import { lockedLawBook } from '../utils/ruleBook.data';
 import { Badge } from '../../../shell/primitives';
 import { isViewOnly, VIEW_ONLY_REASON, apiGet } from '../../../core/api';
@@ -133,6 +133,8 @@ function GridCell({ cell, crit, onClick, label }) {
 // The role flags map back to a ROLE_SWITCHES key so the Approval group can show the
 // deadlock guardrail under the right rows.
 const ROLE_FLAG_KEY = Object.fromEntries(ROLE_SWITCHES.map((rs) => [rs.flag, rs.key]));
+// A flag key → its human switch name, for confirm-dialog titles.
+const CONFIG_FLAG_NAME = Object.fromEntries(CONFIGURABLE_GROUPS.flatMap((g) => g.items).map((i) => [i.flag, i.nm]));
 
 // Screens whose controls are branch-scoped — the panel branch selector shows on these.
 // (roles + masters render static content that ignores branch, so no selector there.)
@@ -190,6 +192,20 @@ export function ControlPanel({ setRoute }) {
     setMsg('');
     try {
       if (owner) {
+        // A live flip is one click — EXCEPT when engaging it creates a real hazard (an FM/AE
+        // approval deadlock, or the Branch-Accountant CRM lock that stops branch refunds). Then
+        // preview the caution and let the Owner confirm before it goes live. Non-hazard flags
+        // (and every turn-OFF) stay one-click, so nothing else grows a confirm step.
+        const cautions = turningOn ? engageCautions([key], v) : [];
+        if (cautions.length) {
+          const { confirmed } = await confirmDialog({
+            title: `Turn on “${CONFIG_FLAG_NAME[key] || key}”${where}?`,
+            message: `${cautions.map((c) => `⚠ ${c.text}`).join('\n\n')}\n\nThis applies live immediately. Turn it on anyway?`,
+            danger: true,
+            confirmLabel: 'Turn on anyway',
+          });
+          if (!confirmed) { say('Left unchanged.', 'info'); return; }
+        }
         const next = await setFlag(key, turningOn, targetBranch);   // live flip (scoped)
         qc.setQueryData(['tk', 'flags'], next);
         const lab = (next && next.flags && next.flags[key] && next.flags[key].label) || key;
@@ -228,6 +244,14 @@ export function ControlPanel({ setRoute }) {
     }
   };
 
+  // A confirm-message suffix listing the hazards a set of flags will engage (deadlock /
+  // Branch-Accountant refund lock) — so a bulk go-live surfaces the same cautions the
+  // per-switch screen shows inline, instead of a silent one-click into a latent deadlock.
+  const cautionSuffix = (enablingKeys) => {
+    const cautions = engageCautions(enablingKeys, v);
+    return cautions.length ? `\n\n⚠ Before you engage this:\n${cautions.map((c) => `• ${c.text}`).join('\n')}` : '';
+  };
+
   // Enable-all / Disable-all — OWNER only, one request over every configurable flag for the
   // current branch scope. This is the go-live / rollback that used to be the master switch.
   const onBulk = async (enable) => {
@@ -236,7 +260,7 @@ export function ControlPanel({ setRoute }) {
     const { confirmed } = await confirmDialog({
       title: `${label} configurable rules${where}?`,
       message: enable
-        ? `This switches ON all ${CONFIGURABLE_FLAGS.length} configurable rules ${scoped ? `for ${branchLabel}` : 'across the Group default'} in one action. Each still applies only to the entries it governs, and the always-on foundation rules are unaffected. You can switch any back off individually.`
+        ? `This switches ON all ${CONFIGURABLE_FLAGS.length} configurable rules ${scoped ? `for ${branchLabel}` : 'across the Group default'} in one action. Each still applies only to the entries it governs, and the always-on foundation rules are unaffected. You can switch any back off individually.${cautionSuffix(CONFIGURABLE_FLAGS)}`
         : `This switches OFF all ${CONFIGURABLE_FLAGS.length} configurable rules ${scoped ? `for ${branchLabel}` : '(Group default)'} — enforcement returns to the always-on foundation rules only. Reversible any time.`,
       danger: !enable,
       confirmLabel: label,
@@ -251,7 +275,7 @@ export function ControlPanel({ setRoute }) {
     const where = scoped ? ` for ${branchLabel}` : ' (Group default)';
     const { confirmed } = await confirmDialog({
       title: `Apply the “${preset.label}” preset${scoped ? ` to ${branchLabel}` : ''}?`,
-      message: `${preset.desc} This sets those ${preset.flags.length} rule${preset.flags.length > 1 ? 's' : ''} ON and every other configurable rule OFF${where}. Reversible — adjust any rule after.`,
+      message: `${preset.desc} This sets those ${preset.flags.length} rule${preset.flags.length > 1 ? 's' : ''} ON and every other configurable rule OFF${where}. Reversible — adjust any rule after.${cautionSuffix(preset.flags)}`,
       danger: false,
       confirmLabel: `Apply ${preset.label}`,
     });
@@ -264,9 +288,10 @@ export function ControlPanel({ setRoute }) {
     const targets = LIMIT_BRANCHES.filter((b) => b.code !== 'default' && b.code !== copySource).map((b) => b.code);
     const srcLabel = (LIMIT_BRANCHES.find((b) => b.code === copySource) || {}).label || copySource;
     const changes = copyBranchChanges(flagsQ.data, copySource, targets);
+    const enablingKeys = [...new Set(changes.filter((c) => c.enabled === true).map((c) => c.key))];
     const { confirmed } = await confirmDialog({
       title: `Copy ${srcLabel}’s rules to the other ${targets.length} branches?`,
-      message: `Every configurable rule’s effective value from ${srcLabel} is applied to ${targets.join(', ')}. Reversible per branch.`,
+      message: `Every configurable rule’s effective value from ${srcLabel} is applied to ${targets.join(', ')}. Reversible per branch.${cautionSuffix(enablingKeys)}`,
       danger: false,
       confirmLabel: 'Copy config',
     });

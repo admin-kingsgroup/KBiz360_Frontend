@@ -102,6 +102,35 @@ export function roleControlWarning(roleKey, view = {}) {
   return null;
 }
 
+// The Branch-Accountant switch is more than chain routing — it makes the CRM the system of
+// record and, because the CRM has no refund path, stops the branch raising refunds at all.
+// Kept as a shared constant so the pre-engage caution and the switch card can't drift.
+export const BRANCH_ACCOUNTANT_REFUND_CAUTION =
+  'Branch Accountant under control makes the CRM the system of record — the branch can no longer hand-raise an SO/PO/GP, an inter-branch deal, a refund or a reissue. The CRM has no refund path, so while this is on nobody in the branch can raise a refund.';
+
+/** Cautions the Owner should see BEFORE a change that turns role controls ON — the same
+ *  hazards the per-switch screen shows inline (the sole-verifier / sole-approver deadlock via
+ *  roleControlWarning, and the Branch-Accountant CRM-refund lock), computed up front for the
+ *  SET of flags an action will enable. `enablingKeys` = the flag keys being switched ON;
+ *  `view` = approvalChainView(). Pure & testable. Returns [{ flag, text }] (empty when none
+ *  apply). Used to enrich the Enable-all / preset / copy / live-flip confirm messages so a
+ *  one-click go-live can't silently create the deadlock the inline guard was built to catch. */
+export function engageCautions(enablingKeys = [], view = {}) {
+  const on = new Set(enablingKeys || []);
+  const out = [];
+  // Only FM (sole approver) and AE (sole verifier) can hit the deadlock — mirror the inline guard.
+  ['fm', 'ae'].forEach((roleKey) => {
+    const flag = `control.role.${roleKey}`;
+    if (!on.has(flag)) return;
+    const w = roleControlWarning(roleKey, view);
+    if (w) out.push({ flag, text: w });
+  });
+  if (on.has('control.role.branch_accountant')) {
+    out.push({ flag: 'control.role.branch_accountant', text: BRANCH_ACCOUNTANT_REFUND_CAUTION });
+  }
+  return out;
+}
+
 /** Policy Tester — given the live config + a hypothetical voucher, does it POST DIRECTLY or
  *  ROUTE to Check → Verify → Approve, and WHY. Mirrors the BE create() guard (Enforcement
  *  Matrix + per-role switches + branch-entry chain). `store` = voucher-policy
@@ -353,11 +382,11 @@ export function postureGrid(flagState, branchCodes = []) {
 // configurable flag OFF for the scope. Applied via the bulk set-many endpoint. Order = the
 // escalation from lightest to full control.
 export const POSTURE_PRESETS = [
-  { key: 'conservative', label: 'Conservative', desc: 'Approval basics: branch-accountant routing.',
+  { key: 'conservative', label: 'Conservative', desc: 'Approval basics — the Branch Accountant works CRM-sourced documents (no hand-raised bookings or refunds) and their entries walk the chain.',
     flags: ['control.role.branch_accountant'] },
-  { key: 'standard', label: 'Standard', desc: 'Conservative + verifier≠approver, large-voucher escalation, mandatory documents, export logging and the period lock.',
+  { key: 'standard', label: 'Standard', desc: 'Conservative + verifier≠approver, large-voucher escalation, mandatory documents, export logging and the period lock. (Branch Accountant on CRM-sourced documents — no hand-raised refunds.)',
     flags: ['control.role.branch_accountant', 'sod.verifier_ne_approver', 'approval.escalation_signoffs', 'entry.mandatory_docs', 'reports.log_exports', 'masters.period_lock'] },
-  { key: 'strict', label: 'Strict', desc: 'Every configurable rule on — the full control layer.',
+  { key: 'strict', label: 'Strict', desc: 'Every configurable rule on — the full control layer: the Branch Accountant on CRM-sourced documents (no hand-raised refunds) and every role (incl. Owner) under control.',
     flags: CONFIGURABLE_FLAGS },
 ];
 

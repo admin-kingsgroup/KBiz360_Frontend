@@ -1,4 +1,4 @@
-import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
+import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, engageCautions, policyTest, activeControls, digestSummary, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
 import { RULE_BOOK, ruleBookStats, regroupRegistry, lockedLawBook } from '../utils/ruleBook.data';
 
 describe('posture presets + copy-across-branches (pure)', () => {
@@ -269,6 +269,44 @@ describe('roleControlWarning (deadlock guardrail)', () => {
   });
   test('roles that are neither sole verifier nor approver never caution', () => {
     ['branch_accountant', 'director', 'owner'].forEach((k) => expect(roleControlWarning(k, dflt)).toBeNull());
+  });
+});
+
+describe('engageCautions (pre-engage hazards for bulk / preset / live-flip)', () => {
+  const dflt = approvalChainView({}); // defaults: sole verifier (Sughra) + sole approver (Faiz)
+  test('turning FM under control surfaces the sole-approver deadlock', () => {
+    const c = engageCautions(['control.role.fm'], dflt);
+    expect(c.map((x) => x.flag)).toEqual(['control.role.fm']);
+    expect(c[0].text).toMatch(/only approver/);
+  });
+  test('turning the Branch Accountant under control surfaces the CRM refund lock', () => {
+    const c = engageCautions(['control.role.branch_accountant'], dflt);
+    expect(c.some((x) => x.flag === 'control.role.branch_accountant' && /refund/i.test(x.text))).toBe(true);
+  });
+  test('Enable-all (every configurable flag) surfaces BOTH deadlock sides + the refund caution', () => {
+    const texts = engageCautions(CONFIGURABLE_FLAGS, dflt).map((x) => x.text).join(' | ');
+    expect(texts).toMatch(/only approver/);   // fm
+    expect(texts).toMatch(/only verifier/);   // ae
+    expect(texts).toMatch(/refund/i);          // branch accountant
+  });
+  test('no role control being enabled → no cautions', () => {
+    expect(engageCautions(['entry.mandatory_docs', 'reports.log_exports', 'masters.period_lock'], dflt)).toEqual([]);
+    expect(engageCautions([], dflt)).toEqual([]);
+    expect(engageCautions()).toEqual([]);
+  });
+  test('a second approver + verifier clears the deadlock — only the refund caution remains', () => {
+    const safe = approvalChainView({ verifyEmails: ['s@x.com', 'y@x.com'], approveEmails: ['faiz@x.com', 'z@x.com'] });
+    expect(engageCautions(CONFIGURABLE_FLAGS, safe).map((x) => x.flag)).toEqual(['control.role.branch_accountant']);
+  });
+});
+
+// Every preset that engages the Branch Accountant must NAME the refund consequence — its
+// desc becomes the bulk confirm's lead line, so an Owner can't apply a preset that silently
+// stops branch refunds without reading it. Guards suggestion #2 against future edits.
+describe('POSTURE_PRESETS descriptions', () => {
+  test('a preset that turns on control.role.branch_accountant names the no-refund consequence', () => {
+    POSTURE_PRESETS.filter((p) => p.flags.includes('control.role.branch_accountant'))
+      .forEach((p) => expect(p.desc).toMatch(/refund/i));
   });
 });
 

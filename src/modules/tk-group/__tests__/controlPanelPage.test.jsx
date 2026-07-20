@@ -154,6 +154,58 @@ describe('Control Panel · three-plane model', () => {
     expect(confirmDialog).toHaveBeenCalledTimes(1);
   });
 
+  test('OWNER: Enable all confirm NAMES the FM/AE deadlock + Branch-Accountant refund caution', async () => {
+    const { setManyFlags } = require('../api/flags');
+    const { confirmDialog } = require('../../../core/ux/confirm');
+    setManyFlags.mockClear(); confirmDialog.mockClear().mockResolvedValue({ confirmed: true });
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Enable all' }));
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    const msg = confirmDialog.mock.calls[0][0].message;
+    expect(msg).toMatch(/only approver/);   // FM sole-approver deadlock
+    expect(msg).toMatch(/refund/i);          // Branch-Accountant CRM lock
+    await waitFor(() => expect(setManyFlags).toHaveBeenCalledTimes(1));
+  });
+
+  test('OWNER: the Strict preset confirm carries the refund caution', async () => {
+    const { confirmDialog } = require('../../../core/ux/confirm');
+    confirmDialog.mockClear().mockResolvedValue({ confirmed: true });
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Strict' }));
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    expect(confirmDialog.mock.calls[0][0].message).toMatch(/refund/i);
+  });
+
+  test('OWNER: turning FM under control (sole approver) PREVIEWS the deadlock and confirms before going live', async () => {
+    const { setFlag } = require('../api/flags');
+    const { confirmDialog } = require('../../../core/ux/confirm');
+    setFlag.mockClear(); confirmDialog.mockClear().mockResolvedValue({ confirmed: true });
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    fireEvent.click(await screen.findByRole('switch', { name: /Senior Finance Manager \(Faiz\) under control/ }));
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    expect(confirmDialog.mock.calls[0][0].message).toMatch(/only approver/);
+    await waitFor(() => expect(setFlag).toHaveBeenCalledWith('control.role.fm', true, 'default'));
+  });
+
+  test('OWNER: cancelling the FM deadlock preview leaves the flag untouched (no setFlag)', async () => {
+    const { setFlag } = require('../api/flags');
+    const { confirmDialog } = require('../../../core/ux/confirm');
+    setFlag.mockClear(); confirmDialog.mockClear().mockResolvedValue({ confirmed: false });
+    localStorage.setItem('kb360-user', JSON.stringify({ role: 'Super Admin' }));
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    fireEvent.click(screen.getByText('Configurable Rules'));
+    fireEvent.click(await screen.findByRole('switch', { name: /Senior Finance Manager \(Faiz\) under control/ }));
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    expect(setFlag).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Left unchanged/)).toBeInTheDocument();
+  });
+
   test('OWNER: Disable all confirms and bulk-flips OFF', async () => {
     const { setManyFlags } = require('../api/flags');
     const { confirmDialog } = require('../../../core/ux/confirm');
