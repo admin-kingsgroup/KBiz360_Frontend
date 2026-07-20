@@ -254,9 +254,11 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
     const blocked = entries.filter((e) => sel.has(e.id) && !e.postable).length;
     const { confirmed } = await confirmDialog({
       title: `Approve ${sel.size} voucher(s)?`,
-      message: blocked > 0
-        ? `They will post to the books. ${blocked} of ${sel.size} aren't ready yet and will stay in Pending (fix them from the list) — the rest will be approved.`
-        : 'They will post to the books.',
+      message: blocked === 0
+        ? 'They will post to the books.'
+        : blocked === sel.size
+          ? `None of the ${sel.size} selected are ready to post yet — they'll stay in Pending. Fix them from the list first.`
+          : `They will post to the books. ${blocked} of ${sel.size} aren't ready yet and will stay in Pending (fix them from the list) — the rest will be approved.`,
       confirmLabel: 'Approve',
     });
     if (confirmed) approveMany.mutate({ ids: [...sel], approver: 'admin' }, {
