@@ -146,12 +146,25 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   // Unsaved-changes guard: while this master editor is open with edits, App.jsx's
   // navigate() confirms before leaving (a menu click / drill-out) so a half-typed
   // ledger/party/group isn't silently discarded. `record` is the pristine seed;
-  // a serialized snapshot compare covers every master uniformly. The modal only
-  // mounts while editing, so the guard auto-clears on Save/Cancel (unmount). An
-  // in-modal Cancel is a plain state change (onClose), not an app navigation, so
-  // it closes without a redundant prompt. Never throws.
+  // a serialized snapshot compare covers every master uniformly. Never throws.
   const pristineRef = useRef(JSON.stringify(record));
-  useNavGuard(() => { try { return JSON.stringify(form) !== pristineRef.current; } catch { return false; } });
+  const dirty = () => { try { return JSON.stringify(form) !== pristineRef.current; } catch { return false; } };
+  useNavGuard(dirty);
+  // Accidental dismissals (backdrop click / ✕ / Esc → the Modal's onClose) confirm
+  // before discarding unsaved edits; the explicit Cancel button still closes at once
+  // (a deliberate discard). `closingRef` dedupes the double-Esc (form key + modal) so
+  // only one prompt surfaces.
+  const closingRef = useRef(false);
+  const requestClose = async () => {
+    if (closingRef.current) return;
+    if (dirty()) {
+      closingRef.current = true;
+      const { confirmed } = await confirmDialog({ title: 'Discard changes?', message: 'You have unsaved changes that will be lost.', confirmLabel: 'Discard', cancelLabel: 'Keep editing', danger: true });
+      closingRef.current = false;
+      if (!confirmed) return;
+    }
+    onClose();
+  };
   // Changing a field may invalidate a dependent one (e.g. picking a new Group makes
   // the previously-chosen Sub-Group stale). A field can declare `clears: ['subGroup']`
   // to reset those dependents to blank whenever it changes, or `onSet(v, next)` to
@@ -171,12 +184,13 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   const visible = editable.filter(isShown);
   const missing = visible.filter((f) => isReq(f) && (form[f.key] === '' || form[f.key] == null));
   const submit = () => { if (!saving && !missing.length) onSave(form); };
-  // Enter advances fields; Enter on the last field (or Ctrl/Cmd+Enter) saves; Esc cancels.
-  const formKeys = useFormKeys({ onSubmit: submit, onCancel: onClose });
+  // Enter advances fields; Enter on the last field (or Ctrl/Cmd+Enter) saves; Esc cancels
+  // (guarded — confirms if the form is dirty).
+  const formKeys = useFormKeys({ onSubmit: submit, onCancel: requestClose });
   return (
     <Modal
       title={title}
-      onClose={onClose}
+      onClose={requestClose}
       maxWidth={460}
       footer={
         <>

@@ -11,8 +11,9 @@
 // size, and prints through the same template. Clicking a voucher number drills
 // into the editable voucher; saving refreshes the statement live.
 // ───────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { confirmDialog } from './ux/confirm';
+import { isTopGuardDirty } from './ux/navGuard';
 import { LedgerAccountView } from './ledgerUI';
 import { pushModal } from './ux/modalStore';
 import { useDock } from './ux/dock';
@@ -44,6 +45,18 @@ export function LedgerModalHost({ branch: shellBranch }) {
   const [job, setJob] = useState(null);          // { name, from, to, invoiceToRegister }
   const [voucher, setVoucher] = useState(null);  // { id, vno }
 
+  // Confirm before discarding an open, DIRTY voucher (backdrop click / ✕ / Back / Esc).
+  // isTopGuardDirty() reports the OPEN voucher editor's own unsaved state (the top of the
+  // nav-guard stack) — so an accidental click outside the panel can't silently drop a
+  // half-typed voucher, without false-positives from a guarded screen underneath.
+  const closeVoucher = useCallback(async () => {
+    if (isTopGuardDirty()) {
+      const { confirmed } = await confirmDialog({ title: 'Discard changes?', message: 'This voucher has unsaved changes that will be lost.', confirmLabel: 'Discard', cancelLabel: 'Keep editing', danger: true });
+      if (!confirmed) return;
+    }
+    setVoucher(null);
+  }, []);
+
   useEffect(() => {
     const onOpen = (e) => { const d = e.detail || {}; if (d.name) setJob({ name: d.name, from: d.from || '', to: d.to || '', invoiceToRegister: !!d.invoiceToRegister }); };
     window.addEventListener('kb:ledger-modal', onOpen);
@@ -66,9 +79,9 @@ export function LedgerModalHost({ branch: shellBranch }) {
 
   useEffect(() => {
     if (!job) return undefined;
-    const pop = pushModal(() => { if (voucher) setVoucher(null); else setJob(null); }); // Esc closes voucher first, then modal
+    const pop = pushModal(() => { if (voucher) closeVoucher(); else setJob(null); }); // Esc closes voucher first (guarded if dirty), then modal
     return () => pop();
-  }, [job, voucher]);
+  }, [job, voucher, closeVoucher]);
 
   const dock = useDock();
 
@@ -121,14 +134,14 @@ export function LedgerModalHost({ branch: shellBranch }) {
       </div>
 
       {voucher && (
-        <div onMouseDown={(e) => { e.stopPropagation(); setVoucher(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.5)', zIndex: 8900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
+        <div onMouseDown={(e) => { e.stopPropagation(); closeVoucher(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(17,17,17,0.5)', zIndex: 8900, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: '4vh 2vw' }}>
           <div onMouseDown={(e) => e.stopPropagation()} style={{ width: 'min(880px, 96vw)', maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #cdd1d8', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
               <strong style={{ fontSize: 13, color: '#0d1326' }}>{job.name} · {voucher.vno}</strong>
-              <button onClick={() => setVoucher(null)} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18 }}>✕</button>
+              <button onClick={closeVoucher} title="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18 }}>✕</button>
             </div>
             <Suspense fallback={<div style={{ padding: 24, color: DIM, fontSize: 13 }}>Loading voucher…</div>}>
-              <VoucherEditor voucherId={voucher.id} cur={cur} onBack={() => setVoucher(null)} onClose={() => setVoucher(null)} />
+              <VoucherEditor voucherId={voucher.id} cur={cur} onBack={closeVoucher} onClose={closeVoucher} />
             </Suspense>
           </div>
         </div>

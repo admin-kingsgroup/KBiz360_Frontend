@@ -33,6 +33,7 @@ import { useHotkey } from '../../../core/ux/hotkeys';
 import { useNavGuard } from '../../../core/ux/navGuard';
 import { Combobox } from '../../../core/ux/Combobox';
 import { toast } from '../../../core/ux/toast';
+import { confirmDialog } from '../../../core/ux/confirm';
 import { Kbd } from '../../../core/ux/widgets.jsx';
 import { PageLayout } from '../../../shell/PageLayout';
 import { Button, IconButton, Input, Select, Textarea, FormField, LoadingState, ErrorState, EmptyState, Skeleton } from '../../../shell/primitives';
@@ -365,6 +366,19 @@ export function HistoryTab({ q, branch }) {
 export function PartyShell({ title, subtitle, m, tabs, tab, setTab, children }) {
   const { list, rows, current, save, saving, err, savedAt, dirty } = m;
 
+  // Switching the record selector loads the picked party over the form — a plain state
+  // change, not an app navigation, so it bypasses the nav guard. Confirm first when the
+  // current record has unsaved edits, so picking another customer mid-edit can't silently
+  // discard them. (View-only can't save, so nothing to warn about.)
+  const pickRecord = async (id) => {
+    if (id === ((current && current.id) || '')) return;
+    if (dirty && !isViewOnly()) {
+      const { confirmed } = await confirmDialog({ title: 'Discard changes?', message: 'You have unsaved changes to this record that will be lost.', confirmLabel: 'Discard', cancelLabel: 'Keep editing', danger: true });
+      if (!confirmed) return;
+    }
+    m.setSelectedId(id);
+  };
+
   const selector = (
     <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
       <label className="text-[11px] font-bold text-ink-muted" htmlFor="party-record-select">Record</label>
@@ -375,7 +389,7 @@ export function PartyShell({ title, subtitle, m, tabs, tab, setTab, children }) 
           ariaLabel="Record"
           value={(current && current.id) || ''}
           options={[...rows].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' })).map((r) => ({ value: r.id, label: r.name, sublabel: r.branch ? `· ${r.branch}` : '' }))}
-          onChange={(id) => m.setSelectedId(id)}
+          onChange={pickRecord}
           placeholder={rows.length === 0 ? '— no records —' : 'Search records…'}
         />
       </div>

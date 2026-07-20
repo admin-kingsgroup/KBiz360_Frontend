@@ -1,6 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { setNavGuard, clearNavGuard, isGuardDirty, useNavGuard } from '../ux/navGuard';
+import { setNavGuard, clearNavGuard, isGuardDirty, isTopGuardDirty, useNavGuard } from '../ux/navGuard';
 
 describe('navGuard (module)', () => {
   afterEach(() => clearNavGuard());
@@ -53,6 +53,33 @@ describe('navGuard (module)', () => {
     setNavGuard(() => { throw new Error('boom'); });
     setNavGuard(() => true);
     expect(isGuardDirty()).toBe(true);
+  });
+
+  // isTopGuardDirty() checks ONLY the most-recently-mounted guard — an overlay's own
+  // close (backdrop/✕) uses it to confirm discarding just the top editor, ignoring a
+  // dirty screen underneath.
+  describe('isTopGuardDirty (top-of-stack only)', () => {
+    test('false when nothing is registered', () => {
+      expect(isTopGuardDirty()).toBe(false);
+    });
+
+    test('reflects the TOP guard, ignoring a dirty one underneath', () => {
+      setNavGuard(() => true);         // underlying screen: dirty
+      setNavGuard(() => false);        // top overlay (e.g. a clean voucher drill)
+      expect(isGuardDirty()).toBe(true);      // the app as a whole is dirty…
+      expect(isTopGuardDirty()).toBe(false);  // …but the TOP editor is not
+    });
+
+    test('true when the top guard itself is dirty', () => {
+      setNavGuard(() => false);        // clean underlying screen
+      setNavGuard(() => true);         // dirty top overlay
+      expect(isTopGuardDirty()).toBe(true);
+    });
+
+    test('a throwing top guard is treated as not-dirty', () => {
+      setNavGuard(() => { throw new Error('boom'); });
+      expect(isTopGuardDirty()).toBe(false);
+    });
   });
 });
 

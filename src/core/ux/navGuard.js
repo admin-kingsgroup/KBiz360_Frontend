@@ -35,6 +35,16 @@ export function isGuardDirty() {
   return guards.some((fn) => { try { return !!fn(); } catch { return false; } });
 }
 
+// True when the MOST-RECENTLY-MOUNTED guarded form is dirty. Used by an overlay's own
+// close (backdrop / ✕ / Back) to confirm discarding just the top editor — checking the
+// global isGuardDirty() there would false-positive on an underlying guarded screen
+// deeper in the stack (e.g. the Party Master beneath a voucher drill). Never throws.
+export function isTopGuardDirty() {
+  const fn = guards[guards.length - 1];
+  if (!fn) return false;
+  try { return !!fn(); } catch { return false; }
+}
+
 // Register the current screen's dirty-check for its lifetime. `isDirtyFn` is read live
 // on each navigation (kept in a ref), so it always sees the latest state. Also arms a
 // `beforeunload` handler for the same check, so a browser refresh/close on a dirty

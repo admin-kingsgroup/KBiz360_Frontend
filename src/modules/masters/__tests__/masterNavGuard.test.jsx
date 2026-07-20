@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Phase 3a — every simple master (Ledgers, Parties, Groups, Voucher Types, Cost
@@ -25,6 +25,8 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { MasterCrud } from '../shared/masterCrud';
 // eslint-disable-next-line import/first
 import { isGuardDirty, clearNavGuard } from '../../../core/ux/navGuard';
+// eslint-disable-next-line import/first
+import { confirmDialog } from '../../../core/ux/confirm';
 
 function renderWith(ui) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -65,6 +67,33 @@ describe('MasterCrud EditModal — unsaved-changes nav guard', () => {
     // Cancel closes the modal (unmount) → the guard clears, no stale dirty-check.
     fireEvent.click(screen.getByRole('button', { name: /Cancel/i }));
     expect(isGuardDirty()).toBe(false);
+  });
+
+  // The ✕ / backdrop / Esc dismissals (the Modal's onClose) are accidental-close paths —
+  // they now confirm before discarding unsaved edits. (The explicit Cancel button still
+  // closes immediately — that's a deliberate discard, covered by the test above.)
+  test('the ✕ close on a DIRTY editor prompts to discard; confirming closes it', async () => {
+    confirmDialog.mockResolvedValue({ confirmed: true });
+    renderWith(<MasterCrud title="Widgets" subtitle="test" resource="widgets" fields={FIELDS} />);
+    fireEvent.click(screen.getAllByTitle('Edit')[0]);
+    fireEvent.change(screen.getByDisplayValue('Alpha'), { target: { value: 'Alpha-edited' } });
+    expect(isGuardDirty()).toBe(true);
+
+    fireEvent.click(screen.getByLabelText('Close'));   // the Modal's ✕
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    await waitFor(() => expect(isGuardDirty()).toBe(false)); // modal unmounted → guard clear
+  });
+
+  test('declining the discard prompt keeps the editor open with edits intact', async () => {
+    confirmDialog.mockResolvedValue({ confirmed: false });
+    renderWith(<MasterCrud title="Widgets" subtitle="test" resource="widgets" fields={FIELDS} />);
+    fireEvent.click(screen.getAllByTitle('Edit')[0]);
+    fireEvent.change(screen.getByDisplayValue('Alpha'), { target: { value: 'Alpha-edited' } });
+
+    fireEvent.click(screen.getByLabelText('Close'));
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    expect(screen.getByDisplayValue('Alpha-edited')).toBeInTheDocument(); // still open
+    expect(isGuardDirty()).toBe(true);                                    // still dirty
   });
 
   test('a brand-new record is clean until a field is typed', () => {
