@@ -62,8 +62,9 @@ export const isSettlerRole = (role) => {
 
 export const STATUS_META = {
   tied: { tone: 'success', label: 'Tied' },
-  // Round Off head only: a sub-rupee residue tolerated as rounding — non-blocking, but
-  // shown so it is never silent. Mirrors the backend buildTieOut `rounding` status.
+  // A definitionally-rounding head (Round Off, or the synthetic Profit & Loss A/c b/f): a
+  // sub-rupee residue tolerated as rounding — non-blocking, but shown so it is never silent.
+  // Mirrors the backend buildTieOut `rounding` status.
   rounding: { tone: 'info', label: 'Rounding' },
   off: { tone: 'danger', label: 'Off' },
   matched: { tone: 'success', label: 'Matched' },

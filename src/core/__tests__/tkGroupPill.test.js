@@ -17,7 +17,7 @@ const hrefsOf = (nodes, out = []) => {
 const labels = (roots) => (roots || []).map((r) => r && r.label);
 const CENTRAL = { role: 'Super Admin' };
 const CONTROL_ROUTES = [
-  '/tk/control-tower', '/tk/approvals', '/tk/decisions', '/tk/onboarding', '/tk/controls', '/tk/limits', '/tk/period-locks',
+  '/tk/control-tower', '/tk/approvals', '/tk/decisions', '/tk/onboarding', '/tk/period-locks',
   '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability',
   '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/go-live', '/tk/my-role', '/tk/roles',
   '/tk/tax-desk', '/tk/assets', '/tk/control-panel', '/tk/readiness', '/tk/voucher-approvals',
@@ -51,7 +51,7 @@ describe('TK Group Central — control cockpit mode', () => {
 
   test('every TK Group page stays controllable in Page Visibility Control', () => {
     const keys = new Set(allPageKeys());
-    for (const leaf of ['/tk/my-role', '/tk/go-live', '/tk/approvals', '/tk/onboarding', '/tk/controls', '/tk/limits', '/tk/period-locks', '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/control-tower', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability', '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/roles', '/tk/tax-desk', '/tk/assets']) {
+    for (const leaf of ['/tk/my-role', '/tk/go-live', '/tk/approvals', '/tk/onboarding', '/tk/period-locks', '/tk/targets', '/tk/master-control', '/tk/hr-control', '/tk/control-tower', '/tk/scorecard', '/tk/performance', '/tk/investment', '/tk/profitability', '/tk/receivables-payables', '/tk/exceptions', '/tk/compliance', '/tk/branch-cockpit', '/tk/audit', '/tk/roles', '/tk/tax-desk', '/tk/assets']) {
       expect(keys.has(leaf)).toBe(true);
     }
   });
@@ -59,7 +59,7 @@ describe('TK Group Central — control cockpit mode', () => {
   test('the page registry (MENU_TK_GROUP export) lists the /tk control routes', () => {
     const hrefs = MENU_TK_GROUP.children.filter((c) => c.href).map((c) => c.href);
     expect(hrefs).toEqual(expect.arrayContaining([
-      '/tk/my-role', '/tk/go-live', '/tk/approvals', '/tk/onboarding', '/tk/controls',
+      '/tk/my-role', '/tk/go-live', '/tk/approvals', '/tk/onboarding',
       '/tk/period-locks', '/tk/targets', '/tk/master-control', '/tk/control-tower',
       '/tk/scorecard', '/tk/branch-cockpit', '/tk/audit',
     ]));

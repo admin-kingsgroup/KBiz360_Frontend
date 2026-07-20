@@ -49,6 +49,10 @@ export const PAY_METHODS = ['', 'Bank Transfer', 'BSP NEFT', 'NEFT/RTGS', 'Chequ
 export const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD'];
 export const ADDR_TYPES = ['Billing', 'Shipping', 'Registered Office', 'Head Office', 'Branch', 'Other'];
 
-// Customer classification — the business's four customer kinds (2026-07-18).
-export const CUST_TYPES = ['', 'B2C Reference', 'B2C Meta', 'B2B', 'B2E'];
+// Customer classification — the business's customer kinds (2026-07-18).
+// 'Inter Branch' added 2026-07-20: the inter-company Travkings branch entities
+// (counterparties on INB deals) are classified here, matching the locked
+// "Inter Branch" Client Type the booking screen already shows for those deals
+// (soPoGpVoucherEntry.jsx). Kept last so the four retail kinds lead the list.
+export const CUST_TYPES = ['', 'B2C Reference', 'B2C Meta', 'B2B', 'B2E', 'Inter Branch'];
 export const CUST_SOURCES = ['', 'Direct Referral', 'Cold Outreach', 'Digital Marketing', 'Walk-in', 'Existing Client'];

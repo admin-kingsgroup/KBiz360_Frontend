@@ -42,7 +42,7 @@ describe('per-user grant (allow-list)', () => {
     const menu = getMenu('ALL', acct());
     const accounts = menu.find((m) => m.label === 'Accounts');
     const heads = (accounts?.children || []).map((c) => c.label);
-    for (const gone of ['Branch MIS', 'Inter Branch', 'Period Close', 'Accounts Master']) {
+    for (const gone of ['Branch MIS', 'Inter Branch', 'Period Close', 'Currency & Planning']) {
       expect(heads).not.toContain(gone);
     }
     expect(heads).toContain('Daily Entry'); // the workspace itself is intact

@@ -130,7 +130,7 @@ export function UserConfig({ go, branch = 'default' }) {
 
       <div className="mt-[16px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold">
         <span>🛡️</span>
-        <span>A blank ceiling means <b>no limit</b> for that scope. A branch ceiling overrides the user’s default; clear it to re-inherit. Ceilings enforce on <b>voucher approval</b> once the branch’s Master Switch is on. 2FA &amp; session rules remain Planned.</span>
+        <span>A blank ceiling means <b>no limit</b> for that scope. A branch ceiling overrides the user’s default; clear it to re-inherit. Ceilings enforce on <b>voucher approval</b> once the relevant control is engaged. 2FA &amp; session rules were considered and declined.</span>
       </div>
     </div>
   );

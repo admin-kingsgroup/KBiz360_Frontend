@@ -16,8 +16,9 @@ import { ChangeLog } from '../ChangeLog';
 import { Delegation } from '../Delegation';
 import { BreakGlass } from '../BreakGlass';
 import { AuthorityAdmin } from './AuthorityAdmin';
+import { RatesReference } from './RatesReference';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
-import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
+import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, engageCautions, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
 import { lockedLawBook } from '../utils/ruleBook.data';
 import { Badge } from '../../../shell/primitives';
 import { isViewOnly, VIEW_ONLY_REASON, apiGet } from '../../../core/api';
@@ -97,6 +98,19 @@ function LawGroup({ title, sub, rows, count, onOpen }) {
     </div>
   );
 }
+// Data-provenance line for the law bands — live registry / loading / bundled fallback.
+function LawState({ q }) {
+  const live = !!(q.data && q.data.items && q.data.items.length);
+  return (
+    <p className="mb-4 flex items-center gap-1.5 text-[11px]">
+      {live
+        ? <><span className="inline-block h-2 w-2 rounded-full bg-success" /><span className="text-ink-subtle">Live from the rules registry (<code>/api/rules</code>).</span></>
+        : q.isLoading
+          ? <><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-ink-subtle" /><span className="text-ink-subtle">Loading the live registry…</span></>
+          : <><span className="inline-block h-2 w-2 rounded-full bg-warning" /><span className="text-ink-subtle">Showing the built-in reference copy — the live registry didn’t load, so counts may lag the server.</span></>}
+    </p>
+  );
+}
 // Check → Verify → Approve reads as a pipeline, so each level gets its own accent.
 const CHAIN_COLORS = ['#2563eb', '#d97706', '#16a34a'];
 function ChainCard({ k, r, w, n }) {
@@ -133,6 +147,8 @@ function GridCell({ cell, crit, onClick, label }) {
 // The role flags map back to a ROLE_SWITCHES key so the Approval group can show the
 // deadlock guardrail under the right rows.
 const ROLE_FLAG_KEY = Object.fromEntries(ROLE_SWITCHES.map((rs) => [rs.flag, rs.key]));
+// A flag key → its human switch name, for confirm-dialog titles.
+const CONFIG_FLAG_NAME = Object.fromEntries(CONFIGURABLE_GROUPS.flatMap((g) => g.items).map((i) => [i.flag, i.nm]));
 
 // Screens whose controls are branch-scoped — the panel branch selector shows on these.
 // (roles + masters render static content that ignores branch, so no selector there.)
@@ -141,7 +157,7 @@ const BRANCH_SCOPED = new Set(['configurable', 'matrix', 'limits', 'users']);
 const SCREEN_FLAGS = { configurable: CONFIGURABLE_FLAGS };
 
 export function ControlPanel({ setRoute }) {
-  const [screen, setScreen] = useState('defaults');
+  const [screen, setScreen] = useState('law-erp');
   const [branch, setBranch] = useState('default');   // panel-wide branch scope for the controls
   const flagsQ = useQuery({ queryKey: ['tk', 'flags'], queryFn: getFlagState, staleTime: 30_000 });
   // Plane ① · ERP Law band — read the enforced-rule registry (same key/fallback as the Rule
@@ -190,6 +206,20 @@ export function ControlPanel({ setRoute }) {
     setMsg('');
     try {
       if (owner) {
+        // A live flip is one click — EXCEPT when engaging it creates a real hazard (an FM/AE
+        // approval deadlock, or the Branch-Accountant CRM lock that stops branch refunds). Then
+        // preview the caution and let the Owner confirm before it goes live. Non-hazard flags
+        // (and every turn-OFF) stay one-click, so nothing else grows a confirm step.
+        const cautions = turningOn ? engageCautions([key], v) : [];
+        if (cautions.length) {
+          const { confirmed } = await confirmDialog({
+            title: `Turn on “${CONFIG_FLAG_NAME[key] || key}”${where}?`,
+            message: `${cautions.map((c) => `⚠ ${c.text}`).join('\n\n')}\n\nThis applies live immediately. Turn it on anyway?`,
+            danger: true,
+            confirmLabel: 'Turn on anyway',
+          });
+          if (!confirmed) { say('Left unchanged.', 'info'); return; }
+        }
         const next = await setFlag(key, turningOn, targetBranch);   // live flip (scoped)
         qc.setQueryData(['tk', 'flags'], next);
         const lab = (next && next.flags && next.flags[key] && next.flags[key].label) || key;
@@ -228,6 +258,14 @@ export function ControlPanel({ setRoute }) {
     }
   };
 
+  // A confirm-message suffix listing the hazards a set of flags will engage (deadlock /
+  // Branch-Accountant refund lock) — so a bulk go-live surfaces the same cautions the
+  // per-switch screen shows inline, instead of a silent one-click into a latent deadlock.
+  const cautionSuffix = (enablingKeys) => {
+    const cautions = engageCautions(enablingKeys, v);
+    return cautions.length ? `\n\n⚠ Before you engage this:\n${cautions.map((c) => `• ${c.text}`).join('\n')}` : '';
+  };
+
   // Enable-all / Disable-all — OWNER only, one request over every configurable flag for the
   // current branch scope. This is the go-live / rollback that used to be the master switch.
   const onBulk = async (enable) => {
@@ -236,7 +274,7 @@ export function ControlPanel({ setRoute }) {
     const { confirmed } = await confirmDialog({
       title: `${label} configurable rules${where}?`,
       message: enable
-        ? `This switches ON all ${CONFIGURABLE_FLAGS.length} configurable rules ${scoped ? `for ${branchLabel}` : 'across the Group default'} in one action. Each still applies only to the entries it governs, and the always-on foundation rules are unaffected. You can switch any back off individually.`
+        ? `This switches ON all ${CONFIGURABLE_FLAGS.length} configurable rules ${scoped ? `for ${branchLabel}` : 'across the Group default'} in one action. Each still applies only to the entries it governs, and the always-on foundation rules are unaffected. You can switch any back off individually.${cautionSuffix(CONFIGURABLE_FLAGS)}`
         : `This switches OFF all ${CONFIGURABLE_FLAGS.length} configurable rules ${scoped ? `for ${branchLabel}` : '(Group default)'} — enforcement returns to the always-on foundation rules only. Reversible any time.`,
       danger: !enable,
       confirmLabel: label,
@@ -251,7 +289,7 @@ export function ControlPanel({ setRoute }) {
     const where = scoped ? ` for ${branchLabel}` : ' (Group default)';
     const { confirmed } = await confirmDialog({
       title: `Apply the “${preset.label}” preset${scoped ? ` to ${branchLabel}` : ''}?`,
-      message: `${preset.desc} This sets those ${preset.flags.length} rule${preset.flags.length > 1 ? 's' : ''} ON and every other configurable rule OFF${where}. Reversible — adjust any rule after.`,
+      message: `${preset.desc} This sets those ${preset.flags.length} rule${preset.flags.length > 1 ? 's' : ''} ON and every other configurable rule OFF${where}. Reversible — adjust any rule after.${cautionSuffix(preset.flags)}`,
       danger: false,
       confirmLabel: `Apply ${preset.label}`,
     });
@@ -264,9 +302,10 @@ export function ControlPanel({ setRoute }) {
     const targets = LIMIT_BRANCHES.filter((b) => b.code !== 'default' && b.code !== copySource).map((b) => b.code);
     const srcLabel = (LIMIT_BRANCHES.find((b) => b.code === copySource) || {}).label || copySource;
     const changes = copyBranchChanges(flagsQ.data, copySource, targets);
+    const enablingKeys = [...new Set(changes.filter((c) => c.enabled === true).map((c) => c.key))];
     const { confirmed } = await confirmDialog({
       title: `Copy ${srcLabel}’s rules to the other ${targets.length} branches?`,
-      message: `Every configurable rule’s effective value from ${srcLabel} is applied to ${targets.join(', ')}. Reversible per branch.`,
+      message: `Every configurable rule’s effective value from ${srcLabel} is applied to ${targets.join(', ')}. Reversible per branch.${cautionSuffix(enablingKeys)}`,
       danger: false,
       confirmLabel: 'Copy config',
     });
@@ -353,33 +392,42 @@ export function ControlPanel({ setRoute }) {
 
   const screenBody = () => {
     switch (screen) {
-      case 'defaults': {
-        const lawLive = !!(lawQ.data && lawQ.data.items && lawQ.data.items.length);
+      case 'law-erp':
         return (
           <>
             <p className="mb-1.5 mt-1 max-w-[82ch] text-[13.5px] text-ink-muted">
-              The <b>law floor</b> — <b>{band.totals.all}</b> locked laws the ERP enforces in code across <b>{band.totals.domains}</b> domains.
-              These are <b>always on and read-only</b>: they apply on day one and can’t be switched off. The Owner-set rules — who
-              approves, statutory rates — are operated in{' '}
-              <button type="button" className="font-semibold text-navy underline" onClick={() => setScreen('authority')}>Owner &amp; Authority</button>, not here.
-              Rolled up by domain below; click a domain for its individual rules, each citing the file that enforces it, in the{' '}
-              <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book')}>Rule Book</button>.
+              The <b>accounting law floor</b> — <b>{band.totals.accounts}</b> locked laws across <b>{band.accounts.length}</b> domains
+              (tax, ledgers, posting, gross profit, refunds, reconciliation). These are <b>always on and read-only</b>: they apply on
+              day one and can’t be switched off. Click a domain for its individual rules in the{' '}
+              <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book&track=accounts')}>Rule Book</button>.
+              The process &amp; control laws are under{' '}
+              <button type="button" className="font-semibold text-navy underline" onClick={() => setScreen('law-ops')}>Operational Rules</button>.
             </p>
-            <p className="mb-4 flex items-center gap-1.5 text-[11px]">
-              {lawLive
-                ? <><span className="inline-block h-2 w-2 rounded-full bg-success" /><span className="text-ink-subtle">Live from the rules registry (<code>/api/rules</code>).</span></>
-                : <><span className="inline-block h-2 w-2 rounded-full bg-warning" /><span className="text-ink-subtle">Showing the built-in reference copy — the live registry didn’t load, so counts may lag the server.</span></>}
-            </p>
-            <div className="grid gap-4 tablet:grid-cols-2">
+            <LawState q={lawQ} />
+            <div className="grid gap-4">
               <LawGroup title={'📒 Accounts — financial law'} sub="Accounts" rows={band.accounts} count={band.totals.accounts} onOpen={() => go('/tk/rules?tab=book&track=accounts')} />
-              <LawGroup title={'⚙ Operations — process & control law'} sub="Operations" rows={band.ops} count={band.totals.ops} onOpen={() => go('/tk/rules?tab=book&track=ops')} />
             </div>
             <H3>Day-one foundation locks</H3>
-            <p className="mb-3 -mt-1 max-w-[82ch] text-[12.5px] text-ink-muted">The always-on essentials spelled out in plain language — the most governance-critical laws from the domains above.</p>
+            <p className="mb-3 -mt-1 max-w-[82ch] text-[12.5px] text-ink-muted">The always-on essentials spelled out in plain language — the most governance-critical laws, across both tracks.</p>
             <div className="grid gap-2.5 tablet:grid-cols-2">{DEFAULT_RULES.map((r, i) => <DefaultRow key={i} {...r} />)}</div>
           </>
         );
-      }
+      case 'law-ops':
+        return (
+          <>
+            <p className="mb-1.5 mt-1 max-w-[82ch] text-[13.5px] text-ink-muted">
+              The <b>process &amp; control law floor</b> — <b>{band.totals.ops}</b> locked laws across <b>{band.ops.length}</b> domains
+              (approvals, voucher lifecycle, inter-branch, access, visibility, HR). Also <b>always on and read-only</b>. Click a domain
+              for its individual rules in the{' '}
+              <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book&track=ops')}>Rule Book</button>.
+              The intended role posture and the master-onboarding chain are the other two screens in this head.
+            </p>
+            <LawState q={lawQ} />
+            <div className="grid gap-4">
+              <LawGroup title={'⚙ Operations — process & control law'} sub="Operations" rows={band.ops} count={band.totals.ops} onOpen={() => go('/tk/rules?tab=book&track=ops')} />
+            </div>
+          </>
+        );
       case 'configurable':
         return (
           <>
@@ -491,6 +539,7 @@ export function ControlPanel({ setRoute }) {
       case 'limits': return <BranchLimitsEditor go={go} branch={branch} onBranchChange={setBranch} />;
       case 'users': return <UserConfig go={go} branch={branch} />;
       case 'authority': return <AuthorityAdmin canManage={owner} />;
+      case 'rates': return <RatesReference />;
       case 'delegation': return <Delegation />;
       case 'breakglass': return <BreakGlass />;
       case 'log': return <ChangeLog go={go} />;
@@ -539,6 +588,11 @@ export function ControlPanel({ setRoute }) {
   const stripBranch = showBranchBar ? branch : 'default';
   const stripScoped = showBranchBar && scoped;
   const engaged = CONFIGURABLE_FLAGS.filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length;
+  // Cross-branch reality: a configurable rule counts as engaged if it is on for the Group
+  // default OR any branch override. On a non-branch-scoped screen the header uses THIS, so a
+  // branch that has controls on can't hide behind a dormant Group default ("Everything OFF").
+  const engagedAnywhere = CONFIGURABLE_FLAGS.filter((k) => LIMIT_BRANCHES.some((b) => isFlagOn(flagsQ.data, k, b.code))).length;
+  const headEngaged = showBranchBar ? engaged : engagedAnywhere;
   // A failed / blocked flag read returns {flags:{}, _error} (see api/flags getFlagState). Surface
   // it as its OWN state — "Everything OFF · dormant" must never stand in for "couldn't load".
   const loadError = flagsQ.data && flagsQ.data._error;
@@ -565,17 +619,19 @@ export function ControlPanel({ setRoute }) {
           <span className="text-[12px] text-ink-muted">Reading the live control state…</span>
         </div>
       ) : (
-        <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${engaged > 0 ? 'border-success/40 bg-success-soft' : 'border-warning/40 bg-warning-soft'}`}>
-          <span className={`text-[11px] font-bold uppercase tracking-wide ${engaged > 0 ? 'text-success' : 'text-warning'}`}>Control Panel</span>
-          <Badge tone={engaged > 0 ? 'success' : 'warning'}>
-            {engaged > 0 ? `${engaged} control${engaged > 1 ? 's' : ''} on` : 'Everything OFF · dormant'}
+        <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${headEngaged > 0 ? 'border-success/40 bg-success-soft' : 'border-warning/40 bg-warning-soft'}`}>
+          <span className={`text-[11px] font-bold uppercase tracking-wide ${headEngaged > 0 ? 'text-success' : 'text-warning'}`}>Control Panel</span>
+          <Badge tone={headEngaged > 0 ? 'success' : 'warning'}>
+            {headEngaged > 0 ? `${headEngaged} control${headEngaged > 1 ? 's' : ''} on${!showBranchBar ? ' · across branches' : ''}` : 'Everything OFF · dormant'}
           </Badge>
-          <span className={`text-[12px] ${engaged > 0 ? 'text-success' : 'text-warning'}`}>
+          <span className={`text-[12px] ${headEngaged > 0 ? 'text-success' : 'text-warning'}`}>
             {stripScoped ? <><b>{branchLabel}</b> scope · </> : null}
-            {owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
-              : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
+            {headEngaged > 0 && !showBranchBar
+              ? <>Live on one or more branches — <button type="button" className="underline" onClick={() => setScreen('active')}>Active Controls</button> shows exactly where.</>
+              : owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
+                : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
           </span>
-          <button type="button" onClick={() => go('/tk/rules')}
+          <button type="button" onClick={() => go('/tk/rules?tab=book')}
             className="ml-auto shrink-0 rounded-full border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">
             📖 Rule Book
           </button>

@@ -216,8 +216,13 @@ export const LedgersMaster = ({ branch }) => {
   const branchOptions = shellLocked ? ['ALL', topBarView] : ['ALL', ...BRANCH_CODES];
 
   // A party ledger = one whose Group (or Sub-Group) is Sundry Debtors / Creditors.
-  // The GSTIN / credit-terms / contact / bank fields apply only to these.
+  // The GSTIN / credit-terms / contact fields apply only to these.
   const isParty = (form) => /sundry\s+(debtors|creditors)/i.test(`${form?.group || ''} ${form?.subGroup || ''}`);
+  // A bank-account ledger (Group = Bank Accounts) also needs Bank Name / A/c No. / IFSC
+  // and an optional OD/credit limit — the Bank Account Master register reads them from
+  // here, so expose those fields for bank ledgers too, not only party ledgers.
+  const isBankAcct = (form) => /^\s*bank accounts\s*$/i.test(String(form?.group || ''));
+  const isPartyOrBank = (form) => isParty(form) || isBankAcct(form);
 
   // Group + cascading Sub-Group LIST filters (default = show all). Pick a main group
   // (e.g. Sundry Debtors) → the list narrows to ledgers under it; a Sub-Group dropdown
@@ -302,17 +307,19 @@ export const LedgersMaster = ({ branch }) => {
           { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
           { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
           { key: 'active', label: 'Active', type: 'bool', default: true },
-          // Party (Sundry Debtors / Creditors) details — only shown & validated when
-          // the ledger's Group is a party group. Credit days & limit are mandatory.
+          // Party (Sundry Debtors / Creditors) details — GSTIN / credit terms / contact
+          // show & validate only for a party group. Bank Name / A/c No. / IFSC + an
+          // optional credit (OD) limit also show for a Bank Accounts ledger so its bank
+          // details are captured here (the Bank Account Master register reads them back).
           { key: 'gstin', label: 'GSTIN', type: 'text', table: false, show: isParty, placeholder: '27AAMCT1096J1ZU' },
           { key: 'creditDays', label: 'Credit Days', type: 'number', table: false, show: isParty, required: isParty, default: '' },
-          { key: 'creditLimit', label: 'Credit Limit', type: 'number', table: false, show: isParty, required: isParty, default: '' },
+          { key: 'creditLimit', label: 'Credit Limit', type: 'number', table: false, show: isPartyOrBank, required: isParty, default: '' },
           { key: 'contactName', label: 'Contact Name', type: 'text', table: false, show: isParty },
           { key: 'contactNumber', label: 'Contact Number', type: 'text', table: false, show: isParty },
           { key: 'email', label: 'Email', type: 'text', table: false, show: isParty, placeholder: 'name@example.com' },
-          { key: 'bankName', label: 'Bank Name', type: 'text', table: false, show: isParty },
-          { key: 'bankAcNo', label: 'Bank A/c No.', type: 'text', table: false, show: isParty },
-          { key: 'bankIfsc', label: 'Bank IFSC', type: 'text', table: false, show: isParty },
+          { key: 'bankName', label: 'Bank Name', type: 'text', table: false, show: isPartyOrBank },
+          { key: 'bankAcNo', label: 'Bank A/c No.', type: 'text', table: false, show: isPartyOrBank },
+          { key: 'bankIfsc', label: 'Bank IFSC', type: 'text', table: false, show: isPartyOrBank },
         ]} />
     </>
   );

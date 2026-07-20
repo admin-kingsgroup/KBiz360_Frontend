@@ -102,6 +102,35 @@ export function roleControlWarning(roleKey, view = {}) {
   return null;
 }
 
+// The Branch-Accountant switch is more than chain routing — it makes the CRM the system of
+// record and, because the CRM has no refund path, stops the branch raising refunds at all.
+// Kept as a shared constant so the pre-engage caution and the switch card can't drift.
+export const BRANCH_ACCOUNTANT_REFUND_CAUTION =
+  'Branch Accountant under control makes the CRM the system of record — the branch can no longer hand-raise an SO/PO/GP, an inter-branch deal, a refund or a reissue. The CRM has no refund path, so while this is on nobody in the branch can raise a refund.';
+
+/** Cautions the Owner should see BEFORE a change that turns role controls ON — the same
+ *  hazards the per-switch screen shows inline (the sole-verifier / sole-approver deadlock via
+ *  roleControlWarning, and the Branch-Accountant CRM-refund lock), computed up front for the
+ *  SET of flags an action will enable. `enablingKeys` = the flag keys being switched ON;
+ *  `view` = approvalChainView(). Pure & testable. Returns [{ flag, text }] (empty when none
+ *  apply). Used to enrich the Enable-all / preset / copy / live-flip confirm messages so a
+ *  one-click go-live can't silently create the deadlock the inline guard was built to catch. */
+export function engageCautions(enablingKeys = [], view = {}) {
+  const on = new Set(enablingKeys || []);
+  const out = [];
+  // Only FM (sole approver) and AE (sole verifier) can hit the deadlock — mirror the inline guard.
+  ['fm', 'ae'].forEach((roleKey) => {
+    const flag = `control.role.${roleKey}`;
+    if (!on.has(flag)) return;
+    const w = roleControlWarning(roleKey, view);
+    if (w) out.push({ flag, text: w });
+  });
+  if (on.has('control.role.branch_accountant')) {
+    out.push({ flag: 'control.role.branch_accountant', text: BRANCH_ACCOUNTANT_REFUND_CAUTION });
+  }
+  return out;
+}
+
 /** Policy Tester — given the live config + a hypothetical voucher, does it POST DIRECTLY or
  *  ROUTE to Check → Verify → Approve, and WHY. Mirrors the BE create() guard (Enforcement
  *  Matrix + per-role switches + branch-entry chain). `store` = voucher-policy
@@ -164,37 +193,43 @@ export function digestSummary({ overview = {}, integrity = {}, inbox = {} } = {}
 }
 
 // ─── Power Console structure (pure data) ─────────────────────────────────────
-// ONE console, organised by WHO governs each rule — the three governance planes,
-// plus an Oversight lens that reads across all of them:
-//   ① ERP Law          — locked, in code, read-only (the floor)
-//   ② Operational Rules — the Owner's switches / limits / matrix (ship OFF, fail-safe)
-//   ③ Owner & Authority — who verifies / approves / signs, delegation, break-glass
-// There is NO master switch: enforcement engages rule-by-rule. `key` matches the
-// component's screen router. Approval Authority is converged HERE (plane ③) so authority
-// has one home — /tk/rules keeps only the Rule Book + Rules Manager.
+// ONE console, organised by GOVERNANCE into four heads (+ a Monitoring lens):
+//   ① ERP Rules         — mandatory accounting law (locked, read-only)          🔒
+//   ② Operational Rules — mandatory process/control law (locked, read-only)     🔒
+//   ③ Owner Rules       — the switches / grid / matrix / limits / ceilings /    ⚙
+//                         rates the Owner turns on/off or sets (ship OFF, fail-safe)
+//   ④ Approval Chain    — who verifies / approves / signs, delegation, break-glass 👤
+//   Monitoring          — a read-only lens across all four
+// The 564 mandatory laws split by track: ERP Rules = Accounts, Operational Rules = Ops
+// (the registry already tags every law `accounts`/`ops`). There is NO master switch —
+// enforcement engages rule-by-rule. `key` matches the component's screen router.
 export const POWER_SCREENS = [
-  { group: 'ERP Law', items: [
-    { key: 'defaults',     label: 'Law by Domain' },
+  { group: 'ERP Rules', items: [
+    { key: 'law-erp',      label: 'By Domain' },
   ] },
   { group: 'Operational Rules', items: [
+    { key: 'law-ops',      label: 'By Domain' },
+    { key: 'roles',        label: 'Role Capabilities' },
+    { key: 'masters',      label: 'Master & Onboarding' },
+  ] },
+  { group: 'Owner Rules', items: [
     { key: 'configurable', label: 'Configurable Rules' },
     { key: 'grid',         label: 'All-Branches Grid' },
     { key: 'matrix',       label: 'Enforcement Matrix' },
     { key: 'limits',       label: 'Limits & Thresholds' },
     { key: 'tester',       label: 'Policy Tester' },
+    { key: 'users',        label: 'User Ceilings' },
+    { key: 'rates',        label: 'Rates & Values' },
   ] },
-  { group: 'Owner & Authority', items: [
-    { key: 'authority',  label: 'Approval Authority' },
-    { key: 'roles',      label: 'Role Capabilities' },
-    { key: 'users',      label: 'User Configuration' },
-    { key: 'masters',    label: 'Master & Onboarding' },
-    { key: 'delegation', label: 'Delegation' },
-    { key: 'breakglass', label: 'Break-Glass Access' },
+  { group: 'Approval Chain', items: [
+    { key: 'authority',    label: 'Approval Authority' },
+    { key: 'delegation',   label: 'Delegation' },
+    { key: 'breakglass',   label: 'Break-Glass Access' },
   ] },
-  { group: 'Oversight', items: [
-    { key: 'active', label: 'Active Controls' },
-    { key: 'digest', label: 'Daily Digest' },
-    { key: 'log',    label: 'Change Log / Audit' },
+  { group: 'Monitoring', items: [
+    { key: 'active',       label: 'Active Controls' },
+    { key: 'digest',       label: 'Daily Digest' },
+    { key: 'log',          label: 'Change Log / Audit' },
   ] },
 ];
 
@@ -353,11 +388,11 @@ export function postureGrid(flagState, branchCodes = []) {
 // configurable flag OFF for the scope. Applied via the bulk set-many endpoint. Order = the
 // escalation from lightest to full control.
 export const POSTURE_PRESETS = [
-  { key: 'conservative', label: 'Conservative', desc: 'Approval basics: branch-accountant routing.',
+  { key: 'conservative', label: 'Conservative', desc: 'Approval basics — the Branch Accountant works CRM-sourced documents (no hand-raised bookings or refunds) and their entries walk the chain.',
     flags: ['control.role.branch_accountant'] },
-  { key: 'standard', label: 'Standard', desc: 'Conservative + verifier≠approver, large-voucher escalation, mandatory documents, export logging and the period lock.',
+  { key: 'standard', label: 'Standard', desc: 'Conservative + verifier≠approver, large-voucher escalation, mandatory documents, export logging and the period lock. (Branch Accountant on CRM-sourced documents — no hand-raised refunds.)',
     flags: ['control.role.branch_accountant', 'sod.verifier_ne_approver', 'approval.escalation_signoffs', 'entry.mandatory_docs', 'reports.log_exports', 'masters.period_lock'] },
-  { key: 'strict', label: 'Strict', desc: 'Every configurable rule on — the full control layer.',
+  { key: 'strict', label: 'Strict', desc: 'Every configurable rule on — the full control layer: the Branch Accountant on CRM-sourced documents (no hand-raised refunds) and every role (incl. Owner) under control.',
     flags: CONFIGURABLE_FLAGS },
 ];
 

@@ -30,6 +30,11 @@ export const useAssetCategories = () => refQuery('asset-categories', '/api/asset
 export const useApprovalRules   = () => refQuery('approval-rules', '/api/approval-rules', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.ruleId })) });
 export const useApprovalLimits  = () => refQuery('approval-limits', '/api/approval-limits', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, dbId: r.id, id: r.alId })) });
 export const useDocumentTypes   = () => refQuery('document-types', '/api/document-types', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, id: r.dtId })) });
+// Party Type master (Client Types / Supplier Categories). `kind` = 'customer' | 'supplier'.
+// Returns the ACTIVE type names in sort order — the shape the party-master dropdowns want.
+// Screens fall back to the hardcoded core/partyEnums lists when this is empty (pre-seed),
+// so behaviour is unchanged until the master is populated.
+export const usePartyTypes      = (kind) => refQuery('party-types', '/api/party-types', REF, { params: { kind, active: 'true' }, select: (rows) => (rows || []).slice().sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map((r) => r.name) });
 // dbId keeps the Mongo id the CRUD routes key on (PUT/DELETE /:id) — `id` is
 // remapped to the display code (etId/cfId) for the legacy screen shapes.
 export const useEmailTemplates  = () => refQuery('email-templates', '/api/email-templates', REF, { select: (rows) => (rows || []).map((r) => ({ ...r, dbId: r.id, id: r.etId })) });
@@ -47,6 +52,9 @@ export const useUserAccess      = () => refQuery('user-access', '/api/user-acces
 
 // app-config convenience: { INR:{symbol,toINR}, ... }
 export const useCurrencies      = () => refQuery('currencies', '/api/app-config/currencies', LONG);
+// Latest forex rate per pair — the SAME operational store the Forex Rates screen writes.
+// Currency Master reads this so its displayed rate matches what "Edit Rate" edits.
+export const useForexLatest     = () => refQuery('forex-latest', '/api/forex-rates/latest', REF);
 export const useAppConfig       = (key) => useQuery({ queryKey: ['ref', 'app-config', key], queryFn: () => apiGet(`/api/app-config/${key}`), enabled: enabled() && !!key, staleTime: LONG });
 
 // Live chart of accounts mapped to the legacy LEDGER_REGISTRY shape (adds a

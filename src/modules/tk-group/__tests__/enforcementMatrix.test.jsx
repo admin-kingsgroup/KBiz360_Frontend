@@ -7,6 +7,9 @@ jest.mock('../api/voucherPolicy', () => ({
   setVoucherPolicy: jest.fn(),
   proposeVoucherPolicy: jest.fn().mockResolvedValue({}),
 }));
+// core/api pulls import.meta (breaks under jest) — mock it; the matrix only needs the
+// view-only gate + reason. Not view-only here, so controls stay live for these tests.
+jest.mock('../../../core/api', () => ({ isViewOnly: () => false, VIEW_ONLY_REASON: 'View only — this account can review but cannot make changes.' }));
 // eslint-disable-next-line import/first
 import { EnforcementMatrix } from '../EnforcementMatrix';
 // eslint-disable-next-line import/first

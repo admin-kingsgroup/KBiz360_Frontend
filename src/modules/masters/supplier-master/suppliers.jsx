@@ -6,7 +6,7 @@
    renders through the shared <MasterCrud/> (masters/shared/masterCrud.jsx).
    ──────────────────────────────────────────────────────────────────── */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { BRANCH_CODES } from '../../../core/data';
 import {
   SUPPLIER_CATS, GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
@@ -14,7 +14,9 @@ import {
 } from '../../../core/partyEnums';
 import { branchCode } from '../../../core/useAccounting';
 import { isVatBranch } from '../../../core/voucherSpecs';
+import { usePartyTypes } from '../../../core/useReference';
 import { MasterCrud } from '../shared/masterCrud';
+import { Select } from '../../../shell/primitives';
 
 /* ── Parties (live, backend-connected) ──────────────────────────────────── */
 // Party lists follow the TOP-BAR branch: a specific branch shows ITS parties plus
@@ -29,26 +31,53 @@ const partyScope = (brc) => ({
 export const SuppliersMaster = ({ branch } = {}) => {
   const brc = branchCode(branch);
   const scope = partyScope(brc);
+  // Supplier Categories now come from the Party Type master (Masters ▸ Utilities);
+  // fall back to the hardcoded SUPPLIER_CATS while it's empty/loading (no leading '' —
+  // a category is always a real value).
+  const liveCats = usePartyTypes('supplier').data;
+  const supCats = (liveCats && liveCats.length) ? liveCats : SUPPLIER_CATS;
+  // Supplier Type filter — narrows the list to one vendor category (Airline / DMC /
+  // Hotel / …, the backend-validated SUPPLIER_CATS shown in the Category column) or
+  // to the ones not yet categorised. '__blank__' = the Uncategorised bucket so those
+  // rows can be found and tagged, not silently hidden by the filter.
+  const [catFilter, setCatFilter] = useState('');
+  const matchCat = (r) => (!catFilter ? true
+    : catFilter === '__blank__' ? !r.category
+    : r.category === catFilter);
+  const selWrap = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted';
+  const toolbar = (
+    <label className={selWrap}>Category
+      <div className="w-48"><Select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
+        <option value="">All categories</option>
+        {supCats.map((c) => <option key={c} value={c}>{c}</option>)}
+        <option value="__blank__">Uncategorised</option>
+      </Select></div>
+    </label>
+  );
   return (
   <MasterCrud title="Suppliers" subtitle="Vendors (Sundry Creditors) — live from the backend" resource="suppliers"
     // Scope on the SERVER (?branch → its vendors + Common 'ALL' ones), not just in the
     // browser: fetching every branch's vendors and hiding rows client-side is exactly
     // how one branch's parties leaked into another's view. rowFilter stays as a belt.
     params={brc ? { branch: brc } : {}}
-    rowFilter={scope.rowFilter}
+    rowFilter={(r) => scope.rowFilter(r) && matchCat(r)}
+    toolbar={toolbar}
     // Vendors are PER-BRANCH (shared/constants/ledgerScope): each branch owns the
     // vendors it buys from, so a branch with none is a legitimate empty — not a fault.
     // Say so, and name where the other branches' vendors are: Chart of Accounts still
     // lists BOM-cloned creditor heads under every branch, so a bare "No records yet"
-    // here reads as broken data next to a chart that is visibly full.
-    emptyMessage={({ total }) => (brc && total > 0
-      ? `No vendors onboarded for ${brc} yet. Vendors are per-branch — the ${total} vendor(s) on file belong to other branches and are never shared. Click “New” to add ${brc}’s first vendor, or switch branch from the top-right selector.`
-      : 'No vendors yet — click “New” to add one.')}
+    // here reads as broken data next to a chart that is visibly full. When the Category
+    // filter is what emptied the list, say THAT instead — don't blame the branch.
+    emptyMessage={({ total }) => (catFilter
+      ? `No ${catFilter === '__blank__' ? 'uncategorised' : catFilter} vendors${brc ? ` in ${brc}` : ''} — choose “All categories” to clear the filter.`
+      : brc && total > 0
+        ? `No vendors onboarded for ${brc} yet. Vendors are per-branch — the ${total} vendor(s) on file belong to other branches and are never shared. Click “New” to add ${brc}’s first vendor, or switch branch from the top-right selector.`
+        : 'No vendors yet — click “New” to add one.')}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       // Category is the one picklist the backend validates (VALID_CATS) — a dropdown
       // guarantees a valid value. The rest mirror the 12-tab master via core/partyEnums.
-      { key: 'category', label: 'Category', type: 'select', options: SUPPLIER_CATS },
+      { key: 'category', label: 'Category', type: 'select', options: supCats },
       // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       // India (GST) branches capture GSTIN + GST Treatment + TDS Section; a VAT branch

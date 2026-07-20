@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "next": 363,
+  "next": 364,
   "screens": {
     "/": 1,
     "/accounting/intercompany": 2,
@@ -151,6 +151,7 @@
     "/masters/markup": 151,
     "/masters/merge": 152,
     "/masters/numbering": 153,
+    "/masters/party-types": 363,
     "/masters/passports": 154,
     "/masters/projects": 155,
     "/masters/scenarios": 156,

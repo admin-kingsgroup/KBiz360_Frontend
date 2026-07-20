@@ -163,6 +163,27 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText('▸ drill vouchers')).not.toBeInTheDocument();
   });
 
+  test('a Round-Off-only P&L residue reads "Rounding" in the footer, never a red "Off"', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-01', tier: 'month', periodEnd: '2026-01-31',
+      // Gate clean (off 0 / absDiff 0) but a tolerated Round Off P&L residue shifts net profit by 0.01.
+      counts: { total: 3, tied: 2, rounding: 1, off: 0, onlyErp: 0, onlyTally: 0, offTotal: 0, absDiff: 0, absDiffRaw: 0.01, netProfitErp: 604223.01, netProfitTally: 604223.02 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
+      rows: [
+        { ledger: 'Air Ticket Sales', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -604223, tally: -604223, diff: 0, status: 'tied' },
+        { ledger: 'Round Off', code: 'L1156', group: 'Variable Expenses', parentGroup: 'Indirect Expenses', statement: 'PL', nature: 'expense', erp: -0.01, tally: -0.02, diff: 0.01, status: 'rounding', rounding: true },
+        { ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 604223.01, tally: 604223.01, diff: 0, status: 'tied' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('Round Off');
+    fireEvent.click(screen.getByText('Profit & Loss'));
+    const footRow = (await screen.findByText('Net Profit / (Loss)')).closest('tr');
+    expect(within(footRow).getByText('Rounding')).toBeInTheDocument();
+    expect(within(footRow).queryByText('Off')).not.toBeInTheDocument();
+  });
+
   test('chart sub-group nesting + the ERP module drill (toggle ONLY where a real split exists)', async () => {
     const { getTieOut, getModuleBreakdown } = require('../api');
     getTieOut.mockResolvedValueOnce({
@@ -1049,6 +1070,22 @@ describe('Tally Reconciliation · certificate re-open', () => {
     getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
   });
 
+  test('CertifyPanel surfaces a tolerated Round Off residue at the sign-off gate', async () => {
+    const { getTallyCert } = require('../api');
+    getTallyCert.mockResolvedValueOnce({ certificate: null, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: true } });
+    wrap(<CertifyPanel branch="BOM" period="2026-01" tier="month" offTotal={0} fixTotal={0} rounding={1} currentUser={{ role: 'Owner' }} />);
+    expect(await screen.findByTestId('certify-rounding-note')).toBeInTheDocument();
+    expect(screen.getByText(/Ties within rounding/)).toBeInTheDocument();
+  });
+
+  test('CertifyPanel shows NO rounding note when the period ties on the paise', async () => {
+    const { getTallyCert } = require('../api');
+    getTallyCert.mockResolvedValueOnce({ certificate: null, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: true } });
+    wrap(<CertifyPanel branch="BOM" period="2026-02" tier="month" offTotal={0} fixTotal={0} rounding={0} currentUser={{ role: 'Owner' }} />);
+    await screen.findByText(/Sign chain/);
+    expect(screen.queryByTestId('certify-rounding-note')).not.toBeInTheDocument();
+  });
+
   test('a certified period disables the Upload buttons (re-open first)', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({
@@ -1082,6 +1119,20 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     expect(await screen.findByText('2025-09')).toBeInTheDocument();
     // Both the "🔒 Certified" KPI chip and the certified row badge carry the label.
     expect(screen.getAllByText('🔒 Certified').length).toBeGreaterThan(0);
+  });
+
+  test('Certification Register tones a rounding-only Net-profit Δ as info, never red', async () => {
+    const { getRegister } = require('../api');
+    getRegister.mockResolvedValueOnce([
+      // Certified, gate clean (off 0 / absDiff 0) but a tolerated Round Off residue shifted net profit by 0.01.
+      { period: '2026-01', tier: 'month', ledgers: 5, cert: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
+        snapshot: { offTotal: 0, absDiff: 0, absDiffRaw: 0.01, rounding: 1, netProfitErp: 604223.01, netProfitTally: 604223.02, frozenAt: '2026-01-31' }, reopened: 0 } },
+    ]);
+    wrap(<TallyCertRegister branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
+    await screen.findByText('2026-01');
+    const cell = screen.getByTitle('Differs only by tolerated Round Off rounding');
+    expect(cell.className).toMatch(/text-info/);
+    expect(cell.className).not.toMatch(/text-danger/);
   });
 
   test('Certification Register self-guards a non-central role', async () => {

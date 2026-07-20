@@ -6,6 +6,7 @@ import { toastSuccess, toastError, toastInfo } from '../../core/ux/toast';
 import { resolveCell, hasCellOverride } from './utils/voucherPolicy';
 import { LIMIT_BRANCHES } from './utils/branchLimits';
 import { Skeleton } from '../../shell/primitives';
+import { isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
 
 // ─── Control Panel · Enforcement Matrix (per voucher type × branch) ──────────
 // For the panel-selected branch: turn on approval enforcement per voucher type, above a
@@ -15,6 +16,9 @@ import { Skeleton } from '../../shell/primitives';
 export function EnforcementMatrix({ go, branch = 'default' }) {
   const qc = useQueryClient();
   const owner = isOwner();
+  // A view-only account may review the matrix but never flip Enforce or Apply/Propose — the
+  // controls are pre-disabled with the shared reason, never a live action that only 403s.
+  const vo = isViewOnly();
   const q = useQuery({ queryKey: ['tk', 'voucherPolicy'], queryFn: () => getVoucherPolicy(), staleTime: 30_000 });
   const store = q.data?.store || { default: {}, branches: {} };
   const categories = q.data?.categories || [];
@@ -105,8 +109,9 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
                   </td>
                   <td className="p-2.5 text-center">
                     <button type="button" role="switch" aria-checked={r.enforce} aria-label={`Enforce ${c.label}`}
+                      disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined}
                       onClick={() => setRows((s) => ({ ...s, [c.key]: { ...r, enforce: !r.enforce } }))}
-                      className={`relative h-[22px] w-[40px] rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${r.enforce ? 'bg-danger' : 'bg-surface-border'}`}>
+                      className={`relative h-[22px] w-[40px] rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 ${r.enforce ? 'bg-danger' : 'bg-surface-border'} ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>
                       <span className="absolute top-[2px] h-[18px] w-[18px] rounded-full bg-white shadow transition-all" style={{ left: r.enforce ? 20 : 2 }} />
                     </button>
                   </td>
@@ -122,12 +127,12 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
                   </td>
                   <td className="p-2.5 text-center">
                     <div className="flex items-center justify-center gap-1.5">
-                      <button type="button" onClick={() => applyRow(c)} disabled={busy === c.key}
-                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold text-white ${busy === c.key ? 'bg-ink-subtle' : 'bg-success hover:bg-success/90'}`}>
+                      <button type="button" onClick={() => applyRow(c)} disabled={busy === c.key || vo} title={vo ? VIEW_ONLY_REASON : undefined}
+                        className={`rounded-md px-2.5 py-1 text-[11px] font-semibold text-white ${busy === c.key ? 'bg-ink-subtle' : 'bg-success hover:bg-success/90'} ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>
                         {busy === c.key ? '…' : owner ? 'Apply' : 'Propose'}
                       </button>
                       {scoped && isOv && (
-                        <button type="button" onClick={() => inheritRow(c)} title="Clear override (inherit Group default)" className="text-[11px] text-ink-subtle hover:text-danger">↺</button>
+                        <button type="button" onClick={() => inheritRow(c)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Clear override (inherit Group default)'} className={`text-[11px] text-ink-subtle hover:text-danger ${vo ? 'cursor-not-allowed opacity-50' : ''}`}>↺</button>
                       )}
                     </div>
                   </td>
@@ -140,7 +145,7 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
 
       <div className="mt-[16px] flex items-start gap-2.5 rounded-[9px] border border-warning/40 bg-warning-soft px-[15px] py-3 text-[12.5px] text-warning [&_b]:font-semibold">
         <span>▶</span>
-        <span>Turning <b>Enforce</b> on routes that voucher type through the approval chain directly — it does <b>not</b> require the Master Switch. <b>0</b> (the default, or blank) enforces at any amount; the <b>Effective from</b> date defaults to today (effective immediately) — set a future date to schedule the rule. Each branch inherits the <b>Group default</b> row unless it sets its own. <b>Booking (SO/PO/GP)</b> governs a booking’s sale and purchase legs together; <b>Inter-Branch (INB)</b> is controlled separately.</span>
+        <span>Turning <b>Enforce</b> on routes that voucher type through the approval chain directly — each rule engages on its own, there is no master switch. <b>0</b> (the default, or blank) enforces at any amount; the <b>Effective from</b> date defaults to today (effective immediately) — set a future date to schedule the rule. Each branch inherits the <b>Group default</b> row unless it sets its own. <b>Booking (SO/PO/GP)</b> governs a booking’s sale and purchase legs together; <b>Inter-Branch (INB)</b> is controlled separately.</span>
       </div>
     </div>
   );

@@ -17,6 +17,7 @@ import {
 } from '../../../core/partyEnums';
 import { isIndiaCountry as isIndiaFE, isExplicitIndiaCountry as isExplicitIndiaFE, stateCodeOf, supplyTypeOf } from '../../../core/gstSupply';
 import { branchCode } from '../../../core/useAccounting';
+import { usePartyTypes } from '../../../core/useReference';
 import {
   GOLD,
   tabPanel, usePartyMaster, PartyShell,
@@ -62,6 +63,10 @@ export function SupplierMasterTabbed({ branch } = {}) {
   const f = m.form || {};
   const set = m.setField;
   const branchOpts = brc ? ['ALL', brc] : ['ALL', ...BRANCH_CODES];
+  // Supplier Categories from the Party Type master (Masters ▸ Utilities); fall back to
+  // the hardcoded SUPPLIER_CATS while it's empty/loading.
+  const liveCats = usePartyTypes('supplier').data;
+  const supCats = (liveCats && liveCats.length) ? liveCats : SUPPLIER_CATS;
 
   return (
     <PartyShell title="Supplier Master" subtitle="Vendors (Sundry Creditors) — live" m={m} tabs={SUPP_TABS} tab={tab} setTab={setTab}>
@@ -69,7 +74,7 @@ export function SupplierMasterTabbed({ branch } = {}) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,160px),1fr))', gap: 14 }}>
           <Field label="Legal Name" value={f.name} onChange={(v) => set('name', v)} />
           <Field label="Supplier Code" value={f.id} readOnly mono />
-          <SelectField label="Category" value={f.category} onChange={(v) => set('category', v)} options={SUPPLIER_CATS} />
+          <SelectField label="Category" value={f.category} onChange={(v) => set('category', v)} options={supCats} />
           <Field label="Type" value={f.type} onChange={(v) => set('type', v)} />
           <SelectField label="Branch" value={f.branch} onChange={(v) => set('branch', v)} options={branchOpts} />
           <SelectField label="Country" value={f.country || 'India'} onChange={(v) => set('country', v)} options={COUNTRIES} />

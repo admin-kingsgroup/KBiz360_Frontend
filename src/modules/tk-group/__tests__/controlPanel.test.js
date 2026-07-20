@@ -1,4 +1,4 @@
-import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, policyTest, activeControls, digestSummary, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
+import { approvalChainView, asEmailList, POWER_SCREENS, POWER_SCREEN_KEYS, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, ROLE_CAPS, CAP_COLS, verifyApproveOverlap, roleControlWarning, engageCautions, policyTest, activeControls, digestSummary, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
 import { RULE_BOOK, ruleBookStats, regroupRegistry, lockedLawBook } from '../utils/ruleBook.data';
 
 describe('posture presets + copy-across-branches (pure)', () => {
@@ -55,21 +55,30 @@ describe('postureGrid — all-branches bird\'s-eye', () => {
 });
 
 describe('Control Panel structure', () => {
-  test('three governance planes + Oversight, no master screen', () => {
-    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['ERP Law', 'Operational Rules', 'Owner & Authority', 'Oversight']);
-    // Plane ① is the read-only law screen; plane ② opens with the switch screens.
-    expect(POWER_SCREEN_KEYS.slice(0, 3)).toEqual(['defaults', 'configurable', 'grid']);
+  test('four governance heads + Monitoring, no master screen', () => {
+    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['ERP Rules', 'Operational Rules', 'Owner Rules', 'Approval Chain', 'Monitoring']);
+    // ERP Rules opens with the Accounts law screen; Operational Rules with the Ops law screen.
+    expect(POWER_SCREEN_KEYS.slice(0, 3)).toEqual(['law-erp', 'law-ops', 'roles']);
     expect(POWER_SCREEN_KEYS).not.toContain('master');
-    expect(POWER_SCREEN_KEYS).toHaveLength(15);   // +1: Approval Authority converged into plane ③
+    expect(POWER_SCREEN_KEYS).not.toContain('defaults');
+    expect(POWER_SCREEN_KEYS).toHaveLength(17);   // 15 + law split (2) + rates − defaults
   });
-  test('Approval Authority is converged into plane ③ (Owner & Authority)', () => {
-    const auth = POWER_SCREENS.find((g) => g.group === 'Owner & Authority');
-    expect(auth.items.map((i) => i.key)).toContain('authority');
-    expect(auth.items.find((i) => i.key === 'authority').label).toBe('Approval Authority');
+  test('mandatory law splits into two heads by track (ERP vs Operational)', () => {
+    const erp = POWER_SCREENS.find((g) => g.group === 'ERP Rules');
+    const ops = POWER_SCREENS.find((g) => g.group === 'Operational Rules');
+    expect(erp.items.map((i) => i.key)).toEqual(['law-erp']);
+    expect(ops.items.map((i) => i.key)).toEqual(['law-ops', 'roles', 'masters']);
+  });
+  test('Approval Chain holds who-acts; Owner Rules holds the switches + ceilings + rates', () => {
+    const chain = POWER_SCREENS.find((g) => g.group === 'Approval Chain');
+    expect(chain.items.map((i) => i.key)).toEqual(['authority', 'delegation', 'breakglass']);
+    expect(chain.items.find((i) => i.key === 'authority').label).toBe('Approval Authority');
+    const own = POWER_SCREENS.find((g) => g.group === 'Owner Rules');
+    expect(own.items.map((i) => i.key)).toEqual(expect.arrayContaining(['configurable', 'grid', 'matrix', 'limits', 'tester', 'users', 'rates']));
   });
   test('screen keys are unique and include the tools', () => {
     expect(new Set(POWER_SCREEN_KEYS).size).toBe(POWER_SCREEN_KEYS.length);
-    for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log']) expect(POWER_SCREEN_KEYS).toContain(k);
+    for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log', 'rates']) expect(POWER_SCREEN_KEYS).toContain(k);
   });
 });
 
@@ -269,6 +278,44 @@ describe('roleControlWarning (deadlock guardrail)', () => {
   });
   test('roles that are neither sole verifier nor approver never caution', () => {
     ['branch_accountant', 'director', 'owner'].forEach((k) => expect(roleControlWarning(k, dflt)).toBeNull());
+  });
+});
+
+describe('engageCautions (pre-engage hazards for bulk / preset / live-flip)', () => {
+  const dflt = approvalChainView({}); // defaults: sole verifier (Sughra) + sole approver (Faiz)
+  test('turning FM under control surfaces the sole-approver deadlock', () => {
+    const c = engageCautions(['control.role.fm'], dflt);
+    expect(c.map((x) => x.flag)).toEqual(['control.role.fm']);
+    expect(c[0].text).toMatch(/only approver/);
+  });
+  test('turning the Branch Accountant under control surfaces the CRM refund lock', () => {
+    const c = engageCautions(['control.role.branch_accountant'], dflt);
+    expect(c.some((x) => x.flag === 'control.role.branch_accountant' && /refund/i.test(x.text))).toBe(true);
+  });
+  test('Enable-all (every configurable flag) surfaces BOTH deadlock sides + the refund caution', () => {
+    const texts = engageCautions(CONFIGURABLE_FLAGS, dflt).map((x) => x.text).join(' | ');
+    expect(texts).toMatch(/only approver/);   // fm
+    expect(texts).toMatch(/only verifier/);   // ae
+    expect(texts).toMatch(/refund/i);          // branch accountant
+  });
+  test('no role control being enabled → no cautions', () => {
+    expect(engageCautions(['entry.mandatory_docs', 'reports.log_exports', 'masters.period_lock'], dflt)).toEqual([]);
+    expect(engageCautions([], dflt)).toEqual([]);
+    expect(engageCautions()).toEqual([]);
+  });
+  test('a second approver + verifier clears the deadlock — only the refund caution remains', () => {
+    const safe = approvalChainView({ verifyEmails: ['s@x.com', 'y@x.com'], approveEmails: ['faiz@x.com', 'z@x.com'] });
+    expect(engageCautions(CONFIGURABLE_FLAGS, safe).map((x) => x.flag)).toEqual(['control.role.branch_accountant']);
+  });
+});
+
+// Every preset that engages the Branch Accountant must NAME the refund consequence — its
+// desc becomes the bulk confirm's lead line, so an Owner can't apply a preset that silently
+// stops branch refunds without reading it. Guards suggestion #2 against future edits.
+describe('POSTURE_PRESETS descriptions', () => {
+  test('a preset that turns on control.role.branch_accountant names the no-refund consequence', () => {
+    POSTURE_PRESETS.filter((p) => p.flags.includes('control.role.branch_accountant'))
+      .forEach((p) => expect(p.desc).toMatch(/refund/i));
   });
 });
 

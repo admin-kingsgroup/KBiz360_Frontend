@@ -95,3 +95,25 @@ export function pickBranchForUser(user) {
   // gets NULL — no all-branch fallback, so they can't see anything until assigned.
   return full ? BRANCHES[0] : null;
 }
+
+// Branch to select on a FRESH LOGIN (not a refresh). A TK Group Central member — any
+// full-scope user (Owner / Director / Finance Manager / Sr. Accounts Executive) — always
+// starts on the group view: Selector A = 'ALL' = "TK Group Central". They operate at the
+// group level first, then drill into a branch via the top-right selector as needed. This
+// deliberately IGNORES any branch left in localStorage, so every sign-in resets to the
+// group view (the switch back to a branch still persists within the session and across
+// refreshes — see pickBranchForUser, the refresh-time picker, which restores the saved
+// branch so a reload keeps you where you were).
+//
+// A NON-full user (Branch Accountant / GM / BM) has no group view to land on, so they
+// fall through to pickBranchForUser — their assigned branch (or null if unassigned).
+//
+// GUARD: land on 'ALL' only when the user can ACTUALLY see every branch. A full-scope ROLE
+// that the Page Visibility admin has narrowed to a branch subset comes back with
+// allBranches===false (auth.service resolveBranches) — the server would then 403 the
+// consolidated reads. So a narrowed user falls through to pickBranchForUser (their first
+// in-scope branch) instead of 'ALL'. allBranches undefined (older cached session) is
+// treated as full — the real TK Group Central members are all-scope, so this is safe.
+export function branchForLogin(user) {
+  return (isFullScope(user) && user?.allBranches !== false) ? 'ALL' : pickBranchForUser(user);
+}

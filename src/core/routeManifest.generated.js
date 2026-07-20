@@ -155,6 +155,7 @@ export const APP_ROUTES = [
   "/masters/markup",
   "/masters/merge",
   "/masters/numbering",
+  "/masters/party-types",
   "/masters/passports",
   "/masters/projects",
   "/masters/scenarios",

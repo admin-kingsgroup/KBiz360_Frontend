@@ -10,7 +10,7 @@ import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
 import { ErrorBoundary } from './shell/ErrorBoundary';
-import { pickBranchForUser, withCanonicalRole, applyRenewedAccess } from './core/branchScope';
+import { pickBranchForUser, branchForLogin, withCanonicalRole, applyRenewedAccess } from './core/branchScope';
 import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
@@ -64,6 +64,7 @@ const { UnifiedApprovals, InbOutgoing } = lazyModule(() => import('./modules/app
 const { PaymentVerificationLive } = lazyModule(() => import('./modules/payments'));
 const { ModuleRegister } = lazyModule(() => import('./modules/reports/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/masters/chartBuilder'));
+const { PartyTypeMaster } = lazyModule(() => import('./modules/masters/utilities/partyTypeMaster'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/reportsFinancial/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/reportsFinancial/balanceSheetTally'));
 const { ReconStatusPage } = lazyModule(() => import('./modules/recon-status'));
@@ -99,7 +100,7 @@ import { ReportActionBar } from './core/ReportActionBar';
 import { PrefsProvider } from './core/prefs';
 import { HotkeysProvider } from './core/ux/hotkeys';
 import { NavContext } from './core/ux/nav';
-import { ToastHost } from './core/ux/toast';
+import { ToastHost, toastInfo } from './core/ux/toast';
 import { RuleBlockHost } from './core/ux/ruleBlock';
 import { GlobalFetchBar } from './core/ux/GlobalFetchBar';
 import { ConfirmHost, confirmDialog } from './core/ux/confirm';
@@ -242,7 +243,15 @@ export default function KB360App(){
   // branch focused they may work in that branch's ERP (opBranch drives it), so don't
   // bounce those routes back to the Control Tower.
   useEffect(()=>{
-    if (!embed && isCentral && inGroupMode && !branchFocused && route && !isCockpitRoute(route)) navigate('/tk/control-tower');
+    if (!embed && isCentral && inGroupMode && !branchFocused && route && !isCockpitRoute(route)) {
+      // Not-silent (per the empty/blocked-screen rule): say WHAT (you're in the group view),
+      // WHY (branch screens need a specific branch) and WHERE (Focus a branch / here's the
+      // Control Tower) instead of teleporting with no context. Matters more now that central
+      // users DEFAULT into group mode — a stale deep link to a branch screen would otherwise
+      // bounce mysteriously. The toast is de-duped, so repeated bounces don't stack.
+      toastInfo('TK Group Central is a group view — Focus a branch from the top bar to open branch screens. Opened the Control Tower.');
+      navigate('/tk/control-tower');
+    }
   }, [branch, currentUser, route, navigate, focus, isCentral, inGroupMode, branchFocused, embed]);
 
   /* Persist the current route so a refresh / re-open returns you here.
@@ -298,7 +307,12 @@ export default function KB360App(){
     // central cockpit + every owner-only surface, not a half-owner.
     const newUser = withCanonicalRole(rawUser);
     setCurrentUser(newUser);
-    setBranch(pickBranchForUser(newUser));
+    // Fresh sign-in: a TK Group Central member (full-scope) starts on the group view
+    // ("TK Group Central" in the top-right selector), regardless of any branch left in
+    // storage; everyone else lands on their assigned branch. A REFRESH still restores the
+    // last-selected branch (see the pickBranchForUser initializer above), so a reload keeps
+    // you where you were — only a new sign-in resets to the group view.
+    setBranch(branchForLogin(newUser));
     // Redirect on user switch (current route may be forbidden). Accountants land on
     // their own workspace dashboard; everyone else on the general dashboard.
     navigate(/accountant/i.test(newUser?.role || '') ? "/accounts/dashboard" : "/dashboard", { force:true });
@@ -653,6 +667,7 @@ export default function KB360App(){
     if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser} shellBranch={branch}/>;
     if(route==="/masters/projects")       return <ProjectMaster/>;
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;
+    if(route==="/masters/party-types")    return <PartyTypeMaster/>;
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     // ── Accounts — branch accountant workspace (new screens) ──
@@ -834,11 +849,12 @@ export default function KB360App(){
     if(route==="/settings/users")        return <SettingsUsers/>;
     if(route==="/settings/audit")        return <SettingsAudit/>;
     // Chart-of-Accounts masters — 3 Tally-style doors (consolidated 2026-07-01):
-    //   Groups (Create/Alter/Display) · Ledgers (Create/Alter/Display) · Chart of
-    //   Accounts (tree, Display). The retired routes — /masters/subgroups (folded
+    //   Groups (Display) · Ledgers (Create/Alter/Display) · Chart of Accounts (tree,
+    //   Display). The group/sub-group STRUCTURE is system-managed — read-only here;
+    //   only Ledgers are user-created. The retired routes — /masters/subgroups (folded
     //   into Groups), /masters/groups-view, /masters/ledgers-view, /masters/accounts-info
     //   (overlapping read-only viewers) — were removed here.
-    if(route==="/masters/groups")        return <GroupsMaster/>;                 // Groups door — Create/Alter/Display groups & sub-groups (3-tier)
+    if(route==="/masters/groups")        return <GroupsMaster/>;                 // Groups door — read-only Display of the 3-tier group/sub-group tree
     if(route==="/masters/ledgers")       return <LedgersMaster branch={branch}/>;// Ledgers door — live CRUD (cascading Group ▸ Sub-Group)
     if(route==="/masters/accounts-tree") return <AccountsTreeView branch={branch} setRoute={navigate} setBranch={setBranch}/>;  // Chart of Accounts (Display): Primary Group ▸ Group ▸ Sub-Group ▸ Ledger tree
     if(route==="/masters/chart-builder") return <Navigate to="/masters/accounts-tree" replace/>;  // legacy alias → canonical

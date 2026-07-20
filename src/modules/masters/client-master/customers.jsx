@@ -6,15 +6,17 @@
    renders through the shared <MasterCrud/> (masters/shared/masterCrud.jsx).
    ──────────────────────────────────────────────────────────────────── */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { BRANCH_CODES } from '../../../core/data';
 import {
-  GST_TREATMENTS, COUNTRIES, MSME_STATUS, TDS_SECTIONS,
+  GST_TREATMENTS, COUNTRIES, STATE_NAMES, MSME_STATUS, TDS_SECTIONS,
   CUST_TYPES, CUST_SOURCES, PAY_TERMS,
 } from '../../../core/partyEnums';
 import { branchCode } from '../../../core/useAccounting';
 import { isVatBranch } from '../../../core/voucherSpecs';
+import { usePartyTypes } from '../../../core/useReference';
 import { MasterCrud } from '../shared/masterCrud';
+import { Select } from '../../../shell/primitives';
 
 /* ── Parties (live, backend-connected) ──────────────────────────────────── */
 // Party lists follow the TOP-BAR branch: a specific branch shows ITS parties plus
@@ -29,18 +31,50 @@ const partyScope = (brc) => ({
 export const CustomersMaster = ({ branch } = {}) => {
   const brc = branchCode(branch);
   const scope = partyScope(brc);
+  // Client Type filter — narrows the list to one customer kind (B2B / B2C
+  // Reference / …) or to the ones not yet classified. The type is stored on every
+  // customer (customerType) but was hidden from the list; it's now a column too so
+  // you can see what you're filtering on. '__blank__' = the Unclassified bucket
+  // (historic rows imported without a type) so they can be found and tagged, not
+  // silently swallowed by the filter.
+  const [typeFilter, setTypeFilter] = useState('');
+  // Client Types now come from the Party Type master (Masters ▸ Utilities). Fall back
+  // to the hardcoded CUST_TYPES while the master is empty/loading so nothing regresses
+  // before it's seeded. Lead with '' to match the CUST_TYPES "not set" convention.
+  const liveTypes = usePartyTypes('customer').data;
+  const custTypes = (liveTypes && liveTypes.length) ? ['', ...liveTypes] : CUST_TYPES;
+  const matchType = (r) => (!typeFilter ? true
+    : typeFilter === '__blank__' ? !r.customerType
+    : r.customerType === typeFilter);
+  const selWrap = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted';
+  const toolbar = (
+    <label className={selWrap}>Type
+      <div className="w-48"><Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+        <option value="">All types</option>
+        {custTypes.filter(Boolean).map((t) => <option key={t} value={t}>{t}</option>)}
+        <option value="__blank__">Unclassified</option>
+      </Select></div>
+    </label>
+  );
   return (
   <MasterCrud title="Customers" subtitle="Clients (Sundry Debtors) — live from the backend" resource="customers"
     // Scope on the SERVER (?branch → its customers + Common 'ALL' ones), not just in
     // the browser: fetching every branch's customers and hiding rows client-side is
     // exactly how one branch's parties leaked into another's view. rowFilter = belt.
     params={brc ? { branch: brc } : {}}
-    rowFilter={scope.rowFilter}
+    rowFilter={(r) => scope.rowFilter(r) && matchType(r)}
+    toolbar={toolbar}
+    // When the Type/Branch filter hides every row, say WHY — the records exist,
+    // they're just filtered out; a bare "No customers" would read as missing data.
+    emptyMessage={({ total, hidden }) => (hidden > 0
+      ? `No customers match the current filter — ${hidden} of ${total} hidden. Choose “All types” (or switch branch) to clear it.`
+      : 'No customers yet — click “New” to add one.')}
     fields={[
       { key: 'name', label: 'Name', type: 'text', required: true },
       // Dropdowns are fed from core/partyEnums (the same picklists the 12-tab master uses),
       // so values stay consistent with the rest of the ERP instead of free-typed text.
-      { key: 'customerType', label: 'Customer Type', type: 'select', options: CUST_TYPES, table: false },
+      // Shown as a column (table: default) AND filterable via the Type toolbar above.
+      { key: 'customerType', label: 'Customer Type', type: 'select', options: custTypes },
       { key: 'source', label: 'Source', type: 'select', options: CUST_SOURCES, table: false },
       // Already stored on the model (used by the 12-tab master) but wasn't exposed here.
       { key: 'accountManager', label: 'Key Account Manager', type: 'text', table: false },
@@ -72,7 +106,15 @@ export const CustomersMaster = ({ branch } = {}) => {
       // treated as overseas (GST Treatment auto-set to 'Overseas'), same country-driven
       // logic as the Supplier master.
       { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false,
-        onSet: (v, next) => { next.gstTreatment = (v && v !== 'India') ? 'Overseas' : (next.gstTreatment === 'Overseas' ? '' : next.gstTreatment); } },
+        onSet: (v, next) => {
+          next.gstTreatment = (v && v !== 'India') ? 'Overseas' : (next.gstTreatment === 'Overseas' ? '' : next.gstTreatment);
+          next.state = (v && v !== 'India') ? 'Others' : '';   // India → pick a real state; else foreign 'Others'
+        } },
+      // State (place of supply) — REQUIRED for an India customer: the BE defaults a blank country
+      // to 'India' and then demands a state (it decides CGST/SGST vs IGST). Without this field an
+      // India B2C / no-GSTIN customer could not be created (hard 400). Hidden on VAT branches (no
+      // Indian place-of-supply). Mirrors the Supplier master.
+      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false, show: (f) => !isVatBranch(f.branch), required: (f) => !isVatBranch(f.branch) },
       { key: 'city', label: 'City', type: 'text', table: false },
       { key: 'phone', label: 'Phone', type: 'text', required: true },
       { key: 'contact', label: 'Contact', type: 'text', table: false },

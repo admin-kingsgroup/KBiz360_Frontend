@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Navigate } from 'react-router-dom';
 import { MyRole } from './setup-roles/MyRole';
 import { ApprovalsInbox } from './approvals/ApprovalsInbox';
-import { FlagAdmin } from './control-configuration/FlagAdmin';
 import { PeriodLockAdmin } from './control-configuration/PeriodLockAdmin';
 import { DecisionsBoard } from './approvals/DecisionsBoard';
 import { ControlTower } from './control-configuration/ControlTower';
@@ -33,7 +32,6 @@ import { ConfigReadiness } from './setup-roles/ConfigReadiness';
 import { ControlPanel } from './control-configuration/ControlPanel';
 import { TaxDesk } from './performance-oversight/TaxDesk';
 import { AssetsCentral } from './performance-oversight/AssetsCentral';
-import { LimitsAdmin } from './control-configuration/LimitsAdmin';
 import { PageLayout } from '../../shell/PageLayout';
 import { BRANCHES } from '../../core/referenceCache';
 import { SettingsUsers } from '../settings/legacy';
@@ -98,7 +96,7 @@ export function TkConfigReadinessPage() {
 
 export function TkControlPanelPage({ setRoute }) {
   return (
-    <Page title="Control Panel" subtitle="The TK Group control centre — enforcement posture, the live approval chain (Check → Verify · Sughra → Approve · Faiz), whether the AE can also approve, and who is under control vs acting independently. Read-only; changes are Owner-approved on Control Flags / Limits.">
+    <Page title="Control Panel" subtitle="The TK Group control centre, in four heads — mandatory ERP & Operational law (read-only), the Owner's on/off rules, and the approval chain (Check → Verify · Sughra → Approve · Faiz). The Owner flips controls live; other central roles propose a change-request.">
       <ControlPanel setRoute={setRoute} />
     </Page>
   );
@@ -112,20 +110,16 @@ export function TkVoucherApprovalsPage() {
   );
 }
 
+// Control Flags folded into the Control Panel (Owner Rules › Configurable Rules) — the panel
+// is the single authoritative home. The route is kept as a redirect so old links / bookmarks
+// still land somewhere sensible instead of 404-ing.
 export function TkControlsPage() {
-  return (
-    <Page title="Control Flags" subtitle="TK Group control switches — the Owner's to manage. Toggling a flag submits an Owner change-request (never a raw flip), so even go-live is Owner-approved and audited.">
-      <FlagAdmin />
-    </Page>
-  );
+  return <Navigate to="/tk/control-panel" replace />;
 }
 
+// Thresholds & Limits folded into the Control Panel (Owner Rules › Limits & Thresholds).
 export function TkLimitsPage() {
-  return (
-    <Page title="Thresholds & Limits" subtitle="The control-model numbers — decision escalation ceilings, voucher tiers, cash limits, investment thresholds. Owner-editable; changes are filed as an Owner change-request and apply only on approval.">
-      <LimitsAdmin />
-    </Page>
-  );
+  return <Navigate to="/tk/control-panel" replace />;
 }
 
 export function TkPeriodLockPage() {
