@@ -117,6 +117,9 @@ function RegisterRow({ it, cur, branch, tier, setRoute }) {
   const sigs = it.cert?.signatures || [];
   const snap = it.cert?.snapshot || null;
   const npDelta = snap ? round2((snap.netProfitErp || 0) - (snap.netProfitTally || 0)) : null;
+  // A frozen snapshot "ties within rounding" when the gate was clean (nothing off) yet a
+  // tolerated Round Off residue remained — its net-profit Δ is then pure rounding, not a defect.
+  const npRounding = !!(snap && Number(snap.rounding || 0) > 0 && Number(snap.offTotal || 0) === 0 && round2(snap.absDiff || 0) === 0);
   return (
     <tr className="border-b border-surface-border hover:bg-surface-alt/60">
       <td className="px-4 py-2 font-semibold text-ink">{it.period}
@@ -134,7 +137,7 @@ function RegisterRow({ it, cur, branch, tier, setRoute }) {
           })}
         </div>
       </td>
-      <td className={`px-4 py-2 text-right font-mono tabular-nums ${npDelta === null ? 'text-ink-subtle' : npDelta !== 0 ? 'text-danger font-semibold' : 'text-ink-muted'}`}>
+      <td title={npRounding && npDelta ? 'Differs only by tolerated Round Off rounding' : undefined} className={`px-4 py-2 text-right font-mono tabular-nums ${npDelta === null ? 'text-ink-subtle' : npDelta === 0 ? 'text-ink-muted' : npRounding ? 'text-info' : 'text-danger font-semibold'}`}>
         {npDelta === null ? '—' : fmt(npDelta, cur)}
       </td>
       <td className="px-4 py-2 text-right">

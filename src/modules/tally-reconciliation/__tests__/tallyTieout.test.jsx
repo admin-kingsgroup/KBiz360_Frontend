@@ -1105,6 +1105,20 @@ describe('Tally Reconciliation · Certification Register + Report + selector loc
     expect(screen.getAllByText('🔒 Certified').length).toBeGreaterThan(0);
   });
 
+  test('Certification Register tones a rounding-only Net-profit Δ as info, never red', async () => {
+    const { getRegister } = require('../api');
+    getRegister.mockResolvedValueOnce([
+      // Certified, gate clean (off 0 / absDiff 0) but a tolerated Round Off residue shifted net profit by 0.01.
+      { period: '2026-01', tier: 'month', ledgers: 5, cert: { status: 'locked', signatures: [{ role: 'AE' }, { role: 'FM' }, { role: 'Director' }, { role: 'Owner' }],
+        snapshot: { offTotal: 0, absDiff: 0, absDiffRaw: 0.01, rounding: 1, netProfitErp: 604223.01, netProfitTally: 604223.02, frozenAt: '2026-01-31' }, reopened: 0 } },
+    ]);
+    wrap(<TallyCertRegister branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} setRoute={() => {}} />);
+    await screen.findByText('2026-01');
+    const cell = screen.getByTitle('Differs only by tolerated Round Off rounding');
+    expect(cell.className).toMatch(/text-info/);
+    expect(cell.className).not.toMatch(/text-danger/);
+  });
+
   test('Certification Register self-guards a non-central role', async () => {
     wrap(<TallyCertRegister branch="BOM" tier="month" currentUser={{ role: 'Branch Accountant' }} setRoute={() => {}} />);
     expect(await screen.findByText('Central control')).toBeInTheDocument();
