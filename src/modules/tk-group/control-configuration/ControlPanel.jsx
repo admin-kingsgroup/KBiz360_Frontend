@@ -359,8 +359,8 @@ export function ControlPanel({ setRoute }) {
           <>
             <p className="mb-1.5 mt-1 max-w-[82ch] text-[13.5px] text-ink-muted">
               The <b>law floor</b> — <b>{band.totals.all}</b> locked laws the ERP enforces in code across <b>{band.totals.domains}</b> domains.
-              These are <b>always on and read-only</b>: they apply on day one and can’t be switched off. The Owner-set rules — who
-              approves, statutory rates — are operated in{' '}
+              These are <b>always on and read-only</b>: they apply on day one and can’t be switched off. The Owner-set approval
+              authority — who verifies, approves and signs — is operated in{' '}
               <button type="button" className="font-semibold text-navy underline" onClick={() => setScreen('authority')}>Owner &amp; Authority</button>, not here.
               Rolled up by domain below; click a domain for its individual rules, each citing the file that enforces it, in the{' '}
               <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book')}>Rule Book</button>.
@@ -368,7 +368,9 @@ export function ControlPanel({ setRoute }) {
             <p className="mb-4 flex items-center gap-1.5 text-[11px]">
               {lawLive
                 ? <><span className="inline-block h-2 w-2 rounded-full bg-success" /><span className="text-ink-subtle">Live from the rules registry (<code>/api/rules</code>).</span></>
-                : <><span className="inline-block h-2 w-2 rounded-full bg-warning" /><span className="text-ink-subtle">Showing the built-in reference copy — the live registry didn’t load, so counts may lag the server.</span></>}
+                : lawQ.isLoading
+                  ? <><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-ink-subtle" /><span className="text-ink-subtle">Loading the live registry…</span></>
+                  : <><span className="inline-block h-2 w-2 rounded-full bg-warning" /><span className="text-ink-subtle">Showing the built-in reference copy — the live registry didn’t load, so counts may lag the server.</span></>}
             </p>
             <div className="grid gap-4 tablet:grid-cols-2">
               <LawGroup title={'📒 Accounts — financial law'} sub="Accounts" rows={band.accounts} count={band.totals.accounts} onOpen={() => go('/tk/rules?tab=book&track=accounts')} />
