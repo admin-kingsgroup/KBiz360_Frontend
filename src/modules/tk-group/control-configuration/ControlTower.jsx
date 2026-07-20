@@ -16,6 +16,10 @@ import { SetupReadiness } from '../SetupReadiness';
 import { ModulesHealth } from '../ModulesHealth';
 import { IntegritySummary } from '../IntegritySummary';
 import { ScrutinyTrend } from '../ScrutinyTrend';
+import { FORM_DIRECTORY, FORM_DIRECTORY_MODULES } from '../utils/formsDirectory';
+import { isCockpitRoute } from '../cockpit';
+import { FOCUS_ALL } from '../utils/cockpitFocus';
+import { toastInfo } from '../../../core/ux/toast';
 // Development findings share the Dev Control registry + tracking rows — the SAME
 // clearing rule (registry row live, or tracked done/won't-do). Fixing an item in
 // /dev/control clears its finding here automatically; the shared react-query key
@@ -43,6 +47,7 @@ const TABS = [
   // completeness and coverage now live inside Modules Health (one home). The old
   // `?tab=tasks` deep-link is redirected there below so existing links still work.
   { id: 'modules-health', label: 'Modules Health' },
+  { id: 'forms', label: 'Form Directory' },
 ];
 
 // ── Development findings — Dev Control's open items surfaced as a Tower lens ──
@@ -333,6 +338,82 @@ function Governance() {
   );
 }
 
+// ── Form Directory tab: every data-creation form in the ERP, one searchable
+//    list with a one-click "Open →" that jumps straight to the form. ──
+// A TK Group Central user with no branch Focused (focus === FOCUS_ALL) is
+// held in the control cockpit — App.jsx's own guard bounces any non-cockpit
+// route (vouchers, HR self-service, assets, reports, tax…) straight back to
+// this page (see isCockpitRoute / the useEffect in App.jsx). Without this
+// check "Open →" on those rows looked like it silently did nothing (it
+// actually navigated, then got bounced back to the Overview tab). So: grey
+// those rows out and say why, instead of letting the click round-trip.
+function goToForm(row, setRoute, focus) {
+  const blocked = focus === FOCUS_ALL && !isCockpitRoute(row.route);
+  if (blocked) {
+    toastInfo(`Focus a branch (top selector) to open "${row.name}" — it's a branch-operational form, not reachable in All-branches mode.`);
+    return;
+  }
+  setRoute(row.route);
+}
+
+const formDirectoryCols = (setRoute, focus) => [
+  { key: 'module', header: 'Module', width: '11rem', render: (r) => <Badge tone="neutral" size="sm">{r.module}</Badge> },
+  { key: 'name', header: 'Form', render: (r) => <span className="font-semibold text-ink">{r.name}</span> },
+  { key: 'breadcrumb', header: 'Path', render: (r) => <span className="text-ink-muted">{r.breadcrumb}</span> },
+  { key: 'route', header: 'Route', render: (r) => <code className="rounded bg-surface-alt px-1.5 py-0.5 text-[11px] text-ink-muted">{r.route}</code> },
+  {
+    key: 'action', header: '', sortable: false, hideable: false, align: 'right', exportable: false,
+    render: (r) => {
+      const blocked = focus === FOCUS_ALL && !isCockpitRoute(r.route);
+      return (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); goToForm(r, setRoute, focus); }}
+          title={blocked ? 'Focus a branch (top selector) to open this form' : undefined}
+          className={blocked
+            ? 'text-[11.5px] font-semibold text-ink-subtle cursor-not-allowed'
+            : 'text-[11.5px] font-semibold text-accent hover:underline'}
+        >
+          {blocked ? 'Focus branch →' : 'Open →'}
+        </button>
+      );
+    },
+  },
+];
+
+function FormsDirectory({ setRoute, focus }) {
+  const rows = FORM_DIRECTORY;
+  const cols = formDirectoryCols(setRoute, focus);
+  const blockedCount = focus === FOCUS_ALL ? rows.filter((r) => !isCockpitRoute(r.route)).length : 0;
+  return (
+    <div className="grid gap-4">
+      <div className="text-xs text-ink-muted">
+        Every data-creation form in the ERP — <b className="text-ink">{rows.length}</b> forms across{' '}
+        <b className="text-ink">{FORM_DIRECTORY_MODULES.length}</b> modules. Search, then <b>Open →</b> to jump straight to the form.
+      </div>
+      {blockedCount > 0 && (
+        <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs text-ink-muted">
+          You're in <b className="text-ink">All branches</b> mode — <b className="text-ink">{blockedCount}</b> branch-operational
+          forms (vouchers, HR self-service, assets, reports…) are greyed out below. Focus a branch in the top selector to open them;
+          Masters, HR admin and Settings forms stay open from here.
+        </div>
+      )}
+      <DataTable
+        title={`Form Directory (${rows.length})`}
+        columns={cols}
+        rows={rows}
+        getRowKey={(r) => r.id}
+        onRowClick={(r) => goToForm(r, setRoute, focus)}
+        searchable
+        searchPlaceholder="Search forms…"
+        showDensityToggle={false}
+        zebra
+        emptyMessage="No forms found."
+      />
+    </div>
+  );
+}
+
 export function ControlTower({ setRoute } = {}) {
   const focus = useCockpitFocus();
   // Tab lives in the URL (`?tab=`), not plain state, so the header/browser Back
@@ -365,6 +446,7 @@ export function ControlTower({ setRoute } = {}) {
       {tab === 'dev' && <DevelopmentLens setRoute={setRoute} />}
       {tab === 'gov' && <Governance />}
       {tab === 'modules-health' && <ModulesHealth setRoute={setRoute} />}
+      {tab === 'forms' && <FormsDirectory setRoute={setRoute} focus={focus} />}
     </div>
   );
 }
