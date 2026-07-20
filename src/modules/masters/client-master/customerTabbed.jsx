@@ -21,6 +21,7 @@ import {
 } from '../../../core/partyEnums';
 import { isIndiaCountry as isIndiaFE, isExplicitIndiaCountry as isExplicitIndiaFE, stateCodeOf, supplyTypeOf } from '../../../core/gstSupply';
 import { branchCode } from '../../../core/useAccounting';
+import { usePartyTypes } from '../../../core/useReference';
 import {
   GOLD, DIM, DARK, GREEN,
   tabPanel, usePartyMaster, numOf, rupee,
@@ -66,6 +67,10 @@ export function CustomerMasterTabbed({ branch } = {}) {
   const f = m.form || {};
   const set = m.setField;
   const branchOpts = brc ? ['', 'ALL', brc] : ['', ...BRANCH_CODES];
+  // Client Types from the Party Type master (Masters ▸ Utilities); fall back to the
+  // hardcoded CUST_TYPES while it's empty/loading. Lead with '' for the "not set" slot.
+  const liveTypes = usePartyTypes('customer').data;
+  const custTypes = (liveTypes && liveTypes.length) ? ['', ...liveTypes] : CUST_TYPES;
   const available = Math.max(0, (Number(f.creditLimit) || 0) - numOf(f.out));
 
   return (
@@ -74,7 +79,7 @@ export function CustomerMasterTabbed({ branch } = {}) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,160px),1fr))', gap: 14 }}>
           <Field label="Legal Name" value={f.name} onChange={(v) => set('name', v)} />
           <Field label="Customer Code" value={f.id} readOnly mono />
-          <SelectField label="Customer Type" value={f.customerType} onChange={(v) => set('customerType', v)} options={CUST_TYPES} />
+          <SelectField label="Customer Type" value={f.customerType} onChange={(v) => set('customerType', v)} options={custTypes} />
           <SelectField label="Branch" value={f.branch} onChange={(v) => set('branch', v)} options={branchOpts} />
           <Field label="Industry" value={f.industry} onChange={(v) => set('industry', v)} />
           <SelectField label="Source" value={f.source} onChange={(v) => set('source', v)} options={CUST_SOURCES} />

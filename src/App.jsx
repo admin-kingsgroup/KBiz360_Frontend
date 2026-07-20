@@ -64,6 +64,7 @@ const { UnifiedApprovals, InbOutgoing } = lazyModule(() => import('./modules/app
 const { PaymentVerificationLive } = lazyModule(() => import('./modules/payments'));
 const { ModuleRegister } = lazyModule(() => import('./modules/reports/moduleRegister'));
 const { AccountsTreeView } = lazyModule(() => import('./modules/masters/chartBuilder'));
+const { PartyTypeMaster } = lazyModule(() => import('./modules/masters/utilities/partyTypeMaster'));
 const { PnLTallyLive } = lazyModule(() => import('./modules/reportsFinancial/pnlTally'));
 const { BalanceSheetTallyLive } = lazyModule(() => import('./modules/reportsFinancial/balanceSheetTally'));
 const { ReconStatusPage } = lazyModule(() => import('./modules/recon-status'));
@@ -666,6 +667,7 @@ export default function KB360App(){
     if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser} shellBranch={branch}/>;
     if(route==="/masters/projects")       return <ProjectMaster/>;
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;
+    if(route==="/masters/party-types")    return <PartyTypeMaster/>;
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
     if(route==="/masters/numbering")      return <NumberingSeriesMaster branch={branch}/>;
     // ── Accounts — branch accountant workspace (new screens) ──
@@ -847,11 +849,12 @@ export default function KB360App(){
     if(route==="/settings/users")        return <SettingsUsers/>;
     if(route==="/settings/audit")        return <SettingsAudit/>;
     // Chart-of-Accounts masters — 3 Tally-style doors (consolidated 2026-07-01):
-    //   Groups (Create/Alter/Display) · Ledgers (Create/Alter/Display) · Chart of
-    //   Accounts (tree, Display). The retired routes — /masters/subgroups (folded
+    //   Groups (Display) · Ledgers (Create/Alter/Display) · Chart of Accounts (tree,
+    //   Display). The group/sub-group STRUCTURE is system-managed — read-only here;
+    //   only Ledgers are user-created. The retired routes — /masters/subgroups (folded
     //   into Groups), /masters/groups-view, /masters/ledgers-view, /masters/accounts-info
     //   (overlapping read-only viewers) — were removed here.
-    if(route==="/masters/groups")        return <GroupsMaster/>;                 // Groups door — Create/Alter/Display groups & sub-groups (3-tier)
+    if(route==="/masters/groups")        return <GroupsMaster/>;                 // Groups door — read-only Display of the 3-tier group/sub-group tree
     if(route==="/masters/ledgers")       return <LedgersMaster branch={branch}/>;// Ledgers door — live CRUD (cascading Group ▸ Sub-Group)
     if(route==="/masters/accounts-tree") return <AccountsTreeView branch={branch} setRoute={navigate} setBranch={setBranch}/>;  // Chart of Accounts (Display): Primary Group ▸ Group ▸ Sub-Group ▸ Ledger tree
     if(route==="/masters/chart-builder") return <Navigate to="/masters/accounts-tree" replace/>;  // legacy alias → canonical

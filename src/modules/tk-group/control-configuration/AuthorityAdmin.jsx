@@ -53,11 +53,24 @@ export function AuthorityAdmin({ canManage = false }) {
   if (error) return <PageSection><div className="p-4 text-sm text-danger">{error}</div></PageSection>;
   if (!rules || !rules.length) return <PageSection><div className="p-4 text-sm text-ink-muted">No Owner-controlled approval rules found.</div></PageSection>;
 
+  // Segregation-of-duties check AT THE POINT OF EDIT: anyone in BOTH the Verify and Approve
+  // lists could verify and then give final approval on their own voucher. The switches screen
+  // shows this too, but the Owner types the emails HERE — warn where the mistake is made.
+  const vRule = rules.find((r) => r.configKey === 'approval.verifyEmails');
+  const aRule = rules.find((r) => r.configKey === 'approval.approveEmails');
+  const aSet = new Set(chips(aRule && aRule.value).map((e) => String(e).trim().toLowerCase()));
+  const sodOverlap = chips(vRule && vRule.value).filter((e) => e && aSet.has(String(e).trim().toLowerCase()));
+
   return (
     <div className="mx-auto grid max-w-[660px] gap-3">
       <div className="rounded-lg border border-dashed border-surface-border bg-surface/60 p-3 text-[12px] text-ink-muted">
         Who <b className="text-ink">verifies</b>, <b className="text-ink">approves</b> and signs (Director / Owner) on the three-level approval chain. These are read <b className="text-ink">live from the DB</b> — a change here takes effect immediately, with no deploy, and every change is audited. Owner-only.
       </div>
+      {sodOverlap.length > 0 && (
+        <div role="alert" className="rounded-lg border border-danger/40 bg-danger-soft p-3 text-[12px] text-danger">
+          <b>Segregation-of-duties conflict:</b> {sodOverlap.join(', ')} {sodOverlap.length === 1 ? 'is' : 'are'} in both the <b>Verify</b> and <b>Approve</b> lists — the same person could verify and then give final approval on their own voucher. Remove them from one list.
+        </div>
+      )}
       {rules.map((r) => (
         <PageSection key={r.ruleId} padded={false} className="overflow-hidden">
           {r.msg && (

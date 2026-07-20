@@ -55,21 +55,30 @@ describe('postureGrid — all-branches bird\'s-eye', () => {
 });
 
 describe('Control Panel structure', () => {
-  test('three governance planes + Oversight, no master screen', () => {
-    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['ERP Law', 'Operational Rules', 'Owner & Authority', 'Oversight']);
-    // Plane ① is the read-only law screen; plane ② opens with the switch screens.
-    expect(POWER_SCREEN_KEYS.slice(0, 3)).toEqual(['defaults', 'configurable', 'grid']);
+  test('four governance heads + Monitoring, no master screen', () => {
+    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['ERP Rules', 'Operational Rules', 'Owner Rules', 'Approval Chain', 'Monitoring']);
+    // ERP Rules opens with the Accounts law screen; Operational Rules with the Ops law screen.
+    expect(POWER_SCREEN_KEYS.slice(0, 3)).toEqual(['law-erp', 'law-ops', 'roles']);
     expect(POWER_SCREEN_KEYS).not.toContain('master');
-    expect(POWER_SCREEN_KEYS).toHaveLength(15);   // +1: Approval Authority converged into plane ③
+    expect(POWER_SCREEN_KEYS).not.toContain('defaults');
+    expect(POWER_SCREEN_KEYS).toHaveLength(17);   // 15 + law split (2) + rates − defaults
   });
-  test('Approval Authority is converged into plane ③ (Owner & Authority)', () => {
-    const auth = POWER_SCREENS.find((g) => g.group === 'Owner & Authority');
-    expect(auth.items.map((i) => i.key)).toContain('authority');
-    expect(auth.items.find((i) => i.key === 'authority').label).toBe('Approval Authority');
+  test('mandatory law splits into two heads by track (ERP vs Operational)', () => {
+    const erp = POWER_SCREENS.find((g) => g.group === 'ERP Rules');
+    const ops = POWER_SCREENS.find((g) => g.group === 'Operational Rules');
+    expect(erp.items.map((i) => i.key)).toEqual(['law-erp']);
+    expect(ops.items.map((i) => i.key)).toEqual(['law-ops', 'roles', 'masters']);
+  });
+  test('Approval Chain holds who-acts; Owner Rules holds the switches + ceilings + rates', () => {
+    const chain = POWER_SCREENS.find((g) => g.group === 'Approval Chain');
+    expect(chain.items.map((i) => i.key)).toEqual(['authority', 'delegation', 'breakglass']);
+    expect(chain.items.find((i) => i.key === 'authority').label).toBe('Approval Authority');
+    const own = POWER_SCREENS.find((g) => g.group === 'Owner Rules');
+    expect(own.items.map((i) => i.key)).toEqual(expect.arrayContaining(['configurable', 'grid', 'matrix', 'limits', 'tester', 'users', 'rates']));
   });
   test('screen keys are unique and include the tools', () => {
     expect(new Set(POWER_SCREEN_KEYS).size).toBe(POWER_SCREEN_KEYS.length);
-    for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log']) expect(POWER_SCREEN_KEYS).toContain(k);
+    for (const k of ['matrix', 'tester', 'active', 'digest', 'breakglass', 'log', 'rates']) expect(POWER_SCREEN_KEYS).toContain(k);
   });
 });
 

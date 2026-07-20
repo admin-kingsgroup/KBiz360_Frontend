@@ -98,7 +98,7 @@ export function TkConfigReadinessPage() {
 
 export function TkControlPanelPage({ setRoute }) {
   return (
-    <Page title="Control Panel" subtitle="The TK Group control centre — enforcement posture, the live approval chain (Check → Verify · Sughra → Approve · Faiz), whether the AE can also approve, and who is under control vs acting independently. Read-only; changes are Owner-approved on Control Flags / Limits.">
+    <Page title="Control Panel" subtitle="The TK Group control centre, in four heads — mandatory ERP & Operational law (read-only), the Owner's on/off rules, and the approval chain (Check → Verify · Sughra → Approve · Faiz). The Owner flips controls live; other central roles propose a change-request.">
       <ControlPanel setRoute={setRoute} />
     </Page>
   );

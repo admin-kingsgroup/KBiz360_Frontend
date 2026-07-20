@@ -193,37 +193,43 @@ export function digestSummary({ overview = {}, integrity = {}, inbox = {} } = {}
 }
 
 // ─── Power Console structure (pure data) ─────────────────────────────────────
-// ONE console, organised by WHO governs each rule — the three governance planes,
-// plus an Oversight lens that reads across all of them:
-//   ① ERP Law          — locked, in code, read-only (the floor)
-//   ② Operational Rules — the Owner's switches / limits / matrix (ship OFF, fail-safe)
-//   ③ Owner & Authority — who verifies / approves / signs, delegation, break-glass
-// There is NO master switch: enforcement engages rule-by-rule. `key` matches the
-// component's screen router. Approval Authority is converged HERE (plane ③) so authority
-// has one home — /tk/rules keeps only the Rule Book + Rules Manager.
+// ONE console, organised by GOVERNANCE into four heads (+ a Monitoring lens):
+//   ① ERP Rules         — mandatory accounting law (locked, read-only)          🔒
+//   ② Operational Rules — mandatory process/control law (locked, read-only)     🔒
+//   ③ Owner Rules       — the switches / grid / matrix / limits / ceilings /    ⚙
+//                         rates the Owner turns on/off or sets (ship OFF, fail-safe)
+//   ④ Approval Chain    — who verifies / approves / signs, delegation, break-glass 👤
+//   Monitoring          — a read-only lens across all four
+// The 564 mandatory laws split by track: ERP Rules = Accounts, Operational Rules = Ops
+// (the registry already tags every law `accounts`/`ops`). There is NO master switch —
+// enforcement engages rule-by-rule. `key` matches the component's screen router.
 export const POWER_SCREENS = [
-  { group: 'ERP Law', items: [
-    { key: 'defaults',     label: 'Law by Domain' },
+  { group: 'ERP Rules', items: [
+    { key: 'law-erp',      label: 'By Domain' },
   ] },
   { group: 'Operational Rules', items: [
+    { key: 'law-ops',      label: 'By Domain' },
+    { key: 'roles',        label: 'Role Capabilities' },
+    { key: 'masters',      label: 'Master & Onboarding' },
+  ] },
+  { group: 'Owner Rules', items: [
     { key: 'configurable', label: 'Configurable Rules' },
     { key: 'grid',         label: 'All-Branches Grid' },
     { key: 'matrix',       label: 'Enforcement Matrix' },
     { key: 'limits',       label: 'Limits & Thresholds' },
     { key: 'tester',       label: 'Policy Tester' },
+    { key: 'users',        label: 'User Ceilings' },
+    { key: 'rates',        label: 'Rates & Values' },
   ] },
-  { group: 'Owner & Authority', items: [
-    { key: 'authority',  label: 'Approval Authority' },
-    { key: 'roles',      label: 'Role Capabilities' },
-    { key: 'users',      label: 'User Configuration' },
-    { key: 'masters',    label: 'Master & Onboarding' },
-    { key: 'delegation', label: 'Delegation' },
-    { key: 'breakglass', label: 'Break-Glass Access' },
+  { group: 'Approval Chain', items: [
+    { key: 'authority',    label: 'Approval Authority' },
+    { key: 'delegation',   label: 'Delegation' },
+    { key: 'breakglass',   label: 'Break-Glass Access' },
   ] },
-  { group: 'Oversight', items: [
-    { key: 'active', label: 'Active Controls' },
-    { key: 'digest', label: 'Daily Digest' },
-    { key: 'log',    label: 'Change Log / Audit' },
+  { group: 'Monitoring', items: [
+    { key: 'active',       label: 'Active Controls' },
+    { key: 'digest',       label: 'Daily Digest' },
+    { key: 'log',          label: 'Change Log / Audit' },
   ] },
 ];
 

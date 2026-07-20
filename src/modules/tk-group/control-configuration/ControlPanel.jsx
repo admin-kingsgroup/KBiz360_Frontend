@@ -16,6 +16,7 @@ import { ChangeLog } from '../ChangeLog';
 import { Delegation } from '../Delegation';
 import { BreakGlass } from '../BreakGlass';
 import { AuthorityAdmin } from './AuthorityAdmin';
+import { RatesReference } from './RatesReference';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
 import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, engageCautions, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
 import { lockedLawBook } from '../utils/ruleBook.data';
@@ -97,6 +98,19 @@ function LawGroup({ title, sub, rows, count, onOpen }) {
     </div>
   );
 }
+// Data-provenance line for the law bands — live registry / loading / bundled fallback.
+function LawState({ q }) {
+  const live = !!(q.data && q.data.items && q.data.items.length);
+  return (
+    <p className="mb-4 flex items-center gap-1.5 text-[11px]">
+      {live
+        ? <><span className="inline-block h-2 w-2 rounded-full bg-success" /><span className="text-ink-subtle">Live from the rules registry (<code>/api/rules</code>).</span></>
+        : q.isLoading
+          ? <><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-ink-subtle" /><span className="text-ink-subtle">Loading the live registry…</span></>
+          : <><span className="inline-block h-2 w-2 rounded-full bg-warning" /><span className="text-ink-subtle">Showing the built-in reference copy — the live registry didn’t load, so counts may lag the server.</span></>}
+    </p>
+  );
+}
 // Check → Verify → Approve reads as a pipeline, so each level gets its own accent.
 const CHAIN_COLORS = ['#2563eb', '#d97706', '#16a34a'];
 function ChainCard({ k, r, w, n }) {
@@ -143,7 +157,7 @@ const BRANCH_SCOPED = new Set(['configurable', 'matrix', 'limits', 'users']);
 const SCREEN_FLAGS = { configurable: CONFIGURABLE_FLAGS };
 
 export function ControlPanel({ setRoute }) {
-  const [screen, setScreen] = useState('defaults');
+  const [screen, setScreen] = useState('law-erp');
   const [branch, setBranch] = useState('default');   // panel-wide branch scope for the controls
   const flagsQ = useQuery({ queryKey: ['tk', 'flags'], queryFn: getFlagState, staleTime: 30_000 });
   // Plane ① · ERP Law band — read the enforced-rule registry (same key/fallback as the Rule
@@ -378,35 +392,42 @@ export function ControlPanel({ setRoute }) {
 
   const screenBody = () => {
     switch (screen) {
-      case 'defaults': {
-        const lawLive = !!(lawQ.data && lawQ.data.items && lawQ.data.items.length);
+      case 'law-erp':
         return (
           <>
             <p className="mb-1.5 mt-1 max-w-[82ch] text-[13.5px] text-ink-muted">
-              The <b>law floor</b> — <b>{band.totals.all}</b> locked laws the ERP enforces in code across <b>{band.totals.domains}</b> domains.
-              These are <b>always on and read-only</b>: they apply on day one and can’t be switched off. The Owner-set approval
-              authority — who verifies, approves and signs — is operated in{' '}
-              <button type="button" className="font-semibold text-navy underline" onClick={() => setScreen('authority')}>Owner &amp; Authority</button>, not here.
-              Rolled up by domain below; click a domain for its individual rules, each citing the file that enforces it, in the{' '}
-              <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book')}>Rule Book</button>.
+              The <b>accounting law floor</b> — <b>{band.totals.accounts}</b> locked laws across <b>{band.accounts.length}</b> domains
+              (tax, ledgers, posting, gross profit, refunds, reconciliation). These are <b>always on and read-only</b>: they apply on
+              day one and can’t be switched off. Click a domain for its individual rules in the{' '}
+              <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book&track=accounts')}>Rule Book</button>.
+              The process &amp; control laws are under{' '}
+              <button type="button" className="font-semibold text-navy underline" onClick={() => setScreen('law-ops')}>Operational Rules</button>.
             </p>
-            <p className="mb-4 flex items-center gap-1.5 text-[11px]">
-              {lawLive
-                ? <><span className="inline-block h-2 w-2 rounded-full bg-success" /><span className="text-ink-subtle">Live from the rules registry (<code>/api/rules</code>).</span></>
-                : lawQ.isLoading
-                  ? <><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-ink-subtle" /><span className="text-ink-subtle">Loading the live registry…</span></>
-                  : <><span className="inline-block h-2 w-2 rounded-full bg-warning" /><span className="text-ink-subtle">Showing the built-in reference copy — the live registry didn’t load, so counts may lag the server.</span></>}
-            </p>
-            <div className="grid gap-4 tablet:grid-cols-2">
+            <LawState q={lawQ} />
+            <div className="grid gap-4">
               <LawGroup title={'📒 Accounts — financial law'} sub="Accounts" rows={band.accounts} count={band.totals.accounts} onOpen={() => go('/tk/rules?tab=book&track=accounts')} />
-              <LawGroup title={'⚙ Operations — process & control law'} sub="Operations" rows={band.ops} count={band.totals.ops} onOpen={() => go('/tk/rules?tab=book&track=ops')} />
             </div>
             <H3>Day-one foundation locks</H3>
-            <p className="mb-3 -mt-1 max-w-[82ch] text-[12.5px] text-ink-muted">The always-on essentials spelled out in plain language — the most governance-critical laws from the domains above.</p>
+            <p className="mb-3 -mt-1 max-w-[82ch] text-[12.5px] text-ink-muted">The always-on essentials spelled out in plain language — the most governance-critical laws, across both tracks.</p>
             <div className="grid gap-2.5 tablet:grid-cols-2">{DEFAULT_RULES.map((r, i) => <DefaultRow key={i} {...r} />)}</div>
           </>
         );
-      }
+      case 'law-ops':
+        return (
+          <>
+            <p className="mb-1.5 mt-1 max-w-[82ch] text-[13.5px] text-ink-muted">
+              The <b>process &amp; control law floor</b> — <b>{band.totals.ops}</b> locked laws across <b>{band.ops.length}</b> domains
+              (approvals, voucher lifecycle, inter-branch, access, visibility, HR). Also <b>always on and read-only</b>. Click a domain
+              for its individual rules in the{' '}
+              <button type="button" className="font-semibold text-navy underline" onClick={() => go('/tk/rules?tab=book&track=ops')}>Rule Book</button>.
+              The intended role posture and the master-onboarding chain are the other two screens in this head.
+            </p>
+            <LawState q={lawQ} />
+            <div className="grid gap-4">
+              <LawGroup title={'⚙ Operations — process & control law'} sub="Operations" rows={band.ops} count={band.totals.ops} onOpen={() => go('/tk/rules?tab=book&track=ops')} />
+            </div>
+          </>
+        );
       case 'configurable':
         return (
           <>
@@ -518,6 +539,7 @@ export function ControlPanel({ setRoute }) {
       case 'limits': return <BranchLimitsEditor go={go} branch={branch} onBranchChange={setBranch} />;
       case 'users': return <UserConfig go={go} branch={branch} />;
       case 'authority': return <AuthorityAdmin canManage={owner} />;
+      case 'rates': return <RatesReference />;
       case 'delegation': return <Delegation />;
       case 'breakglass': return <BreakGlass />;
       case 'log': return <ChangeLog go={go} />;

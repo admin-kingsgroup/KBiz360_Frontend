@@ -29,7 +29,7 @@ export function BankAccountMaster({ branch, setRoute }) {
   // them live and map the ledger's bank fields onto the register's columns.
   // Banks are branch-owned: fetch only the filtered branch's chart (+ 'ALL' heads)
   // instead of pulling every branch's bank ledgers and hiding rows in the browser.
-  const { data: ledgers = [] } = useMasterList('ledgers', filterBranch !== 'ALL' ? { branch: filterBranch } : {});
+  const { data: ledgers = [], isLoading, isError, error, refetch } = useMasterList('ledgers', filterBranch !== 'ALL' ? { branch: filterBranch } : {});
   const bankRows = useMemo(() => (ledgers || [])
     .filter((l) => ['Bank Accounts', 'Cash-in-Hand'].includes(l.group))
     .map((l) => ({
@@ -98,7 +98,7 @@ export function BankAccountMaster({ branch, setRoute }) {
         </ResponsiveGrid>
       )}
 
-      <DataTable columns={columns} rows={filtered} getRowKey={(r) => r.id} dense exportName="bank-accounts" printTitle="Bank Account Master" emptyMessage="No bank accounts match the filter." />
+      <DataTable columns={columns} rows={filtered} getRowKey={(r) => r.id} dense loading={isLoading} isError={isError} error={error} onRetry={refetch} exportName="bank-accounts" printTitle="Bank Account Master" emptyMessage="No bank accounts match the filter." />
     </PageLayout>
   );
 }

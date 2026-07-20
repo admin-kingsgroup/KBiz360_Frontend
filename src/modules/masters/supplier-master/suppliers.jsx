@@ -14,6 +14,7 @@ import {
 } from '../../../core/partyEnums';
 import { branchCode } from '../../../core/useAccounting';
 import { isVatBranch } from '../../../core/voucherSpecs';
+import { usePartyTypes } from '../../../core/useReference';
 import { MasterCrud } from '../shared/masterCrud';
 import { Select } from '../../../shell/primitives';
 
@@ -30,6 +31,11 @@ const partyScope = (brc) => ({
 export const SuppliersMaster = ({ branch } = {}) => {
   const brc = branchCode(branch);
   const scope = partyScope(brc);
+  // Supplier Categories now come from the Party Type master (Masters ▸ Utilities);
+  // fall back to the hardcoded SUPPLIER_CATS while it's empty/loading (no leading '' —
+  // a category is always a real value).
+  const liveCats = usePartyTypes('supplier').data;
+  const supCats = (liveCats && liveCats.length) ? liveCats : SUPPLIER_CATS;
   // Supplier Type filter — narrows the list to one vendor category (Airline / DMC /
   // Hotel / …, the backend-validated SUPPLIER_CATS shown in the Category column) or
   // to the ones not yet categorised. '__blank__' = the Uncategorised bucket so those
@@ -43,7 +49,7 @@ export const SuppliersMaster = ({ branch } = {}) => {
     <label className={selWrap}>Category
       <div className="w-48"><Select value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
         <option value="">All categories</option>
-        {SUPPLIER_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
+        {supCats.map((c) => <option key={c} value={c}>{c}</option>)}
         <option value="__blank__">Uncategorised</option>
       </Select></div>
     </label>
@@ -71,7 +77,7 @@ export const SuppliersMaster = ({ branch } = {}) => {
       { key: 'name', label: 'Name', type: 'text', required: true },
       // Category is the one picklist the backend validates (VALID_CATS) — a dropdown
       // guarantees a valid value. The rest mirror the 12-tab master via core/partyEnums.
-      { key: 'category', label: 'Category', type: 'select', options: SUPPLIER_CATS },
+      { key: 'category', label: 'Category', type: 'select', options: supCats },
       // Branch must be a real code, not free-text/blank (a blank branch = unscoped party).
       { key: 'branch', label: 'Branch', type: 'select', options: scope.branchOptions, default: scope.branchDefault, required: true },
       // India (GST) branches capture GSTIN + GST Treatment + TDS Section; a VAT branch

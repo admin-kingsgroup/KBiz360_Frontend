@@ -26,7 +26,7 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
     // one "Groups" door; the read-only tree is the "Display" view. Cost Centres are
     // Super-Admin-only (branch-wise master) — their writes 403 for other roles.
     {divider:true, label:"Chart of Accounts"},
-    {label:"Groups (Create / Alter / Display)", href:"/masters/groups"},
+    {label:"Groups (Display)", href:"/masters/groups"},
     {label:"Ledgers (Create / Alter / Display)", href:"/masters/ledgers"},
     {label:"Chart of Accounts (Tree view)", href:"/masters/accounts-tree"},
     {label:"Bank Accounts", href:"/masters/bank-accounts"},
@@ -71,6 +71,7 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
   {label:"Utilities", children:[
     {label:"Passport Register", href:"/masters/passports"},
     {label:"Document Type Master", href:"/masters/doc-types"},
+    {label:"Party Type Master", href:"/masters/party-types"},
     {label:"Approval Limits Master", href:"/masters/approval-limits"},
     {label:"Merge Duplicate Records", href:"/masters/merge"},
   ]},
@@ -432,7 +433,7 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
   // set-up-once: daily Forex Rates plus Budgets & Scenarios (period planning). Tax &
   // Statutory live under the Taxation header (TAX_INDIA / TAX_AFRICA / TAX_ALL).
   {label:"Currency & Planning", children:[
-    {divider:true, label:"Currency"},
+    {divider:true, label:"Forex"},
     {label:"Forex Rates", href:"/masters/forex"},
     {divider:true, label:"Planning"},
     {label:"Budgets", href:"/masters/budgets"},

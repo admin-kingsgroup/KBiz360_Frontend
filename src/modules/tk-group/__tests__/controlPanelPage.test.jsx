@@ -52,30 +52,40 @@ function renderWith(ui) {
 afterEach(() => { try { localStorage.clear(); } catch { /* ignore */ } });
 
 describe('Control Panel · three-plane model', () => {
-  test('opens on Law by Domain (plane ①), dormant, with the three planes + Oversight in the nav', async () => {
+  test('opens on ERP Rules › By Domain (Accounts), dormant, with the four heads + Monitoring in the nav', async () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     expect(await screen.findByText(/Control Panel/)).toBeInTheDocument();
     expect(await screen.findByText(/Everything OFF/)).toBeInTheDocument();   // resolves after the brief loading strip
-    // "Law by Domain" is both the nav item and the active screen heading, so it appears twice
-    expect(screen.getAllByText('Law by Domain').length).toBeGreaterThanOrEqual(1);
+    // "By Domain" is a nav item under each law head + the active screen heading
+    expect(screen.getAllByText('By Domain').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Configurable Rules')).toBeInTheDocument();
     expect(screen.getByText('Enforcement Matrix')).toBeInTheDocument();
-    expect(screen.getByText('User Configuration')).toBeInTheDocument();
+    expect(screen.getByText('User Ceilings')).toBeInTheDocument();
+    expect(screen.getByText('Rates & Values')).toBeInTheDocument();
     expect(screen.getByText('Break-Glass Access')).toBeInTheDocument();
-    // the three governance planes are the nav groups
-    expect(screen.getByText('ERP Law')).toBeInTheDocument();
-    expect(screen.getByText('Operational Rules')).toBeInTheDocument();
-    // Appears as the nav group header AND the plane-① intro's "operated in Owner & Authority" link
-    expect(screen.getAllByText('Owner & Authority').length).toBeGreaterThanOrEqual(1);
-    // Approval Authority is converged into the panel (plane ③)
+    // the four governance heads + Monitoring are the nav groups
+    expect(screen.getByText('ERP Rules')).toBeInTheDocument();
+    expect(screen.getAllByText('Operational Rules').length).toBeGreaterThanOrEqual(1); // nav header + the law-erp intro link
+    expect(screen.getByText('Owner Rules')).toBeInTheDocument();
+    expect(screen.getByText('Approval Chain')).toBeInTheDocument();
+    expect(screen.getByText('Monitoring')).toBeInTheDocument();
     expect(screen.getByText('Approval Authority')).toBeInTheDocument();
-    // plane ① renders the ERP-Law band — Accounts + Operations domain roll-ups (bundled
-    // RULE_BOOK fallback here, since apiGet is mocked to {}) plus the foundation locks
+    // the ERP Rules head opens on the Accounts law band + the foundation locks
     expect(screen.getByText(/Accounts — financial law/)).toBeInTheDocument();
-    expect(screen.getByText(/Operations — process & control law/)).toBeInTheDocument();
     expect(screen.getByText('Day-one foundation locks')).toBeInTheDocument();
     // the master switch is gone
     expect(screen.queryByText('Master Switch')).not.toBeInTheDocument();
+  });
+
+  test('the mandatory law splits into two heads — ERP Rules = Accounts, Operational Rules = Ops', async () => {
+    renderWith(<ControlPanel setRoute={() => {}} />);
+    await screen.findByText(/Accounts — financial law/);          // ERP Rules head (default)
+    // the Operations band is NOT on the ERP Rules screen — it's the other law head
+    expect(screen.queryByText(/Operations — process & control law/)).not.toBeInTheDocument();
+    // open Operational Rules › By Domain (the 2nd "By Domain" nav item)
+    fireEvent.click(screen.getAllByText('By Domain')[1]);
+    expect(await screen.findByText(/Operations — process & control law/)).toBeInTheDocument();
+    expect(screen.queryByText(/Accounts — financial law/)).not.toBeInTheDocument();
   });
 
   test('a failed flag load shows a distinct error state, NOT a false “Everything OFF · dormant”', async () => {
@@ -86,7 +96,7 @@ describe('Control Panel · three-plane model', () => {
     expect(screen.queryByText(/Everything OFF/)).not.toBeInTheDocument();   // must not masquerade as dormant
   });
 
-  test('ERP Law (plane ①) screen lists always-on foundation locks (read-only)', async () => {
+  test('ERP Rules head lists always-on foundation locks (read-only)', async () => {
     renderWith(<ControlPanel setRoute={() => {}} />);
     expect(await screen.findByText('Negative-GP block')).toBeInTheDocument();
     expect(screen.getByText(/Maker cannot approve their own routed/)).toBeInTheDocument();

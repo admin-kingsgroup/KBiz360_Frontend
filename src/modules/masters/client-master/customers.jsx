@@ -14,6 +14,7 @@ import {
 } from '../../../core/partyEnums';
 import { branchCode } from '../../../core/useAccounting';
 import { isVatBranch } from '../../../core/voucherSpecs';
+import { usePartyTypes } from '../../../core/useReference';
 import { MasterCrud } from '../shared/masterCrud';
 import { Select } from '../../../shell/primitives';
 
@@ -37,6 +38,11 @@ export const CustomersMaster = ({ branch } = {}) => {
   // (historic rows imported without a type) so they can be found and tagged, not
   // silently swallowed by the filter.
   const [typeFilter, setTypeFilter] = useState('');
+  // Client Types now come from the Party Type master (Masters ▸ Utilities). Fall back
+  // to the hardcoded CUST_TYPES while the master is empty/loading so nothing regresses
+  // before it's seeded. Lead with '' to match the CUST_TYPES "not set" convention.
+  const liveTypes = usePartyTypes('customer').data;
+  const custTypes = (liveTypes && liveTypes.length) ? ['', ...liveTypes] : CUST_TYPES;
   const matchType = (r) => (!typeFilter ? true
     : typeFilter === '__blank__' ? !r.customerType
     : r.customerType === typeFilter);
@@ -45,7 +51,7 @@ export const CustomersMaster = ({ branch } = {}) => {
     <label className={selWrap}>Type
       <div className="w-48"><Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
         <option value="">All types</option>
-        {CUST_TYPES.filter(Boolean).map((t) => <option key={t} value={t}>{t}</option>)}
+        {custTypes.filter(Boolean).map((t) => <option key={t} value={t}>{t}</option>)}
         <option value="__blank__">Unclassified</option>
       </Select></div>
     </label>
@@ -68,7 +74,7 @@ export const CustomersMaster = ({ branch } = {}) => {
       // Dropdowns are fed from core/partyEnums (the same picklists the 12-tab master uses),
       // so values stay consistent with the rest of the ERP instead of free-typed text.
       // Shown as a column (table: default) AND filterable via the Type toolbar above.
-      { key: 'customerType', label: 'Customer Type', type: 'select', options: CUST_TYPES },
+      { key: 'customerType', label: 'Customer Type', type: 'select', options: custTypes },
       { key: 'source', label: 'Source', type: 'select', options: CUST_SOURCES, table: false },
       // Already stored on the model (used by the 12-tab master) but wasn't exposed here.
       { key: 'accountManager', label: 'Key Account Manager', type: 'text', table: false },
