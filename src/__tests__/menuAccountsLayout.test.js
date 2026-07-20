@@ -31,7 +31,7 @@ describe('Accounts pill — reorganized layout', () => {
       'Branch MIS',
       'Inter Branch',
       'Period Close',
-      'Accounts Master',
+      'Currency & Planning',
     ]);
   });
 

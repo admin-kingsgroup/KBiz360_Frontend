@@ -24,12 +24,14 @@ export function isCentralRole(currentUser) {
 // enter against a group total).
 //
 // Masters are the one deliberate omission: the cockpit already surfaces the chart/party
-// masters centrally via the "Masters & Ledger" pill, so the "Accounts Master" group is
-// dropped here to avoid listing the same masters twice inside one nav.
+// masters centrally via the "Masters & Ledger" pill (the Accounts Master group itself now
+// lives under the branch Masters pill, not Accounts). The residual "Currency & Planning"
+// node (Forex Rates / Budgets / Scenarios) is dropped here too — the cockpit is a control
+// tower, not a rate/planning entry surface.
 function branchWorkspace(focus) {
   const focused = focus && focus !== 'ALL';
   if (!focused) return [];
-  const children = (MENU_ACCOUNTS.children || []).filter((c) => c && c.label !== 'Accounts Master');
+  const children = (MENU_ACCOUNTS.children || []).filter((c) => c && c.label !== 'Currency & Planning');
   return [{ label: `Accounts — ${focus}`, icon: Calculator, children }];
 }
 

@@ -1,15 +1,16 @@
 import { MENU_ACCOUNTS, MENU_MASTERS } from '../menus';
 
-// "Accounts Master" (Chart of Accounts, Cost Centres, Budgets, Scenarios) was
-// moved from the standalone Masters pill into the Accounts header.
-// Consolidated to 3 Tally-style doors: Groups, Ledgers, Chart of Accounts (tree).
-// The old separate "/masters/subgroups" menu item was folded into the Groups door
-// (groups & sub-groups are one collection), so it no longer appears in the menu.
+// "Accounts Master" (Groups, Ledgers, Chart-of-Accounts tree, Bank Accounts,
+// Currencies and the Cost dimensions) lives under the MASTERS pill. Only
+// operational rate/planning data — daily Forex Rates plus Budgets & Scenarios —
+// stays under the Accounts header, in a node renamed "Currency & Planning".
+// Groups & sub-groups are one collection (3-tier tree) sharing the Groups door.
 const ACCOUNTS_MASTER_HREFS = [
   '/masters/groups', '/masters/ledgers', '/masters/accounts-tree',
-  '/masters/bank-accounts', '/masters/cost-categories', '/masters/cost-centers',
-  '/masters/budgets', '/masters/scenarios',
+  '/masters/bank-accounts', '/masters/currency',
+  '/masters/cost-categories', '/masters/cost-centers',
 ];
+const CURRENCY_PLANNING_HREFS = ['/masters/forex', '/masters/budgets', '/masters/scenarios'];
 
 const section = (menu, label) => (menu.children || []).find((c) => c.label === label);
 const hrefs = (node, out = []) => {
@@ -19,40 +20,44 @@ const hrefs = (node, out = []) => {
   return out;
 };
 
-describe('Accounts Master moved into the Accounts header', () => {
-  it('exists as an "Accounts Master" section under the Accounts pill', () => {
-    const sec = section(MENU_ACCOUNTS, 'Accounts Master');
+describe('Accounts Master lives under the Masters pill', () => {
+  it('exists as an "Accounts Master" section under the Masters pill', () => {
+    const sec = section(MENU_MASTERS, 'Accounts Master');
     expect(sec).toBeTruthy();
     const got = new Set(hrefs(sec));
     ACCOUNTS_MASTER_HREFS.forEach((h) => expect(got.has(h)).toBe(true));
   });
 
-  it('no longer lives under the Masters pill', () => {
-    expect(section(MENU_MASTERS, 'Accounts Master')).toBeUndefined();
-    // the chart-of-accounts routes are gone from the Masters pill entirely
+  it('the chart-of-accounts / cost / currency masters are gone from the Accounts pill', () => {
+    const accHrefs = new Set(hrefs(MENU_ACCOUNTS));
+    ACCOUNTS_MASTER_HREFS.forEach((h) => expect(accHrefs.has(h)).toBe(false));
+    // the old "Accounts Master" node no longer exists under Accounts
+    expect(section(MENU_ACCOUNTS, 'Accounts Master')).toBeUndefined();
+  });
+
+  it('Accounts keeps a "Currency & Planning" node with Forex / Budgets / Scenarios only', () => {
+    const cp = section(MENU_ACCOUNTS, 'Currency & Planning');
+    expect(cp).toBeTruthy();
+    const got = new Set(hrefs(cp));
+    CURRENCY_PLANNING_HREFS.forEach((h) => expect(got.has(h)).toBe(true));
+    // these operational/planning routes did NOT move to Masters
     const mastersHrefs = new Set(hrefs(MENU_MASTERS));
-    ['/masters/accounts-tree', '/masters/groups', '/masters/subgroups', '/masters/ledgers']
-      .forEach((h) => expect(mastersHrefs.has(h)).toBe(false));
+    CURRENCY_PLANNING_HREFS.forEach((h) => expect(mastersHrefs.has(h)).toBe(false));
   });
 
-  it('drops the old "Masters (quick create)" subset from Accounts', () => {
-    expect(section(MENU_ACCOUNTS, 'Masters (quick create)')).toBeUndefined();
-  });
-
-  it('Masters pill still keeps its other sections (Voucher / Client / Supplier)', () => {
-    ['Voucher Master', 'Client Master', 'Supplier Master'].forEach((l) =>
+  it('Masters pill still keeps its other sections (Voucher / Client / Supplier / Tax)', () => {
+    ['Voucher Master', 'Client Master', 'Supplier Master', 'Tax Master'].forEach((l) =>
       expect(section(MENU_MASTERS, l)).toBeTruthy());
   });
 
-  it('Currencies & Forex Rates moved into Accounts Master, out of the Masters pill', () => {
-    const accMaster = new Set(hrefs(section(MENU_ACCOUNTS, 'Accounts Master')));
+  it('Currencies moved to Masters ▸ Accounts Master; daily Forex Rates stay in Accounts', () => {
+    const accMaster = new Set(hrefs(section(MENU_MASTERS, 'Accounts Master')));
     expect(accMaster.has('/masters/currency')).toBe(true);
-    expect(accMaster.has('/masters/forex')).toBe(true);
-    const mastersHrefs = new Set(hrefs(MENU_MASTERS));
-    expect(mastersHrefs.has('/masters/currency')).toBe(false);
-    expect(mastersHrefs.has('/masters/forex')).toBe(false);
-    // the section is renamed Tax Master and still has the tax codes
-    expect(section(MENU_MASTERS, 'Tax Master')).toBeTruthy();
-    expect(mastersHrefs.has('/masters/tax')).toBe(true);
+    expect(accMaster.has('/masters/forex')).toBe(false);
+    const currencyPlanning = new Set(hrefs(section(MENU_ACCOUNTS, 'Currency & Planning')));
+    expect(currencyPlanning.has('/masters/forex')).toBe(true);
+    expect(currencyPlanning.has('/masters/currency')).toBe(false);
+    // Tax codes still under the Tax Master section
+    expect(new Set(hrefs(MENU_MASTERS)).has('/masters/tax')).toBe(true);
   });
 });
