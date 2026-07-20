@@ -78,7 +78,7 @@ export const DEV_SCAN = {
       "source": "build"
     },
     {
-      "id": "FE:App.jsx:283:empty-catch",
+      "id": "FE:App.jsx:290:empty-catch",
       "tree": "FE",
       "rule": "empty-catch",
       "category": "broken-code",
@@ -86,7 +86,7 @@ export const DEV_SCAN = {
       "title": "Empty catch — error silently swallowed",
       "remark": "This catch block is empty with no comment, so failures disappear silently. Handle the error, surface it, or at least add a note on why it is safe to ignore.",
       "file": "App.jsx",
-      "line": 283,
+      "line": 290,
       "snippet": "try{ Object.keys(localStorage).filter(k=>k.startsWith(\"kb360-\")).forEach(k=>localStorage.removeItem(k)); }catch{}",
       "source": "build"
     },

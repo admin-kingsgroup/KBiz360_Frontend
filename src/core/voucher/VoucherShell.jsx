@@ -14,6 +14,7 @@ import { Kbd } from '../ux/widgets.jsx';
 import { isViewOnly, VIEW_ONLY_REASON } from '../api';
 import { triggerSaveRefresh } from '../hooks';
 import { useVNo } from '../useNextNo';
+import { useNavGuard } from '../ux/navGuard';
 
 /**
  * Unified voucher form (Option C).
@@ -48,6 +49,16 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   });
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
+
+  // Unsaved-changes guard: snapshot the pristine form on first render; App.jsx's
+  // navigate() confirms before leaving when the form has been edited but not yet
+  // saved (`done`). Category-agnostic — a serialized snapshot compare covers EVERY
+  // voucher type (receipt/payment/contra/journal/purchase-expense/debit-note/
+  // refund/ADM/ACM) through this one engine, with no per-category wiring. Never
+  // throws (a compare error must never block navigation).
+  const pristineRef = React.useRef(null);
+  if (pristineRef.current === null) pristineRef.current = JSON.stringify(state);
+  useNavGuard(() => { try { return !done && JSON.stringify(state) !== pristineRef.current; } catch { return false; } });
 
   const createMut = useCreateVoucher();
   const updateMut = useUpdateVoucher();

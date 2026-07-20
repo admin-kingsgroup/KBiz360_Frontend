@@ -15,6 +15,7 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { exportToExcel } from '../../../core/exportExcel';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { useFormKeys } from '../../../core/ux/forms';
+import { useNavGuard } from '../../../core/ux/navGuard';
 import { usePager, Pager } from '../../../core/ux/pager';
 import { toast } from '../../../core/ux/toast';
 import { confirmDialog } from '../../../core/ux/confirm';
@@ -142,6 +143,15 @@ function FieldInput({ field, value, onChange, form }) {
 
 function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   const [form, setForm] = useState(record);
+  // Unsaved-changes guard: while this master editor is open with edits, App.jsx's
+  // navigate() confirms before leaving (a menu click / drill-out) so a half-typed
+  // ledger/party/group isn't silently discarded. `record` is the pristine seed;
+  // a serialized snapshot compare covers every master uniformly. The modal only
+  // mounts while editing, so the guard auto-clears on Save/Cancel (unmount). An
+  // in-modal Cancel is a plain state change (onClose), not an app navigation, so
+  // it closes without a redundant prompt. Never throws.
+  const pristineRef = useRef(JSON.stringify(record));
+  useNavGuard(() => { try { return JSON.stringify(form) !== pristineRef.current; } catch { return false; } });
   // Changing a field may invalidate a dependent one (e.g. picking a new Group makes
   // the previously-chosen Sub-Group stale). A field can declare `clears: ['subGroup']`
   // to reset those dependents to blank whenever it changes, or `onSet(v, next)` to

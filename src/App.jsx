@@ -264,6 +264,10 @@ export default function KB360App(){
      to fetch until I refresh": login left the branch at a stale/out-of-scope
      value, which the server-side branch scoping then rejected with 403s. */
   const switchUser = (rawUser) => {
+    // A new session starts clean — drop any unsaved-changes guard a prior form left
+    // armed so it can't prompt on this fresh sign-in's redirect (the previous user's
+    // half-filled form is gone with the session anyway).
+    clearNavGuard();
     // Canonicalise 'super_admin' → 'Super Admin' so the Owner gets full scope + the
     // central cockpit + every owner-only surface, not a half-owner.
     const newUser = withCanonicalRole(rawUser);
@@ -271,12 +275,15 @@ export default function KB360App(){
     setBranch(pickBranchForUser(newUser));
     // Redirect on user switch (current route may be forbidden). Accountants land on
     // their own workspace dashboard; everyone else on the general dashboard.
-    navigate(/accountant/i.test(newUser?.role || '') ? "/accounts/dashboard" : "/dashboard");
+    navigate(/accountant/i.test(newUser?.role || '') ? "/accounts/dashboard" : "/dashboard", { force:true });
   };
 
   /* ── Sign out: clear the stored JWT + user so the next session must log in ── */
   const setUser = (u) => {
     if(!u){
+      // Sign-out unmounts the whole app to the login screen — drop any armed unsaved-
+      // changes guard so a dirty form left open can't prompt as the session tears down.
+      clearNavGuard();
       // Clear the ENTIRE kb360-* session — token, user, AND branch / route / prefs. Clearing
       // only token+user let the previous user's saved branch and last route bleed into the
       // next login on a shared machine. Wipe every kb360-* key so nothing leaks across users.
