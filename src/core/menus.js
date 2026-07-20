@@ -16,8 +16,26 @@ import { isPageAccessAdmin, isOwnerDashboardUser } from './pageCatalog';
 // Organised on Tally's master taxonomy: Accounts Info · Statutory Info ·
 // Parties (which in Tally are just ledgers) · Inventory & Catalog · Utilities.
 export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
-  // Accounts Master (Chart of Accounts, Cost Centres, Budgets, Scenarios) lives
-  // under the ACCOUNTS header now — see MENU_ACCOUNTS ▸ "Accounts Master".
+  // Accounts Master — the Chart-of-Accounts masters (Groups, Ledgers, CoA tree),
+  // Bank Accounts, Currencies and the Cost dimensions live HERE under the Masters
+  // pill (moved out of the ACCOUNTS header). Operational rate/planning data — daily
+  // Forex Rates, Budgets, Scenarios — stays under ACCOUNTS ▸ "Currency & Planning".
+  {label:"Accounts Master", children:[
+    // Three Tally-style doors: Groups → Ledgers → Chart of Accounts (Display).
+    // Groups & Sub-Groups are the SAME collection (a 3-tier tree) so they share
+    // one "Groups" door; the read-only tree is the "Display" view. Cost Centres are
+    // Super-Admin-only (branch-wise master) — their writes 403 for other roles.
+    {divider:true, label:"Chart of Accounts"},
+    {label:"Groups (Create / Alter / Display)", href:"/masters/groups"},
+    {label:"Ledgers (Create / Alter / Display)", href:"/masters/ledgers"},
+    {label:"Chart of Accounts (Tree view)", href:"/masters/accounts-tree"},
+    {label:"Bank Accounts", href:"/masters/bank-accounts"},
+    {divider:true, label:"Currency"},
+    {label:"Currencies", href:"/masters/currency"},
+    {divider:true, label:"Costing"},
+    {label:"Cost Categories", href:"/masters/cost-categories"},
+    {label:"Cost Centres (Super-Admin)", href:"/masters/cost-centers"},
+  ]},
   {label:"Voucher Master", children:[
     {label:"Voucher Types", href:"/masters/voucher-types"},
     {label:"Numbering Series (auto)", href:"/masters/numbering"},
@@ -35,7 +53,8 @@ export const MENU_MASTERS = {label:"Masters", icon:Database, children:[
   ]},
   {label:"Tax Master", children:[
     {label:"Tax / HSN-SAC Codes", href:"/masters/tax"},
-    // Currencies & Forex Rates moved to ACCOUNTS ▸ Accounts Master ▸ Currency.
+    // Currencies live in Masters ▸ Accounts Master ▸ Currency; daily Forex Rates
+    // stay under ACCOUNTS ▸ Currency & Planning (operational, not set-up-once).
   ]},
   {label:"Inventory & Catalog Master", children:[
     {divider:true, label:"Travel Inventory"},
@@ -407,26 +426,14 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
     {label:"Recurring Vouchers", href:"/accounting/recurring"},
     {label:"Year-End Close", href:"/accounting/year-close"},
   ]},
-  // Accounts Master — the Chart-of-Accounts masters now live under THIS Accounts
-  // header (moved out of the standalone Masters pill). Cost Centres are Super-Admin-
-  // only (branch-wise master) — their writes 403 for a Branch Accountant, who can
-  // still open the screen to view. Tax & Statutory moved to the Taxation header (see
-  // TAX_INDIA / TAX_AFRICA / TAX_ALL in core/data.js) — no longer under Accounts.
-  {label:"Accounts Master", children:[
-    // Three Tally-style doors: Groups → Ledgers → Chart of Accounts (Display).
-    // Groups & Sub-Groups are the SAME collection (a 3-tier tree) so they share
-    // one "Groups" door; the read-only tree is the "Display" view.
-    {divider:true, label:"Chart of Accounts"},
-    {label:"Groups (Create / Alter / Display)", href:"/masters/groups"},
-    {label:"Ledgers (Create / Alter / Display)", href:"/masters/ledgers"},
-    {label:"Chart of Accounts (Tree view)", href:"/masters/accounts-tree"},
-    {label:"Bank Accounts", href:"/masters/bank-accounts"},
+  // Currency & Planning — the Chart-of-Accounts masters (Groups, Ledgers, CoA tree,
+  // Bank Accounts, Currencies, Cost Categories/Centres) moved OUT to the Masters pill
+  // (see MENU_MASTERS ▸ "Accounts Master"). What remains here is operational, not
+  // set-up-once: daily Forex Rates plus Budgets & Scenarios (period planning). Tax &
+  // Statutory live under the Taxation header (TAX_INDIA / TAX_AFRICA / TAX_ALL).
+  {label:"Currency & Planning", children:[
     {divider:true, label:"Currency"},
-    {label:"Currencies", href:"/masters/currency"},
     {label:"Forex Rates", href:"/masters/forex"},
-    {divider:true, label:"Costing"},
-    {label:"Cost Categories", href:"/masters/cost-categories"},
-    {label:"Cost Centres (Super-Admin)", href:"/masters/cost-centers"},
     {divider:true, label:"Planning"},
     {label:"Budgets", href:"/masters/budgets"},
     {label:"Scenarios", href:"/masters/scenarios"},
@@ -434,12 +441,12 @@ export const MENU_ACCOUNTS = {label:"Accounts", icon:Calculator, children:[
 ]};
 
 // The Branch-Accountant view of the Accounts pill: the central-finance heads —
-// Branch MIS (financial statements), Inter Branch, Period Close and Accounts
-// Master (Chart of Accounts) — are stripped from the accountant surface. Nav-only:
-// the routes stay reachable (they share segments with in-role pages, so the
-// route-lockout deny-list can't carry them); per-page hiding/granting remains
-// available via Page Visibility Control.
-const ACCOUNTANT_HIDDEN_ACCOUNTS_HEADS = new Set(['Branch MIS', 'Inter Branch', 'Period Close', 'Accounts Master']);
+// Branch MIS (financial statements), Inter Branch, Period Close and Currency &
+// Planning (Forex Rates / Budgets / Scenarios) — are stripped from the accountant
+// surface. Nav-only: the routes stay reachable (they share segments with in-role
+// pages, so the route-lockout deny-list can't carry them); per-page hiding/granting
+// remains available via Page Visibility Control.
+const ACCOUNTANT_HIDDEN_ACCOUNTS_HEADS = new Set(['Branch MIS', 'Inter Branch', 'Period Close', 'Currency & Planning']);
 export const MENU_ACCOUNTS_BRANCH_ACCOUNTANT = {
   ...MENU_ACCOUNTS,
   children: MENU_ACCOUNTS.children.filter((c) => !ACCOUNTANT_HIDDEN_ACCOUNTS_HEADS.has(c?.label)),
@@ -560,8 +567,8 @@ export const MENU_TK_ADMIN = {label:"Administration", icon:ShieldCheck, children
 ]};
 
 // "Masters & Ledger" dropdown. Every route here is ALSO already toggleable under the
-// branch-side "Accounts" (Accounts Master) and "Masters" (Client/Supplier Master)
-// sections — this section deliberately claims them first (it's listed ahead of
+// branch-side "Masters" pill (Accounts Master — Chart/Ledgers — plus Client/Supplier
+// Master) — this section deliberately claims them first (it's listed ahead of
 // MENU_ACCOUNTS / MENU_MASTERS in pageCatalog.js's PREFERRED_SECTIONS) so the admin
 // manages them grouped exactly like the live cockpit dropdown instead of hunting
 // through the much larger Accounts/Masters lists. Same toggle, same effect either way.
