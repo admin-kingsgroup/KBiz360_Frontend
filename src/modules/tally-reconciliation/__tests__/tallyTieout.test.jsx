@@ -163,6 +163,27 @@ describe('Tally Reconciliation · tie-out board render', () => {
     expect(screen.queryByText('▸ drill vouchers')).not.toBeInTheDocument();
   });
 
+  test('a Round-Off-only P&L residue reads "Rounding" in the footer, never a red "Off"', async () => {
+    const { getTieOut } = require('../api');
+    getTieOut.mockResolvedValueOnce({
+      branch: 'BOM', period: '2026-01', tier: 'month', periodEnd: '2026-01-31',
+      // Gate clean (off 0 / absDiff 0) but a tolerated Round Off P&L residue shifts net profit by 0.01.
+      counts: { total: 3, tied: 2, rounding: 1, off: 0, onlyErp: 0, onlyTally: 0, offTotal: 0, absDiff: 0, absDiffRaw: 0.01, netProfitErp: 604223.01, netProfitTally: 604223.02 },
+      erpTotals: { balanced: true }, tallyTotals: { balanced: true }, imported: { count: 3 },
+      rows: [
+        { ledger: 'Air Ticket Sales', code: 'S1', group: 'Sales Accounts', parentGroup: 'Sales Accounts', statement: 'PL', nature: 'income', erp: -604223, tally: -604223, diff: 0, status: 'tied' },
+        { ledger: 'Round Off', code: 'L1156', group: 'Variable Expenses', parentGroup: 'Indirect Expenses', statement: 'PL', nature: 'expense', erp: -0.01, tally: -0.02, diff: 0.01, status: 'rounding', rounding: true },
+        { ledger: 'ICICI Bank A/c', code: 'B1', group: 'Bank Accounts', parentGroup: 'Bank Accounts', statement: 'BS', nature: 'asset', erp: 604223.01, tally: 604223.01, diff: 0, status: 'tied' },
+      ],
+    });
+    wrap(<TallyTieOutBoard branch="BOM" tier="month" currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('Round Off');
+    fireEvent.click(screen.getByText('Profit & Loss'));
+    const footRow = (await screen.findByText('Net Profit / (Loss)')).closest('tr');
+    expect(within(footRow).getByText('Rounding')).toBeInTheDocument();
+    expect(within(footRow).queryByText('Off')).not.toBeInTheDocument();
+  });
+
   test('chart sub-group nesting + the ERP module drill (toggle ONLY where a real split exists)', async () => {
     const { getTieOut, getModuleBreakdown } = require('../api');
     getTieOut.mockResolvedValueOnce({
