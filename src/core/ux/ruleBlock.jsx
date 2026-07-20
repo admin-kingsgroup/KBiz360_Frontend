@@ -32,8 +32,10 @@ export function RuleBlockHost() {
     if (detail) { setDetail(null); return; }
     setLoading(true);
     try {
+      // apiGet already unwraps the { success, data } envelope → `r` IS the rule (r.title,
+      // r.description, r.sourceRef). Reading r.data here always missed and showed the fallback.
       const r = await apiGet(`/api/rules/${encodeURIComponent(block.ruleId)}`);
-      setDetail((r && r.data) || { ruleId: block.ruleId, title: block.ruleId, description: 'No further detail on file.' });
+      setDetail(r || { ruleId: block.ruleId, title: block.ruleId, description: 'No further detail on file.' });
     } catch {
       setDetail({ ruleId: block.ruleId, title: block.ruleId, description: 'Rule details are unavailable right now.' });
     } finally { setLoading(false); }

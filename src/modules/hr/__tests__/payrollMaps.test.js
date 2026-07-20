@@ -3,7 +3,7 @@
 import {
   fromPayrollLineDTO, payrollTotalsFromDTO, challanDueDate,
   emailOfUser, currentUserEmail, matchEmployeeByEmail,
-  fyOfMonth, form16Summary,
+  fyOfMonth, form16Summary, regimeName, isIndiaRegime, REGIME_NAME,
 } from '../payrollMaps';
 
 describe('fromPayrollLineDTO', () => {
@@ -36,6 +36,29 @@ describe('fromPayrollLineDTO', () => {
     expect(row.net).toBe(0);
     expect(row.empPF).toBe(0);
     expect(row.esiEligible).toBe(false);
+  });
+
+  it('carries the statutory regime (defaults IN) so a payslip is self-describing', () => {
+    expect(fromPayrollLineDTO({ empId: 'X' }).statutoryRegime).toBe('IN');
+    expect(fromPayrollLineDTO({ empId: 'X', statutoryRegime: 'CD' }).statutoryRegime).toBe('CD');
+  });
+});
+
+describe('statutory-regime labelling helpers', () => {
+  it('isIndiaRegime is true only for IN (default when absent)', () => {
+    expect(isIndiaRegime('IN')).toBe(true);
+    expect(isIndiaRegime()).toBe(true);       // no code → India (the historical default)
+    expect(isIndiaRegime('ke')).toBe(false);  // case-insensitive
+    expect(isIndiaRegime('TZ')).toBe(false);
+  });
+
+  it('regimeName maps ISO codes to friendly country names', () => {
+    expect(regimeName('IN')).toBe('India');
+    expect(regimeName('KE')).toBe('Kenya');
+    expect(regimeName('TZ')).toBe('Tanzania');
+    expect(regimeName('CD')).toBe('DR Congo');
+    expect(regimeName()).toBe('India');       // default
+    expect(REGIME_NAME.CD).toBe('DR Congo');
   });
 });
 

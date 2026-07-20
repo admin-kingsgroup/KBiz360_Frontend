@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useMobile } from '../../../core/hooks';
 import { usePayrollRegister, useChallans, useMarkChallanPaid } from '../usePayroll';
-import { challanDueDate } from '../payrollMaps';
+import { challanDueDate, isIndiaRegime as isIndiaRegimeCode, regimeName as regimeNameOf } from '../payrollMaps';
 import { toast } from '../../../core/ux/toast';
 import { FL, btnG, card, inp } from '../../../core/styles';
 import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
@@ -24,6 +24,10 @@ export function PfEsiChallan({branch}){
   const rates=regC.rates;
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const DUE_DATE=challanDueDate(month);
+  // PF/ESI/Professional Tax are INDIAN statutory remittances — this whole screen is India-only.
+  // A foreign (Africa) branch has none, so tell the user plainly instead of showing empty challans.
+  const isIndiaRegime=isIndiaRegimeCode(regC.statutoryRegime);
+  const regimeName=regimeNameOf(regC.statutoryRegime);
 
   // PF register rows (UAN/ESIC numbers aren't on the employee master yet — display placeholders)
   const pfData=lines.map((e,i)=>({
@@ -81,10 +85,19 @@ export function PfEsiChallan({branch}){
         </select>
       </div>
 
+      {/* Non-India notice — PF/ESI/PT don't exist for a foreign branch (never a silent empty screen). */}
+      {!regC.isLoading&&!isIndiaRegime&&(
+        <div role="note" style={{marginBottom:12,padding:"11px 14px",borderRadius:9,background:"#FFF7E6",border:"1px solid #E7C877",fontSize:11.5,color:"#7A5B12",lineHeight:1.55}}>
+          🌍 <b>Not applicable to the {regimeName} branch.</b> PF, ESI and Professional Tax are Indian statutory remittances — they don't apply here, so there are no challans to file. {regimeName}'s own statutory contributions (e.g. NSSF / NHIF / PAYE) are handled outside this India-specific screen.
+        </div>
+      )}
+
       {/* Alert */}
-      <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600}}>
-        <AlertTriangle size={14} style={{display:"inline",marginRight:6}}/> PF challan due: <b>{DUE_DATE}</b> · Late filing: 1% simple interest per month + penalty up to ₹10,000 per day
-      </div>
+      {isIndiaRegime&&(
+        <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#FAEEDA",border:"1px solid #FAC775",fontSize:10.5,color:"#854F0B",fontWeight:600}}>
+          <AlertTriangle size={14} style={{display:"inline",marginRight:6}}/> PF challan due: <b>{DUE_DATE}</b> · Late filing: 1% simple interest per month + penalty up to ₹10,000 per day
+        </div>
+      )}
 
       {/* Summary KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>

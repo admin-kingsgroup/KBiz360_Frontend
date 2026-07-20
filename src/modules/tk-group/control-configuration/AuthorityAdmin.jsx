@@ -23,8 +23,10 @@ export function AuthorityAdmin({ canManage = false }) {
       const list = await apiGet('/api/rules', { govern: 'owner' });
       const who = (list.items || []).filter((r) => r.kind === 'who');
       const withVals = await Promise.all(who.map(async (r) => {
+        // apiGet unwraps the { success, data } envelope → `one` IS the rule; its live value is
+        // one.value (getOne attaches it). Reading one.data.value always missed → "(none set)".
         const one = await apiGet(`/api/rules/${r.ruleId}`);
-        const value = (one.data && one.data.value) || [];
+        const value = (one && one.value) || [];
         return { ...r, value, draft: chips(value).join(', '), reason: '', msg: '' };
       }));
       setRules(withVals);
@@ -42,7 +44,7 @@ export function AuthorityAdmin({ canManage = false }) {
     patch(r.ruleId, { msg: 'Saving…' });
     try {
       const res = await apiPut(`/api/rules/${r.ruleId}/value`, { value: emails, reason: r.reason.trim() });
-      const value = (res.data && res.data.value) || emails;
+      const value = (res && res.value) || emails; // apiPut also unwraps the envelope → res IS the saved rule
       patch(r.ruleId, { value, draft: chips(value).join(', '), reason: '', msg: 'Saved — applied live to the approval chain.' });
     } catch (e) { patch(r.ruleId, { msg: (e && e.message) || 'Failed to save.' }); }
   };

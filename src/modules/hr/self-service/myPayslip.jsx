@@ -7,6 +7,7 @@ import { Download } from 'lucide-react';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { BRANCHES } from '../../../core/data';
 import { usePayslips, useMyEmployee } from '../usePayroll';
+import { isIndiaRegime as isIndiaRegimeCode, regimeName as regimeNameOf } from '../payrollMaps';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { SelfServiceGate, SS_MONTH_LABEL } from './selfServiceGate';
 import { SkeletonText } from '../../../shell/primitives';
@@ -29,8 +30,16 @@ function MyPayslipBody({emp}){
   const curMonth=months.includes(selMonth)?selMonth:months[0]||"";
   const slip=slips.find(s=>s.month===curMonth)||null;
   const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{entity:"Travkings Tours & Travels"};
+  // Indian PF/ESI/PT/TDS apply to India branches only; a foreign branch's payslip carries zero of
+  // them (its own statute is handled manually) — so show ONLY the deductions that actually apply,
+  // never a misleading "Provident Fund ₹0" row, and surface a one-line note explaining net = gross.
+  const indiaRegime=isIndiaRegimeCode(slip?.statutoryRegime);
   const earnings=slip?[["Basic Salary",slip.basic],["HRA",slip.hra],["Dearness Allowance",slip.da],["Travel Allowance",slip.travel],["Medical Allowance",slip.medical]]:[];
-  const deductions=slip?[["Provident Fund",slip.empPF],["ESI",slip.empESI],["Professional Tax",slip.profTax],...(slip.lwpDed>0?[["LWP Deduction",slip.lwpDed]]:[]),["Income Tax (TDS)",slip.tds]]:[];
+  const deductions=slip
+    ?(indiaRegime
+      ?[["Provident Fund",slip.empPF],["ESI",slip.empESI],["Professional Tax",slip.profTax],...(slip.lwpDed>0?[["LWP Deduction",slip.lwpDed]]:[]),["Income Tax (TDS)",slip.tds]]
+      :(slip.lwpDed>0?[["LWP Deduction",slip.lwpDed]]:[]))
+    :[];
   return(
     <PHASE2_Page title="My Payslip" subtitle={`${emp.name} (${emp.id}) · ${emp.branch}`}
       toolbar={<><select value={curMonth} onChange={e=>setSelMonth(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{months.length===0&&<option value="">No payslips</option>}{months.map(m=><option key={m} value={m}>{SS_MONTH_LABEL(m)}</option>)}</select>{slip&&<button onClick={()=>openPrintPreview({ selector:'main', title:'Payslip', recommend:'portrait' })} style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download PDF</button>}</>}>
@@ -43,7 +52,12 @@ function MyPayslipBody({emp}){
               <p style={{margin:0,lineHeight:1.6}}>Payslips appear here after HR processes payroll for your branch.</p>
             </>)}
           </div>
-        ):(
+        ):(<>
+        {!indiaRegime&&(
+          <div role="note" style={{marginBottom:12,padding:"9px 13px",borderRadius:8,background:"#FFF7E6",border:"1px solid #E7C877",fontSize:11,color:"#7A5B12",lineHeight:1.5}}>
+            🌍 <b>{regimeNameOf(slip.statutoryRegime)} payroll.</b> Indian PF, ESI, Professional Tax and TDS don't apply to your branch, so your net pay equals your gross earnings (less any LWP). Local statutory deductions, where applicable, are handled separately by HR.
+          </div>
+        )}
         <div style={{background:"#fff",border:"1px solid #cdd1d8",borderRadius:8,overflow:"hidden"}}>
           {/* Header */}
           <div style={{padding:"18px 22px",background:"#0d1326",color:"#fff"}}>
@@ -89,7 +103,7 @@ function MyPayslipBody({emp}){
             <p style={{margin:0,fontSize:26,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>₹{Number(slip.net).toLocaleString("en-IN")}</p>
           </div>
         </div>
-        )}
+        </>)}
       </div>
     </PHASE2_Page>
   );

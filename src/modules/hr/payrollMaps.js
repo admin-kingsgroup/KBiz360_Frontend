@@ -21,6 +21,7 @@ export function fromPayrollLineDTO(l = {}) {
     profTax: +l.profTax || 0, tds: +l.tds || 0,
     totalDeductions: +l.totalDeductions || 0, net: +l.net || 0,
     month: l.month || '', branch: l.branch || '',
+    statutoryRegime: l.statutoryRegime || 'IN', // 'IN' = Indian statutory applied; foreign = its ISO code + zero deductions
   };
 }
 
@@ -36,6 +37,13 @@ export function payrollTotalsFromDTO(t = {}) {
     headcount: +t.headcount || 0,
   };
 }
+
+// ISO statutory-regime code → friendly country name. 'IN' = Indian PF/ESI/PT/TDS; a foreign branch
+// carries its own code + zero Indian deductions. Shared by the payroll screens' "doesn't apply here"
+// notices so the mapping lives in ONE place (mirrors the backend taxRegime.HOME_COUNTRY_NAME).
+export const REGIME_NAME = { IN: 'India', KE: 'Kenya', TZ: 'Tanzania', CD: 'DR Congo' };
+export const isIndiaRegime = (code) => (String(code || 'IN').toUpperCase()) === 'IN';
+export const regimeName = (code) => REGIME_NAME[String(code || 'IN').toUpperCase()] || code || 'India';
 
 // Statutory deposit due date for a salary month: 15th of the FOLLOWING month.
 export function challanDueDate(month) {

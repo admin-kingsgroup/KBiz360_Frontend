@@ -32,4 +32,15 @@ describe('unwrapEnvelope', () => {
     expect(unwrapEnvelope(null)).toBeNull();
     expect(unwrapEnvelope('x')).toBe('x');
   });
+
+  // Regression for the RuleBlockHost "Why?" + AuthorityAdmin chips double-unwrap: GET /api/rules/:id
+  // replies { success, data: rule }; apiGet returns the BARE rule, so consumers must read r.value /
+  // r.description directly — r.data is undefined (reading it showed "(none set)" / the generic fallback).
+  test('a rule getOne envelope unwraps to the bare rule (fields at top level, no .data)', () => {
+    const rule = { ruleId: 'APPR-WHO-02', title: 'Who approves', value: ['a@x.com'], description: 'why', sourceRef: 'file.js:12' };
+    const out = unwrapEnvelope({ success: true, data: rule });
+    expect(out.value).toEqual(['a@x.com']);
+    expect(out.description).toBe('why');
+    expect(out.data).toBeUndefined();
+  });
 });

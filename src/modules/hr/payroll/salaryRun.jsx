@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Check, Download } from 'lucide-react';
 import { useMobile } from '../../../core/hooks';
 import { usePayrollRegister, useProcessPayroll } from '../usePayroll';
-import { challanDueDate } from '../payrollMaps';
+import { challanDueDate, regimeName as regimeNameOf, isIndiaRegime as isIndiaRegimeCode } from '../payrollMaps';
 import { toast } from '../../../core/ux/toast';
 import { B, btnG, card, inp } from '../../../core/styles';
 import { MiniBar } from '../../../core/insightsUI';
@@ -36,6 +36,11 @@ export function HrPayroll({branch}){
   // surface the REAL voucher number (or any posting error) rather than a mock flag.
   const jvVno=processMut.data?.jvVno||reg.run?.jvVno||"";
   const jvError=processMut.data?.jvError||"";
+  // Statutory regime the SERVER computed for this branch: 'IN' = Indian PF/ESI/PT/TDS; a foreign
+  // (Africa) branch runs its own country's statute and carries ZERO Indian deductions. Never leave
+  // those zeros unexplained — a banner says WHY they're zero and WHERE the local ones are handled.
+  const isIndiaRegime=isIndiaRegimeCode(reg.statutoryRegime);
+  const regimeName=regimeNameOf(reg.statutoryRegime);
 
   const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
   const DUE_DATE=challanDueDate(period);
@@ -61,7 +66,7 @@ export function HrPayroll({branch}){
     {side:"Cr",ledger:"Professional Tax Payable",  amount:totals.profTax,note:"Prof Tax — Maharashtra"},
     {side:"Cr",ledger:"TDS Payable",               amount:totals.tds,    note:"TDS on salaries"},
     {side:"Cr",ledger:"Salary Payable",            amount:totals.net,    note:"Net salary — payable to staff"},
-  ];
+  ].filter(e=>e.amount>0); // exactly the legs the server posts (buildPayrollJv drops zero legs) — so a foreign branch shows only Salaries & Wages / Salary Payable
   const jDr=journalEntries.filter(e=>e.side==="Dr").reduce((s,e)=>s+e.amount,0);
   const jCr=journalEntries.filter(e=>e.side==="Cr").reduce((s,e)=>s+e.amount,0);
   const balDiff=jDr-jCr; const balanced=balDiff>=-0.01&&balDiff<=0.01;
@@ -86,6 +91,13 @@ export function HrPayroll({branch}){
             :<span style={{padding:"6px 12px",borderRadius:9,background:"#EAF3DE",color:"#27500A",fontSize:11,fontWeight:700}}>✔ Processed{reg.run?.runAt?` · ${reg.run.runAt}`:""}</span>}
         </div>
       </div>
+
+      {/* Non-India regime notice — explains WHY PF/ESI/PT/TDS are zero here (never a silent zero). */}
+      {!reg.isLoading&&!isIndiaRegime&&(
+        <div role="note" style={{marginBottom:14,padding:"10px 14px",borderRadius:9,background:"#FFF7E6",border:"1px solid #E7C877",fontSize:11,color:"#7A5B12",lineHeight:1.55}}>
+          <b>🌍 {regimeName} branch — Indian statutory deductions do not apply.</b> PF, ESI, Professional Tax and TDS are India-specific, so they read zero here. This run books <b>gross pay</b> and <b>net Salary Payable</b> only; {regimeName}'s own statutory deductions (e.g. NSSF / PAYE) are handled manually. The PF/ESI and Maharashtra-PT panels below are India-only.
+        </div>
+      )}
 
       {/* Summary KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}}>

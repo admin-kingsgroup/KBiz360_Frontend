@@ -29,6 +29,9 @@ export function usePayrollRegister(branch, month) {
     rates: (q.data && q.data.rates) || null,
     run: (q.data && q.data.run) || null,
     persisted: !!(q.data && q.data.persisted),
+    // ISO country whose statutory law the server applied ('IN' = Indian PF/ESI/PT/TDS; a foreign
+    // branch = its own code + zero Indian deductions). Lets the screen label the regime, never silent.
+    statutoryRegime: (q.data && q.data.statutoryRegime) || 'IN',
   };
 }
 

@@ -29,11 +29,15 @@ function regroupRegistry(items) {
   const map = new Map();
   const order = [];
   for (const it of items) {
-    if (!map.has(it.domain)) {
-      map.set(it.domain, { id: it.domain, group: it.group, title: it.domainTitle, blurb: it.domainBlurb || '', rules: [] });
-      order.push(it.domain);
+    // Key on domainCode (the canonical mnemonic), NOT domain: flatten rows carry the letter
+    // (A, Q, N…) while curated rows carry the mnemonic (GST, APPR, RECON…) — same domain, so
+    // keying on `domain` split each into two identically-titled sections. domainCode unifies them.
+    const key = it.domainCode || it.domain;
+    if (!map.has(key)) {
+      map.set(key, { id: key, group: it.group, title: it.domainTitle, blurb: it.domainBlurb || '', rules: [] });
+      order.push(key);
     }
-    map.get(it.domain).rules.push({ t: it.title, r: it.sourceRef, regime: it.regime || undefined });
+    map.get(key).rules.push({ t: it.title, r: it.sourceRef, regime: it.regime || undefined });
   }
   return order.map((id) => map.get(id));
 }
