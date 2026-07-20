@@ -132,14 +132,14 @@ export function TallyReconReport({ branch: appBranch, currentUser, tier: fixedTi
                   <tbody>{certs.map((it) => {
                     const m = certMeta(it.cert.status); const snap = it.cert.snapshot || {};
                     const npDelta = round2((snap.netProfitErp || 0) - (snap.netProfitTally || 0));
-                    // Net-profit Δ that is pure tolerated Round Off rounding (gate clean) is not a defect.
+                    // Net-profit Δ that is pure tolerated sub-rupee rounding (Round Off / P&L b/f, gate clean) is not a defect.
                     const npRounding = Number(snap.rounding || 0) > 0 && Number(snap.offTotal || 0) === 0 && round2(snap.absDiff || 0) === 0;
                     const signers = (it.cert.signatures || []).map((s) => s.role).join(' → ') || '—';
                     return (<tr key={it.period} className="border-b border-surface-border hover:bg-surface-alt/60">
                       <td className="px-4 py-2 font-semibold text-ink">{it.period}{it.cert.reopened > 0 ? <span className="ml-1.5 rounded-full bg-warning/15 px-1.5 text-[10px] font-semibold text-warning">↻ {it.cert.reopened}</span> : null}</td>
                       <td className="px-4 py-2"><Badge tone={m.tone} size="sm" dot>{m.icon} {m.label}</Badge></td>
                       <td className={`px-4 py-2 text-right font-mono tabular-nums ${Number(snap.offTotal || 0) > 0 ? 'text-danger font-semibold' : 'text-ink-subtle'}`}>{snap.frozenAt ? (snap.offTotal || 0) : '—'}</td>
-                      <td title={npRounding && npDelta ? 'Differs only by tolerated Round Off rounding' : undefined} className={`px-4 py-2 text-right font-mono tabular-nums ${npDelta === 0 ? 'text-ink-subtle' : npRounding ? 'text-info' : 'text-danger'}`}>{snap.frozenAt ? fmt(npDelta, cur) : '—'}</td>
+                      <td title={npRounding && npDelta ? 'Differs only by tolerated sub-rupee rounding (Round Off / P&L b/f)' : undefined} className={`px-4 py-2 text-right font-mono tabular-nums ${npDelta === 0 ? 'text-ink-subtle' : npRounding ? 'text-info' : 'text-danger'}`}>{snap.frozenAt ? fmt(npDelta, cur) : '—'}</td>
                       <td className="px-4 py-2 text-xs text-ink-muted">{signers}</td>
                       <td className="px-4 py-2 text-right"><OpenLink setRoute={setRoute} branch={branch} tier={tier} period={it.period} /></td>
                     </tr>);

@@ -48,6 +48,11 @@ export function useMasterHealth(resource, branch) {
 export const MASTER_RELATED_ROOTS = {
   subgroups: [['master', 'groups'], ['groups'], ['accounting'], ['finance']],
   ledgers:   [['ledgers'], ['ref', 'ledger-registry'], ['groups'], ['accounting'], ['finance']],
+  // The Party Type master (Client Types / Supplier Categories) is ALSO read live by the
+  // customer/supplier dropdowns via usePartyTypes → ['ref','party-types']. Without this,
+  // adding/renaming/deactivating a type wouldn't reach those dropdowns until the 5-min
+  // reference staleTime lapsed (the "new type doesn't show up until I refresh" bug).
+  'party-types': [['ref', 'party-types']],
 };
 
 export function useMasterMutations(resource) {

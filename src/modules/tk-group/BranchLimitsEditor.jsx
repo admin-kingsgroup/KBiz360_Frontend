@@ -136,7 +136,6 @@ export function BranchLimitsEditor({ go, branch: controlledBranch, onBranchChang
           className={`rounded-brand px-4 py-2 text-[13px] font-semibold text-white transition-colors ${saving || q.isLoading || vo ? 'cursor-not-allowed bg-ink-subtle' : 'bg-success hover:bg-success/90'}`}>
           {saving ? 'Saving…' : owner ? `Save ${meta.label} thresholds` : `Submit ${meta.label} for approval`}
         </button>
-        {go && <button type="button" onClick={() => go('/tk/limits')} className="text-[12px] text-ink-muted underline">Open full editor</button>}
       </div>
     </div>
   );

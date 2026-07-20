@@ -588,6 +588,11 @@ export function ControlPanel({ setRoute }) {
   const stripBranch = showBranchBar ? branch : 'default';
   const stripScoped = showBranchBar && scoped;
   const engaged = CONFIGURABLE_FLAGS.filter((k) => isFlagOn(flagsQ.data, k, stripBranch)).length;
+  // Cross-branch reality: a configurable rule counts as engaged if it is on for the Group
+  // default OR any branch override. On a non-branch-scoped screen the header uses THIS, so a
+  // branch that has controls on can't hide behind a dormant Group default ("Everything OFF").
+  const engagedAnywhere = CONFIGURABLE_FLAGS.filter((k) => LIMIT_BRANCHES.some((b) => isFlagOn(flagsQ.data, k, b.code))).length;
+  const headEngaged = showBranchBar ? engaged : engagedAnywhere;
   // A failed / blocked flag read returns {flags:{}, _error} (see api/flags getFlagState). Surface
   // it as its OWN state — "Everything OFF · dormant" must never stand in for "couldn't load".
   const loadError = flagsQ.data && flagsQ.data._error;
@@ -614,15 +619,17 @@ export function ControlPanel({ setRoute }) {
           <span className="text-[12px] text-ink-muted">Reading the live control state…</span>
         </div>
       ) : (
-        <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${engaged > 0 ? 'border-success/40 bg-success-soft' : 'border-warning/40 bg-warning-soft'}`}>
-          <span className={`text-[11px] font-bold uppercase tracking-wide ${engaged > 0 ? 'text-success' : 'text-warning'}`}>Control Panel</span>
-          <Badge tone={engaged > 0 ? 'success' : 'warning'}>
-            {engaged > 0 ? `${engaged} control${engaged > 1 ? 's' : ''} on` : 'Everything OFF · dormant'}
+        <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-brand border px-4 py-2.5 ${headEngaged > 0 ? 'border-success/40 bg-success-soft' : 'border-warning/40 bg-warning-soft'}`}>
+          <span className={`text-[11px] font-bold uppercase tracking-wide ${headEngaged > 0 ? 'text-success' : 'text-warning'}`}>Control Panel</span>
+          <Badge tone={headEngaged > 0 ? 'success' : 'warning'}>
+            {headEngaged > 0 ? `${headEngaged} control${headEngaged > 1 ? 's' : ''} on${!showBranchBar ? ' · across branches' : ''}` : 'Everything OFF · dormant'}
           </Badge>
-          <span className={`text-[12px] ${engaged > 0 ? 'text-success' : 'text-warning'}`}>
+          <span className={`text-[12px] ${headEngaged > 0 ? 'text-success' : 'text-warning'}`}>
             {stripScoped ? <><b>{branchLabel}</b> scope · </> : null}
-            {owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
-              : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
+            {headEngaged > 0 && !showBranchBar
+              ? <>Live on one or more branches — <button type="button" className="underline" onClick={() => setScreen('active')}>Active Controls</button> shows exactly where.</>
+              : owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
+                : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
           </span>
           <button type="button" onClick={() => go('/tk/rules?tab=book')}
             className="ml-auto shrink-0 rounded-full border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">

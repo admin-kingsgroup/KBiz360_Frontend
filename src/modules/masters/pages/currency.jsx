@@ -10,7 +10,7 @@
    ──────────────────────────────────────────────────────────────────── */
 
 import React, { useState, useMemo } from 'react';
-import { RefreshCw, Upload, Plus } from 'lucide-react';
+import { RefreshCw, Upload, Plus, AlertTriangle } from 'lucide-react';
 import { useCurrencies, useForexLatest } from '../../../core/useReference';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
@@ -82,6 +82,17 @@ export function CurrencyMaster({ setRoute }) {
       }
       filters={<Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code or name…" className="w-auto min-w-[220px] flex-1" />}
     >
+      {/* Never-silent: the live-forex query failing is otherwise invisible (every row
+          would just read "Reference"). Say WHAT failed, WHY it still shows rates, and
+          offer a Retry — the primary currencies list is unaffected below. */}
+      {fxQ.isError && (
+        <div className="mb-3 flex flex-wrap items-center gap-2.5 rounded-brand border border-warning/30 bg-warning-soft/30 px-3 py-2 text-[12.5px]" role="alert">
+          <AlertTriangle size={15} className="shrink-0 text-warning" aria-hidden="true" />
+          <span className="font-semibold text-ink">Live exchange rates couldn’t be loaded.</span>
+          <span className="text-ink-muted">Showing app-config <b>reference</b> rates below (the “Reference” source); the Forex Rates screen is unaffected.</span>
+          <Button size="xs" variant="secondary" className="ml-auto" onClick={() => fxQ.refetch()}>Retry</Button>
+        </div>
+      )}
       <DataTable columns={columns} rows={filtered} getRowKey={(r) => r.code} dense loading={curQ.isLoading} isError={curQ.isError} error={curQ.error} onRetry={() => { curQ.refetch(); fxQ.refetch(); }} exportName="currencies" printTitle="Currency Master" emptyMessage="No currencies match." />
     </PageLayout>
   );

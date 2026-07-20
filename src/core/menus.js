@@ -510,8 +510,6 @@ export const MENU_TK_CONTROL = {label:"Control & Configuration", icon:Lock, chil
   ]},
   {label:"Power Console", children:[
     {label:"Control Panel", href:"/tk/control-panel"},
-    {label:"Control Flags", href:"/tk/controls"},
-    {label:"Thresholds & Limits", href:"/tk/limits"},
   ]},
   {label:"Rules & Requests", children:[
     {label:"ERP Rules Manager", href:"/tk/rules"},
@@ -644,8 +642,6 @@ export const MENU_TK_GROUP = {label:"TK Group", icon:Lock, children:[
   {label:"Approvals Inbox", href:"/tk/approvals"},
   {label:"Voucher Approvals", href:"/tk/voucher-approvals"},
   {label:"Onboarding", href:"/tk/onboarding"},
-  {label:"Control Flags", href:"/tk/controls"},
-  {label:"Thresholds & Limits", href:"/tk/limits"},
   {label:"Period Locks", href:"/tk/period-locks"},
   {label:"Targets & Budgets", href:"/tk/targets"},
   {label:"Master Control", href:"/tk/master-control"},
