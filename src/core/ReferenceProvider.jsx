@@ -9,8 +9,8 @@
    lightweight splash so the shell renders against real data, not fallbacks.
    ════════════════════════════════════════════════════════════════════ */
 import React, { useEffect } from 'react';
-import { useBranches, useCompanyProfiles, useCurrencies, useRoles, useRolesMeta, useHsnCodes } from './useReference';
-import { setBranches, setBranchCfg, setCurrencyMeta, setRoles, setPermMeta, setHsnCodes } from './referenceCache';
+import { useBranches, useCompanyProfiles, useCurrencies, useRoles, useRolesMeta, useHsnCodes, useVatRates } from './useReference';
+import { setBranches, setBranchCfg, setCurrencyMeta, setRoles, setPermMeta, setHsnCodes, setVatRateOverrides } from './referenceCache';
 import { getAuthToken } from './api';
 
 export function ReferenceProvider({ children }) {
@@ -22,11 +22,13 @@ export function ReferenceProvider({ children }) {
   const roles      = useRoles();
   const rolesMeta  = useRolesMeta();
   const hsn        = useHsnCodes();
+  const vatRates   = useVatRates();
 
   // Push each result into the synchronous cache as it arrives.
   useEffect(() => { if (branches.data)   setBranches(branches.data); }, [branches.data]);
   useEffect(() => { if (profiles.data)   setBranchCfg(profiles.data); }, [profiles.data]);
   useEffect(() => { if (hsn.data)        setHsnCodes(hsn.data); }, [hsn.data]);
+  useEffect(() => { if (vatRates.data)   setVatRateOverrides(vatRates.data); }, [vatRates.data]);
   useEffect(() => { if (currencies.data) setCurrencyMeta(currencies.data); }, [currencies.data]);
   useEffect(() => { if (roles.data)      setRoles(roles.data); }, [roles.data]);
   useEffect(() => {

@@ -125,6 +125,18 @@ export function setBranchCfg(profiles) {
 // branches are VAT — also used by the import templates' regime toggle.
 export const VAT_RATE = { NBO: 16, DAR: 18, FBM: 16 };
 
+// Amended VAT-master rates (branch code → %), hydrated once from /api/vat-rates by the
+// ReferenceProvider. Lets the no-company-profile fallback below follow an Owner amendment,
+// mirroring the backend's registerVatRates — so no frontend path bills the hardcoded VAT_RATE
+// constant when the VAT master says otherwise. (Branches WITH a profile already get the master
+// rate via the company-profile DTO → profileToCfg; this covers the unseeded-branch corner.)
+let _vatOverrides = {};
+export function setVatRateOverrides(rows) {
+  const m = {};
+  (rows || []).forEach((r) => { if (r && r.branch && r.active !== false && r.rate != null && r.rate !== '') m[String(r.branch).toUpperCase()] = Number(r.rate); });
+  _vatOverrides = m;
+}
+
 // Derive a branch's tax/currency config from the branch record when no
 // company-profile doc exists. Without this every branch fell back to BOM's
 // GST/INR config, so the Africa branches never showed VAT in the voucher forms.
@@ -132,8 +144,8 @@ function deriveCfgFromBranch(code) {
   const b = BRANCHES.find((x) => x.code === code);
   if (!b) return null;
   const taxStr = String(b.tax || '');
-  const isVat = VAT_RATE[code] != null || /vat/i.test(taxStr);
-  const vr = VAT_RATE[code] ?? (parseFloat((taxStr.match(/(\d+(?:\.\d+)?)\s*%/) || [])[1]) || null);
+  const isVat = _vatOverrides[code] != null || VAT_RATE[code] != null || /vat/i.test(taxStr);
+  const vr = _vatOverrides[code] ?? VAT_RATE[code] ?? (parseFloat((taxStr.match(/(\d+(?:\.\d+)?)\s*%/) || [])[1]) || null);
   return {
     cur: resolveCurSym(b.currency),
     curCode: b.currency || 'INR',

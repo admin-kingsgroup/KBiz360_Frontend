@@ -21,6 +21,7 @@ function refQuery(key, path, staleTime = REF, { params = {}, select } = {}) {
 export const useBranches        = () => refQuery('branches', '/api/branches', LONG);
 export const useCompanyProfiles = () => refQuery('company-profile', '/api/company-profile', LONG);
 export const useHsnCodes        = () => refQuery('hsn-codes', '/api/hsn-codes', LONG);
+export const useVatRates        = () => refQuery('vat-rates', '/api/vat-rates', LONG);
 export const useFiscalYears     = () => refQuery('fiscal-years', '/api/fiscal-years', REF, { select: (rows) => (rows || []).map((f) => ({ ...f, l: f.label })) });
 export const useExpenseLedgers  = () => refQuery('expense-ledgers', '/api/expense-ledgers', REF, { select: (rows) => (rows || []).slice().sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map((l) => ({ ...l, id: l.code })) });
 export const useExpenseBudgets  = (params = {}) => refQuery('expense-budgets', '/api/expense-budgets', REF, { params });
