@@ -30,6 +30,7 @@ import { localeOf } from '../../../core/format';
 import { ADDR_TYPES, CURRENCIES } from '../../../core/partyEnums';
 import { openLedgerModal } from '../../../core/LedgerModalHost';
 import { useHotkey } from '../../../core/ux/hotkeys';
+import { useNavGuard } from '../../../core/ux/navGuard';
 import { Combobox } from '../../../core/ux/Combobox';
 import { toast } from '../../../core/ux/toast';
 import { Kbd } from '../../../core/ux/widgets.jsx';
@@ -138,6 +139,11 @@ export function usePartyMaster(resource, side, brc) {
   const liveRef = useRef(null);
   liveRef.current = { save, dirty, saving };
   useHotkey('mod+enter', () => { const s = liveRef.current; if (s && s.dirty && !s.saving) s.save(); }, []);
+  // Unsaved-changes guard: `dirty` (a live snapshot-vs-baseline compare that resets on
+  // save) is the exact signal App.jsx's navigate() needs. Wiring it here in the shared
+  // party engine covers BOTH the Customer and Supplier tabbed masters (12 tabs each) —
+  // leaving a half-edited party now confirms before discarding it.
+  useNavGuard(() => dirty);
 
   return {
     list, rows, current, form, setField, setSelectedId, save,
