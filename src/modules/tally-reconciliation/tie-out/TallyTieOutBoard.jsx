@@ -265,6 +265,12 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   // single "must fix in Tally before sign-off" tally = amount gaps + name/group fixes.
   const fixTotal = counts.fixTotal ?? ((counts.nameMismatch || 0) + (counts.groupMismatch || 0));
   const blocking = counts.blocking ?? (offTotal + fixTotal);
+  // The board "ties within rounding" precisely when the gate is clean (nothing off) yet a
+  // tolerated Round Off residue remains. In that state EVERY rolled-up diff (footers, net
+  // profit, group subtotals) is provably pure rounding — tied rows contribute exactly 0 — so
+  // those aggregates read info-toned "Rounding", never a red "Off" that would contradict the
+  // certifiable gate. It can never mask a real gap: any real off makes offTotal/absDiff > 0.
+  const tiesWithinRounding = offTotal === 0 && round2(counts.absDiff || 0) === 0 && (counts.rounding || 0) > 0;
   // Once nothing's left to fix (a corrected re-upload cleared the punch-list), drop the
   // filter so the board never sits on an empty view with its toggle already hidden.
   useEffect(() => { if (!blocking && onlyFixes) setOnlyFixes(false); }, [blocking, onlyFixes]);
@@ -345,11 +351,14 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       erp: round2(-(counts.netProfitErp || 0)), tally: round2(-(counts.netProfitTally || 0)),
       plErp: round2(counts.netProfitErp || 0), plTally: round2(counts.netProfitTally || 0) };
     np.diff = round2((np.plErp || 0) - (np.plTally || 0)); np.status = statusOf(np.erp, np.tally);
+    // Net profit differs only because the tolerated Round Off (a P&L head) shifts it by ≤ tol —
+    // read it as rounding, not a red off, when the gate is clean.
+    if (np.status === 'off' && tiesWithinRounding) np.status = 'rounding';
     return [
       { label: 'Liabilities & Capital', rows: [...rows.filter((r) => r.nature === 'liability'), ...(hasPL ? [np] : [])] },
       { label: 'Assets', rows: rows.filter((r) => r.nature === 'asset') },
     ];
-  }, [tab, rows, counts]);
+  }, [tab, rows, counts, tiesWithinRounding]);
 
   // The "fix in Tally" punch-list view: keep only rows the reviewer must act on
   // (amount off, one-sided, or a name/group that still differs from ERP). The FOOTER
@@ -432,8 +441,8 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         <td className={`py-1.5 pr-4 font-bold ${depth === 0 ? 'text-[11px] uppercase tracking-wider text-white' : 'text-[12px] text-ink'}`} style={{ paddingLeft: 16 + depth * 16 }}>{depth > 0 ? '▸ ' : ''}{n.name}</td>
         <td className={`px-4 py-1.5 text-right font-mono tabular-nums font-semibold ${depth === 0 ? 'text-white' : 'text-ink'}`}>{fmt(n.erp, cur)}</td>
         <td className={`px-4 py-1.5 text-right font-mono tabular-nums font-semibold ${depth === 0 ? 'text-white' : 'text-ink'}`}>{fmt(n.tally, cur)}</td>
-        <td className={`px-4 py-1.5 text-right font-mono tabular-nums font-semibold ${n.diff === 0 ? (depth === 0 ? 'text-white/70' : 'text-ink-subtle') : 'text-danger'}`}>{n.diff === 0 ? '0' : `${n.diff > 0 ? '+' : '−'}${Math.abs(n.diff).toLocaleString(localeOf(cur))}`}</td>
-        <td className="px-4 py-1.5 text-right"><Badge tone={n.status === 'tied' ? 'success' : 'danger'} size="sm" dot>{n.status === 'tied' ? 'Tied' : 'Off'}</Badge></td>
+        <td className={`px-4 py-1.5 text-right font-mono tabular-nums font-semibold ${n.diff === 0 ? (depth === 0 ? 'text-white/70' : 'text-ink-subtle') : n.status === 'rounding' ? (depth === 0 ? 'text-white/70' : 'text-info') : 'text-danger'}`}>{n.diff === 0 ? '0' : `${n.diff > 0 ? '+' : '−'}${Math.abs(n.diff).toLocaleString(localeOf(cur))}`}</td>
+        <td className="px-4 py-1.5 text-right"><Badge tone={n.status === 'tied' ? 'success' : n.status === 'rounding' ? 'info' : 'danger'} size="sm" dot>{n.status === 'tied' ? 'Tied' : n.status === 'rounding' ? 'Rounding' : 'Off'}</Badge></td>
       </tr>
       {(n.rows || []).map((r) => renderLedgerRow(r, 'coa|' + (n.id || n.name) + '|' + (r.code || r.ledger), 16 + (depth + 1) * 16))}
       {renderTreeNodes(n.children, depth + 1)}
@@ -750,7 +759,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         <Kpi label="Only in ERP" value={counts.onlyErp || 0} tone={(counts.onlyErp || 0) > 0 ? 'warning' : 'muted'} />
         <Kpi label="Only in Tally" value={counts.onlyTally || 0} tone={(counts.onlyTally || 0) > 0 ? 'warning' : 'muted'} />
         <Kpi label="Fix in Tally" value={fixTotal} tone={fixTotal > 0 ? 'warning' : 'muted'} />
-        <Kpi label="Net profit Δ" value={fmt(round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)), cur)} tone={round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)) !== 0 ? 'danger' : 'muted'} small />
+        <Kpi label="Net profit Δ" value={fmt(round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)), cur)} tone={round2((counts.netProfitErp || 0) - (counts.netProfitTally || 0)) === 0 ? 'muted' : tiesWithinRounding ? 'info' : 'danger'} small />
       </div>
 
       {/* Before any Tally TB is uploaded, onboard calmly (not a wall of red);
@@ -883,15 +892,15 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                       {/* Net Profit / (Loss): a loss shows in parentheses + red, never a positive Dr. */}
                       <td className={`px-4 py-3 text-right font-mono tabular-nums ${plTone(foot.erp)}`}>{plText(foot.erp, cur)}</td>
                       <td className={`px-4 py-3 text-right font-mono tabular-nums ${plTone(foot.tally)}`}>{plText(foot.tally, cur)}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums text-danger">{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
-                      <td className="px-4 py-3 text-right"><Badge tone={round2(foot.erp - foot.tally) === 0 ? 'success' : 'danger'} size="sm" dot>{round2(foot.erp - foot.tally) === 0 ? 'Tied' : 'Off'}</Badge></td>
+                      <td className={`px-4 py-3 text-right font-mono tabular-nums ${tiesWithinRounding ? 'text-info' : 'text-danger'}`}>{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
+                      <td className="px-4 py-3 text-right"><Badge tone={round2(foot.erp - foot.tally) === 0 ? 'success' : tiesWithinRounding ? 'info' : 'danger'} size="sm" dot>{round2(foot.erp - foot.tally) === 0 ? 'Tied' : tiesWithinRounding ? 'Rounding' : 'Off'}</Badge></td>
                     </>
                   ) : (
                     <>
                       <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(foot.erp, cur)}</td>
                       <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(foot.tally, cur)}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums text-danger">{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
-                      <td className="px-4 py-3 text-right"><Badge tone={round2(foot.erp - foot.tally) === 0 ? 'success' : 'danger'} size="sm" dot>{round2(foot.erp - foot.tally) === 0 ? 'Tied' : 'Off'}</Badge></td>
+                      <td className={`px-4 py-3 text-right font-mono tabular-nums ${tiesWithinRounding ? 'text-info' : 'text-danger'}`}>{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
+                      <td className="px-4 py-3 text-right"><Badge tone={round2(foot.erp - foot.tally) === 0 ? 'success' : tiesWithinRounding ? 'info' : 'danger'} size="sm" dot>{round2(foot.erp - foot.tally) === 0 ? 'Tied' : tiesWithinRounding ? 'Rounding' : 'Off'}</Badge></td>
                     </>
                   )}
                 </tr>
