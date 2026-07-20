@@ -411,7 +411,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
             {canModule ? <button type="button" onClick={(e) => { e.stopPropagation(); toggleModules(r); }} className="mt-0.5 block text-[10.5px] font-semibold text-accent hover:underline" title="ERP cost-centre split (Flight/Hotel/Holiday/Visa…). Tally has no cost-centre axis, so this is ERP-only.">{mShown ? '▾' : '▸'} modules (ERP split)</button> : null}</td>
           <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plErp) : r.erp === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plErp, cur) : fmt(r.erp, cur)}</td>
           <td className={`px-4 py-2 text-right font-mono tabular-nums ${r.synthetic ? plTone(r.plTally) : r.tally === null ? 'text-ink-subtle' : ''}`}>{r.synthetic ? plText(r.plTally, cur) : fmt(r.tally, cur)}</td>
-          <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${r.diff === 0 ? 'text-ink-subtle' : 'text-danger'}`} title={r.diff > 0 ? 'ERP higher' : r.diff < 0 ? 'Tally higher' : ''}>{r.diff === 0 ? '0' : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(localeOf(cur))}`}</td>
+          <td className={`px-4 py-2 text-right font-mono tabular-nums font-semibold ${r.diff === 0 ? 'text-ink-subtle' : r.status === 'rounding' ? 'text-info' : 'text-danger'}`} title={r.diff > 0 ? 'ERP higher' : r.diff < 0 ? 'Tally higher' : ''}>{r.diff === 0 ? '0' : `${r.diff > 0 ? '+' : '−'}${Math.abs(r.diff).toLocaleString(localeOf(cur))}`}</td>
           <td className="px-4 py-2 text-right"><Badge tone={meta.tone} size="sm" dot>{meta.label}</Badge></td>
         </tr>
         {mShown ? (mInfo?.loading
@@ -464,6 +464,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
   const modBadge = (st) => st === 'tied' ? { tone: 'success', label: 'Tied' }
     : st === 'off' ? { tone: 'danger', label: 'Off' }
     : st === 'partial' ? { tone: 'warning', label: 'Partial' }
+    : st === 'rounding' ? { tone: 'info', label: 'Rounding' }
     : st === 'shared' ? { tone: 'info', label: 'At ledger' }
     : { tone: 'warning', label: 'Not in Tally' };
   // "N not in Tally · M at ledger" — makes a module header's Tally/Δ composition transparent, so a
@@ -751,7 +752,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
       )}
 
       {/* KPI chips */}
-      <div className="grid grid-cols-2 gap-3 tablet:grid-cols-4 desktop:grid-cols-7">
+      <div className={`grid grid-cols-2 gap-3 tablet:grid-cols-4 ${(counts.rounding || 0) > 0 ? 'desktop:grid-cols-8' : 'desktop:grid-cols-7'}`}>
         <Kpi label="In scope" value={counts.total || 0} />
         <Kpi label="Tied" value={counts.tied || 0} tone="success" />
         <Kpi label="Off" value={(counts.off || 0)} tone={(counts.off || 0) > 0 ? 'danger' : 'muted'} />
