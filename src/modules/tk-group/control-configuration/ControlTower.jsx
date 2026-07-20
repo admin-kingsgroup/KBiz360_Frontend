@@ -17,6 +17,7 @@ import { ModulesHealth } from '../ModulesHealth';
 import { IntegritySummary } from '../IntegritySummary';
 import { ScrutinyTrend } from '../ScrutinyTrend';
 import { FORM_DIRECTORY, FORM_DIRECTORY_MODULES } from '../utils/formsDirectory';
+import { otherPages } from '../utils/pagesCatalog';
 import { isCockpitRoute } from '../cockpit';
 import { FOCUS_ALL } from '../utils/cockpitFocus';
 import { toastInfo } from '../../../core/ux/toast';
@@ -47,7 +48,7 @@ const TABS = [
   // completeness and coverage now live inside Modules Health (one home). The old
   // `?tab=tasks` deep-link is redirected there below so existing links still work.
   { id: 'modules-health', label: 'Modules Health' },
-  { id: 'forms', label: 'Form Directory' },
+  { id: 'forms', label: 'Form Directory & Pages' },
 ];
 
 // ── Development findings — Dev Control's open items surfaced as a Tower lens ──
@@ -382,34 +383,60 @@ const formDirectoryCols = (setRoute, focus) => [
 ];
 
 function FormsDirectory({ setRoute, focus }) {
-  const rows = FORM_DIRECTORY;
-  const cols = formDirectoryCols(setRoute, focus);
-  const blockedCount = focus === FOCUS_ALL ? rows.filter((r) => !isCockpitRoute(r.route)).length : 0;
+  const forms = FORM_DIRECTORY;
+  const pages = React.useMemo(() => otherPages(), []);
+  const formCols = formDirectoryCols(setRoute, focus);
+  const pageCols = formDirectoryCols(setRoute, focus);
+  const blockedForms = focus === FOCUS_ALL ? forms.filter((r) => !isCockpitRoute(r.route)).length : 0;
+  const blockedPages = focus === FOCUS_ALL ? pages.filter((r) => !isCockpitRoute(r.route)).length : 0;
+  const blockedCount = blockedForms + blockedPages;
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-6">
       <div className="text-xs text-ink-muted">
-        Every data-creation form in the ERP — <b className="text-ink">{rows.length}</b> forms across{' '}
-        <b className="text-ink">{FORM_DIRECTORY_MODULES.length}</b> modules. Search, then <b>Open →</b> to jump straight to the form.
+        Every page in the ERP, one directory — <b className="text-ink">{forms.length + pages.length}</b> registered routes total:{' '}
+        <b className="text-ink">{forms.length}</b> data-creation forms across <b className="text-ink">{FORM_DIRECTORY_MODULES.length}</b> modules,
+        plus <b className="text-ink">{pages.length}</b> other pages (reports, dashboards, registers, approvals…).
+        Search, then <b>Open →</b> to jump straight there.
       </div>
       {blockedCount > 0 && (
         <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs text-ink-muted">
           You're in <b className="text-ink">All branches</b> mode — <b className="text-ink">{blockedCount}</b> branch-operational
-          forms (vouchers, HR self-service, assets, reports…) are greyed out below. Focus a branch in the top selector to open them;
-          Masters, HR admin and Settings forms stay open from here.
+          pages are greyed out below. Focus a branch in the top selector to open them; Masters, HR admin, Settings and most
+          Reports/Dashboards stay open from here.
         </div>
       )}
-      <DataTable
-        title={`Form Directory (${rows.length})`}
-        columns={cols}
-        rows={rows}
-        getRowKey={(r) => r.id}
-        onRowClick={(r) => goToForm(r, setRoute, focus)}
-        searchable
-        searchPlaceholder="Search forms…"
-        showDensityToggle={false}
-        zebra
-        emptyMessage="No forms found."
-      />
+
+      <div className="grid gap-2">
+        <div className="text-[13px] font-bold text-ink">Data-Creation Forms</div>
+        <DataTable
+          title={`Form Directory (${forms.length})`}
+          columns={formCols}
+          rows={forms}
+          getRowKey={(r) => r.id}
+          onRowClick={(r) => goToForm(r, setRoute, focus)}
+          searchable
+          searchPlaceholder="Search forms…"
+          showDensityToggle={false}
+          zebra
+          emptyMessage="No forms found."
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <div className="text-[13px] font-bold text-ink">Other Pages</div>
+        <DataTable
+          title={`Pages (${pages.length})`}
+          columns={pageCols}
+          rows={pages}
+          getRowKey={(r) => r.id}
+          onRowClick={(r) => goToForm(r, setRoute, focus)}
+          searchable
+          searchPlaceholder="Search pages…"
+          showDensityToggle={false}
+          zebra
+          emptyMessage="No pages found."
+        />
+      </div>
     </div>
   );
 }
