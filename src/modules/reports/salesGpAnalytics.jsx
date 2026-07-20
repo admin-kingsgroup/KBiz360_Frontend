@@ -200,10 +200,9 @@ export function SalesGpAnalytics({ branch }) {
   // elimination balances are INR control accounts. (Shadows it within this component.)
   const cur = (bc(branch) || {}).cur || '₹';
   const money = (n) => compactAmt(n || 0, { currency: cur });
-  // Consolidated (All-branches) scope: revenue/cost/GP cannot be summed across branch
-  // currencies (₹ India + $ Africa), and this report has no per-branch currency split (it
-  // is built from raw vouchers), so it is branch-scoped — a clear pick-a-branch notice
-  // replaces the (otherwise blended) figures. Per-branch sales/GP live on the dashboards.
+  // Consolidated (All-branches) scope: revenue/cost/GP are shown PER BRANCH, each in its own
+  // currency (₹ India / $ Africa) via <BranchGpSection> — never summed across currencies. The
+  // report is built from raw vouchers and split by branch client-side.
   const isAll = !branch || branch === 'ALL' || branch?.code === 'ALL';
   const [preset, setPreset] = useState('all');
   const [from, setFrom] = useState(ALL_TIME_FROM);     // default: inception → today (data may sit in a prior FY)

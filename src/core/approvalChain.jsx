@@ -7,6 +7,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, getAuthToken } from './api';
+import { capForBranch } from '../modules/tk-group/utils/branchLimits';
 
 export const DEFAULT_VERIFY = ['sughra@travkings.com'];
 export const DEFAULT_APPROVE = ['faiz@travkings.com'];
@@ -191,8 +192,13 @@ export function StageTracker({ e }) {
   const ef = flags['approval.escalation_signoffs'] || {};
   const escOn = ef.enabled === true || ef.foundation === true;
   const amt = Math.abs(Number(e.total != null ? e.total : e.amount) || 0);
-  const esc = Number(lim.voucherEscalate) > 0 ? Number(lim.voucherEscalate) : Infinity;
-  const dual = Number(lim.voucherDual) > 0 ? Number(lim.voucherDual) : Infinity;
+  // Currency-aware ceilings: a USD branch (NBO/DAR/FBM) reads the …USD cap, mirroring the
+  // backend's capForBranch, so the predicted path matches what the server will actually demand
+  // (previously the ₹ base ceiling was compared to a $ amount → the Director bead never showed).
+  const escCap = Number(capForBranch(lim, 'voucherEscalate', e.branch));
+  const dualCap = Number(capForBranch(lim, 'voucherDual', e.branch));
+  const esc = escCap > 0 ? escCap : Infinity;
+  const dual = dualCap > 0 ? dualCap : Infinity;
   const s = stageOf(e); // check | verify | director | owner | approve
   // Director/Owner beads show only when the feature is engaged AND the amount crosses the
   // ceiling — or when the entry is already sitting at that stage (backend truth, race-proof).

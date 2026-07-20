@@ -124,8 +124,12 @@ export function CashFlowForecast({ branch }) {
       {isAll
         ? (byBranch && byBranch.length
             ? byBranch.map((b) => (
-                <BranchForecast key={b.branch} branchCode={b.branch} cur={bc({ code: b.branch }).cur} openingCash={openingCashOf(b.rows)}
-                  lines={(rows || []).filter((r) => (r.branch || '') === b.branch)} create={create} remove={remove} vo={vo} heading={b.branch} />
+                b._error
+                  ? <div key={b.branch} style={{ ...card, borderColor: '#f0b4b4', background: '#fff5f5', color: '#a12a2a', margin: '10px 0' }}>
+                      <b>{b.branch}</b> — couldn’t load this branch’s opening cash: {b._error}. Forecast hidden so no false ₹0 is shown.
+                    </div>
+                  : <BranchForecast key={b.branch} branchCode={b.branch} cur={bc({ code: b.branch }).cur} openingCash={openingCashOf(b.rows)}
+                      lines={(rows || []).filter((r) => (r.branch || '') === b.branch)} create={create} remove={remove} vo={vo} heading={b.branch} />
               ))
             : <div style={{ ...card, textAlign: 'center', color: '#5a6691', padding: 24 }}>No branch data yet — post entries and the forecast appears per branch, each in its own currency.</div>)
         : <BranchForecast branchCode={brCode} cur={bc(branch).cur} openingCash={openingCashOf(tb.rows)} lines={rows || []} create={create} remove={remove} vo={vo} heading={null} />}

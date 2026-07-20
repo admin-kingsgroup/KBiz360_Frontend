@@ -352,10 +352,19 @@ export function NotesToFinancials({ branch }) {
       {!loading && !err && !empty && (isAll
         ? (branchCodes.length === 0
             ? <EmptyState title="No branch data for this period." hint="Record vouchers to generate the notes." />
-            : branchCodes.map((code) => (
-                <BranchNotes key={code} bs={sliceFor(qBs.data, code)} pl={sliceFor(qPl.data, code)} tb={sliceFor(qTb.data, code)} ageing={sliceFor(qAg.data, code)}
-                  cur={(bc({ code }) && bc({ code }).cur) || '₹'} branch={{ code }} to={to} detailed={detailed} periodLabel={period.label} heading={code} />
-              )))
+            : branchCodes.map((code) => {
+                const slices = { bs: sliceFor(qBs.data, code), pl: sliceFor(qPl.data, code), tb: sliceFor(qTb.data, code), ageing: sliceFor(qAg.data, code) };
+                const errSlice = [slices.bs, slices.pl, slices.tb, slices.ageing].find((sl) => sl && sl._error);
+                if (errSlice) return (
+                  <div key={code} style={{ background: '#fff5f5', border: '1px solid #f0b4b4', borderRadius: 10, color: '#a12a2a', padding: '12px 14px', margin: '10px 0', fontSize: 12.5 }}>
+                    <b>{code}</b> — couldn’t load this branch’s notes: {errSlice._error}. Skipped so no false “out of balance” is shown.
+                  </div>
+                );
+                return (
+                  <BranchNotes key={code} bs={slices.bs} pl={slices.pl} tb={slices.tb} ageing={slices.ageing}
+                    cur={(bc({ code }) && bc({ code }).cur) || '₹'} branch={{ code }} to={to} detailed={detailed} periodLabel={period.label} heading={code} />
+                );
+              }))
         : <BranchNotes bs={qBs.data} pl={qPl.data} tb={qTb.data} ageing={qAg.data} cur={cur} branch={branch} to={to} detailed={detailed} periodLabel={period.label} heading={null} />
       )}
     </PageLayout>

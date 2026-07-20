@@ -187,9 +187,11 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const localCcy = (opts && opts.localCurrency) || '';
   const converting = fx !== 1 && !!localCcy;
   const LOCAL_SYM = { KES: 'KSh ', TZS: 'TSh ', CDF: 'FC ' };
-  // Never fall back to ₹ on a USD (Africa/VAT) branch — derive from the regime so a missing/
-  // stale company profile can't print '₹' under a "(USD)" header.
-  const baseCur = prof.cur_sym || (isVat ? '$' : ((bc(branch) || {}).cur || '₹'));
+  // The regime is AUTHORITATIVE for the symbol on a VAT (Africa/USD) branch — a company
+  // profile's cur_sym defaults to '₹' (schema default) and, when the profile is missing, `prof`
+  // is the BOM fallback whose cur_sym is '₹'. Trusting it first printed '₹' under a "(USD)"
+  // header. So force '$' whenever isVat; India keeps the profile/branch symbol.
+  const baseCur = isVat ? '$' : (prof.cur_sym || (bc(branch) || {}).cur || '₹');
   const cur = converting ? (LOCAL_SYM[localCcy] || `${localCcy} `) : baseCur;
   const curCode = converting ? localCcy : (isVat ? 'USD' : 'INR');
   // fx-aware money formatter — shadows the module n2 so EVERY amount in this invoice

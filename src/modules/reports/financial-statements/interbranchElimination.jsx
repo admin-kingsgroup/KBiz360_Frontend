@@ -2,10 +2,9 @@ import { useState, useMemo } from 'react';
 import { Printer, FileSpreadsheet, FileText, Building2 } from 'lucide-react';
 import { useTrialBalance, useLedgerStatement } from '../../../core/useAccounting';
 import { useLedgerRegistry } from '../../../core/useReference';
-import { BRANCHES } from '../../../core/data';
-import { fmtINR } from '../../../core/format';
+import { money } from '../../../core/format';
 import { CUR_FY, todayISO, fmtDate } from '../../../core/dates';
-import { RPT_thStyle, RPT_tdStyle } from '../../../core/styleTokens';
+import { RPT_thStyle, RPT_tdStyle, bc } from '../../../core/styleTokens';
 import { PeriodBar } from '../../../core/period';
 import { exportToExcel } from '../../../core/exportExcel';
 import { exportToCSV } from '../../../core/business-logic';
@@ -15,22 +14,15 @@ import { PageLayout } from '../../../shell/PageLayout';
 import { Button, StatusPill, Card, ResponsiveGrid, LoadingState, EmptyState, SkeletonTable } from '../../../shell/primitives';
 import { clickable } from '../../../core/ux/clickable';
 import { openPrintPreview } from '../../../core/PrintPreview';
-import { isInterBranch, brName } from '../../interbranch/interbranch';
+import { brName } from '../../interbranch/interbranch';
+import { buildElimModel } from './interbranchElimModel';
 
-// Resolve the COUNTER branch a ledger points at (the branch named in the
-// ledger), excluding the ledger's own owning branch.
-function counterBranchOf(name, owningCode) {
-  const low = (name || '').toLowerCase();
-  for (const b of BRANCHES) {
-    if (b.code === owningCode) continue;
-    const tokens = [b.code, b.city].filter(Boolean).map((s) => String(s).toLowerCase());
-    if (tokens.some((t) => t.length >= 2 && low.includes(t))) return b;
-  }
-  return null;
-}
+// A branch's book-currency symbol (₹ India / $ Africa). Inter-branch balances are shown in the
+// OWNING branch's own currency — never converted or summed across currencies.
+const curOf = (code) => (bc({ code }) || {}).cur || '₹';
 
 /* ── status palette → design-system StatusPill tones ── */
-const STATUS_TONE = { Matched: 'success', Eliminated: 'info', Partial: 'warning', Unmatched: 'danger' };
+const STATUS_TONE = { Matched: 'success', Eliminated: 'info', Partial: 'warning', 'Cross-Currency': 'info', Unmatched: 'danger' };
 function Badge({ status }) {
   return <StatusPill tone={STATUS_TONE[status] || 'danger'} size="sm">{status}</StatusPill>;
 }
@@ -43,7 +35,7 @@ export function RPT_InterbranchElim() {
   const [from, setFrom] = useState(CUR_FY.startISO);          // FY start → cumulative balances
   const [to, setTo]     = useState(todayISO());               // as-on current date
   const [open, setOpen] = useState('');                       // expanded "side:ledger" in detailed view
-  const [voucher, setVoucher] = useState(null);              // drill target { id }
+  const [voucher, setVoucher] = useState(null);              // drill target { id, cur }
 
   // Consolidated (ALL branches) — elimination is inherently group-level.
   const tbQ  = useTrialBalance(undefined, { from, to });
@@ -51,84 +43,20 @@ export function RPT_InterbranchElim() {
   const tbRows = tbQ.data?.rows || [];
   const ledgers = regQ.data || [];
 
-  const model = useMemo(() => {
-    const regByName = new Map(ledgers.map((l) => [String(l.name).toLowerCase(), l]));
+  const model = useMemo(() => buildElimModel(tbRows, ledgers, curOf), [tbRows, ledgers]);
 
-    const classify = (row) => {
-      const reg = regByName.get(String(row.ledger).toLowerCase());
-      const group = row.group || reg?.group || '';
-      const isDebtor   = /sundry debtors/i.test(group);
-      const isCreditor = /sundry creditors/i.test(group);
-      if (!isDebtor && !isCreditor) return null;
-      if (!isInterBranch(row.ledger)) return null;
-      const owning = reg && reg.branch && reg.branch !== 'ALL' ? reg.branch : null;
-      const counter = counterBranchOf(row.ledger, owning);
-      return {
-        ledger: row.ledger, group, owning,
-        counterCode: counter?.code || null,
-        side: isDebtor ? 'receivable' : 'payable',
-        debit: row.debit || 0, credit: row.credit || 0,
-        // Outstanding = closing balance on the ledger's natural side.
-        outstanding: isDebtor ? (row.closingDebit || 0) : (row.closingCredit || 0),
-      };
-    };
-
-    const all = tbRows.map(classify).filter(Boolean);
-    const receivables = all.filter((c) => c.side === 'receivable');
-    const payables    = all.filter((c) => c.side === 'payable');
-
-    // Match a receivable (owning A → counter B) against the mirror payable
-    // (owning B → counter A) and compute the eliminable overlap.
-    const payByKey = new Map(payables.map((p) => [`${p.owning || '?'}|${p.counterCode || '?'}`, p]));
-    receivables.forEach((r) => {
-      const mirror = payByKey.get(`${r.counterCode || '?'}|${r.owning || '?'}`);
-      if (mirror) {
-        const elim = Math.min(r.outstanding, mirror.outstanding);
-        const status = Math.abs(r.outstanding - mirror.outstanding) < 1 ? 'Matched' : 'Partial';
-        r.matched = true;  r.elim = elim;  r.status = status;  r.mirror = mirror.ledger;
-        mirror.matched = true; mirror.elim = elim; mirror.status = status; mirror.mirror = r.ledger;
-      } else {
-        r.matched = false; r.elim = 0; r.status = 'Unmatched';
-      }
-    });
-    payables.forEach((p) => { if (p.matched === undefined) { p.matched = false; p.elim = 0; p.status = 'Unmatched'; } });
-
-    const sum = (arr, k) => arr.reduce((s, x) => s + (x[k] || 0), 0);
-    const totalRec  = sum(receivables, 'outstanding');
-    const totalPay  = sum(payables, 'outstanding');
-    const totalElim = sum(receivables, 'elim');               // each pair counted once
-    const totals = {
-      totalRec, totalPay, totalElim,
-      unmatchedRec: Math.max(0, totalRec - totalElim),
-      unmatchedPay: Math.max(0, totalPay - totalElim),
-      netDiff: totalRec - totalPay,
-    };
-
-    // Branch-wise rollup (by owning branch).
-    const branchMap = new Map();
-    const bump = (code, key, amt) => {
-      const k = code || '—';
-      if (!branchMap.has(k)) branchMap.set(k, { branch: k, rec: 0, pay: 0, elim: 0 });
-      branchMap.get(k)[key] += amt;
-    };
-    receivables.forEach((r) => { bump(r.owning, 'rec', r.outstanding); bump(r.owning, 'elim', r.elim); });
-    payables.forEach((p) => { bump(p.owning, 'pay', p.outstanding); bump(p.owning, 'elim', p.elim); });
-    const branchSummary = [...branchMap.values()].sort((a, b) => (b.rec + b.pay) - (a.rec + a.pay));
-
-    return { receivables, payables, totals, branchSummary };
-  }, [tbRows, ledgers]);
-
-  const { receivables, payables, totals, branchSummary } = model;
+  const { receivables, payables, byCcy, currencies, branchSummary } = model;
   const hasData = receivables.length > 0 || payables.length > 0;
   const loading = tbQ.isLoading || regQ.isLoading;
+  const multiCcy = currencies.length > 1;
 
   /* ── exports ── */
   const exportRows = useMemo(() => ([
-    ...receivables.map((r) => ({ type: 'Receivable', branch: r.owning || '—', counter: r.counterCode || '—', ledger: r.ledger, debit: r.debit, credit: 0, outstanding: r.outstanding, eliminated: r.elim, status: r.status })),
-    ...payables.map((p) => ({ type: 'Payable', branch: p.owning || '—', counter: p.counterCode || '—', ledger: p.ledger, debit: 0, credit: p.credit, outstanding: p.outstanding, eliminated: p.elim, status: p.status })),
+    ...receivables.map((r) => ({ type: 'Receivable', branch: r.owning || '—', counter: r.counterCode || '—', currency: r.cur, ledger: r.ledger, debit: r.debit, credit: 0, outstanding: r.outstanding, eliminated: r.elim, status: r.status })),
+    ...payables.map((p) => ({ type: 'Payable', branch: p.owning || '—', counter: p.counterCode || '—', currency: p.cur, ledger: p.ledger, debit: 0, credit: p.credit, outstanding: p.outstanding, eliminated: p.elim, status: p.status })),
   ]), [receivables, payables]);
   const exportCols = [
-    { key: 'type', label: 'Type' }, { key: 'branch', label: 'Branch' }, { key: 'counter', label: 'Counter Branch' },
+    { key: 'type', label: 'Type' }, { key: 'branch', label: 'Branch' }, { key: 'counter', label: 'Counter Branch' }, { key: 'currency', label: 'Currency' },
     { key: 'ledger', label: 'Ledger' }, { key: 'debit', label: 'Debit' }, { key: 'credit', label: 'Credit' },
     { key: 'outstanding', label: 'Outstanding' }, { key: 'eliminated', label: 'Eliminated' }, { key: 'status', label: 'Status' },
   ];
@@ -144,18 +72,20 @@ export function RPT_InterbranchElim() {
           <button onClick={() => setVoucher(null)} className="font-semibold text-info hover:underline">Inter-Branch Report</button>
           <span className="text-ink-subtle"> ▸ </span><span className="font-bold text-ink">Voucher</span>
         </div>
-        <Card><VoucherEditor voucherId={voucher.id} cur="₹" onBack={() => setVoucher(null)} /></Card>
+        <Card><VoucherEditor voucherId={voucher.id} cur={voucher.cur || '₹'} onBack={() => setVoucher(null)} /></Card>
       </PageLayout>
     );
   }
 
-  const reconciled = Math.abs(totals.netDiff) < 1 && totals.unmatchedRec < 1 && totals.unmatchedPay < 1;
+  // Reconciled only when EVERY currency's balances net to zero with nothing unmatched.
+  const reconciled = byCcy.length > 0 && byCcy.every((t) => Math.abs(t.netDiff) < 1 && t.unmatchedRec < 1 && t.unmatchedPay < 1);
+  const ccyLabel = (cur) => (cur === '₹' ? '₹ · India branches' : `${cur} · Africa branches`);
 
   return (
     <PageLayout
       maxWidth="max-w-[1400px] mx-auto"
       title="Inter-Branch Elimination Report"
-      subtitle="Group consolidation · Inter-Branch Sundry Debtors ⇄ Sundry Creditors · reconciled & auto-eliminated"
+      subtitle="Group consolidation · Inter-Branch Sundry Debtors ⇄ Sundry Creditors · reconciled per currency & auto-eliminated"
       actions={
         <>
           <PeriodBar branch="ALL" defaultPreset="all" onChange={(r) => { setFrom(r.from); setTo(r.to); }} />
@@ -165,32 +95,44 @@ export function RPT_InterbranchElim() {
         </>
       }
     >
-      {/* Dashboard summary cards */}
-      <ResponsiveGrid min="150px" gap="md" className="mb-3.5">
-        {[
-          { l: 'Total Receivables', v: totals.totalRec, c: '#185FA5', bg: '#E6F1FB' },
-          { l: 'Total Payables', v: totals.totalPay, c: '#854F0B', bg: '#FAEEDA' },
-          { l: 'Total Eliminated', v: totals.totalElim, c: '#1D9E75', bg: '#EAF3DE' },
-          { l: 'Unmatched Receivables', v: totals.unmatchedRec, c: '#A32D2D', bg: '#FCEBEB' },
-          { l: 'Unmatched Payables', v: totals.unmatchedPay, c: '#A32D2D', bg: '#FCEBEB' },
-          { l: 'Net Difference', v: totals.netDiff, c: Math.abs(totals.netDiff) < 1 ? '#1D9E75' : '#A32D2D', bg: Math.abs(totals.netDiff) < 1 ? '#EAF3DE' : '#FCEBEB' },
-        ].map((k, i) => (
-          <div key={i} className="rounded-brand border border-t-[3px] border-surface-border p-3" style={{ borderTopColor: k.c, background: k.bg }}>
-            <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: k.c }}>{k.l}</p>
-            <p className="mt-1 text-[19px] font-extrabold tabular-nums text-ink">{fmtINR(k.v)}</p>
-          </div>
-        ))}
-      </ResponsiveGrid>
+      {/* Dashboard summary cards — one block PER book currency (₹ and $ are never blended) */}
+      {byCcy.map((t) => (
+        <div key={t.cur} className="mb-3.5">
+          {multiCcy && <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-muted">{ccyLabel(t.cur)}</p>}
+          <ResponsiveGrid min="150px" gap="md">
+            {[
+              { l: 'Total Receivables', v: t.totalRec, c: '#185FA5', bg: '#E6F1FB' },
+              { l: 'Total Payables', v: t.totalPay, c: '#854F0B', bg: '#FAEEDA' },
+              { l: 'Total Eliminated', v: t.totalElim, c: '#1D9E75', bg: '#EAF3DE' },
+              { l: 'Unmatched Receivables', v: t.unmatchedRec, c: '#A32D2D', bg: '#FCEBEB' },
+              { l: 'Unmatched Payables', v: t.unmatchedPay, c: '#A32D2D', bg: '#FCEBEB' },
+              { l: 'Net Difference', v: t.netDiff, c: Math.abs(t.netDiff) < 1 ? '#1D9E75' : '#A32D2D', bg: Math.abs(t.netDiff) < 1 ? '#EAF3DE' : '#FCEBEB' },
+            ].map((k, i) => (
+              <div key={i} className="rounded-brand border border-t-[3px] border-surface-border p-3" style={{ borderTopColor: k.c, background: k.bg }}>
+                <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: k.c }}>{k.l}</p>
+                <p className="mt-1 text-[19px] font-extrabold tabular-nums text-ink">{money(k.v, t.cur)}</p>
+              </div>
+            ))}
+          </ResponsiveGrid>
+        </div>
+      ))}
 
-      {/* Validation banner */}
+      {/* Validation banner — reconciliation is asserted per currency */}
       {hasData && (
-        <div className="mb-3.5 rounded-brand border border-l-4 border-surface-border p-4" style={{ borderLeftColor: reconciled ? '#1D9E75' : '#A32D2D', background: reconciled ? '#f4faf0' : '#fdf3f3' }}>
+        <div className="mb-2 rounded-brand border border-l-4 border-surface-border p-4" style={{ borderLeftColor: reconciled ? '#1D9E75' : '#A32D2D', background: reconciled ? '#f4faf0' : '#fdf3f3' }}>
           <p className="text-xs font-bold" style={{ color: reconciled ? '#27500A' : '#A32D2D' }}>
             {reconciled
-              ? '✔ All inter-branch balances reconcile — receivables fully match payables. Safe to eliminate on consolidation.'
-              : `⚠ ${fmtINR(Math.abs(totals.netDiff))} net difference · ${fmtINR(totals.unmatchedRec)} unmatched receivables · ${fmtINR(totals.unmatchedPay)} unmatched payables. Resolve before signing off group accounts.`}
+              ? '✔ All inter-branch balances reconcile in every currency — receivables fully match payables. Safe to eliminate on consolidation.'
+              : (<>⚠ Resolve before signing off group accounts —
+                  {byCcy.filter((t) => Math.abs(t.netDiff) >= 1 || t.unmatchedRec >= 1 || t.unmatchedPay >= 1).map((t) => (
+                    <span key={t.cur}>{' '}[{t.cur}] {money(Math.abs(t.netDiff), t.cur)} net diff · {money(t.unmatchedRec, t.cur)} unmatched receivables · {money(t.unmatchedPay, t.cur)} unmatched payables;</span>
+                  ))}
+                </>)}
           </p>
         </div>
+      )}
+      {hasData && multiCcy && (
+        <p className="mb-3.5 text-[11px] text-ink-muted">Cross-currency inter-branch pairs (₹ ⇄ $) are shown as <b>Cross-Currency</b> — they can't be auto-eliminated here; each settles at its deal's own frozen FX rate.</p>
       )}
 
       {/* View toggle */}
@@ -232,7 +174,7 @@ export function RPT_InterbranchElim() {
 function SummaryView({ branchSummary, receivables, payables }) {
   return (
     <>
-      {/* Branch-wise totals */}
+      {/* Branch-wise totals — each branch in its OWN currency */}
       <div className="kbiz-card mb-3.5">
         <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#0d1326' }}>Branch-wise Summary</p>
         <div style={{ overflowX: 'auto' }}>
@@ -248,10 +190,10 @@ function SummaryView({ branchSummary, receivables, payables }) {
               {branchSummary.map((b) => (
                 <tr key={b.branch}>
                   <td style={{ ...RPT_tdStyle, fontWeight: 600 }}>{brName(b.branch)}</td>
-                  <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#185FA5' }}>{fmtINR(b.rec)}</td>
-                  <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#854F0B' }}>{fmtINR(b.pay)}</td>
-                  <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#1D9E75' }}>{fmtINR(b.elim)}</td>
-                  <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700, color: Math.abs(b.rec - b.pay) < 1 ? '#1D9E75' : '#A32D2D' }}>{fmtINR(b.rec - b.pay)}</td>
+                  <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#185FA5' }}>{money(b.rec, b.cur)}</td>
+                  <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#854F0B' }}>{money(b.pay, b.cur)}</td>
+                  <td style={{ ...RPT_tdStyle, textAlign: 'right', color: '#1D9E75' }}>{money(b.elim, b.cur)}</td>
+                  <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700, color: Math.abs(b.rec - b.pay) < 1 ? '#1D9E75' : '#A32D2D' }}>{money(b.rec - b.pay, b.cur)}</td>
                 </tr>
               ))}
             </tbody>
@@ -267,8 +209,8 @@ function SummaryView({ branchSummary, receivables, payables }) {
 
 function LedgerTable({ title, side, rows, amountLabel, amountKey }) {
   const accent = side === 'receivable' ? '#185FA5' : '#854F0B';
-  const totAmt = rows.reduce((s, r) => s + (r[amountKey] || 0), 0);
-  const totOut = rows.reduce((s, r) => s + (r.outstanding || 0), 0);
+  // Footer totals are per-currency — a table can list both ₹ and $ ledgers, and those must not sum.
+  const ccys = [...new Set(rows.map((r) => r.cur))].sort();
   return (
     <div className="kbiz-card mb-3.5">
       <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: accent }}>{title} <span style={{ color: '#5a6691', fontWeight: 500 }}>· {rows.length} ledgers</span></p>
@@ -289,18 +231,27 @@ function LedgerTable({ title, side, rows, amountLabel, amountKey }) {
                 <td style={{ ...RPT_tdStyle, fontWeight: 600 }}>{r.owning ? brName(r.owning) : '—'}</td>
                 <td style={RPT_tdStyle}>{r.counterCode ? brName(r.counterCode) : '—'}</td>
                 <td style={RPT_tdStyle}>{r.ledger}</td>
-                <td style={{ ...RPT_tdStyle, textAlign: 'right' }}>{fmtINR(r[amountKey])}</td>
-                <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700, color: accent }}>{fmtINR(r.outstanding)}</td>
+                <td style={{ ...RPT_tdStyle, textAlign: 'right' }}>{money(r[amountKey], r.cur)}</td>
+                <td style={{ ...RPT_tdStyle, textAlign: 'right', fontWeight: 700, color: accent }}>{money(r.outstanding, r.cur)}</td>
                 <td style={RPT_tdStyle}><Badge status={r.status} /></td>
               </tr>
             ))}
           </tbody>
-          {rows.length > 0 && <tfoot><tr style={{ background: '#0d1326' }}>
-            <td colSpan={3} style={{ padding: '9px 12px', fontWeight: 700, color: '#d4a437' }}>TOTAL</td>
-            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{fmtINR(totAmt)}</td>
-            <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#d4a437' }}>{fmtINR(totOut)}</td>
-            <td />
-          </tr></tfoot>}
+          {rows.length > 0 && <tfoot>
+            {ccys.map((cur) => {
+              const rs = rows.filter((r) => r.cur === cur);
+              const totAmt = rs.reduce((s, r) => s + (r[amountKey] || 0), 0);
+              const totOut = rs.reduce((s, r) => s + (r.outstanding || 0), 0);
+              return (
+                <tr key={cur} style={{ background: '#0d1326' }}>
+                  <td colSpan={3} style={{ padding: '9px 12px', fontWeight: 700, color: '#d4a437' }}>TOTAL{ccys.length > 1 ? ` · ${cur}` : ''}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#fff' }}>{money(totAmt, cur)}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 800, color: '#d4a437' }}>{money(totOut, cur)}</td>
+                  <td />
+                </tr>
+              );
+            })}
+          </tfoot>}
         </table>
       </div>
     </div>
@@ -339,12 +290,12 @@ function DetailGroup({ title, accent, side, rows, open, setOpen, from, to, onVou
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: accent, fontVariantNumeric: 'tabular-nums' }}>{fmtINR(r.outstanding)}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: accent, fontVariantNumeric: 'tabular-nums' }}>{money(r.outstanding, r.cur)}</span>
                 <button onClick={(e) => { e.stopPropagation(); openLedgerModal(r.ledger); }} title="Open full ledger account" style={{ border: '1px solid #cdd1d8', background: '#fff', borderRadius: 6, fontSize: 11, padding: '3px 8px', cursor: 'pointer', color: '#0d1326', fontWeight: 700 }}>📒</button>
                 <Badge status={r.status} />
               </div>
             </div>
-            {isOpen && <IBLedgerDrill ledger={r.ledger} status={r.status} from={from} to={to} onVoucher={onVoucher} />}
+            {isOpen && <IBLedgerDrill ledger={r.ledger} cur={r.cur} status={r.status} from={from} to={to} onVoucher={onVoucher} />}
           </div>
         );
       })}
@@ -352,8 +303,9 @@ function DetailGroup({ title, accent, side, rows, open, setOpen, from, to, onVou
   );
 }
 
-// Voucher-wise drill for ONE ledger — live ledger statement (own hook instance).
-function IBLedgerDrill({ ledger, status, from, to, onVoucher }) {
+// Voucher-wise drill for ONE ledger — live ledger statement (own hook instance), in the
+// owning branch's currency.
+function IBLedgerDrill({ ledger, cur, status, from, to, onVoucher }) {
   const q = useLedgerStatement(ledger, undefined, { from, to });
   const d = q.data;
   const lines = d?.lines || [];
@@ -374,23 +326,23 @@ function IBLedgerDrill({ ledger, status, from, to, onVoucher }) {
               <td style={{ padding: '7px 10px', color: '#5a6691', whiteSpace: 'nowrap' }}>{fmtDate(e.date)}</td>
               <td style={{ padding: '7px 10px' }}>
                 {e.voucherId
-                  ? <button onClick={() => onVoucher({ id: e.voucherId })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#185FA5', fontWeight: 700, fontFamily: 'monospace', fontSize: 10, padding: 0 }}>{e.vno || '(view)'}</button>
+                  ? <button onClick={() => onVoucher({ id: e.voucherId, cur })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#185FA5', fontWeight: 700, fontFamily: 'monospace', fontSize: 10, padding: 0 }}>{e.vno || '(view)'}</button>
                   : <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#5a6691' }}>{e.vno}</span>}
               </td>
               <td style={{ padding: '7px 10px', color: '#384677' }}>{e.narration || e.party || e.category || '—'}</td>
               <td style={{ padding: '7px 10px', color: '#5a6691', fontFamily: 'monospace', fontSize: 10 }}>{e.party || '—'}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'right', color: e.debit > 0 ? '#185FA5' : '#cfd3e2', fontVariantNumeric: 'tabular-nums' }}>{e.debit > 0 ? fmtINR(e.debit) : '—'}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'right', color: e.credit > 0 ? '#A32D2D' : '#cfd3e2', fontVariantNumeric: 'tabular-nums' }}>{e.credit > 0 ? fmtINR(e.credit) : '—'}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: e.balanceSide === 'Cr' ? '#A32D2D' : '#185FA5', fontVariantNumeric: 'tabular-nums' }}>{fmtINR(Math.abs(e.balance))} {e.balanceSide}</td>
+              <td style={{ padding: '7px 10px', textAlign: 'right', color: e.debit > 0 ? '#185FA5' : '#cfd3e2', fontVariantNumeric: 'tabular-nums' }}>{e.debit > 0 ? money(e.debit, cur) : '—'}</td>
+              <td style={{ padding: '7px 10px', textAlign: 'right', color: e.credit > 0 ? '#A32D2D' : '#cfd3e2', fontVariantNumeric: 'tabular-nums' }}>{e.credit > 0 ? money(e.credit, cur) : '—'}</td>
+              <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: e.balanceSide === 'Cr' ? '#A32D2D' : '#185FA5', fontVariantNumeric: 'tabular-nums' }}>{money(Math.abs(e.balance), cur)} {e.balanceSide}</td>
               <td style={{ padding: '7px 10px' }}><Badge status={status === 'Matched' ? 'Eliminated' : status} /></td>
             </tr>
           ))}
         </tbody>
         {d && <tfoot><tr style={{ background: '#fafbfd', borderTop: '1px solid #cdd1d8' }}>
           <td colSpan={4} style={{ padding: '7px 10px', fontWeight: 700, color: '#0d1326' }}>Closing</td>
-          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{fmtINR(d.totalDebit)}</td>
-          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{fmtINR(d.totalCredit)}</td>
-          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: d.closingSide === 'Cr' ? '#A32D2D' : '#185FA5' }}>{fmtINR(d.closingBalance)} {d.closingSide}</td>
+          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{money(d.totalDebit, cur)}</td>
+          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{money(d.totalCredit, cur)}</td>
+          <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, color: d.closingSide === 'Cr' ? '#A32D2D' : '#185FA5' }}>{money(d.closingBalance, cur)} {d.closingSide}</td>
           <td />
         </tr></tfoot>}
       </table>

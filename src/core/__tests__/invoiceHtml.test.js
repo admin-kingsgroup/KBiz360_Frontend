@@ -160,6 +160,17 @@ describe('buildBookingInvoice — Africa VAT branch (NBO)', () => {
     expect(html).toContain('NET TOTAL (USD)');
   });
 
+  test('a stale/BOM-fallback company profile (cur_sym ₹) still prints $ on a USD branch — never ₹', () => {
+    // The profile schema defaults cur_sym to '₹', and a missing NBO profile falls back to BOM's
+    // (also ₹). The symbol MUST come from the regime, not the profile — otherwise a USD invoice
+    // printed '₹1,130.00' under a "(USD)" header. This pins the regime-authoritative fix.
+    companyProfile.mockReturnValue({ cur_sym: '₹', entity: 'Travkings', operAddr: 'Nairobi', gstin: '' });
+    const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {});
+    expect(html).toContain('NET TOTAL (USD)');
+    expect(html).not.toContain('₹');   // regression: no rupee symbol anywhere on a USD invoice
+    expect(html).toContain('$');       // amounts carry the USD symbol
+  });
+
   test('local-currency print converts every amount at the FX rate + footnote', () => {
     const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {}, { fxRate: 130, localCurrency: 'KES', fxDate: '2026-06-29' });
     expect(html).toContain('Converted at 1 USD = 130.00 KES');

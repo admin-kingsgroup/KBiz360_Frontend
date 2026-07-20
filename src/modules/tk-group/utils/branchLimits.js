@@ -23,6 +23,19 @@ export function symbolFor(fieldKey, fieldUnit, branchCcy) {
   return GENERIC_MONEY.has(fieldKey) ? (branchCcy || fieldUnit) : fieldUnit;
 }
 
+// USD (Africa) branches — mirrors backend bookCurrencyOf. Drives the …USD cap-variant pick.
+const USD_BRANCHES = new Set(['NBO', 'DAR', 'FBM']);
+export const isUsdBranch = (branch) => USD_BRANCHES.has(String(branch || '').toUpperCase());
+
+/** Currency-aware cap read — mirrors backend limits.capForBranch: a USD branch reads the
+ *  `<base>USD` variant when it is set, else the base. Keeps FE previews (e.g. the approval
+ *  StageTracker) in step with the server's per-branch-currency ceilings. */
+export function capForBranch(lim, baseKey, branch) {
+  if (!lim) return undefined;
+  if (isUsdBranch(branch) && lim[baseKey + 'USD'] != null) return lim[baseKey + 'USD'];
+  return lim[baseKey];
+}
+
 const isDefaultBranch = (b) => !b || b === 'default' || b === 'ALL';
 
 /** The EFFECTIVE value a branch would use for a field (for placeholder display):
