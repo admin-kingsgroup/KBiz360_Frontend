@@ -210,9 +210,15 @@ export function Field({ label, value, onChange, readOnly, mono, type = 'text', p
 }
 
 export function SelectField({ label, value, onChange, options }) {
+  // Keep the CURRENT value selectable even if it's no longer in `options` (a master
+  // value later renamed/deactivated) — otherwise the <select> shows blank and re-saving
+  // could silently drop it. Flag it as stale so it's visible, not lost.
+  const cur = value == null ? '' : value;
+  const hasCur = cur === '' || options.some((o) => String(o) === String(cur));
   return (
     <FormField label={label}>
-      <Select value={value == null ? '' : value} onChange={(e) => onChange(e.target.value)}>
+      <Select value={cur} onChange={(e) => onChange(e.target.value)}>
+        {!hasCur && <option value={cur}>{`${cur} (current)`}</option>}
         {options.map((o) => <option key={o} value={o}>{o === '' ? '— Select —' : o}</option>)}
       </Select>
     </FormField>
