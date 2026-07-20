@@ -18,10 +18,12 @@
 // A ref that isn't part of a booking (a manual sale/purchase voucher) falls back to
 // opening that single voucher, so a ledger click never dead-ends.
 // ───────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { apiGet } from './api';
 import { JvBlock } from './voucher/JvBlock';
 import { pushModal } from './ux/modalStore';
+import { confirmDialog } from './ux/confirm';
+import { isTopGuardDirty } from './ux/navGuard';
 import { bc } from './styleTokens';
 import { VSPECS } from './voucherSpecs';
 import { printBookingInvoice } from './printInvoice';
@@ -79,6 +81,18 @@ export function BookingFolderHost({ branch: shellBranch }) {
   const [job, setJob] = useState(null);       // { ref, branch, voucherId, vno }
   const [state, setState] = useState({ loading: false, err: '', data: null, fallback: false });
 
+  // Confirm before discarding an open, DIRTY voucher when this overlay is dismissed
+  // (backdrop / ✕ / Back / Esc). The fallback single-voucher view embeds an editable
+  // VoucherEditor (guarded); isTopGuardDirty() reports its unsaved state so an accidental
+  // close can't drop a half-typed voucher. The folder view itself is read-only.
+  const close = useCallback(async () => {
+    if (isTopGuardDirty()) {
+      const { confirmed } = await confirmDialog({ title: 'Discard changes?', message: 'This voucher has unsaved changes that will be lost.', confirmLabel: 'Discard', cancelLabel: 'Keep editing', danger: true });
+      if (!confirmed) return;
+    }
+    setJob(null);
+  }, []);
+
   useEffect(() => {
     const onOpen = (e) => { const d = e.detail || {}; if (d.ref) setJob({ ref: d.ref, branch: d.branch || '', voucherId: d.voucherId || '', vno: d.vno || '' }); };
     window.addEventListener('kb:booking-folder', onOpen);
@@ -95,7 +109,7 @@ export function BookingFolderHost({ branch: shellBranch }) {
 
   useEffect(() => {
     if (!job) { setState({ loading: false, err: '', data: null, fallback: false }); return undefined; }
-    const pop = pushModal(() => setJob(null)); // Esc closes
+    const pop = pushModal(close); // Esc closes (guarded if the fallback voucher is dirty)
     let cancelled = false;
     setState({ loading: true, err: '', data: null, fallback: false });
     (async () => {
@@ -110,12 +124,11 @@ export function BookingFolderHost({ branch: shellBranch }) {
       }
     })();
     return () => { cancelled = true; pop(); };
-  }, [job]);
+  }, [job, close]);
 
   if (!job) return null;
   const branch = shellBranch;
   const cur = bc(branch).cur;
-  const close = () => setJob(null);
   const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 18, lineHeight: 1, padding: '0 2px' };
   const btn = (bg) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 7, border: bg ? 'none' : '1px solid #cdd1d8', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: bg || '#fff', color: bg ? '#fff' : DARK });
 
