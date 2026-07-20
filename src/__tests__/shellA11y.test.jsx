@@ -34,6 +34,13 @@ describe('BranchSwitcher (keyboard/listbox)', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
+  it('a TK Group Central member lands on the group view — trigger reads "TK Group Central"', () => {
+    // branch="ALL" is exactly what branchForLogin returns for a full-scope member at sign-in,
+    // so this asserts the user-facing text the top-right selector shows right after login.
+    render(<BranchSwitcher branch="ALL" setBranch={() => {}} currentUser={director} light />);
+    expect(screen.getByRole('button', { name: /TK Group Central\. Change branch/i })).toBeInTheDocument();
+  });
+
   it('Escape closes and returns focus to the trigger', () => {
     render(<BranchSwitcher branch={{ code: 'BOM', city: 'Mumbai' }} setBranch={() => {}} currentUser={director} light />);
     const trigger = screen.getByRole('button', { name: /change branch/i });

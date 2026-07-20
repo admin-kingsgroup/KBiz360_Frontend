@@ -10,7 +10,7 @@ import { Settings } from 'lucide-react';
 import { LoginScreen } from './auth/LoginScreen';
 import { apiPost } from './core/api';
 import { ErrorBoundary } from './shell/ErrorBoundary';
-import { pickBranchForUser, withCanonicalRole, applyRenewedAccess } from './core/branchScope';
+import { pickBranchForUser, branchForLogin, withCanonicalRole, applyRenewedAccess } from './core/branchScope';
 import { useMobile } from './core/hooks';
 import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
@@ -99,7 +99,7 @@ import { ReportActionBar } from './core/ReportActionBar';
 import { PrefsProvider } from './core/prefs';
 import { HotkeysProvider } from './core/ux/hotkeys';
 import { NavContext } from './core/ux/nav';
-import { ToastHost } from './core/ux/toast';
+import { ToastHost, toastInfo } from './core/ux/toast';
 import { RuleBlockHost } from './core/ux/ruleBlock';
 import { GlobalFetchBar } from './core/ux/GlobalFetchBar';
 import { ConfirmHost, confirmDialog } from './core/ux/confirm';
@@ -242,7 +242,15 @@ export default function KB360App(){
   // branch focused they may work in that branch's ERP (opBranch drives it), so don't
   // bounce those routes back to the Control Tower.
   useEffect(()=>{
-    if (!embed && isCentral && inGroupMode && !branchFocused && route && !isCockpitRoute(route)) navigate('/tk/control-tower');
+    if (!embed && isCentral && inGroupMode && !branchFocused && route && !isCockpitRoute(route)) {
+      // Not-silent (per the empty/blocked-screen rule): say WHAT (you're in the group view),
+      // WHY (branch screens need a specific branch) and WHERE (Focus a branch / here's the
+      // Control Tower) instead of teleporting with no context. Matters more now that central
+      // users DEFAULT into group mode — a stale deep link to a branch screen would otherwise
+      // bounce mysteriously. The toast is de-duped, so repeated bounces don't stack.
+      toastInfo('TK Group Central is a group view — Focus a branch from the top bar to open branch screens. Opened the Control Tower.');
+      navigate('/tk/control-tower');
+    }
   }, [branch, currentUser, route, navigate, focus, isCentral, inGroupMode, branchFocused, embed]);
 
   /* Persist the current route so a refresh / re-open returns you here.
@@ -298,7 +306,12 @@ export default function KB360App(){
     // central cockpit + every owner-only surface, not a half-owner.
     const newUser = withCanonicalRole(rawUser);
     setCurrentUser(newUser);
-    setBranch(pickBranchForUser(newUser));
+    // Fresh sign-in: a TK Group Central member (full-scope) starts on the group view
+    // ("TK Group Central" in the top-right selector), regardless of any branch left in
+    // storage; everyone else lands on their assigned branch. A REFRESH still restores the
+    // last-selected branch (see the pickBranchForUser initializer above), so a reload keeps
+    // you where you were — only a new sign-in resets to the group view.
+    setBranch(branchForLogin(newUser));
     // Redirect on user switch (current route may be forbidden). Accountants land on
     // their own workspace dashboard; everyone else on the general dashboard.
     navigate(/accountant/i.test(newUser?.role || '') ? "/accounts/dashboard" : "/dashboard", { force:true });

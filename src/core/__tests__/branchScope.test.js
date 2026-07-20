@@ -2,7 +2,7 @@
    login and refresh must resolve to a branch the user can actually access, or
    the server-side branch scoping (auth.middleware enforceBranchScope) 403s every
    branch-scoped read. pickBranchForUser is the single picker both paths use. */
-import { pickBranchForUser, isFullScope, hasNoAssignedBranch, canonicalRole, withCanonicalRole, applyRenewedAccess } from '../branchScope';
+import { pickBranchForUser, branchForLogin, isFullScope, hasNoAssignedBranch, canonicalRole, withCanonicalRole, applyRenewedAccess } from '../branchScope';
 import { BRANCHES } from '../data';
 
 beforeEach(() => { try { localStorage.removeItem('kb360-branch'); } catch { /* ignore */ } });
@@ -55,6 +55,44 @@ describe('pickBranchForUser', () => {
   test('a leftover saved branch cannot rescue an unassigned non-full user', () => {
     localStorage.setItem('kb360-branch', 'BOM');
     expect(pickBranchForUser({ role: 'Branch Manager' })).toBe(null);
+  });
+});
+
+describe('branchForLogin (fresh sign-in resets a TK Group Central member to the group view)', () => {
+  test('each full-scope role signs in on "ALL" (TK Group Central)', () => {
+    ['Super Admin', 'Director', 'Senior Finance Manager', 'Sr. Accounts Executive']
+      .forEach((role) => expect(branchForLogin({ role })).toBe('ALL'));
+  });
+
+  test('a canonicalised super_admin (Owner) signs in on TK Group Central', () => {
+    expect(branchForLogin(withCanonicalRole({ role: 'super_admin' }))).toBe('ALL');
+  });
+
+  test('a saved branch does NOT override the group view on login (login resets; refresh restores)', () => {
+    localStorage.setItem('kb360-branch', 'NBO');
+    expect(branchForLogin({ role: 'Director' })).toBe('ALL');            // login → reset to group
+    expect(pickBranchForUser({ role: 'Director' })).toMatchObject({ code: 'NBO' }); // refresh → keep branch
+  });
+
+  test('a NON-full user still lands on their assigned branch, never the group view', () => {
+    expect(branchForLogin({ role: 'Branch Accountant', branches: ['BOM'] })).toMatchObject({ code: 'BOM' });
+  });
+
+  test('a NON-full user with no assigned branch → null (unchanged from pickBranchForUser)', () => {
+    expect(branchForLogin({ role: 'Branch Manager' })).toBe(null);
+  });
+
+  test('a full-scope ROLE narrowed to a branch subset (allBranches:false) does NOT default to ALL', () => {
+    // The Page Visibility admin can restrict an otherwise all-scope role to specific branches;
+    // the server then 403s consolidated reads, so login must land on their in-scope branch, not ALL.
+    const b = branchForLogin({ role: 'Sr. Accounts Executive', branches: ['AMD'], allBranches: false });
+    expect(b).toMatchObject({ code: 'AMD' });
+    expect(b).not.toBe('ALL');
+  });
+
+  test('a full-scope user with allBranches true/undefined still lands on ALL', () => {
+    expect(branchForLogin({ role: 'Super Admin', allBranches: true })).toBe('ALL');
+    expect(branchForLogin({ role: 'Director' })).toBe('ALL'); // undefined → treated as full
   });
 });
 

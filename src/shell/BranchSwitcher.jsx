@@ -26,7 +26,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
   const isAll=branch==="ALL";
   const brFlag=isAll?"🌐":branch?.flag||"🇮🇳";
   const brLabel=isAll?CONSOLIDATED_LABEL:(branch?.code||"BOM")+(branch?.city?" — "+branch.city:"");
-  const brTagLabel=isAll?"Consolidated":"Branch";
+  const brTagLabel=isAll?"TK Group":"Branch";
 
   // The branches this user may switch to, plus a Consolidated (ALL) row.
   const list=useMemo(()=>{
@@ -151,7 +151,7 @@ export function BranchSwitcher({branch,setBranch,currentUser,light}){
                     {b.code==="ALL"?CONSOLIDATED_LABEL:b.code+(b.city?" — "+b.city:"")}
                   </p>
                   <p style={{margin:0,fontSize:9.5,color:"#64748b"}}>
-                    {b.code==="ALL"?"Consolidated":"Branch"} · {b.currency||b.cur} · {b.tax||b.taxType||""}
+                    {b.code==="ALL"?"TK Group":"Branch"} · {b.currency||b.cur} · {b.tax||b.taxType||""}
                   </p>
                 </div>
                 {sel&&<span style={{marginLeft:"auto",color:optColor,fontSize:12}} aria-hidden="true">✔</span>}
