@@ -17,9 +17,8 @@ const lazyEl = (loader, name) =>
   React.lazy(() => loader().then(m => ({ default: m[name] })));
 
 export const financeRoutes = [
-  // Mounted at /finance/trial-balance so it lands alongside the legacy
-  // /trial-balance screen during migration (no regression); it takes over the
-  // canonical path once it reaches feature parity (export / print / drill).
+  // The canonical Trial Balance (Excel export / print / ledger drill). The legacy
+  // /trial-balance path now redirects here; the old TrialBalanceLive was removed.
   { path: '/finance/trial-balance', title: 'Trial Balance', moduleName: 'Finance', Element: lazyEl(() => import('../pages/trial-balance'), 'TrialBalancePage') },
 
   // Voucher registers — live from GET /api/vouchers, period driven by the FY selector.

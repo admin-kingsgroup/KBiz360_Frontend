@@ -35,9 +35,10 @@ Layering: `pages → hooks → services → api → core/api → backend`.
 
 > The legacy `TrialBalanceLegacy` (in `legacy.jsx`) computed a fake trial balance
 > from seed data with invented ratios. The migrated page reads the real
-> double-entry books. It mounts at `/finance/trial-balance` and will take over
-> the canonical `/trial-balance` path (currently `accountingLive::TrialBalanceLive`)
-> once it reaches feature parity (Excel export, print, ledger drill-down).
+> double-entry books. It is now the canonical Trial Balance at
+> `/finance/trial-balance` (Excel export, print, ledger drill-down); the legacy
+> `/trial-balance` path redirects here, and the old `accountingLive::TrialBalanceLive`
+> has been removed.
 
 ## Next screen to migrate
 

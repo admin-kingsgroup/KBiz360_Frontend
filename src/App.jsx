@@ -201,11 +201,14 @@ export default function KB360App(){
   // useBlocker in react-router 6 without a data router — so that one path stays uncovered.)
   const goBack = useCallback(()=>{ if(isGuardDirty()){ confirmLeave(()=>rrNavigate(-1)); return; } rrNavigate(-1); }, [rrNavigate, confirmLeave]);
   const goForward = useCallback(()=>{ if(isGuardDirty()){ confirmLeave(()=>rrNavigate(1)); return; } rrNavigate(1); }, [rrNavigate, confirmLeave]);
-  // Native browser Back/Forward (the chrome buttons) don't pass through navigate()/goBack(),
-  // so guard them with react-router's useBlocker: block a history navigation whenever a form
-  // is dirty, then reuse the same Leave/Stay confirm. In-app navigation already prompts AND
-  // clears the guard BEFORE it navigates, so isGuardDirty() reads false by the time the router
-  // runs shouldBlock for those — this path only ever fires for the browser's own buttons.
+  // useBlocker intercepts EVERY router navigation (push / replace / POP), not only the
+  // browser's Back/Forward buttons — but those buttons are the point: they don't pass through
+  // navigate()/goBack(), so nothing else would guard them. It's harmless for the in-app paths
+  // because navigate()/goBack()/goForward() call clearNavGuard() BEFORE rrNavigate, so
+  // isGuardDirty() already reads false when the blocker checks them (no double-prompt). NET
+  // effect: the blocker only ever *surfaces* for the browser's own buttons. INVARIANT to keep:
+  // never fire a RAW rrNavigate / <Navigate> on a path where a form can be dirty — route
+  // programmatic navigation through the guarded navigate(), or the blocker will false-block it.
   const backBlocker = useBlocker(()=>isGuardDirty());
   useEffect(()=>{
     if(backBlocker.state !== 'blocked') return;

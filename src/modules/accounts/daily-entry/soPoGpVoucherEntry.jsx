@@ -1727,13 +1727,22 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
   const vo = isViewOnly();
 
   // Unsaved-changes guard: the reversal (RF/RI) form keeps its OWN state, which the
-  // fare-grid parent's guard (customer/supplier/lines) never sees — so without this,
-  // a half-entered refund/reissue could be navigated away and silently discarded. A
-  // snapshot compare vs the pristine seed; skipped once saved (`result`) or for a
-  // view-only user (nothing savable to lose). Never throws.
-  const pristineRef = useRef(null);
-  if (pristineRef.current === null) pristineRef.current = JSON.stringify(state);
-  useNavGuard(() => { try { return !result && !vo && JSON.stringify(state) !== pristineRef.current; } catch { return false; } });
+  // fare-grid parent's guard (customer/supplier/lines) never sees — so without this a
+  // half-entered refund/reissue could be navigated away and silently discarded. Check
+  // the USER-ENTRY fields, NOT a full-state snapshot: a snapshot false-armed on load
+  // for VAT branches (RefundReissueFields auto-seeds gstPct 18→16 on NBO/FBM) and after
+  // the "New" reset (which retains party/counterParty vs the pristine seed). These are
+  // the fields that signal an in-progress reversal (and that "New" clears). Skipped once
+  // saved (`result`) or for a view-only user (nothing savable to lose). Never throws.
+  const reversalHasData = () => {
+    try {
+      const s = state;
+      return !!(String(s.againstInvoice || '').trim() || String(s.againstPurchase || '').trim()
+        || (+s.supplierAmt) > 0 || (+s.serviceCharge) > 0 || (+s.markup) > 0 || (+s.supplierSvc) > 0
+        || (+s.supplierCancel) > 0 || (+s.incentiveAmt) > 0 || String(s.remarks || '').trim());
+    } catch { return false; }
+  };
+  useNavGuard(() => !result && !vo && reversalHasData());
 
   // Saving always lands the RF/RI booking in Pending — no save-and-approve from entry
   // (any user). It posts only when approved from the Pending queue.
