@@ -18,7 +18,7 @@ const STATUS = {
   open: { tone: 'warning', label: 'Not tied' },
 };
 
-export function CertifyPanel({ branch, period, tier, offTotal, fixTotal = 0, currentUser }) {
+export function CertifyPanel({ branch, period, tier, offTotal, fixTotal = 0, rounding = 0, currentUser }) {
   const qc = useQueryClient();
   // "Tied" for the close gate now also requires every Tally ledger name/group to match
   // ERP (policy: correct Tally before sign-off) — mirrors the backend fixTotal gate.
@@ -78,6 +78,13 @@ export function CertifyPanel({ branch, period, tier, offTotal, fixTotal = 0, cur
           </div>
         ) : (
           <>
+            {/* Never certify silently over a residue: when the period ties only because a
+                sub-rupee Round Off residue is tolerated, say so at the point of sign-off. */}
+            {(rounding || 0) > 0 && tied ? (
+              <div className="rounded-brand border border-info/30 bg-info/5 px-4 py-2.5 text-sm text-ink" data-testid="certify-rounding-note">
+                <b className="text-info">Ties within rounding.</b> A tolerated sub-rupee Round Off residue is certified as reconciled — every other ledger ties to the paise.
+              </div>
+            ) : null}
             {/* chain progress */}
             <div>
               <div className="mb-1 flex items-center justify-between text-xs text-ink-muted">

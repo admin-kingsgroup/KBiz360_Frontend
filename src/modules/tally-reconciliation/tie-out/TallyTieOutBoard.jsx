@@ -773,7 +773,7 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
         : null}
 
       {!empty && !isLoading && (imported.count
-        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} fixTotal={fixTotal} currentUser={currentUser} />
+        ? <CertifyPanel branch={branch} period={period} tier={tier} offTotal={offTotal} fixTotal={fixTotal} rounding={counts.rounding || 0} currentUser={currentUser} />
         : (
           <PageSection icon={Upload} title={`No Tally Trial Balance uploaded — ${branch} · ${periodLabel(period)}`}
             subtitle="Until you upload the period's Tally TB, every ERP ledger below shows as unmatched. This is the starting point, not an error.">
@@ -893,14 +893,14 @@ export function TallyTieOutBoard({ branch: appBranch, currentUser, tier: fixedTi
                       {/* Net Profit / (Loss): a loss shows in parentheses + red, never a positive Dr. */}
                       <td className={`px-4 py-3 text-right font-mono tabular-nums ${plTone(foot.erp)}`}>{plText(foot.erp, cur)}</td>
                       <td className={`px-4 py-3 text-right font-mono tabular-nums ${plTone(foot.tally)}`}>{plText(foot.tally, cur)}</td>
-                      <td className={`px-4 py-3 text-right font-mono tabular-nums ${tiesWithinRounding ? 'text-info' : 'text-danger'}`}>{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
+                      <td className={`px-4 py-3 text-right font-mono tabular-nums ${round2(foot.erp - foot.tally) === 0 ? 'text-ink-subtle' : tiesWithinRounding ? 'text-info' : 'text-danger'}`}>{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
                       <td className="px-4 py-3 text-right"><Badge tone={round2(foot.erp - foot.tally) === 0 ? 'success' : tiesWithinRounding ? 'info' : 'danger'} size="sm" dot>{round2(foot.erp - foot.tally) === 0 ? 'Tied' : tiesWithinRounding ? 'Rounding' : 'Off'}</Badge></td>
                     </>
                   ) : (
                     <>
                       <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(foot.erp, cur)}</td>
                       <td className="px-4 py-3 text-right font-mono tabular-nums">{fmt(foot.tally, cur)}</td>
-                      <td className={`px-4 py-3 text-right font-mono tabular-nums ${tiesWithinRounding ? 'text-info' : 'text-danger'}`}>{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
+                      <td className={`px-4 py-3 text-right font-mono tabular-nums ${round2(foot.erp - foot.tally) === 0 ? 'text-ink-subtle' : tiesWithinRounding ? 'text-info' : 'text-danger'}`}>{round2(foot.erp - foot.tally) === 0 ? '0' : `${foot.erp - foot.tally > 0 ? '+' : '−'}${Math.abs(round2(foot.erp - foot.tally)).toLocaleString(localeOf(cur))}`}</td>
                       <td className="px-4 py-3 text-right"><Badge tone={round2(foot.erp - foot.tally) === 0 ? 'success' : tiesWithinRounding ? 'info' : 'danger'} size="sm" dot>{round2(foot.erp - foot.tally) === 0 ? 'Tied' : tiesWithinRounding ? 'Rounding' : 'Off'}</Badge></td>
                     </>
                   )}

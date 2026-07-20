@@ -1070,6 +1070,22 @@ describe('Tally Reconciliation · certificate re-open', () => {
     getTallyCert.mockResolvedValue({ certificate: null, chain: lockedCert.chain, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: false, reason: 'freeze the tie-out first' } });
   });
 
+  test('CertifyPanel surfaces a tolerated Round Off residue at the sign-off gate', async () => {
+    const { getTallyCert } = require('../api');
+    getTallyCert.mockResolvedValueOnce({ certificate: null, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: true } });
+    wrap(<CertifyPanel branch="BOM" period="2026-01" tier="month" offTotal={0} fixTotal={0} rounding={1} currentUser={{ role: 'Owner' }} />);
+    expect(await screen.findByTestId('certify-rounding-note')).toBeInTheDocument();
+    expect(screen.getByText(/Ties within rounding/)).toBeInTheDocument();
+  });
+
+  test('CertifyPanel shows NO rounding note when the period ties on the paise', async () => {
+    const { getTallyCert } = require('../api');
+    getTallyCert.mockResolvedValueOnce({ certificate: null, progress: { done: 0, total: 4, next: { role: 'AE' } }, canSign: { ok: true } });
+    wrap(<CertifyPanel branch="BOM" period="2026-02" tier="month" offTotal={0} fixTotal={0} rounding={0} currentUser={{ role: 'Owner' }} />);
+    await screen.findByText(/Sign chain/);
+    expect(screen.queryByTestId('certify-rounding-note')).not.toBeInTheDocument();
+  });
+
   test('a certified period disables the Upload buttons (re-open first)', async () => {
     const { getTieOut } = require('../api');
     getTieOut.mockResolvedValueOnce({
