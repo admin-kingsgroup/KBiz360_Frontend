@@ -41,10 +41,11 @@ export function ClientStatement({ branch }) {
     type: p.debit > 0 ? 'Invoice' : 'Receipt',
     ref: p.vno,
     desc: p.narration || p.entryNarration || (p.particulars && p.particulars[0]?.ledger) || p.category || '—',
+    supplier: p.supplier || '',
     dr: p.debit || 0, cr: p.credit || 0,
     bal: p.balanceSide === 'Cr' ? -(p.balance || 0) : (p.balance || 0),
   }));
-  const filteredTxns = txnsWithBal.filter((t) => matchNeedle([t.date, t.type, t.ref, t.desc], needle));
+  const filteredTxns = txnsWithBal.filter((t) => matchNeedle([t.date, t.type, t.ref, t.desc, t.supplier], needle));
   const totDr = stmt?.totalDebit || 0;
   const totCr = stmt?.totalCredit || 0;
   const outstanding = stmt ? (stmt.closingSide === 'Cr' ? -(stmt.closingBalance || 0) : (stmt.closingBalance || 0)) : 0;
@@ -74,6 +75,7 @@ export function ClientStatement({ branch }) {
     { key: 'type', header: 'Type', render: (r, v) => <StatusPill tone={v === 'Invoice' ? 'info' : 'success'} size="sm">{v}</StatusPill> },
     { key: 'ref', header: 'Reference', className: 'font-mono text-[10px] text-[#2563eb]' },
     { key: 'desc', header: 'Description', className: 'text-role-hr' },
+    { key: 'supplier', header: 'Supplier', className: 'text-ink-muted', render: (r, v) => v || '—' },
     { key: 'dr', header: 'Dr', num: true, className: 'text-maroon', render: (r, v) => (v > 0 ? f(v) : '—'), footer: () => f(totDr) },
     { key: 'cr', header: 'Cr', num: true, className: 'text-[#16a34a]', render: (r, v) => (v > 0 ? f(v) : '—'), footer: () => f(totCr) },
     { key: 'bal', header: 'Balance', num: true, render: (r, v) => <span className="font-bold" style={{ color: v > 0 ? '#dc2626' : v < 0 ? '#16a34a' : '#5b616e' }}>{balText(v)}</span>, footer: () => balText(outstanding), footerLabel: 'CLOSING' },
