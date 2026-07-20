@@ -266,11 +266,12 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const refKeys = spec.idCols.slice(2);            // module reference fields (Ticket/PNR, Hotel/Conf, Country/Passport…)
   const isVatBr = isVatBranch(code);
   const effNoVat = isVatBr && !!booking.noVat;      // noVat only bites on Africa/VAT branches
-  // VAT rate from the branch config (referenceCache → the VAT master, per 3D's single source);
-  // falls back to the built-in constant only if the config hasn't hydrated. So the printed % and
-  // the per-line VAT follow an amended VAT master exactly like the posting engine — no hardcoded
-  // 16/18/16 that could drift from what the server bills.
-  const cfgVatPct = (bc({ code }) || {}).vatRate;
+  // An invoice reproduces the rate the customer was BILLED — the booked snapshot's own vatRate
+  // (persisted at save time from the live VAT master), NEVER the current live config. A reprint
+  // after a later VAT-master amendment must still show the booked rate and foot to the booked NET
+  // TOTAL. Legacy bookings with no stored vatRate fall to the built-in constant below = the rate
+  // in force when they were billed.
+  const cfgVatPct = snap.vatRate;
   const ctx = { branch: code, noVat: effNoVat, vatRate: (isVatBr && cfgVatPct != null) ? Number(cfgVatPct) : undefined };
   // The GST/VAT rate shown in column headers — mirrors the voucher's getGstRate().
   const activeRate = effNoVat ? 0

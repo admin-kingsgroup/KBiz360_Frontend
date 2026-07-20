@@ -82,7 +82,8 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const brCode = branchCode || (branch && (branch.code || branch)) || '';
   const isVatBr = isVatBranch(brCode);
   const VAT_FALLBACK = { NBO: 16, DAR: 18, FBM: 16 };
-  const vatPct = isVatBr ? (num((bc({ code: brCode }) || {}).vatRate) || VAT_FALLBACK[String(brCode).toUpperCase()] || 16) : 0;
+  const _brVatRaw = (bc({ code: brCode }) || {}).vatRate;   // honor an amended 0% (mirror PurchaseExpenseFields' != null)
+  const vatPct = isVatBr ? (_brVatRaw != null ? num(_brVatRaw) : (VAT_FALLBACK[String(brCode).toUpperCase()] || 16)) : 0;
   const taxLabel = isVatBr ? 'VAT' : 'GST';
   const whtLabel = isVatBr ? 'WHT' : 'TDS';
   const rateSlabs = isVatBr ? [vatPct] : GST_SLABS;

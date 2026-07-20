@@ -172,11 +172,16 @@ describe('buildBookingInvoice — Africa VAT branch (NBO)', () => {
     expect(html).toContain('$');       // amounts carry the USD symbol
   });
 
-  test('the VAT-column % follows an amended VAT master (single source), not a hardcoded 16/18/16', () => {
-    bc.mockReturnValue({ cur: '₹', vatRate: 15 });   // Owner amended Kenya VAT 16 → 15 in Masters ▸ Tax
-    const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {});
-    expect(html).toContain('(15%)');    // caption follows the master…
-    expect(html).not.toContain('(16%)'); // …not the built-in constant
+  test('the VAT-column % reflects the BOOKED snapshot rate, not the live config (faithful reprint)', () => {
+    const booked15 = { ...nbo, so: { ...nbo.so, vatRate: 15 } };   // this booking was billed at 15%
+    const html = buildBookingInvoice(booked15, 'sale', { code: 'NBO' }, {});
+    expect(html).toContain('(15%)');    // faithful to what was billed…
+    expect(html).not.toContain('(16%)'); // …not the live rate or the built-in constant
+  });
+
+  test('a legacy booking with no stored vatRate falls back to the branch constant', () => {
+    const html = buildBookingInvoice(nbo, 'sale', { code: 'NBO' }, {});   // nbo.so carries no vatRate
+    expect(html).toContain('(16%)');    // NBO built-in constant = the rate in force when billed
   });
 
   test('USD invoice spells the amount with international grouping — no Indian "Lakh"/"Crore"', () => {
