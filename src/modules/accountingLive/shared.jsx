@@ -4,9 +4,8 @@
    common page scaffold, table chrome, date/format helpers and register
    pivot-column building blocks used by BOTH the screens that moved to
    modules/accounts/ (DayBookLive, LedgerAcLive, CashBookLive, RegisterLive)
-   and the screens that stayed here (VoucherEditor, TrialBalanceLive,
-   ReportPnLLive, ReportBSLive, InvoiceGPLive, buildCaptureSheet) — so
-   neither side needs a duplicate copy.
+   and the screens that stayed here (VoucherEditor, ReportPnLLive, ReportBSLive,
+   InvoiceGPLive, buildCaptureSheet) — so neither side needs a duplicate copy.
    ════════════════════════════════════════════════════════════════════ */
 
 import React, { useState } from 'react';

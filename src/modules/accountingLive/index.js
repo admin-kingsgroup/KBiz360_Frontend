@@ -10,15 +10,14 @@
    superseded by accounts/branch-mis/reportsLive.jsx) — was extracted to
    ./shared.jsx rather than duplicated.
 
-   BUSINESS SUB-MODULE REORG (2026-07-14): TrialBalanceLive (+ its exclusive
-   LedgerDrill drill-down) moved to finance/books/; InvoiceGPLive (+ its
-   exclusive ViewToggle) moved to finance/registers-outstanding/ — both are
-   MENU_FINANCE-routed, not MENU_ACCOUNTS. Re-exported below for the same
-   reason as the other moved screens. */
+   BUSINESS SUB-MODULE REORG (2026-07-14): InvoiceGPLive (+ its exclusive
+   ViewToggle) moved to finance/registers-outstanding/ — MENU_FINANCE-routed,
+   not MENU_ACCOUNTS. Re-exported below for the same reason as the other moved
+   screens. (The old TrialBalanceLive was superseded by finance/pages/trial-
+   balance.jsx in the Trial Balance dedup and has been removed.) */
 export * from './legacy';
 export { DayBookLive } from '../accounts/books-scrutiny/dayBookLive';
 export { LedgerAcLive } from '../accounts/books-scrutiny/ledgerAcLive';
 export { CashBookLive } from '../accounts/cash-bank/cashBookLive';
 export { RegisterLive } from '../accounts/sales-purchase/registerLive';
-export { TrialBalanceLive } from '../finance/books/trialBalanceLive';
 export { InvoiceGPLive } from '../finance/registers-outstanding/invoiceGPLive';
