@@ -54,7 +54,10 @@ export function AcmRegister({ branch }) {
   const [modal, setModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ airline: 'Air India', airlineCode: 'AI', ticketNo: '', reasonCode: 'RC', amount: 0, currency: 'INR', branch: brCode || 'BOM', remarks: '' });
+  // New-ACM currency defaults to the BRANCH's main currency (NBO/DAR/FBM → USD), not a
+  // hardcoded INR — else an NBO ACM is saved as INR and drops out of the currency-matched
+  // BSP summary. Mirrors the ADM register fix.
+  const [form, setForm] = useState({ airline: 'Air India', airlineCode: 'AI', ticketNo: '', reasonCode: 'RC', amount: 0, currency: (brCode && branchMainCurrency(brCode)) || 'INR', branch: brCode || 'BOM', remarks: '' });
 
   const filtered = acms.filter((a) => (
     (statusFilter === 'All' || a.status === statusFilter)

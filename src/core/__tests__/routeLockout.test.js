@@ -54,9 +54,13 @@ describe('canReachRoute — hard route-level lockout', () => {
 describe('canReachRoute — branch-regime (VAT vs GST) gate', () => {
   const NBO = { code: 'NBO' }, DAR = { code: 'DAR' }, BOM = { code: 'BOM' };
   const INDIA_ONLY = ['/tax/gstr1', '/tax/gstr3b', '/tax/gstr2b', '/tax/tds', '/tax/tds-certs',
-    '/tax/form26as', '/tax/rcm', '/tax/einvoice', '/tax/eway', '/tax/audit-3cd', '/tax/gstr-1-prep'];
+    '/tax/form26as', '/tax/rcm', '/tax/einvoice', '/tax/eway', '/tax/audit-3cd', '/tax/gstr-1-prep',
+    // India-only statutory tools outside /tax/*: the TDS calculator (Sections 194/PAN/Challan
+    // 281) and the PF/ESI challan register are blocked on a VAT branch too. /hr/payroll is NOT
+    // (payroll runs on every branch) — asserted separately below.
+    '/finance/tds-calculator', '/hr/pf-esi'];
   const SHARED_OR_AFRICA = ['/tax/vat', '/tax/reconciliation', '/tax/calendar',
-    '/reports/tax-summary', '/finance/tds-calculator'];
+    '/reports/tax-summary', '/hr/payroll'];
 
   test('India-GST-only routes are blocked on a VAT branch — even for full-menu roles', () => {
     for (const r of INDIA_ONLY) {
