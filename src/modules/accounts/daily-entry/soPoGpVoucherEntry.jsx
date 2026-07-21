@@ -182,10 +182,10 @@ export function inbRowsFromDeal(spec, deal) {
   const line = blankLine(spec);
   const cols = spec.fareCols || [];
   // A fare line whose label no longer has a column (a LEGACY deal captured before a
-  // module's fare columns were removed — insurance → service-only, 2026-07-18) must
-  // NOT be silently dropped: carry it on its legacy key so the entry screen can SEE
-  // the money and refuse the lossy re-save (legacyFareCarry gate) instead of quietly
-  // rebuilding the deal without it.
+  // module's fare columns were removed — insurance → service-only, 2026-07-18) is carried
+  // on its legacy key so the entry screen can compute `legacyFareCarry` and warn (the amber
+  // "premium removed on save" notice). On save those keys are STRIPPED from the rows (FE +
+  // backend stripDroppedFareKeys) — service-only, so the premium is dropped deliberately.
   const LEGACY_FARE_KEY = { 'base fare': 'base', 'k3 tax': 'k3', 'taxes': 'tax' };
   for (const f of (deal.fareLines || [])) {
     const col = cols.find((c) => String(c.label).trim().toLowerCase() === String(f.desc).trim().toLowerCase());
@@ -901,7 +901,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     setError(''); setSaving(true);
     try {
       const gpLines = lines.map((l) => {
-        const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, vatRate: liveVatRate });
+        // Mirror the on-screen tables + the `totals` memo: a FOREIGN supplier charges no
+        // Indian GST and withholds no 194H TDS, so the stored per-line meta must carry the
+        // same flags or it overstates gstPur/tds for a foreign insurance/flight vendor.
+        const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, supplierWhtRate: suppWhtRate, vatRate: liveVatRate });
         return { fn: l.fn, sn: l.sn, finalSales: c.finalSales, salesGST: c.salesGST, finalPurchase: c.finalPurchase, gstPur: c.gstPur, gp: c.gp, gpPct: c.gpPct };
       });
       const payload = {
@@ -1693,7 +1696,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         </div>
       )}
 
-      {gpNegative && !interBranchParty && (
+      {gpNegative && !interBranch && !interBranchParty && (
         <div style={{ ...card, background: '#fdecea', border: '1px solid #e6a99f', color: '#8a2418', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <AlertTriangle size={15} style={{ flexShrink: 0 }} />
           <span><b>Gross Profit is negative</b> — this booking is a loss of {cur} {fmt(Math.abs(num(totals.gp.total)))}. A booking cannot post at a loss, so <b>Save is blocked</b>. Raise the sale (SVC2 / Service Fee) or reduce the supplier cost so <b>Gross Profit is 0 or above</b>, then save.</span>
@@ -1712,7 +1715,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
         <button disabled={!canSave || vo} onClick={() => save()} className="max-tablet:min-h-[44px]"
-          title={vo ? VIEW_ONLY_REASON : (gpNegative ? 'Gross Profit is negative — a booking cannot post at a loss. Adjust the sale / supplier cost so GP ≥ 0.' : undefined)}
+          title={vo ? VIEW_ONLY_REASON : (gpNegative && !interBranch ? 'Gross Profit is negative — a booking cannot post at a loss. Adjust the sale / supplier cost so GP ≥ 0.' : undefined)}
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>
           {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes (Pending)' : 'Save voucher (Pending)')}
         </button>
