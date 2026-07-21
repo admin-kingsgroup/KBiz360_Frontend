@@ -16,7 +16,21 @@ const PREVIEW = {
   ],
   totalDebit: 46284, totalCredit: 46284, balanced: true, diff: 0,
 };
-jest.mock('../core/useAccounting', () => ({ useVoucherPreview: () => ({ data: PREVIEW }) }));
+// A POSTED voucher must render the ACTUAL stored journal (JournalEntry) via
+// useVoucherJournal, NOT the live re-preview — so the popup ties out to the ledger
+// statement / Day Book / Tally. This STORED fixture deliberately differs from PREVIEW.
+const STORED = {
+  postings: [
+    { ledger: 'IT-SVF [Pur]', group: 'Purchase Accounts', debit: 100, credit: 0 },
+    { ledger: 'Sales Refunds', group: 'Sales Accounts', debit: 0, credit: 100 },
+  ],
+  totalDebit: 100, totalCredit: 100, balanced: true, diff: 0,
+};
+jest.mock('../core/useAccounting', () => ({
+  useVoucherPreview: () => ({ data: PREVIEW }),
+  // Mirrors the real hook's `enabled` gate: only a posted voucher passes { id, vno }.
+  useVoucherJournal: (arg) => ({ data: arg && (arg.id || arg.vno) ? STORED : undefined, isLoading: false }),
+}));
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -53,5 +67,15 @@ describe('VoucherLines — full JV with zeros shown as ₹0', () => {
   test('does NOT dump raw line meta as "[object Object]" (full JV replaces head-line cards)', () => {
     render(<VoucherLines voucher={voucher} cur="₹" />);
     expect(screen.queryByText(/\[object Object\]/)).toBeNull();
+  });
+
+  test('a POSTED voucher renders the STORED journal (JournalEntry), not the live re-preview', () => {
+    // status:'approved' → the popup reads useVoucherJournal (stored) instead of the preview,
+    // so it shows the posted head (IT-SVF [Pur]) and NOT the re-preview ledgers.
+    render(<VoucherLines voucher={{ ...voucher, id: 'v1', status: 'approved', category: 'refund' }} cur="₹" />);
+    expect(screen.getByText('IT-SVF [Pur]')).toBeInTheDocument();   // from the stored journal
+    expect(screen.getByText('Sales Refunds')).toBeInTheDocument();
+    expect(screen.queryByText('IT-Base Fare')).toBeNull();          // a re-preview-only ledger must NOT appear
+    expect(screen.getByText('✓ Balanced')).toBeInTheDocument();
   });
 });

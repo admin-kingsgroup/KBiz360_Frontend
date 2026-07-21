@@ -14,7 +14,7 @@ import { PeriodBar } from '../../core/period';
 import {
   useTrialBalance, useProfitAndLoss, useBalanceSheet,
   useLedgerStatement, useChartOfAccounts,
-  useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview,
+  useVoucher, useUpdateVoucher, useCostCenters, useVoucherPreview, useVoucherJournal,
 } from '../../core/useAccounting';
 import { VoucherShell } from '../../core/voucher/VoucherShell';
 import { JvBlock } from '../../core/voucher/JvBlock';
@@ -37,7 +37,14 @@ export function VoucherLines({ voucher: v, cur }) {
   // Sales and Purchase — not just the captured component lines. The hook must run
   // unconditionally (rules of hooks); it's gated to a real voucher with a category.
   const pv = useVoucherPreview(v && v.category ? v : null).data || {};
+  // Approved/posted vouchers show the ACTUAL stored journal (the JournalEntry), not a
+  // from-scratch rebuild, so the popup ties out to the ledger statement / Day Book /
+  // Tally. Live preview is kept only for not-yet-posted (pending) vouchers. (Hook runs
+  // unconditionally — rules of hooks — gated via `enabled` inside the hook.)
+  const posted = !!v && (v.status === 'approved' || v.status === 'saved' || v.status === 'posted');
+  const storedQ = useVoucherJournal(posted ? { id: v.id || v._id, vno: v.vno } : {});
   if (!v) return null;
+  const jv = posted ? (storedQ.data || {}) : pv;
   // The shared `money` renders 0 as '—'; the JV must show a real ₹0 on the empty side
   // so EVERY ledger is visible with an explicit amount.
   const money0 = (n) => cur + Math.round(Number(n) || 0).toLocaleString(localeOf(cur));
@@ -49,7 +56,7 @@ export function VoucherLines({ voucher: v, cur }) {
   );
   const jvTh = { textAlign: 'left', padding: '5px 8px', color: DIM, fontSize: 10, whiteSpace: 'nowrap' };
   const lockedByBooking = v.locked && v.source === 'booking';
-  const postings = pv.postings || [];
+  const postings = jv.postings || [];
   return (
     <>
       {lockedByBooking && (
@@ -68,7 +75,7 @@ export function VoucherLines({ voucher: v, cur }) {
         <div style={{ ...card, padding: 10, marginBottom: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry — every ledger this hits</div>
-            {typeof pv.balanced === 'boolean' && <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money0(pv.diff)}`}</span>}
+            {typeof jv.balanced === 'boolean' && <span style={{ fontSize: 11, fontWeight: 800, color: jv.balanced ? GREEN : RED }}>{jv.balanced ? '✓ Balanced' : `✗ Out by ${money0(jv.diff)}`}</span>}
           </div>
           <JvBlock postings={postings} />
         </div>
@@ -161,6 +168,13 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
     lines: form.lines.filter((l) => l.ledger).map((l) => ({ ...l, amt: Number(l.amt) || 0 })),
   } : null;
   const pv = useVoucherPreview(previewBody).data || {};
+  // The posted/approved read-only view (below) renders the ACTUAL stored journal
+  // (JournalEntry), never a rebuild — so it ties out to the ledger statement / Day Book /
+  // Tally. Live preview is used only while the voucher is still editable (pending). Hook
+  // runs unconditionally (rules of hooks); gated via `enabled` inside the hook.
+  const postedView = !!v && (v.status === 'approved' || v.status === 'saved' || v.status === 'posted');
+  const storedJvQ = useVoucherJournal(postedView ? { id: voucherId || v.id || v._id, vno: v.vno } : {});
+  const jvView = postedView ? (storedJvQ.data || {}) : pv;
   if (vq.isLoading || !form) return (
     <div style={{ padding: 24 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))', gap: 10 }}>
@@ -195,7 +209,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
   const printEntry = () => {
     const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? cur + x.toLocaleString(localeOf(cur)) : ''; };
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-    const rows = (pv.postings || []).map((p) => `<tr>
+    const rows = (jvView.postings || []).map((p) => `<tr>
       <td>${esc(p.ledger)}</td><td>${esc(p.group || '')}</td>
       <td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
     const html = `<style>
@@ -215,7 +229,7 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
       <table>
         <thead><tr><th>Ledger</th><th>Group</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="2">Total</td><td class="r">${fmt(pv.totalDebit)}</td><td class="r">${fmt(pv.totalCredit)}</td></tr></tfoot>
+        <tfoot><tr><td colspan="2">Total</td><td class="r">${fmt(jvView.totalDebit)}</td><td class="r">${fmt(jvView.totalCredit)}</td></tr></tfoot>
       </table>
     </div>`;
     openPrintPreview({ title: `Voucher — ${v.vno}`, recommend: 'portrait', html });
@@ -234,14 +248,14 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry</div>
-            <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: jvView.balanced ? GREEN : RED }}>{jvView.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, jvView.diff)}`}</span>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
             <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
             <tbody>
-              {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+              {(jvView.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
             </tbody>
-            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, jvView.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, jvView.totalCredit)}</td></tr></tfoot>
           </table>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
@@ -267,14 +281,14 @@ export function VoucherEditor({ voucherId, cur, onBack, onClose }) {
         <div style={{ ...card, padding: 10, boxShadow: 'none', border: '1px solid #dfe2e7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ fontWeight: 700, color: DARK, fontSize: 12 }}>Full Journal Entry</div>
-            <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: jvView.balanced ? GREEN : RED }}>{jvView.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, jvView.diff)}`}</span>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
             <thead><tr><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Ledger</th><th style={{ textAlign: 'left', padding: '5px 8px', color: DIM }}>Group</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Debit</th><th style={{ textAlign: 'right', padding: '5px 8px', color: DIM }}>Credit</th></tr></thead>
             <tbody>
-              {(pv.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
+              {(jvView.postings || []).map((p, i) => (<tr key={i} style={{ borderBottom: '1px solid #dfe2e7' }}><td style={{ padding: '5px 8px', fontWeight: 600, color: DARK }}>{p.ledger}</td><td style={{ padding: '5px 8px', color: DIM }}>{p.group}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: BLUE }}>{p.debit ? money(cur, p.debit) : ''}</td><td style={{ padding: '5px 8px', textAlign: 'right', color: RED }}>{p.credit ? money(cur, p.credit) : ''}</td></tr>))}
             </tbody>
-            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, pv.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, pv.totalCredit)}</td></tr></tfoot>
+            <tfoot><tr style={{ fontWeight: 800, background: '#f3f5f9' }}><td style={{ padding: '6px 8px' }} colSpan={2}>Total</td><td style={{ padding: '6px 8px', textAlign: 'right', color: BLUE }}>{money(cur, jvView.totalDebit)}</td><td style={{ padding: '6px 8px', textAlign: 'right', color: RED }}>{money(cur, jvView.totalCredit)}</td></tr></tfoot>
           </table>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>

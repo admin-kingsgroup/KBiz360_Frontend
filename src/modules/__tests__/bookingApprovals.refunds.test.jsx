@@ -108,7 +108,11 @@ describe('SO/PO/GP Approvals — merged Refunds & Reissues section', () => {
     wrap(<BookingApprovals branch={{ code: 'BOM' }} currentUser={{ role: 'Accounts Executive' }} />);
     await screen.findByText('RF/BOM/26/0021');
     // Entries are at the final stage — a non-configured, non-super user may not post.
-    const approveBtns = screen.getAllByRole('button', { name: 'Approve & Post' });
+    // The disabled button visibly reads "Approve & Post" but carries an explanatory
+    // aria-label ("Approve disabled — …", added for a11y so screen readers announce WHY),
+    // which overrides its text as the accessible name — so match the disabled accname.
+    const approveBtns = screen.getAllByRole('button', { name: /Approve disabled/i });
+    expect(approveBtns.length).toBeGreaterThan(0);
     approveBtns.forEach((b) => expect(b).toBeDisabled());
     expect(screen.queryByRole('button', { name: /✎ Edit/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
