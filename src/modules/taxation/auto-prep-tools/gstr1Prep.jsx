@@ -25,6 +25,7 @@ import { TDS_SECTIONS } from '../../../core/taxSections';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { SampleBanner } from '../../../core/ux/SampleBanner';
+import { companyProfile } from '../../../core/referenceCache';
 
 // GSTR-1 B2B is generated from real sale vouchers — no bundled demo invoices.
 // BUSINESS SUB-MODULE REORG (2026-07-14): these two were left behind in
@@ -34,16 +35,20 @@ import { SampleBanner } from '../../../core/ux/SampleBanner';
 export const GSTR1_B2B = [];
 export const GSTR1_B2C = [];
 
-export function GSTR1Prep(){
+export function GSTR1Prep({branch}){
   const [period,setPeriod]=useState(CUR_MONTH);
-  const [entity,setEntity]=useState("Head Office — 27AAACT1234A1ZF");
+  // Filing entity/GSTIN reads the ACTIVE branch's real company profile (was a hardcoded
+  // "Head Office — 27AAACT1234A1ZF" placeholder that showed BOM's GSTIN on every branch).
+  const brCode=branch&&branch!=="ALL"?(branch.code||branch):null;
+  const gstin=(companyProfile(brCode)||{}).gstin||"";
+  const entityLabel=brCode?`${brCode}${gstin?` — ${gstin}`:" — (GSTIN not set in Company Profile)"}`:"All branches";
   const [tab,setTab]=useState("b2b");
   const totalB2BTaxable=GSTR1_B2B.reduce((s,r)=>s+r.taxable,0);
   const totalB2BTax=GSTR1_B2B.reduce((s,r)=>s+r.igst+r.cgst+r.sgst,0);
   const totalB2CTaxable=GSTR1_B2C.reduce((s,r)=>s+r.taxable,0);
   return(
     <PHASE2_Page title="GSTR-1 Auto-Prep" subtitle="Outward supplies auto-aggregated from sales vouchers · ready for JSON download"
-      toolbar={<><select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><select value={entity} onChange={e=>setEntity(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option>Head Office — 27AAACT1234A1ZF</option><option>BOM — 27AAACT5678B1ZG</option><option>AMD — 24AAACT9012C1ZH</option></select><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download JSON</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 File on GST Portal</button></>}>
+      toolbar={<><select value={period} onChange={e=>setPeriod(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}>{MONTH_OPTIONS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}</select><span title="Filing entity — from Company Profile" style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#f7f8fa",color:"#0d1326",fontWeight:600,whiteSpace:"nowrap"}}>{entityLabel}</span><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download JSON</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 File on GST Portal</button></>}>
       {/* Summary tiles */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:14}}>
         {[{l:"Total Invoices",v:GSTR1_B2B.reduce((s,r)=>s+r.invoices,0)+GSTR1_B2C.length,c:"#0d1326"},{l:"B2B Taxable",v:fmtINR(totalB2BTaxable),c:"#3b82f6"},{l:"B2C Taxable",v:fmtINR(totalB2CTaxable),c:"#22c55e"},{l:"Total Tax",v:fmtINR(totalB2BTax),c:"#d4a437"},{l:"GSTR-1 Status",v:"Draft",c:"#f97316"}].map(k=>(
