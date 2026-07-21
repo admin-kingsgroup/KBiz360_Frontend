@@ -50,7 +50,7 @@ export const tabPanel = (children) => <div className="min-h-[360px] p-4 tablet:p
 
 // Branch-aware full amount: ₹ + Indian grouping for India branches, $ + Western
 // grouping for USD branches (NBO/DAR/FBM). `branchCode` defaults to the ₹ home branch.
-const curOfBranch = (branchCode) => (bc({ code: branchCode }) || {}).cur || '₹';
+export const curOfBranch = (branchCode) => (bc({ code: branchCode }) || {}).cur || '₹';
 export const rupee = (n, branchCode) => { const c = curOfBranch(branchCode); return c + (Number(n) || 0).toLocaleString(localeOf(c)); };
 export const numOf = (s) => Number(String(s == null ? '' : s).replace(/[^0-9.-]/g, '')) || 0;
 

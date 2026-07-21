@@ -24,7 +24,10 @@ export function RecurringVouchers({branch}){
   const mob=useMobile();
   const qc=useQueryClient();
   const vo=isViewOnly();   // view-only user: write actions disabled with a reason
-  const { data: masterRows = [] } = useMasterList('recurring-vouchers');
+  // A recurring template is branch-OWNED (create stamps branch.code). Scope the LIST to the
+  // selected branch and branch-KEY the cache — else an NBO user sees BOM (₹) templates rendered
+  // with NBO's $, and a branch switch serves the stale prior-branch list from a shared cache key.
+  const { data: masterRows = [] } = useMasterList('recurring-vouchers', { branch: branch?.code });
   const { create, update } = useMasterMutations('recurring-vouchers');
   const CAT_LABEL={journal:"Journal",payment:"Payment",receipt:"Receipt"};
   const templates=(masterRows||[]).map(t=>({...t,type:CAT_LABEL[t.category]||t.category,lastRun:t.lastRun||"—"}));
@@ -128,7 +131,7 @@ export function RecurringVouchers({branch}){
                 <FL label="Debit ledger"><LedgerSelect branch={branch} value={form.dr} onChange={v=>setForm(f=>({...f,dr:v}))} placeholder="e.g. Office Rent"/></FL>
                 <FL label="Credit ledger"><LedgerSelect branch={branch} value={form.cr} onChange={v=>setForm(f=>({...f,cr:v}))} placeholder="e.g. HDFC Bank"/></FL>
               </div>
-              <FL label="Amount (₹)"><input type="number" value={form.amt} onChange={e=>setForm(f=>({...f,amt:+e.target.value}))} style={inp}/></FL>
+              <FL label={`Amount (${cur})`}><input type="number" value={form.amt} onChange={e=>setForm(f=>({...f,amt:+e.target.value}))} style={inp}/></FL>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
