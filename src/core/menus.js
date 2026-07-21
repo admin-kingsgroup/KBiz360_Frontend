@@ -1078,20 +1078,29 @@ export function getMenu(branch, currentUser){
 //   removed from the accountant surface). Any of these can be granted back per-page.
 const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'group-dashboard', 'dashboards', 'tax']);
 
-// India-GST-only tax screens — meaningless (and ₹/Section-194/GSTIN misleading) on an
-// Africa VAT branch. Blocked for a VAT branch regardless of role (a full-menu NBO Accounts
-// Exec / FM / even Owner focused on NBO). NOT listed — shared or Africa-appropriate, so
-// they stay reachable: /tax/vat (VAT return), /tax/reconciliation (VAT-vs-Books),
-// /tax/calendar, /reports/* and /finance/tds-calculator.
+// India-GST/statutory-only screens — meaningless (and ₹/Section-194/GSTIN/PAN misleading) on
+// an Africa VAT branch. Blocked for a VAT branch regardless of role (a full-menu NBO Accounts
+// Exec / FM / even Owner focused on NBO). NOT listed — shared or Africa-appropriate, so they
+// stay reachable: /tax/vat (VAT return), /tax/reconciliation (VAT-vs-Books), /tax/calendar,
+// /reports/* and /hr/payroll (payroll runs on every branch; PF/ESI just reads zero there).
 const INDIA_ONLY_TAX_ROUTES = new Set([
   '/tax/gstr1', '/tax/gstr3b', '/tax/gstr2b', '/tax/gstr2b-itc', '/tax/gstr2a', '/tax/gstr9c',
   '/tax/tds', '/tax/tds-certs', '/tax/form26as', '/tax/eway', '/tax/rcm', '/tax/einvoice',
   '/tax/audit-3cd', '/tax/gstr-1-prep', '/tax/gstr-3b-prep', '/tax/form-16a',
+  // India-only statutory tools outside /tax/* — the TDS calculator (Sections 194 / PAN /
+  // Challan 281) and the PF/ESI challan register. /hr/payroll deliberately stays reachable.
+  '/finance/tds-calculator', '/hr/pf-esi',
 ]);
 function isIndiaOnlyTaxRoute(r){
   if (INDIA_ONLY_TAX_ROUTES.has(r)) return true;
   for (const p of INDIA_ONLY_TAX_ROUTES) if (r.startsWith(p + '/')) return true; // sub-routes
   return false;
+}
+// True when a route is blocked ONLY because it is an India-only statutory screen on a
+// VAT/Africa branch (as opposed to a role lockout) — lets the UI explain the real reason
+// ("not applicable to your VAT branch") instead of the misleading "your role lacks access".
+export function isRegimeBlockedRoute(route, branch){
+  return isVatBranch(branch) && isIndiaOnlyTaxRoute(String(route || ''));
 }
 
 // Hard route-level lockout used by App.jsx: can this user OPEN this route directly?
@@ -1104,7 +1113,7 @@ export function canReachRoute(route, currentUser, branch){
   const granted = Array.isArray(currentUser?.granted) ? currentUser.granted : [];
   // Regime gate (role-INDEPENDENT): a VAT/Africa branch must not open India-GST-only
   // screens even by direct URL. An explicit per-user GRANT still overrides.
-  if (isVatBranch(branch) && isIndiaOnlyTaxRoute(r) && !granted.includes(r)) return false;
+  if (isRegimeBlockedRoute(r, branch) && !granted.includes(r)) return false;
   if (hasFullMenu(currentUser)) return true;
   if (r === '/dashboard') return true; // landing page is never blocked (avoids lockout)
   // An explicit per-user GRANT (Page Visibility Control) overrides the role lockout —

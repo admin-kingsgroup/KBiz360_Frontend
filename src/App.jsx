@@ -16,7 +16,7 @@ import { ReferenceProvider } from './core/ReferenceProvider';
 import { getRole, getPermModules } from './core/referenceCache';
 import { lazyModule } from './core/lazyModule';
 import { isOwnerDashboardUser, topLevelPillHrefs, ALWAYS_VISIBLE } from './core/pageCatalog';
-import { canReachRoute, expandHidden } from './core/menus';
+import { canReachRoute, expandHidden, isRegimeBlockedRoute } from './core/menus';
 
 /* ── Route-level code-splitting ───────────────────────────────────────────
    Every page component below is loaded via lazyModule() → one dynamic
@@ -464,14 +464,22 @@ export default function KB360App(){
        direct link too. Full-menu roles (Super Admin/Director/…) reach everything;
        finer per-page control stays with the `hidden` deny-list above. ── */
     if(!canReachRoute(route, currentUser, branch)){
+      // A VAT/Africa branch (NBO/DAR/FBM) is blocked from India-only statutory screens
+      // (GST / TDS / PF-ESI) by regime, not by role — say so, instead of the misleading
+      // "your role doesn't have access".
+      const regime = isRegimeBlockedRoute(route, branch);
       return (
         <div style={{padding:30,maxWidth:600,margin:"40px auto",
           background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>
-          <div style={{fontSize:42,marginBottom:14}}>🔒</div>
-          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>Access restricted</h2>
+          <div style={{fontSize:42,marginBottom:14}}>{regime?"🌍":"🔒"}</div>
+          <h2 style={{margin:"0 0 8px",color:"#0d1326",fontSize:20}}>{regime?"Not applicable to this branch":"Access restricted"}</h2>
           <p style={{margin:"0 0 20px",color:"#5a6691",fontSize:13.5,lineHeight:1.5}}>
-            Your role <b>{currentUser?.role}</b> doesn't have access to this section.
-            Contact <b>afshin.dhanani@kingsgroupco.com</b> if you need access.
+            {regime ? (
+              <>This is an India-only statutory screen (GST / TDS / PF-ESI) and doesn't apply to <b>{branch?.code||"this"}</b>, a VAT branch. Use your branch's VAT / WHT tools instead.</>
+            ) : (
+              <>Your role <b>{currentUser?.role}</b> doesn't have access to this section.
+              Contact <b>afshin.dhanani@kingsgroupco.com</b> if you need access.</>
+            )}
           </p>
           <button onClick={()=>navigate("/dashboard")}
             style={{background:"#0d1326",color:"#fff",border:"none",

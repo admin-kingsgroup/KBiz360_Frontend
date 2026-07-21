@@ -9,6 +9,10 @@ const TAX_HREFS = [
   '/reports/statutory-dues',
   '/reports/tax-board',
 ];
+// The India TDS Auto-Calculator (Sections 194 / PAN / Challan 281, ₹) is intentionally
+// NOT in the Africa VAT pill — wrong regime for a VAT branch (same reason "Withholding
+// Tax" was dropped). Everything else appears in all three pills.
+const AFRICA_TAX_HREFS = TAX_HREFS.filter((h) => h !== '/finance/tds-calculator');
 
 // Flatten a menu node tree into the list of every href it contains.
 function hrefs(node, acc = []) {
@@ -27,16 +31,20 @@ describe('Tax & Statutory → Taxation header', () => {
   });
 
   test.each([
-    ['TAX_INDIA', TAX_INDIA],
-    ['TAX_AFRICA', TAX_AFRICA],
-    ['TAX_ALL', TAX_ALL],
-  ])('present in %s without duplication', (_name, menu) => {
+    ['TAX_INDIA', TAX_INDIA, TAX_HREFS],
+    ['TAX_AFRICA', TAX_AFRICA, AFRICA_TAX_HREFS],
+    ['TAX_ALL', TAX_ALL, TAX_HREFS],
+  ])('present in %s without duplication', (_name, menu, expected) => {
     const list = hrefs(menu);
-    TAX_HREFS.forEach(h => {
+    expected.forEach(h => {
       expect(list).toContain(h);
       // each tax href appears exactly once (no duplicate menu entry)
       expect(list.filter(x => x === h)).toHaveLength(1);
     });
+  });
+
+  test('India TDS Auto-Calculator is NOT in the Africa VAT pill (wrong regime)', () => {
+    expect(hrefs(TAX_AFRICA)).not.toContain('/finance/tds-calculator');
   });
 
   test('Branch Accountant keeps Accounts but NOT the Taxation pill (removed 2026-07-17)', () => {
