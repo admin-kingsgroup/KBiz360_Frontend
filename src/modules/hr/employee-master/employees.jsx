@@ -41,7 +41,10 @@ export function HrEmployees({branch}){
   const saving=create.isPending||update.isPending;
   useEffect(()=>{ setBrFilter(branch==="ALL"?"All":branch?.code||"All"); },[branch]);
 
-  const openNew=()=>{ setSelected(null); setForm({...BLANK_EMP,branch:brScope||"BOM"}); setModal(true); };
+  // Seed the active branch (AMD when AMD is focused); on the ALL view leave it blank so the
+  // `!form.branch` save-guard forces an explicit pick — never a silent BOM default that would
+  // land an Ahmedabad hire in Mumbai's payroll/headcount.
+  const openNew=()=>{ setSelected(null); setForm({...BLANK_EMP,branch:brScope}); setModal(true); };
   const openEdit=(e)=>{ setSelected(e); setForm(e); setModal(true); };
   const closeModal=()=>{ setModal(false); setSelected(null); };
   const setF=(k,v)=>setForm(f=>({...f,[k]:v}));

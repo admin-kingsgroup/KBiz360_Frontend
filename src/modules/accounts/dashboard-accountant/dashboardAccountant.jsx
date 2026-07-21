@@ -940,7 +940,9 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
   // accountant's own branch (from their profile) so every figure is theirs to act on.
   // Falls back to the selector value when the user carries no branch (e.g. an admin).
   const ownCode = currentUser?.branches?.[0];
-  const branch = (branchProp && branchProp !== 'ALL') ? branchProp : (ownCode || branchProp);
+  // Coerce a bare-string ownCode (e.g. 'AMD') to an object so bc() resolves the RIGHT branch
+  // config — bc('AMD') reads ('AMD').code === undefined and falls through to BOM's config.
+  const branch = (branchProp && branchProp !== 'ALL') ? branchProp : (ownCode ? { code: ownCode } : branchProp);
   const cur = (bc(branch) || {}).cur || '₹';
   // A VAT/Africa branch (NBO/DAR/FBM) has no India TDS/TCS — hide those India-only compliance
   // tiles/links so they don't mislead or dead-end into India screens on a Kenya VAT branch.
