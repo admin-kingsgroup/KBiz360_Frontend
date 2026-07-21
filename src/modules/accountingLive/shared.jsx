@@ -10,7 +10,7 @@
 
 import React, { useState } from 'react';
 import { card, inp, bc } from '../../core/styles';
-import { localeOf } from '../../core/format';
+import { localeOf, activeCurrency } from '../../core/format';
 import { toast } from '../../core/ux/toast';
 import { CONSOLIDATED_LABEL } from '../../core/data';
 import { PeriodBar } from '../../core/period';
@@ -134,7 +134,7 @@ export const TYPE_CLR = { sale: BLUE, purchase: '#d97706', receipt: GREEN, payme
 export function cellFmt(v) {
   if (v == null || v === '') return { text: '', num: false };
   const s = String(v).trim();
-  if (/^-?\d+(\.\d+)?$/.test(s)) return { text: Number(s).toLocaleString('en-IN', { maximumFractionDigits: 2 }), num: true };
+  if (/^-?\d+(\.\d+)?$/.test(s)) return { text: Number(s).toLocaleString(localeOf(activeCurrency()), { maximumFractionDigits: 2 }), num: true };
   return { text: String(v), num: false };
 }
 
