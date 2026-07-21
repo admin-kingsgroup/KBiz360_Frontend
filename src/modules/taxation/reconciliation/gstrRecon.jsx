@@ -9,6 +9,7 @@ import { AlertTriangle, Calendar, ChevronDown, Download, Plus, Settings, Users }
 import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 import { useGpBills, useRcmLiability, useProfitAndLoss, useTaxSummary, useConfigValue, useSaveConfigValue } from '../../../core/useAccounting';
 import { useTaxCalendar } from '../../../core/useReference';
+import { isVatBranch } from '../../../core/voucherSpecs';
 import { useMasterMutations } from '../../../core/useMasters';
 import { toast } from '../../../core/ux/toast';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, fyRange, rangeNote } from '../../../core/dates';
@@ -37,7 +38,8 @@ export function GstrRecon({branch}){
      warning off invented numbers). The books-side ITC below is a real estimate from
      posted purchase bills; the 2B column stays blank until a 2B import lands. */
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&(+b.cost||0)>0);
+  // India GST recon — EXCLUDE Africa/VAT branches (USD, own VAT Return) from the India ₹ GST recompute.
+  const bills=GP.filter(b=>!isVatBranch(b.branch)&&(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&(+b.cost||0)>0);
   const recon=bills.map((b)=>({
     supplier:b.supplier||'—', gstin:'—', invoiceNo:b.id, period:b.date,
     itcBooks:Math.round((+b.cost||0)/(1+0.18)*0.18), gstr2bAmt:null, diff:null,

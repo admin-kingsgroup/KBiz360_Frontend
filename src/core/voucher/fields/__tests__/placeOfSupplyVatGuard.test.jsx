@@ -81,3 +81,19 @@ describe('VAT rate is seeded from the branch on CREATE only', () => {
     expect(calls.some((s) => +s.gstPct === 16)).toBe(false);
   });
 });
+
+// Owner's rule (2026-07-21): a fresh Africa expense opens WITHOUT VAT — "VAT applicable" defaults OFF
+// (the user ticks it for a genuine local-VAT/ITC expense). India is unchanged.
+describe('Africa expense opens Without VAT (gstApplicable defaults OFF)', () => {
+  test('a NEW NBO purchase defaults gstApplicable = false', () => {
+    const calls = [];
+    render(<PurchaseExpenseFields state={pxpState()} setState={(fn) => calls.push(fn(pxpState()))} ctx={{ branch: { code: 'NBO' }, branchCode: 'NBO', cur: '$' }} />);
+    expect(calls.some((s) => s.gstApplicable === false)).toBe(true);
+  });
+
+  test('India (BOM) is unaffected — no default-off (the effect is VAT-branch-only)', () => {
+    const calls = [];
+    render(<PurchaseExpenseFields state={pxpState()} setState={(fn) => calls.push(fn(pxpState()))} ctx={{ branch: { code: 'BOM' }, branchCode: 'BOM', cur: '₹' }} />);
+    expect(calls.some((s) => s.gstApplicable === false)).toBe(false);
+  });
+});

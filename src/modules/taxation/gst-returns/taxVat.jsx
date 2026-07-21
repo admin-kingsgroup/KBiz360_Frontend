@@ -39,7 +39,10 @@ export function TaxVat({branch}){
   const mob=useMobile();
   const [period,setPeriod]=useState(CUR_MONTH);
   const PERIODS=MONTH_OPTIONS;
-  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
+  const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills) — turnover only
+  // ACTUAL posted VAT (VAT Output/Input ledger movement) for the branch+period — the AUTHORITATIVE
+  // figure, so a Without-VAT booking (which posts no VAT) contributes 0 and never shows phantom VAT.
+  const VAT_SUM=useTaxSummary(branch,{from:period+'-01',to:period+'-31'}).data||{};
 
   // Was hardcoded []; the whole card renderer below rendered for nobody, so NBO/DAR/FBM — real
   // VAT jurisdictions — wrongly saw "India GST only". Drive it off the SELECTED branch: a VAT
@@ -51,11 +54,14 @@ export function TaxVat({branch}){
 
   const getBranchData=(brCode,rate)=>{
     const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
-    const sales=bills.reduce((s,b)=>s+b.sell,0);
-    const taxable=sales/(1+rate/100);
-    const outputVAT=taxable*(rate/100);
-    const inputCredit=bills.reduce((s,b)=>s+b.cost,0)/(1+rate/100)*(rate/100)*0.55;
-    const netVAT=outputVAT-inputCredit;
+    const sales=bills.reduce((s,b)=>s+(Number(b.sell)||0),0);   // total turnover (display)
+    // Output/Input VAT come from the POSTED ledgers (VAT_SUM), NOT a flat-rate back-derivation — so a
+    // Without-VAT booking contributes 0 (no phantom Output VAT / Net Payable). Taxable base is implied
+    // by the real output VAT, so it too reads 0 when nothing was billed.
+    const outputVAT=Number((VAT_SUM.output&&VAT_SUM.output.total)||0);
+    const inputCredit=Number((VAT_SUM.input&&VAT_SUM.input.total)||0);
+    const netVAT=Number(VAT_SUM.netPayable!=null?VAT_SUM.netPayable:(outputVAT-inputCredit));
+    const taxable=rate?outputVAT/(rate/100):0;
     return {bills:bills.length,sales:sales,taxable:taxable,outputVAT:outputVAT,inputCredit:inputCredit,netVAT:netVAT};
   };
 

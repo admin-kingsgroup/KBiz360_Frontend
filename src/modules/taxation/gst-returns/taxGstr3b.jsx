@@ -9,6 +9,7 @@ import { AlertTriangle, Calendar, ChevronDown, Download, Plus, Settings, Users }
 import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 import { useGpBills, useRcmLiability, useProfitAndLoss, useTaxSummary, useConfigValue, useSaveConfigValue } from '../../../core/useAccounting';
 import { useTaxCalendar } from '../../../core/useReference';
+import { isVatBranch } from '../../../core/voucherSpecs';
 import { useMasterMutations } from '../../../core/useMasters';
 import { toast } from '../../../core/ux/toast';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, fyRange, rangeNote } from '../../../core/dates';
@@ -38,9 +39,11 @@ export function TaxGstr3b({branch}){
   // field to split sale vs purchase rows, so `sales` and `purch` are intentionally the same set;
   // ITC below correctly draws from b.cost (purchase amount). If a dedicated purchase voucher
   // source is added later, repoint `purch` to it.
-  const sales=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
-  const purch=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
-  const rcm=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&(b.supplier||'').includes("BSP")); // GDS as RCM proxy
+  // India GST return — EXCLUDE Africa/VAT branches (NBO/DAR/FBM): they book in USD and have their own
+  // VAT Return, so at ALL/consolidated scope their bills must never enter an India ₹ GST recompute.
+  const sales=GP.filter(b=>!isVatBranch(b.branch)&&(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
+  const purch=GP.filter(b=>!isVatBranch(b.branch)&&(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
+  const rcm=GP.filter(b=>!isVatBranch(b.branch)&&(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period)&&(b.supplier||'').includes("BSP")); // GDS as RCM proxy
 
   const gstRate=mod=>mod==="Holiday"?5:18;
   const totOutward =sales.reduce((s,b)=>s+b.sell/(1+gstRate(b.mod)/100)*(gstRate(b.mod)/100),0);
