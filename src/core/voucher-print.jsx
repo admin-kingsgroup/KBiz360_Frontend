@@ -13,7 +13,7 @@ export function openPrintWindow(branch,vNo,title,el){
   const isIndia=cfg.taxType==="GST";
 
   // Company letterhead pulled from the live company-profile master (DB-backed).
-  const prof=companyProfile(branch?.code||"BOM")||{};
+  const prof=companyProfile(branch?.code||"")||{};
   const taxId=prof.gstin?`${cfg.taxType||"GSTIN"}: ${prof.gstin}`:"";
   const addr=[prof.operAddr, [taxId, prof.phone?`Phone: ${prof.phone}`:""].filter(Boolean).join(" | ")].filter(Boolean).join("<br/>");
   const companyName=(prof.entity||"Travkings Tours & Travels");
@@ -79,7 +79,7 @@ export function openPrintWindow(branch,vNo,title,el){
   </div>
   <div style="text-align:right">
     <div class="sig-box">Authorised Signatory</div>
-    <div style="margin-top:4px">${(branch?.code||"BOM")} Branch</div>
+    <div style="margin-top:4px">${(branch?.code||"")} Branch</div>
   </div>
 </div>
 </div>`;

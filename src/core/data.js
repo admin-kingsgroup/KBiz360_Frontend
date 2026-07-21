@@ -80,7 +80,7 @@ export const _VNO_SEED={
 
 
 export function genVNo(branch,pfx){
-  const brCode=branch==="ALL"?"CONS":(branch?.code||"BOM");
+  const brCode=branch==="ALL"?"CONS":(branch?.code||"");
   const key=brCode+"_"+pfx;
   if(_VNO_COUNTERS[key]===undefined){
     _VNO_COUNTERS[key]=(_VNO_SEED[brCode]&&_VNO_SEED[brCode][pfx])||1;
