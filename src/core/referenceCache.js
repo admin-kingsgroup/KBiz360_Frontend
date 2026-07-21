@@ -167,7 +167,11 @@ export function branchCfg(code) {
   return _branchCfg[code] || deriveCfgFromBranch(code) || _branchCfg.BOM || FALLBACK_CFG;
 }
 // Full company-profile doc (legal/bank/address) for printed documents, etc.
-export function companyProfile(code) { return _profiles[code] || _profiles.BOM || {}; }
+// For an EXPLICIT branch code, never cross-fall-back to BOM's profile — that would print
+// BOM's Mumbai address / 27-GSTIN / BOM banks on another branch's (e.g. AMD, BOMMB) invoices
+// and vouchers. Return {} so each caller's own branch-aware fallback (ISSUER_FALLBACK) engages.
+// Only a blank/omitted code (generic default) keeps the BOM default.
+export function companyProfile(code) { return _profiles[code] || (code ? {} : (_profiles.BOM || {})); }
 
 // HSN/SAC master (Masters › Tax & Currency › Tax / HSN-SAC Codes), keyed by module
 // name. A module can hold several codes across rate slabs — we keep the first active

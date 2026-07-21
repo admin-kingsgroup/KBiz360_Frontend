@@ -47,11 +47,14 @@ const ISSUER_FALLBACK = {
     ],
   },
   AMD: {
-    entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '24AABCT1234H1Z2', state: 'Gujarat', stateCode: '24',
-    operAddr: '202, Shapath IV, SG Highway, Ahmedabad 380 054',
-    phone: '+91 79 4000 5678', email: 'ahmedabad@travkings.com', cur_sym: '₹',
+    // Cert-verified identity (GST REG-06, GSTIN 24AAMCT1096J1Z0). Live company-profile wins
+    // field-by-field; blank phone/email and NO bank on purpose — print nothing rather than a
+    // fabricated value. Add AMD's real bank to the profile to have it appear on invoices.
+    entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '24AAMCT1096J1Z0', state: 'Gujarat', stateCode: '24',
+    operAddr: '608, Floor B, Sun West Bank, Ashram Road, Ahmedabad, Gujarat 380009',
+    phone: '', email: '', cur_sym: '₹',
     authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
-    banks: [{ bankName: 'ICICI Bank', branch: 'CG Road', acNo: '987654321098', ifsc: 'ICIC0005678', type: 'Current', primary: true }],
+    banks: [],
   },
 };
 

@@ -499,7 +499,15 @@ function BankRecoRow({ ledger, branch, cur, go }) {
 }
 function BankRecoRollup({ branch, cur, go }) {
   const ledgers = useBankLedgers(branch).data || [];
-  if (!ledgers.length) return null;
+  // Never blank-out silently: say WHAT is empty + WHY + WHERE (mirrors the detail card below).
+  if (!ledgers.length) return (
+    <>
+      <SecTitle>Bank Reconciliation — all accounts</SecTitle>
+      <div style={{ ...card, marginBottom: 16, color: C.dim, fontSize: 13 }}>
+        No bank ledgers found in this branch's trial balance — add a Bank-group ledger to reconcile bank accounts here.
+      </div>
+    </>
+  );
   return (
     <>
       <SecTitle>Bank Reconciliation — all accounts</SecTitle>
@@ -779,7 +787,10 @@ function BudgetVsActual({ branch, cur, go, from, to }) {
   };
   const months = monthSpan(from, to);
   const monthlyBudget = (budgets || [])
-    .filter((b) => !code || !b.branch || String(b.branch) === String(code))
+    // For a specific branch (e.g. AMD) count ONLY that branch's own budget rows — an
+    // unbranched/global row must not inflate one branch's budget (was: `|| !b.branch`
+    // bled every untagged row into AMD). ALL-scope (!code) still totals everything.
+    .filter((b) => !code || String(b.branch) === String(code))
     .reduce((s, b) => s + (Number(b.monthly) || 0), 0);
   const budget = monthlyBudget * months;
   const hasBudget = budget > 0;
@@ -991,6 +1002,13 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
   const { data: alertsRes } = useAlerts(branch);
   const { data: bankLedgers } = useBankLedgers(branch);
   const { data: taxEvents } = useTaxCalendar();
+  // The tax calendar is org-wide (each event carries a currency, not a branch). On a
+  // SPECIFIC branch, scope to that branch's regime/currency so another branch's dues —
+  // especially a USD Africa-VAT event — don't flip this branch's compliance health or
+  // print a USD amount with a ₹ symbol. ALL-scope keeps every event.
+  const brEvents = (branch === 'ALL' || !branch)
+    ? (taxEvents || [])
+    : (taxEvents || []).filter((e) => (isVatBranch((branch && branch.code) || branch) ? e.currency === 'USD' : (e.currency || 'INR') === 'INR'));
 
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedBank, setSelectedBank] = useState('');
@@ -1068,7 +1086,7 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
     { label: 'Gross profit healthy', ok: periodGp > 0, critical: false },
     // Overdue tax = any ACTIVE statutory-calendar event whose due date is strictly
     // before today (live from the tax calendar). No events / none past-due → ok.
-    { label: 'Compliance — no overdue tax', ok: !taxEvents?.some((e) => e.active && e.date && e.date < today), critical: false },
+    { label: 'Compliance — no overdue tax', ok: !brEvents?.some((e) => e.active && e.date && e.date < today), critical: false },
   ];
   // Exception Radar — only non-zero rows render (handled inside the component).
   // Bank reco differences are aggregated across EVERY bank ledger of the branch (not
@@ -1693,7 +1711,7 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
           <GstItcPanel branch={branch} cur={cur} go={go} from={from} to={to} />
 
           {/* New tax events compliance list */}
-          {taxEvents && taxEvents.length > 0 && (
+          {brEvents && brEvents.length > 0 && (
             <>
               <SecTitle>Upcoming Statutory Calendar Deadlines</SecTitle>
               <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 14 }}>
@@ -1707,7 +1725,7 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
                     </tr>
                   </thead>
                   <tbody>
-                    {taxEvents.filter(e => e.active).slice(0, 5).map((e, idx) => (
+                    {brEvents.filter(e => e.active).slice(0, 5).map((e, idx) => (
                       <tr key={idx} style={{ background: idx % 2 ? '#fafbff' : '#fff' }}>
                         <td style={{ ...td, fontWeight: 700 }}>{e.date}</td>
                         <td style={{ ...td }}><span style={{ padding: '2px 6px', borderRadius: 4, background: '#f1f5f9', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{e.type}</span></td>

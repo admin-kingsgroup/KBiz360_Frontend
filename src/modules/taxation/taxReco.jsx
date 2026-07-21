@@ -22,7 +22,9 @@ const isIndiaBranch = (b) => b?.code && ['BOMMB', 'BOM', 'AMD'].includes(b.code)
 export function TaxReco({ branch }) {
   const cur = (bc(branch) || {}).cur || '₹';
   const india = branch === 'ALL' || isIndiaBranch(branch);
-  const modes = india ? [...GST_MODES, ...VAT_MODES] : VAT_MODES;
+  // A specific India branch (e.g. AMD) is GST-only — never offer "VAT Return vs Books".
+  // Only the group ('ALL') view, which spans India + Africa, shows both regimes' modes.
+  const modes = branch === 'ALL' ? [...GST_MODES, ...VAT_MODES] : (india ? GST_MODES : VAT_MODES);
   const [mode, setMode] = useState(modes[0].key);
   const [period, setPeriod] = useState(thisYM());
 

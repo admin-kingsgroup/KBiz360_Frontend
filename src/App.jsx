@@ -673,7 +673,7 @@ export default function KB360App(){
     if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch} setRoute={navigate}/>;
     if(route==="/masters/currency")       return <CurrencyMaster setRoute={navigate}/>;
     if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser} shellBranch={branch}/>;
-    if(route==="/masters/projects")       return <ProjectMaster/>;
+    if(route==="/masters/projects")       return <ProjectMaster branch={branch}/>;
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;
     if(route==="/masters/party-types")    return <PartyTypeMaster/>;
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;
