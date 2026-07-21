@@ -231,6 +231,9 @@ export const POWER_SCREENS = [
     { key: 'digest',       label: 'Daily Digest' },
     { key: 'log',          label: 'Change Log / Audit' },
   ] },
+  { group: 'Form & Pages', items: [
+    { key: 'form-pages',   label: 'Form Directory & Pages' },
+  ] },
 ];
 
 /** Flat list of all screen keys (for the router / tests). */

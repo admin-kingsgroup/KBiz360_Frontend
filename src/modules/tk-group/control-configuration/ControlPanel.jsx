@@ -17,6 +17,8 @@ import { Delegation } from '../Delegation';
 import { BreakGlass } from '../BreakGlass';
 import { AuthorityAdmin } from './AuthorityAdmin';
 import { RatesReference } from './RatesReference';
+import { FormsDirectory } from './FormsDirectory';
+import { useCockpitFocus } from '../../../store/cockpitFocus';
 import { LIMIT_BRANCHES } from '../utils/branchLimits';
 import { approvalChainView, POWER_SCREENS, CAP_COLS, ROLE_CAPS, ROLE_SWITCHES, verifyApproveOverlap, roleControlWarning, engageCautions, DEFAULT_RULES, CONFIGURABLE_GROUPS, CONFIGURABLE_FLAGS, DECLINED_RULES, postureGrid, POSTURE_PRESETS, presetChanges, copyBranchChanges, resetBranchChanges, lawBand } from '../utils/controlPanel';
 import { lockedLawBook } from '../utils/ruleBook.data';
@@ -159,6 +161,7 @@ const SCREEN_FLAGS = { configurable: CONFIGURABLE_FLAGS };
 export function ControlPanel({ setRoute }) {
   const [screen, setScreen] = useState('law-erp');
   const [branch, setBranch] = useState('default');   // panel-wide branch scope for the controls
+  const focus = useCockpitFocus();                   // cockpit branch-Focus — gates Form & Pages' "Open →"
   const flagsQ = useQuery({ queryKey: ['tk', 'flags'], queryFn: getFlagState, staleTime: 30_000 });
   // Plane ① · ERP Law band — read the enforced-rule registry (same key/fallback as the Rule
   // Book, so both agree). regroupRegistry(null) → null → the bundled RULE_BOOK, so the band is
@@ -543,6 +546,7 @@ export function ControlPanel({ setRoute }) {
       case 'delegation': return <Delegation />;
       case 'breakglass': return <BreakGlass />;
       case 'log': return <ChangeLog go={go} />;
+      case 'form-pages': return <FormsDirectory setRoute={go} focus={focus} />;
       case 'roles':
         return (
           <>

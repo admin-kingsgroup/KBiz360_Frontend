@@ -55,13 +55,13 @@ describe('postureGrid — all-branches bird\'s-eye', () => {
 });
 
 describe('Control Panel structure', () => {
-  test('four governance heads + Monitoring, no master screen', () => {
-    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['ERP Rules', 'Operational Rules', 'Owner Rules', 'Approval Chain', 'Monitoring']);
+  test('four governance heads + Monitoring + Form & Pages, no master screen', () => {
+    expect(POWER_SCREENS.map((g) => g.group)).toEqual(['ERP Rules', 'Operational Rules', 'Owner Rules', 'Approval Chain', 'Monitoring', 'Form & Pages']);
     // ERP Rules opens with the Accounts law screen; Operational Rules with the Ops law screen.
     expect(POWER_SCREEN_KEYS.slice(0, 3)).toEqual(['law-erp', 'law-ops', 'roles']);
     expect(POWER_SCREEN_KEYS).not.toContain('master');
     expect(POWER_SCREEN_KEYS).not.toContain('defaults');
-    expect(POWER_SCREEN_KEYS).toHaveLength(17);   // 15 + law split (2) + rates − defaults
+    expect(POWER_SCREEN_KEYS).toHaveLength(18);   // 15 + law split (2) + rates − defaults + form-pages
   });
   test('mandatory law splits into two heads by track (ERP vs Operational)', () => {
     const erp = POWER_SCREENS.find((g) => g.group === 'ERP Rules');
