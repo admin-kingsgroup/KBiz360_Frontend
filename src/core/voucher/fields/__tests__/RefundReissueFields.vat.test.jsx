@@ -31,7 +31,7 @@ import { RefundReissueFields } from '../RefundReissueFields';
 const baseState = {
   date: '2026-07-01', againstInvoice: '', againstPurchase: '', gstMode: 'intra',
   party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '',
-  gstPct: 18, supplierSvc: '', supplierGst: '', supplierCancel: '', cancelRecover: true,
+  gstPct: '', supplierSvc: '', supplierGst: '', supplierCancel: '', cancelRecover: true,
   incentiveAmt: '', incentiveGst: '', incentiveTds: '', remarks: '',
 };
 
@@ -92,23 +92,34 @@ function SeedHarness({ ctx, gstPct }) {
 }
 
 describe('RefundReissueFields — Without-VAT default + edit-preserve', () => {
-  test('fresh NBO (rate 16): a stray India 18 snaps to Without VAT (0)', () => {
-    render(<SeedHarness ctx={{ branch: { code: 'NBO' }, branchCode: 'NBO', cur: '$' }} gstPct={18} />);
+  test('fresh NBO (rate 16, unset): opens Without VAT (0)', () => {
+    render(<SeedHarness ctx={{ branch: { code: 'NBO' }, branchCode: 'NBO', cur: '$' }} gstPct={''} />);
     expect(screen.getByRole('option', { name: '0%' }).selected).toBe(true);
     expect(screen.getByRole('option', { name: '16%' }).selected).toBe(false);
   });
 
-  test('NBO: a stored branch rate (16 = With VAT) is preserved, not stomped to 0', () => {
+  test('fresh DAR (rate 18, unset): opens Without VAT (0) — DAR-18 no longer defaults With VAT', () => {
+    render(<SeedHarness ctx={{ branch: { code: 'DAR' }, branchCode: 'DAR', cur: '$' }} gstPct={''} />);
+    expect(screen.getByRole('option', { name: '0%' }).selected).toBe(true);
+    expect(screen.getByRole('option', { name: '18%' }).selected).toBe(false);
+  });
+
+  test('NBO: a stored branch rate (16 = With VAT) is preserved, not reset to 0', () => {
     render(<SeedHarness ctx={{ branch: { code: 'NBO' }, branchCode: 'NBO', cur: '$' }} gstPct={16} />);
     expect(screen.getByRole('option', { name: '16%' }).selected).toBe(true);
     expect(screen.getByRole('option', { name: '0%' }).selected).toBe(false);
   });
 
-  test('EDIT after a rate amendment: a stored 16 on a now-18 branch is NOT stomped to Without VAT', () => {
-    // DAR's current rate is 18; a reversal saved earlier at 16 must keep 16, not snap to 0. The rate
+  test('EDIT after a rate amendment: a stored 16 on a now-18 branch is NOT reset to Without VAT', () => {
+    // DAR's current rate is 18; a reversal saved earlier at 16 must keep 16, not reset to 0. The rate
     // caption (SVF VAT (X%)) shows the real gstPct even when it isn't in DAR's [0,18] option list.
     render(<SeedHarness ctx={{ branch: { code: 'DAR' }, branchCode: 'DAR', cur: '$' }} gstPct={16} />);
-    expect(screen.getByText(/^SVF VAT \(16%\)/)).toBeInTheDocument();   // kept 16 (old code snapped it to 0)
+    expect(screen.getByText(/^SVF VAT \(16%\)/)).toBeInTheDocument();
     expect(screen.queryByText(/^SVF VAT \(0%\)/)).toBeNull();
+  });
+
+  test('India (BOM, unset): opens at 18% GST (VAT default is Africa-only)', () => {
+    render(<SeedHarness ctx={{ branch: { code: 'BOM' }, branchCode: 'BOM', cur: '₹' }} gstPct={''} />);
+    expect(screen.getByRole('option', { name: '18%' }).selected).toBe(true);
   });
 });

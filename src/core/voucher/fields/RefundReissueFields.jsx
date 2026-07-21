@@ -94,13 +94,14 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const splitTax = isVatBr ? 'VAT' : (state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST');
   const splitTaxPlus = isVatBr ? 'VAT' : (state.gstMode === 'inter' ? 'IGST' : 'CGST + SGST');
 
-  // A VAT branch offers only 0 (Without VAT — the DEFAULT) or its single VAT rate. Snap ONLY a stray
-  // India default (18) to 0 on a VAT branch that doesn't itself bill 18 (NBO/FBM=16), so a fresh
-  // Africa refund/reissue opens WITHOUT VAT (Owner's rule 2026-07-21). A deliberate 0 or the branch
-  // rate is left untouched — and an EDIT keeps its STORED rate (e.g. a With-VAT 16) even if the branch
-  // VAT rate was later amended, instead of being silently stomped to 0 (which understated VAT on re-post).
+  // Seed the branch-appropriate default the FIRST time the rate is UNSET (a fresh manual refund
+  // inits gstPct='' — see registry). VAT branches (incl DAR at 18%) open WITHOUT VAT (0) per the
+  // Owner's rule (2026-07-21: no VAT until physically selected); India opens at 18. A real stored or
+  // entered rate — INCLUDING a deliberate 0 or the branch rate like 16 — is never touched, so an EDIT
+  // keeps its saved rate even after the branch VAT rate is amended, and the SO/PO/GP reversal (which
+  // seeds a concrete 0/18 itself) is left alone. Keys on isVatBr/vatPct so it settles once branch loads.
   useEffect(() => {
-    if (isVatBr && vatPct && vatPct !== 18 && num(state.gstPct) === 18) patch({ gstPct: 0 });
+    if (state.gstPct === '' || state.gstPct == null) patch({ gstPct: isVatBr ? 0 : 18 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVatBr, vatPct]);
 

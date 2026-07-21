@@ -265,7 +265,10 @@ function makeRefundReissue(kind) {
       ? (<><b style={{ color: '#A07828' }}>Refund:</b> cancellation of a sale — the <b>original sale and its purchase are reversed in full</b> (Base Fare / taxes on both Sales &amp; Purchase unwind). We then retain a cancellation service charge + Service Charge - 2 (income) and absorb the airline's cancellation fee; the <b>customer is refunded the net balance</b>. Link the related Purchase invoice so the supplier side also reverses.</>)
       : (<><b style={{ color: '#A07828' }}>Reissue:</b> amendment of a sale. The <b>customer (Debtor) is Debited</b> with the total billed; the <b>supplier/airline (Creditor) is Credited</b> with the fee + fare difference; our service charge + Service Charge - 2 are retained as income.</>),
 
-    initial: () => ({ date: todayISO(), againstInvoice: '', againstPurchase: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: 18, supplierSvc: '', supplierGst: '', supplierCancel: '', supplierCancelGst: '', cancelRecover: true, incentiveAmt: '', incentiveGst: '', incentiveTds: '', remarks: '' }),
+    // gstPct is left UNSET ('') here — RefundReissueFields seeds the branch-appropriate default on
+    // mount (VAT branches incl DAR-18 → 0 / Without VAT; India → 18). A static 18 here couldn't tell
+    // a fresh DAR (rate 18) from a stray India 18, so a fresh DAR refund used to open With VAT.
+    initial: () => ({ date: todayISO(), againstInvoice: '', againstPurchase: '', gstMode: 'intra', party: '', counterParty: '', supplierAmt: '', serviceCharge: '', markup: '', gstPct: '', supplierSvc: '', supplierGst: '', supplierCancel: '', supplierCancelGst: '', cancelRecover: true, incentiveAmt: '', incentiveGst: '', incentiveTds: '', remarks: '' }),
 
     fromVoucher: (v) => ({
       date: v.date || '', againstInvoice: v.againstInvoice || v.linkNo || '', againstPurchase: v.againstPurchase || '', gstMode: v.gstMode || 'intra',

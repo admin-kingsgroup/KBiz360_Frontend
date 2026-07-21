@@ -313,7 +313,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
       ...fareNoTax.map((c) => `<th>${esc(c.label)}</th>`),
       '<th>Taxes</th>',
       pkg ? '' : '<th>Service Chg</th>',
-      pkg ? '' : `<th>GST/Service (${activeRate}%)</th>`,
+      pkg ? '' : `<th>${taxLabel}/Service (${activeRate}%)</th>`,
       '<th>Total</th>',
     ];
     cols = head.filter(Boolean).length;
@@ -338,7 +338,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
       ...refKeys.map((c) => `<th class="l">${esc(c.label)}</th>`),
       ...spec.fareCols.map((c) => `<th>${esc(c.label)}</th>`),
       '<th>Supplier Service</th>',
-      pkg ? '' : `<th>GST (${activeRate}%)</th>`, // package: supplier-service GST shows only in the Net Cost summary
+      pkg ? '' : `<th>${taxLabel} (${activeRate}%)</th>`, // package: supplier-service tax shows only in the Net Cost summary
       '<th>Supplier Incentive</th>',
       '<th>TDS (2%)</th>',
       '<th>Total</th>',
