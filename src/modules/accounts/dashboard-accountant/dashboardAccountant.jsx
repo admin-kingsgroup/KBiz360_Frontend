@@ -16,6 +16,7 @@ import { clickable } from '../../../core/ux/clickable';
 import { usePager, Pager } from '../../../core/ux/pager';
 import { useMobile } from '../../../core/hooks';
 import { bc } from '../../../core/styles';
+import { isVatBranch } from '../../../core/voucherSpecs';
 import { apiGet } from '../../../core/api';
 import { branchTaskBoard } from '../../dashboard/utils/branchTasks';
 import { periodRange, useInception } from '../../../core/period';
@@ -930,6 +931,9 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
   const ownCode = currentUser?.branches?.[0];
   const branch = (branchProp && branchProp !== 'ALL') ? branchProp : (ownCode || branchProp);
   const cur = (bc(branch) || {}).cur || '₹';
+  // A VAT/Africa branch (NBO/DAR/FBM) has no India TDS/TCS — hide those India-only compliance
+  // tiles/links so they don't mislead or dead-end into India screens on a Kenya VAT branch.
+  const isVat = isVatBranch((branch && branch.code) || branch);
   const go = (r) => setRoute && setRoute(r);
   const vo = isViewOnly();   // view-only user: write actions disabled with a reason
   const ym = thisYM();
@@ -1680,8 +1684,8 @@ export function DashboardAccountant({ branch: branchProp, setRoute, currentUser 
           <SecTitle>Statutory compliance &amp; Balances</SecTitle>
           <Row>
             <Tile icon={<ReceiptText size={13} />} label="GST / VAT (this month)" value={netGst == null ? 'View' : money(cur, Math.abs(netGst))} sub={`${netGst == null ? 'open tax summary' : (netGst >= 0 ? 'net payable' : 'refundable')} · due 20th`} tone={netGst != null && netGst > 0 ? C.amber : C.blue} onClick={() => go('/reports/tax-summary')} loading={taxQ.isLoading} />
-            <Tile icon={<ReceiptText size={13} />} label="TDS Payable" value={money(cur, tds)} sub="due 7th · TDS calculator" tone={tds > 0 ? C.amber : C.blue} onClick={() => go('/finance/tds-calculator')} loading={taxQ.isLoading} />
-            <Tile icon={<ReceiptText size={13} />} label="TCS Payable" value={money(cur, tcs)} sub="statutory dues calendar" tone={tcs > 0 ? C.amber : C.blue} onClick={() => go('/reports/statutory-dues')} loading={taxQ.isLoading} />
+            {!isVat && <Tile icon={<ReceiptText size={13} />} label="TDS Payable" value={money(cur, tds)} sub="due 7th · TDS calculator" tone={tds > 0 ? C.amber : C.blue} onClick={() => go('/finance/tds-calculator')} loading={taxQ.isLoading} />}
+            {!isVat && <Tile icon={<ReceiptText size={13} />} label="TCS Payable" value={money(cur, tcs)} sub="statutory dues calendar" tone={tcs > 0 ? C.amber : C.blue} onClick={() => go('/reports/statutory-dues')} loading={taxQ.isLoading} />}
             <Tile icon={<CheckSquare size={13} />} label="Trial Balance" value={tbBalanced ? '✓ Balanced' : (tb.length ? '✗ Out' : '—')} sub={tb.length && !tbBalanced ? `out by ${money(cur, Math.abs(tbDr - tbCr))}` : 'open trial balance'} tone={tbBalanced ? C.green : (tb.length ? C.red : C.dim)} onClick={() => go('/finance/trial-balance')} loading={tbQ.isLoading} />
           </Row>
 
