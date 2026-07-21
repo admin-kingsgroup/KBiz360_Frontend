@@ -205,7 +205,7 @@ export function AdmRegister({branch}){
                       <p style={{margin:0,fontSize:8.5,color:"#5b616e",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={a.remarks}>{a.remarks}</p>
                     </td>
                     <td style={{padding:"8px 10px",textAlign:"right",fontWeight:800,fontVariantNumeric:"tabular-nums",
-                      color:"#dc2626",fontSize:13}}>{a.currency}{Number(a.amount).toLocaleString()}</td>
+                      color:"#dc2626",fontSize:13}}>{cur}{Number(a.amount).toLocaleString(localeOf(cur))}</td>
                     <td style={{padding:"8px 10px"}}>
                       {["Accepted","Rejected"].includes(a.status)
                         ?<p style={{margin:0,fontSize:10,color:"#16a34a"}}>{a.status==="Accepted"?`✔ ${a.voucherVno||"posted"}`:"—"}</p>
@@ -306,7 +306,7 @@ export function AdmRegister({branch}){
             <div style={{padding:"14px 18px",borderBottom:"1px solid #cdd1d8",background:"#fbe9e9",borderRadius:"14px 14px 0 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
                 <p style={{margin:0,fontSize:13,fontWeight:700,color:"#dc2626"}}>Dispute ADM — {disputeModal.id}</p>
-                <p style={{margin:"2px 0 0",fontSize:10,color:"#dc2626"}}>{disputeModal.airline} · {disputeModal.currency}{Number(disputeModal.amount).toLocaleString()} · Due {disputeModal.responseDeadline}</p>
+                <p style={{margin:"2px 0 0",fontSize:10,color:"#dc2626"}}>{disputeModal.airline} · {cur}{Number(disputeModal.amount).toLocaleString(localeOf(cur))} · Due {disputeModal.responseDeadline}</p>
               </div>
               <button onClick={()=>setDisputeModal(null)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#dc2626"}}>✕</button>
             </div>

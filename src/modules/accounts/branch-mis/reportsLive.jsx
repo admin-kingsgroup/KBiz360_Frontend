@@ -49,19 +49,23 @@ const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABE
 // currency shadow these with a local `inr`/`paren` that pass their own `localeOf(cur)`.
 const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(activeCurrency())) : '—'; };
 const paren = (n) => { const v = Math.round(Number(n) || 0); return v ? `(${v.toLocaleString(localeOf(activeCurrency()))})` : '—'; };
-const compact = (cur, n) => {
-  const v = Number(n) || 0, a = Math.abs(v);
-  if (a >= 1e7) return `${cur}${(v / 1e7).toFixed(2)} Cr`;
-  if (a >= 1e5) return `${cur}${(v / 1e5).toFixed(2)} L`;
+// USD (NBO/DAR/FBM) abbreviates on the Western K/M/B scale; ₹ keeps Indian lakh/crore —
+// mirrors core/format.compactAmt so a $ branch KPI reads "$150.0 K"/"$1.20 M", not "$1.50 L".
+const compactScale = (cur, n) => {
+  const v = Number(n) || 0, a = Math.abs(v), sym = String(cur).trim();
+  const usd = sym === '$' || sym === 'US$' || sym.toUpperCase() === 'USD';
+  if (usd) {
+    if (a >= 1e9) return `${cur}${(v / 1e9).toFixed(2)}B`;
+    if (a >= 1e6) return `${cur}${(v / 1e6).toFixed(2)}M`;
+    if (a >= 1e3) return `${cur}${(v / 1e3).toFixed(1)}K`;
+  } else {
+    if (a >= 1e7) return `${cur}${(v / 1e7).toFixed(2)} Cr`;
+    if (a >= 1e5) return `${cur}${(v / 1e5).toFixed(2)} L`;
+  }
   return `${cur}${Math.round(v).toLocaleString(localeOf(cur))}`;
 };
-
-const compactCur = (cur, n) => {
-  const v = Number(n) || 0, a = Math.abs(v);
-  if (a >= 1e7) return `${cur}${(v / 1e7).toFixed(2)} Cr`;
-  if (a >= 1e5) return `${cur}${(v / 1e5).toFixed(2)} L`;
-  return `${cur}${Math.round(v).toLocaleString(localeOf(cur))}`;
-};
+const compact = compactScale;
+const compactCur = compactScale;
 const pctTxt = (p) => `${(Number(p) || 0).toFixed(2)}%`;
 const gpColor = (p) => (p >= 13 ? SAP.greenDk : p >= 8 ? SAP.gold : SAP.orange);
 

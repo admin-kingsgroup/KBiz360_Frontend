@@ -159,6 +159,12 @@ export function RegisterLive({ branch, initial = 'sales', inbOnly = false }) {
   }, [allRows]);
   const needle = search.trim().toLowerCase();
   const rows = useMemo(() => allRows
+    // POSTED-ONLY: the Sales/Purchase Register must tie to the books (TB / P&L / invoice-GP,
+    // which all exclude non-posting + deleted). GET /api/vouchers returns every status, so
+    // without this pending/draft/rejected/soft-deleted vouchers would show AND be summed into
+    // the header total, overstating revenue/purchases. (The Journal/Receipt/Payment register
+    // deliberately badges statuses; a sale/purchase register is posted-only.)
+    .filter((v) => v.status === 'approved' || v.status === 'saved')
     .filter((v) => !inbOnly || isInbRow(v, tab)) // INB register → inter-branch rows only
     .filter((v) => product === 'all' || productOf(v) === product)
 

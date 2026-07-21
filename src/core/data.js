@@ -134,11 +134,11 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
 export const TAX_AFRICA = {label:"Taxation — VAT", icon:FileText, _regime:"VAT", children:[
   {divider:true, label:"VAT Returns"},
   {label:"VAT Return (Monthly)",      href:"/tax/vat"},
-  // NOTE: "Withholding Tax" formerly linked to /tax/tds — the INDIA TDS/TCS register
-  // (₹, Section 194, Form 26AS), the wrong regime for a VAT branch. Removed: Africa WHT
-  // is deducted per supplier `whtRate` and posts to the WHT ledger, visible in ledger
-  // statements / VAT reports. /tax/tds is also route-blocked for VAT branches now
-  // (menus.canReachRoute). A dedicated Kenya-WHT register is a separate build.
+  // "Withholding Tax" → /tax/tds, which FORKS by regime (taxTdsTcs.jsx): a VAT branch gets the
+  // Africa WHT register (USD / branch currency, per-supplier whtRate, WHT Payable/Receivable —
+  // NOT the India Section-194 / Form-26AS register). So it belongs on the VAT pill and stays
+  // reachable (removed from the India-only route gate). India branches see the TDS/TCS register.
+  {label:"Withholding Tax",           href:"/tax/tds"},
   {divider:true, label:"Reconciliation"},
   {label:"VAT Return vs Books",       href:"/tax/reconciliation"},
   {divider:true, label:"Compliance"},

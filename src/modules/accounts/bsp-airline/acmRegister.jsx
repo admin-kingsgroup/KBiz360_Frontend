@@ -95,7 +95,7 @@ export function AcmRegister({ branch }) {
     { key: 'airline', header: 'Airline', render: (a) => <><p className="m-0 font-bold text-ink">{a.airline}</p><p className="m-0 text-[9px] text-ink-muted">IATA {a.iataNum}</p></> },
     { key: 'ticketNo', header: 'Ticket / Reference', className: 'font-mono text-[10px] text-[#185FA5]', render: (a) => a.ticketNo || a.passenger || '—' },
     { key: 'reasonCode', header: 'Reason', render: (a) => { const rc = ACM_REASON_CODES[a.reasonCode] || { label: a.reasonCode }; return <><p className="m-0 text-[10px] font-bold text-[#1D9E75]">{rc.code} — {rc.label}</p><p className="m-0 max-w-[180px] truncate text-[8.5px] text-ink-muted" title={a.remarks}>{a.remarks}</p></>; } },
-    { key: 'amount', header: 'Amount', num: true, className: 'font-extrabold text-[13px] text-[#27500A]', render: (a) => `+${a.currency}${Number(a.amount).toLocaleString()}`, footer: (rows) => `+${cur}${Number(rows.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString()}` },
+    { key: 'amount', header: 'Amount', num: true, className: 'font-extrabold text-[13px] text-[#27500A]', render: (a) => `+${cur}${Number(a.amount).toLocaleString(localeOf(cur))}`, footer: (rows) => `+${cur}${Number(rows.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString(localeOf(cur))}` },
     { key: 'bspCreditDate', header: 'BSP Credit Date', className: 'text-[10.5px] text-ink-muted' },
     { key: 'status', header: 'Status', align: 'center', render: (a) => <StatusPill tone={ACM_TONE[a.status] || 'neutral'} size="sm">{a.status}</StatusPill> },
     {
