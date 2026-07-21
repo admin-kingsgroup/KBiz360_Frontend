@@ -109,10 +109,10 @@ describe('Owner Dashboard — Group/ALL per-branch wiring', () => {
   test('financial-detail tables render once PER BRANCH (all six, side by side), each in its own currency', () => {
     render(<OwnerDashboardPage currentUser={{ name: 'Owner' }} setRoute={jest.fn()} branch={'ALL'} />);
     // One "financial detail" section header per branch — every branch in the roster shows,
-    // not only the ones with postings (BOMMB/BOM/AMD in ₹, NBO/DAR/FBM in $).
+    // not only the ones with postings (MHUB/BOM/AMD in ₹, NBO/DAR/FBM in $).
     expect(screen.getAllByText(/financial detail/).length).toBe(6);
     expect(screen.getAllByText(/· \$ · financial detail/).length).toBe(3);   // NBO/DAR/FBM in USD
-    expect(screen.getAllByText(/· ₹ · financial detail/).length).toBe(3);    // BOMMB/BOM/AMD in ₹
+    expect(screen.getAllByText(/· ₹ · financial detail/).length).toBe(3);    // MHUB/BOM/AMD in ₹
   });
 
   test('GST / Tax Net card drills to the live tax-summary report (not the dead /taxation route)', () => {

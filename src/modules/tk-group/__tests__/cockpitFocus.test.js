@@ -6,7 +6,7 @@ import {
   effectiveScope, parseFocusParam, focusToParam, loadFocus, saveFocus, focusedBranches,
 } from '../utils/cockpitFocus';
 
-const CODES = ['BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+const CODES = ['BOM', 'AMD', 'MHUB', 'NBO', 'DAR', 'FBM'];
 
 describe('normalizeFocus', () => {
   test('valid code (any case) resolves to the upper-cased code', () => {

@@ -969,7 +969,7 @@ export function hasFullMenu(currentUser){
 // India ERP branches (GST regime). Everything else with a real code is an Africa VAT
 // branch (NBO/DAR/FBM); "ALL" is the consolidated/central view (neither). `branch` may be
 // a branch object ({code,...}) or the "ALL" string.
-const INDIA_BRANCH_CODES = ["BOMMB", "BOM", "AMD"];
+const INDIA_BRANCH_CODES = ["MHUB", "BOM", "AMD"];
 const branchCodeOf = (branch) => (branch && typeof branch === 'object') ? branch.code : branch;
 export function isIndiaBranch(branch){ const c = branchCodeOf(branch); return !!c && c !== 'ALL' && INDIA_BRANCH_CODES.includes(c); }
 export function isVatBranch(branch){ const c = branchCodeOf(branch); return !!c && c !== 'ALL' && !INDIA_BRANCH_CODES.includes(c); }

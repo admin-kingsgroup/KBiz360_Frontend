@@ -32,7 +32,7 @@ export const SEVERITIES = [
   { value: 'info', label: 'Info' },
 ];
 
-export const BRANCH_CODES = ['BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+export const BRANCH_CODES = ['BOM', 'AMD', 'MHUB', 'NBO', 'DAR', 'FBM'];
 
 // Shared tone/label helpers — kept in step with utils/rules.js on purpose.
 export function statusTone(status) {

@@ -56,14 +56,14 @@ describe('Without VAT (noVat) — VAT off on BOTH sides', () => {
 
 // A zero-rated export is zero-rated for ANY seller — the server applies taxRate 0 on
 // cross-border + tick-off with no India/Africa split. `noVat` could not express that: it is
-// isVatBranch-gated in the entry screen, so AMD/BOMMB (which default the IGST tick OFF) showed
+// isVatBranch-gated in the entry screen, so AMD/MHUB (which default the IGST tick OFF) showed
 // 18% under an "Export · zero-rated" banner and over-quoted the buyer on the FX preview. It also
 // could not simply be un-gated: on India, noVat zeroes purRateOf and would wipe the purchase
 // GST/ITC. Hence a sale-side-only flag.
 describe('saleZeroRated — sale-side only, works for India sellers too', () => {
   const IN = { branch: 'AMD' };   // India/GST branch — an INB export seller that defaults tick OFF
 
-  test('India seller: a zero-rated export bills nothing on the fee (the AMD/BOMMB gap)', () => {
+  test('India seller: a zero-rated export bills nothing on the fee (the AMD/MHUB gap)', () => {
     const taxed = lineCalc(VSPECS.SF, line, { ...IN, saleZeroRated: false });
     const zero = lineCalc(VSPECS.SF, line, { ...IN, saleZeroRated: true });
     expect(taxed.gstSvc).toBeGreaterThan(0);   // normally 18% GST on the fee

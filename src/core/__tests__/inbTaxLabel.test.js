@@ -28,7 +28,7 @@ describe('inbTaxOf — the seller regime decides the tax name and rate', () => {
   test('India sellers bill IGST 18% — the name is IGST, not the generic "GST" caption', () => {
     expect(inbTaxOf({ branch: 'BOM' })).toEqual({ name: 'IGST', rate: 18 });
     expect(inbTaxOf({ branch: 'AMD' })).toEqual({ name: 'IGST', rate: 18 });
-    expect(inbTaxOf({ branch: 'BOMMB' })).toEqual({ name: 'IGST', rate: 18 });
+    expect(inbTaxOf({ branch: 'MHUB' })).toEqual({ name: 'IGST', rate: 18 });
   });
 
   test('DAR at 18 is VAT-named — a rate match must not be mistaken for an IGST match', () => {
@@ -83,7 +83,7 @@ describe('vatPctOf — the caption % matches the rate the math uses', () => {
 describe('FE/BE mirror — the seller regimes and rates agree with the backend', () => {
   const BACKEND_VAT_BRANCHES = ['NBO', 'DAR', 'FBM'];        // taxRegime.VAT_BRANCHES
   const BACKEND_VAT_RATE = { NBO: 16, DAR: 18, FBM: 16 };    // taxRegime.VAT_RATE
-  const BACKEND_INDIA = ['BOM', 'AMD', 'BOMMB'];             // inb.service.COUNTRY === 'IN'
+  const BACKEND_INDIA = ['BOM', 'AMD', 'MHUB'];             // inb.service.COUNTRY === 'IN'
 
   test('every backend VAT branch is a VAT branch here, at the same rate', () => {
     BACKEND_VAT_BRANCHES.forEach((b) => {

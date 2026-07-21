@@ -803,7 +803,7 @@ function TravkingsGroupView() {
 // Total = Core + Own + ~* (all active — equal across branches).
 const SIGN_CLR = { fixed: P_GREEN, own: BLUE, ll: '#7c3aed', wired: P_AMBER, nf: '#3f5a86', hidden: '#64748b', deact: P_RED };
 
-const P_CUR = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
+const P_CUR = { BOM: '₹', AMD: '₹', MHUB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 const sameScope = (a, b) => !!a && !!b && a.tier === b.tier && a.branch === b.branch && a.cat === b.cat;
 
 function TravkingsGroupTableView({ setRoute, setBranch, shellBranch }) {

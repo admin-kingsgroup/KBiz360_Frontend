@@ -220,7 +220,7 @@ export const RULE_BOOK = [
     { t: 'A BRS is "balanced" only when derived-vs-actual bank balance differ by ≤0.01.', r: 'bankReco.service.js:266' },
     { t: 'setStatus rejects any status outside the RECON_STATUS enum (400); reverting a line to unreconciled clears its match key/vno/type.', r: 'bankReco.service.js:396,403' },
     { t: 'Recon-status: one row per (branch, account, period) unique index; accountType ∈ bank|client|supplier|other|accruals; status ∈ pending|reconciled.', r: 'reconStatus.model.js:13,22' },
-    { t: 'Marking reconciled stamps by/at; reverting to pending clears them; branch summary always rolls over the fixed six-branch list [BOM,AMD,BOMMB,NBO,DAR,FBM].', r: 'reconStatus.service.js:9,58' },
+    { t: 'Marking reconciled stamps by/at; reverting to pending clears them; branch summary always rolls over the fixed six-branch list [BOM,AMD,MHUB,NBO,DAR,FBM].', r: 'reconStatus.service.js:9,58' },
     { t: 'A ledger is a client if its top system group is Sundry Debtors (via topSystemGroup, catching custom sub-groups).', r: 'clientReco.service.js:35' },
     { t: 'Client is an ASSET — signs do NOT flip: statement DEBIT reconciles against book DEBIT (both signed = debit−credit).', r: 'clientReco.service.js:381' },
     { t: 'Client allocation() FIFO-matches receipts↔invoices purely to SURFACE open items and writes NOTHING to the books.', r: 'clientReco.service.js:229' },

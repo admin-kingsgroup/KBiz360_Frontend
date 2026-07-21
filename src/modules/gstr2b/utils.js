@@ -1,6 +1,6 @@
 // ─── GSTR-2B · pure helpers ──────────────────────────────────────────────────
 
-export const BRANCHES = ['BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+export const BRANCHES = ['BOM', 'AMD', 'MHUB', 'NBO', 'DAR', 'FBM'];
 
 export function defaultPeriod(now = new Date()) {
   const y = now.getUTCFullYear();

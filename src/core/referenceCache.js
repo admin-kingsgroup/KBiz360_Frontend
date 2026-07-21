@@ -17,7 +17,7 @@ const FALLBACK_CURRENCY = { INR: { symbol: '₹', name: 'Indian Rupee', toINR: 1
 // this, a USD/Africa branch whose company-profile omits cur_sym fell through to ₹.
 const SYMBOL_FALLBACK = { INR: '₹', USD: '$', EUR: '€', GBP: '£', AED: 'د.إ', KES: 'KSh', TZS: 'TSh', CDF: 'FC' };
 const FALLBACK_BRANCHES = [
-  { code: 'BOMMB', city: 'Mumbai',        country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
+  { code: 'MHUB', city: 'Mumbai',        country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
   { code: 'BOM',  city: 'Mumbai',        country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
   { code: 'AMD',  city: 'Ahmedabad',     country: 'India',    flag: '🇮🇳', currency: 'INR', currencies: ['INR']                     },
   { code: 'NBO',  city: 'Nairobi',       country: 'Kenya',    flag: '🇰🇪', currency: 'USD', currencies: ['USD', 'KES']              },
@@ -25,7 +25,7 @@ const FALLBACK_BRANCHES = [
   { code: 'FBM',  city: 'Lubumbashi',    country: 'DR Congo', flag: '🇨🇩', currency: 'USD', currencies: ['USD']                     },
 ];
 const FALLBACK_CFG = { cur: '₹', curCode: 'INR', taxType: 'GST', vatRate: null, gstRates: [5, 12, 18], hasIGST: true, psOptions: [], voucherPrefix: 'BOM' };
-const FALLBACK_CFG_ALL = { cur: '₹', curCode: 'INR', taxType: 'MULTI', vatRate: null, gstRates: [5, 12, 18], hasIGST: true, psOptions: [], voucherPrefix: 'BOMMB' };
+const FALLBACK_CFG_ALL = { cur: '₹', curCode: 'INR', taxType: 'MULTI', vatRate: null, gstRates: [5, 12, 18], hasIGST: true, psOptions: [], voucherPrefix: 'MHUB' };
 // Minimal Super-Admin fallback so an admin is never locked out if /api/roles fails.
 const FALLBACK_ROLES = { 'Super Admin': { name: 'Super Admin', branches: 'ALL', perms: {}, special: {}, _fullAccess: true } };
 
@@ -168,7 +168,7 @@ export function branchCfg(code) {
 }
 // Full company-profile doc (legal/bank/address) for printed documents, etc.
 // For an EXPLICIT branch code, never cross-fall-back to BOM's profile — that would print
-// BOM's Mumbai address / 27-GSTIN / BOM banks on another branch's (e.g. AMD, BOMMB) invoices
+// BOM's Mumbai address / 27-GSTIN / BOM banks on another branch's (e.g. AMD, MHUB) invoices
 // and vouchers. Return {} so each caller's own branch-aware fallback (ISSUER_FALLBACK) engages.
 // Only a blank/omitted code (generic default) keeps the BOM default.
 export function companyProfile(code) { return _profiles[code] || (code ? {} : (_profiles.BOM || {})); }

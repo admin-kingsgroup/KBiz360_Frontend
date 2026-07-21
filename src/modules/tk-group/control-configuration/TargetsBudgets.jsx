@@ -8,7 +8,7 @@ import { DataTable } from '../../../shell/DataTable';
 // ─── TK GROUP · FE · Targets & Budgets governance (container) ────────────────
 // Propose a branch target / budget for a period; it's filed as a Farhan + Owner
 // change-request. Nothing auto-applies — approval is the governance record.
-const DEFAULT_BRANCHES = ['ALL', 'BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+const DEFAULT_BRANCHES = ['ALL', 'BOM', 'AMD', 'MHUB', 'NBO', 'DAR', 'FBM'];
 
 const COLS = [
   { key: 'branch', header: 'Branch', render: (cr) => ((cr.payload && cr.payload.after) || {}).branch || cr.branch || '—' },

@@ -2,7 +2,7 @@
 // cockpit renders its region hero (₹ India / $ Africa, never summed) and drills to a branch.
 const branch = (code, currency) => ({ code, currency });
 jest.mock('../../../core/data', () => ({
-  BRANCHES: [branch('BOM', 'INR'), branch('BOMMB', 'INR'), branch('AMD', 'INR'), branch('NBO', 'USD'), branch('DAR', 'USD'), branch('FBM', 'USD')],
+  BRANCHES: [branch('BOM', 'INR'), branch('MHUB', 'INR'), branch('AMD', 'INR'), branch('NBO', 'USD'), branch('DAR', 'USD'), branch('FBM', 'USD')],
   branchMainCurrency: (b) => b.currency || 'INR',
   currencySymbol: (c) => (c === 'USD' ? '$' : '₹'),
 }));

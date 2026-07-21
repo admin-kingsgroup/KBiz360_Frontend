@@ -1,7 +1,7 @@
 import { ruleRegime, ruleAppliesTo, regimeStats, REGIME_LABEL } from '../utils/ruleBranches';
 import { RULE_BOOK, ruleBookStats } from '../utils/ruleBook.data';
 
-const INDIA = ['BOMMB', 'BOM', 'AMD'];
+const INDIA = ['MHUB', 'BOM', 'AMD'];
 
 describe('TK rule book · branch applicability (pure)', () => {
   test('ruleRegime — keyword classification', () => {

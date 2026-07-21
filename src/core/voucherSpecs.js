@@ -301,7 +301,7 @@ const pkgRateOf = (spec, ctx) => { if (ctx && (ctx.noVat || ctx.saleZeroRated)) 
 export { isVatBranch };
 // Withholding on the supplier incentive/commission — the RATE follows the BRANCH's own
 // country, because a branch withholds under the law of where it operates.
-//   • India (BOM/AMD/BOMMB) → 194H at the statutory 2%.
+//   • India (BOM/AMD/MHUB) → 194H at the statutory 2%.
 //   • Africa (NBO/DAR/FBM)  → that country's WHT, which is per-supplier and already has a
 //     home on the supplier master: `whtRate` / `whtSection` (added as "the VAT-world
 //     counterparts of gstin/tdsSection") — fields that were built for exactly this and

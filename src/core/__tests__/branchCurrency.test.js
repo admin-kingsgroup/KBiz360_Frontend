@@ -39,6 +39,6 @@ describe('branch-aware currency formatting (FIX 2 helpers)', () => {
 
   test('isVatBranch flags the Africa branches (drives RefundReissueFields VAT labels)', () => {
     ['NBO', 'DAR', 'FBM'].forEach((b) => expect(isVatBranch(b)).toBe(true));
-    ['BOM', 'BOMMB', 'AMD'].forEach((b) => expect(isVatBranch(b)).toBe(false));
+    ['BOM', 'MHUB', 'AMD'].forEach((b) => expect(isVatBranch(b)).toBe(false));
   });
 });

@@ -46,7 +46,7 @@ export function diceSim(a, b) {
 export function codeHintName(code) {
   let c = String(code || '').trim();
   if (!c) return '';
-  c = c.replace(/^(BOM|BOMMB|AMD|NBO|DAR|FBM)-/i, '');   // branch tag
+  c = c.replace(/^(BOM|MHUB|AMD|NBO|DAR|FBM)-/i, '');   // branch tag
   c = c.replace(/^(AUTO|SYS|MN)-/i, '');                 // system marker
   c = c.replace(/^(AUTO|SYS|MN)-/i, '');                 // a second (BOM-AUTO-…)
   c = c.trim();

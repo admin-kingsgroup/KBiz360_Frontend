@@ -537,7 +537,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // use shows 0 (column never hidden). Party (debtor) + Supplier (creditor) get
   // their own columns. Branch tags ([BOM]…) are trimmed from headers (full name on
   // hover); [Pur] is kept so sale vs purchase heads stay distinct.
-  const shortHead = (h) => String(h).replace(/\s*\[(BOMMB|BOM|AMD|NBO|DAR|FBM)\]/gi, '').trim();
+  const shortHead = (h) => String(h).replace(/\s*\[(MHUB|BOM|AMD|NBO|DAR|FBM)\]/gi, '').trim();
   const columnarWise = () => {
     const byCat = {};
     flatEntries.forEach((e) => { (byCat[e.category] || (byCat[e.category] = [])).push(e); });

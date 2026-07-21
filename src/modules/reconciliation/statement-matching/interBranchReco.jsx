@@ -30,7 +30,7 @@ const symOf = (ccy, fallback) => CCY_SYM[ccy] || fallback;
 // Book currency per branch (mirror of backend taxRegime.BOOK_CCY) — an INB link's `total`
 // is in the SELLER (fromBranch) currency, so it must be shown in that currency, not the
 // viewer's. India → INR, Africa → USD.
-const BOOK_CCY = { BOM: 'INR', AMD: 'INR', BOMMB: 'INR', NBO: 'USD', DAR: 'USD', FBM: 'USD' };
+const BOOK_CCY = { BOM: 'INR', AMD: 'INR', MHUB: 'INR', NBO: 'USD', DAR: 'USD', FBM: 'USD' };
 const bookCcyOf = (b) => BOOK_CCY[b] || 'INR';
 
 export function InterBranchReco({ branch }) {

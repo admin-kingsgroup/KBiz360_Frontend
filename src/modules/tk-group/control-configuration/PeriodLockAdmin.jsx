@@ -8,7 +8,7 @@ import { PeriodLockPanel } from '../PeriodLockPanel';
 // filed as a Farhan + Owner change-request, never applied directly. 'ALL' = a
 // group-wide lock across all branches. Branch list is injected (default = the six
 // live branches) so the container stays decoupled from the reference cache.
-const DEFAULT_BRANCHES = ['ALL', 'BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+const DEFAULT_BRANCHES = ['ALL', 'BOM', 'AMD', 'MHUB', 'NBO', 'DAR', 'FBM'];
 
 export function PeriodLockAdmin({ branches = DEFAULT_BRANCHES }) {
   const [state, setState] = useState({ items: [] });

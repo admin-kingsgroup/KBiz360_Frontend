@@ -6,7 +6,7 @@ const defaults = { cashMaxPayment: 20000, backdateDays: 3 };
 describe('branchLimits helpers', () => {
   test('LIMIT_BRANCHES lead with the group default then the 6 branches', () => {
     expect(LIMIT_BRANCHES[0].code).toBe('default');
-    expect(LIMIT_BRANCHES.map((b) => b.code)).toEqual(['default', 'BOMMB', 'BOM', 'AMD', 'NBO', 'DAR', 'FBM']);
+    expect(LIMIT_BRANCHES.map((b) => b.code)).toEqual(['default', 'MHUB', 'BOM', 'AMD', 'NBO', 'DAR', 'FBM']);
   });
 
   test('symbolFor: generic money fields follow the branch currency; others keep their unit', () => {

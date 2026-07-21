@@ -38,8 +38,8 @@ import { useVNo } from '../../../core/useNextNo';
 // different country = cross-border export (zero-rated on the seller side). These codes are PRINTED
 // in the tax-treatment banner, so they must be the real ISO ones — FBM is Lubumbashi, DR Congo =
 // 'CD' (it read 'FB', which is not a country, and the banner showed "zero-rated (IN→FB)").
-const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' };
-const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'BOMMB'];
+const INB_COUNTRY = { BOM: 'IN', AMD: 'IN', MHUB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' };
+const INB_ALL = ['BOM', 'AMD', 'NBO', 'DAR', 'FBM', 'MHUB'];
 // Case-folded like inbIndiaSeller below and the backend's cc() — this was the ONE branch lookup
 // here that wasn't. A lowercase/padded code (inb.updateDeal persists fromBranch unguarded, and
 // getDeal feeds it straight back as editBooking.branch) missed the map, defaulted BOTH sides to
@@ -50,7 +50,7 @@ const inbCrossBorder = (from, to) => (inbCty(from) || 'IN') !== (inbCty(to) || '
 // An India-jurisdiction seller bills IGST on its inter-branch Service Fee even cross-border to
 // Africa (the India side's output tax must reconcile); the Africa buyer can't reclaim Indian GST,
 // so it books the tax-inclusive amount as COST (bookingOrders.buildInbBuyerBookingPayload). This
-// is the SELLER'S JURISDICTION, not one branch: BOM, AMD and BOMMB all bill. Mirrors the backend
+// is the SELLER'S JURISDICTION, not one branch: BOM, AMD and MHUB all bill. Mirrors the backend
 // fallback in inb.service.inbTaxTreatment — keep the two in step.
 // Resolved from the map, NOT via a defaulted 'IN': an unmapped/lowercase code must not default the
 // tick ON and make an Africa seller bill tax. Case-folded to match the backend (inbTaxTreatment),
@@ -599,11 +599,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // deal is always taxable (tick locked ON); a cross-border deal defaults OFF (zero-rated export)
   // and the seller ticks it to bill IGST (added to what the buyer branch pays).
   const crossBorderInb = interBranch && !!toBranch && inbCrossBorder(brCode, toBranch);
-  // EVERY India seller (BOM/AMD/BOMMB) bills IGST on its Service Fee even cross-border to Africa
+  // EVERY India seller (BOM/AMD/MHUB) bills IGST on its Service Fee even cross-border to Africa
   // (seller-side reconciliation rule), so the tick DEFAULTS ON for all of them; an Africa seller
   // defaults to a zero-rated export (OFF). It stays a per-deal CHOICE — a genuine zero-rated export
   // can still be booked by unticking. Was `brCode === 'BOM'`, which opened the tick OFF on an
-  // otherwise identical AMD→FBM / BOMMB→FBM deal and shipped it zero-rated unless someone noticed.
+  // otherwise identical AMD→FBM / MHUB→FBM deal and shipped it zero-rated unless someone noticed.
   // Edit preloads the saved choice. Mirrors the backend fallback (inbTaxTreatment) exactly.
   const [billIgstCB, setBillIgstCB] = useState(editing ? !!(editBooking.billIgst) : inbIndiaSeller(brCode));
   const billIgst = interBranch ? (crossBorderInb ? billIgstCB : true) : undefined;
@@ -631,7 +631,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // `billIgst === false` is exactly that case: a same-country INB pins it true, a non-INB voucher
   // leaves it undefined. It rides its OWN sale-side flag rather than the Africa Without-VAT
   // toggle, because that toggle is `isVatBr`-gated: folding it in there fixed FBM/NBO/DAR but left
-  // AMD/BOMMB (which default the tick OFF) showing 18% under a "zero-rated" banner — and simply
+  // AMD/MHUB (which default the tick OFF) showing 18% under a "zero-rated" banner — and simply
   // dropping the isVatBr gate would zero India's purchase GST/ITC via purRateOf. saleZeroRated
   // touches the sale side only, so input tax keeps following the supplier's invoice either way.
   const inbZeroRated = interBranch && billIgst === false;
