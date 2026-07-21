@@ -39,8 +39,9 @@ const groupKeyLabel = (r) => (r.groupKey !== undefined && r.groupKey !== null)
 const blankSub = () => ({ a7: 0, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, unsettled: 0, receipt: 0, final: 0 });
 const addInto = (s, r) => { FINE_BUCKETS.forEach(([k]) => { s[k] = r2(s[k] + r[k]); }); s.unsettled = r2(s.unsettled + r.unsettled); s.receipt = r2(s.receipt + r.receipt); s.final = r2(s.final + r.final); return s; };
 
-// Pure — derive the six settlement metrics + the sub-group-grouped ageing of Unsettled
-// Bills from an ageing() side payload ({ totals, rows }). Import-free / unit-testable.
+// Pure — derive the six settlement metrics + the ageing of Unsettled Bills grouped by the
+// party attribute (Client Type / Category) from an ageing() side payload ({ totals, rows }).
+// Import-free / unit-testable.
 // `side` = 'receivable' | 'payable' (…s / plural tolerated).
 export function buildSettlement(side, totals = {}, rows = []) {
   const isRec = /^rec/i.test(side || '');
