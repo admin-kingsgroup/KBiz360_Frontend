@@ -86,15 +86,16 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const vatPct = isVatBr ? (_brVatRaw != null ? num(_brVatRaw) : (VAT_FALLBACK[String(brCode).toUpperCase()] || 16)) : 0;
   const taxLabel = isVatBr ? 'VAT' : 'GST';
   const whtLabel = isVatBr ? 'WHT' : 'TDS';
-  const rateSlabs = isVatBr ? [vatPct] : GST_SLABS;
+  const rateSlabs = isVatBr ? [0, vatPct] : GST_SLABS;   // Africa: 0 (Without VAT, default) or the branch rate
   // Place-of-supply split is an Indian-GST concept; a VAT branch shows one 'VAT' line.
   const splitTax = isVatBr ? 'VAT' : (state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST');
   const splitTaxPlus = isVatBr ? 'VAT' : (state.gstMode === 'inter' ? 'IGST' : 'CGST + SGST');
 
-  // A VAT branch bills at its one VAT rate — seed it over the India-default 18 so both
-  // the posted tax and the read-only VAT captions use the branch rate (not a stray 18%).
+  // A VAT branch offers only 0 (Without VAT — the DEFAULT) or its single VAT rate. Snap a stray
+  // India rate (e.g. a seeded 18) to 0 so an Africa refund/reissue opens WITHOUT VAT (Owner's rule
+  // 2026-07-21: no VAT until physically selected); a deliberate 0 or vatPct choice is preserved.
   useEffect(() => {
-    if (isVatBr && vatPct && num(state.gstPct) !== vatPct) patch({ gstPct: vatPct });
+    if (isVatBr && vatPct && num(state.gstPct) !== 0 && num(state.gstPct) !== vatPct) patch({ gstPct: 0 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVatBr, vatPct]);
 
@@ -211,7 +212,9 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   // at the voucher's GST rate (the "GST on our charges" slab, 18% by default), so the
   // accountant doesn't key it by hand. Still editable — a manual override sticks until
   // the base or the slab changes again.
-  const gstRate = num(state.gstPct) || (isVatBr ? vatPct : 18);
+  // Respect an explicit 0% (Without VAT) — `|| fallback` used to coerce a real 0 back to the rate,
+  // so the supplier-fee/cancellation GST kept computing under Without VAT. Fall back only when unset.
+  const gstRate = (state.gstPct === '' || state.gstPct == null) ? (isVatBr ? vatPct : 18) : num(state.gstPct);
   const gstOf = (base) => r2(num(base) * gstRate / 100);
 
   // Commission Reversal (refund only): the "clawback" IS the commission reversal.

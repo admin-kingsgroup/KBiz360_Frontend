@@ -5,42 +5,42 @@
 // MORE than the backend derives. The fix folds the zero-rated case into the Without-VAT flag
 // (`effNoVat`) that soPoGpVoucherEntry already threads into bookingTotals/lineCalc.
 //
-// These tests pin the INVARIANT that makes that one-flag fix safe: on a VAT (Africa) branch,
-// noVat zeroes ONLY the sale-side service-fee tax and leaves the PURCHASE (input) VAT at full
-// rate — voucherSpecs decouples input VAT from the sale choice on purpose ("a VAT branch still
-// records/reclaims it under Without VAT"). If that ever changes, an FBM export would silently
-// lose its supplier ITC and this suite fails loudly.
+// The INB export one-flag fix now rides `saleZeroRated`, NOT `noVat` — the two mean different
+// things (Owner's rule 2026-07-21): `noVat` (the Without VAT toggle) makes the WHOLE booking
+// VAT-free (both sale OUTPUT and purchase INPUT VAT), while `saleZeroRated` (INB export) zeroes the
+// SALE side only and KEEPS the input VAT the branch was actually charged. The first describe block
+// below pins the Without-VAT "no VAT anywhere" rule; the second pins the export invariant.
 import { VSPECS, bookingTotals, lineCalc, isTaxable } from '../voucherSpecs.js';
 
 const FBM = { branch: 'FBM', vatRate: 16 };   // Africa/VAT branch, 16%
 const line = { fn: 'A', sn: 'B', base: 20000, tax: 5335, psvc: 500, ssvc: 1000 };
 
-describe('INB zero-rated export — sale-side fee tax off, purchase VAT untouched', () => {
+describe('Without VAT (noVat) — VAT off on BOTH sides', () => {
   test('VAT branch + noVat: the sale-side Service Fee tax is 0', () => {
     const taxed = lineCalc(VSPECS.SF, line, { ...FBM, noVat: false });
     const zero = lineCalc(VSPECS.SF, line, { ...FBM, noVat: true });
     expect(taxed.gstSvc).toBeGreaterThan(0);   // normally 16% VAT on the fee
-    expect(zero.gstSvc).toBe(0);               // zero-rated export → nothing on the fee
+    expect(zero.gstSvc).toBe(0);               // Without VAT → nothing on the fee
     expect(zero.gstMk).toBe(0);                // and nothing on the markup
   });
 
-  test('VAT branch + noVat: the PURCHASE (input) VAT survives at full rate — supplier ITC is NOT collateral damage', () => {
+  test('VAT branch + noVat: the PURCHASE (input) VAT is ALSO zeroed — Without VAT = no VAT anywhere', () => {
     const taxed = lineCalc(VSPECS.SF, line, { ...FBM, noVat: false });
     const zero = lineCalc(VSPECS.SF, line, { ...FBM, noVat: true });
-    // This is the invariant the one-flag fix leans on: input VAT follows the SUPPLIER's invoice,
-    // not the sale's zero-rating, so it must be identical either way and non-zero.
+    // Owner's rule (2026-07-21): a Without-VAT booking is VAT-free on BOTH sides. (Contrast the
+    // saleZeroRated INB-export case below, which keeps input VAT.)
     expect(taxed.gstPur).toBeGreaterThan(0);
-    expect(zero.gstPur).toBe(taxed.gstPur);
+    expect(zero.gstPur).toBe(0);
   });
 
-  test('VAT branch + noVat: the SO total drops by exactly the fee tax (no inflated total / FX quote)', () => {
+  test('VAT branch + noVat: the SO fee tax AND the PO input VAT both go to 0', () => {
     const taxed = bookingTotals(VSPECS.SF, [line], { branch: 'FBM', vatRate: 16, noVat: false });
     const zero = bookingTotals(VSPECS.SF, [line], { branch: 'FBM', vatRate: 16, noVat: true });
     expect(zero.so.total).toBeLessThan(taxed.so.total);
     expect(zero.so.gst).toBe(0);
-    // The PO cost (what the FX preview and GP lean on) is unchanged by the sale's zero-rating.
-    expect(zero.po.gst).toBe(taxed.po.gst);
-    expect(zero.po.total).toBe(taxed.po.total);
+    // Without VAT now zeroes the purchase-side input VAT too (whole booking VAT-free).
+    expect(taxed.po.gst).toBeGreaterThan(0);
+    expect(zero.po.gst).toBe(0);
   });
 
   test('isTaxable is the sale-side gate only', () => {

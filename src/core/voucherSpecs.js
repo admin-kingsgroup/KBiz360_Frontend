@@ -282,21 +282,21 @@ const vatRateOf = (ctx) => {
     : VAT_RATE[String((ctx && ctx.branch) || '').trim().toUpperCase()];   // trim: mirror the BE's norm()
   return num(pct) / 100;
 };
-// `saleZeroRated` — the SALE side bills no tax on the agency's fee/markup, independent of the
-// Africa "Without VAT" toggle. It exists because a zero-rated INTER-BRANCH EXPORT is zero-rated
-// for ANY seller (the server: cross-border + tick off ⇒ taxRate 0, with no India/Africa split),
-// but `noVat` cannot express that: on an INDIA branch noVat also zeroes purRateOf, which would
-// wipe the purchase GST/ITC. So this flag gates the SALE side ONLY — isInputTaxable/purRateOf
-// below never read it, and input tax keeps following the supplier's invoice.
+// TWO distinct "no tax" gates — keep them separate:
+//   • `noVat` — the Africa "Without VAT" toggle. Owner's rule (2026-07-21): a Without-VAT booking
+//     is VAT-free on the WHOLE voucher ("no VAT until someone physically ticks With VAT") — it
+//     zeroes BOTH the sale-side OUTPUT VAT and the purchase-side INPUT VAT/ITC. India never sets it.
+//   • `saleZeroRated` — a zero-rated INTER-BRANCH EXPORT (server: cross-border + tick off ⇒ taxRate
+//     0, ANY seller). Gates the SALE side ONLY: the branch still incurred input VAT on its costs, so
+//     isInputTaxable/purRateOf below deliberately never read it.
 export const isTaxable = (ctx) => !(ctx && (ctx.noVat || ctx.saleZeroRated));
-// Input (purchase) VAT is DECOUPLED from the client's Without-VAT SALE choice — it
-// follows the supplier's invoice, so a VAT (Africa) branch still records/reclaims it
-// under Without VAT. India never sets noVat → unchanged.
-const isInputTaxable = (ctx) => ((ctx && isVatBranch(ctx.branch)) ? true : !(ctx && ctx.noVat));
+// Input (purchase) VAT: killed by `noVat` (whole booking VAT-free) but NOT by `saleZeroRated`
+// (an INB export still records the input VAT it was actually charged).
+const isInputTaxable = (ctx) => !(ctx && ctx.noVat);
 const svcRateOf = (ctx) => { if (ctx && (ctx.noVat || ctx.saleZeroRated)) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return GST_RATE; };
-// NB: purRateOf must NOT read saleZeroRated — a zero-rated sale says nothing about what the
-// supplier charged us, and reading it here would destroy the purchase GST/ITC.
-const purRateOf = (spec, ctx) => { if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); if (ctx && ctx.noVat) return 0; return moduleRate(spec); };
+// `noVat` ⇒ 0 (no input VAT either), checked BEFORE the branch rate so it wins on a VAT branch.
+// Must NOT read saleZeroRated — a zero-rated sale says nothing about what the supplier charged us.
+const purRateOf = (spec, ctx) => { if (ctx && ctx.noVat) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return moduleRate(spec); };
 const pkgRateOf = (spec, ctx) => { if (ctx && (ctx.noVat || ctx.saleZeroRated)) return 0; if (ctx && isVatBranch(ctx.branch)) return vatRateOf(ctx); return spec.gstRate || PKG_GST; };
 export { isVatBranch };
 // Withholding on the supplier incentive/commission — the RATE follows the BRANCH's own

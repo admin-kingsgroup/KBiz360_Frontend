@@ -1755,7 +1755,9 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       party: (editing && (editBooking.customer?.ledgerName || editBooking.customer?.name)) || '',
       counterParty: r.counterParty || (editing && editBooking.supplier?.ledgerName) || '',
       supplierAmt: r.supplierAmt ?? '', serviceCharge: r.serviceCharge ?? '',
-      markup: r.otherTaxes ?? '', gstPct: r.gstPct || 18,
+      // Africa/VAT branch opens a NEW reversal Without VAT (gstPct 0) — Owner's rule 2026-07-21;
+      // an edit keeps the stored rate. India → 18. (RefundReissueFields also snaps strays to 0.)
+      markup: r.otherTaxes ?? '', gstPct: r.gstPct != null ? r.gstPct : (isVatBranch(brCode) ? 0 : 18),
       supplierSvc: r.supplierSvc ?? '', supplierGst: r.supplierGst ?? '',
       // Refund-only economics — MUST round-trip or an edited/revoked refund re-opens
       // blank and re-posts without the airline cancellation + commission clawback (the
@@ -1810,7 +1812,7 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       const reversal = {
         counterParty: state.counterParty, counterPartyGroup: 'Sundry Creditors',
         supplierAmt: +state.supplierAmt || 0, serviceCharge: +state.serviceCharge || 0,
-        otherTaxes: +state.markup || 0, gstPct: +state.gstPct || 18, gstMode: state.gstMode,
+        otherTaxes: +state.markup || 0, gstPct: (state.gstPct === '' || state.gstPct == null) ? 18 : num(state.gstPct), gstMode: state.gstMode,
         supplierSvc: +state.supplierSvc || 0, supplierGst: +state.supplierGst || 0,
         // Airline cancellation penalty (+ its GST) and commission clawback — carried so
         // the spawned RF voucher posts the SAME journal the live JV previewed, and so an
@@ -1824,6 +1826,9 @@ function ReversalEntry({ moduleCode, changeModule, brCode, cur, editing, editBoo
       };
       const payload = {
         module: moduleCode, branch: brCode, date: state.date, gstMode: state.gstMode,
+        // Without VAT when the reversal rate is 0 on a VAT branch — mirrors the forward booking so
+        // the spawned RF/RI voucher posts no VAT (backend buildReversalVoucherData reads b.noVat too).
+        noVat: isVatBranch(brCode) && num(state.gstPct) === 0,
         customer: { name: state.party, ledgerName: state.party },
         supplier: { name: state.counterParty, ledgerName: state.counterParty },
         againstInvoice: state.againstInvoice, againstPurchase: state.againstPurchase || '',
