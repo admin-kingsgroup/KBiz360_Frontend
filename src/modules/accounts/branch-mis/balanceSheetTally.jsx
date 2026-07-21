@@ -29,7 +29,10 @@ const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec';
 // (Indian lakh/crore for ₹, Western thousands for USD branches); the symbol itself
 // is rendered separately by the caller. ALL/consolidated → bc returns ₹ → en-IN.
 const money = (n, cur = '₹') => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString(localeOf(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
+// A blank/unresolved branch defaults to CONSOLIDATED ('ALL' → '' param), never 'BOM' —
+// this value feeds both the query key and the API branch param, so a 'BOM' default would
+// silently load Mumbai's books into the report. Matches useAccounting.branchCode() (blank⇒all).
+const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'ALL'));
 // Per-branch currency + label for the consolidated (ALL) breakdown. A byBranch slice
 // carries a bare branch CODE (string); bc() expects an object with `.code`, so wrap it.
 const brObj = (code) => ({ code: String(code || 'BOM') });
@@ -145,9 +148,9 @@ export function BalanceSheetTallyLive({ branch }) {
         ) : (!isLoading && !error && top.kind === 'bs' && bs && (
           <div style={{ overflowX: 'auto' }}>
             <div style={{ display: 'flex', gap: 0 }}>
-              <PLSide title="Liabilities" lines={bs.liabilities} total={bs.total} periodLabel={asAt} onPick={pick} />
+              <PLSide title="Liabilities" lines={bs.liabilities} total={bs.total} periodLabel={asAt} onPick={pick} branch={brObj(brCodeOf(branch))} />
               <div style={{ width: 1, background: LINE }} />
-              <PLSide title="Assets" lines={bs.assets} total={bs.total} periodLabel={asAt} onPick={pick} />
+              <PLSide title="Assets" lines={bs.assets} total={bs.total} periodLabel={asAt} onPick={pick} branch={brObj(brCodeOf(branch))} />
             </div>
             <div style={{ padding: '8px 16px', background: '#f7f8fb', fontSize: 11.5, color: DIM, borderTop: '1px solid ' + LINE }}>
               {bs.balanced ? '✔ Balanced' : '⚠ Difference'} · Total <b style={{ color: DARK }}>{cur} {money(bs.total, cur)}</b> · click any group or ledger to drill down.

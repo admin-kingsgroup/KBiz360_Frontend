@@ -32,7 +32,10 @@ const DARK = '#1a1c22', DIM = '#5b616e', LINE = '#e6e8ec', HEAD = '#2e323c';
 // itself is rendered separately by the caller. Defaulting cur to ₹ keeps every
 // consolidated/ALL view (bc → ₹) and any un-threaded caller on en-IN, unchanged.
 const money = (n, cur = '₹') => (n == null || n === '' ? '' : Number(Math.round((+n || 0) * 100) / 100).toLocaleString(localeOf(cur), { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
+// A blank/unresolved branch defaults to CONSOLIDATED ('ALL' → '' param), never 'BOM' —
+// this value feeds both the query key and the API branch param, so a 'BOM' default would
+// silently load Mumbai's books into the report. Matches useAccounting.branchCode() (blank⇒all).
+const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'ALL'));
 // Per-branch currency + label for the consolidated (ALL) breakdown. A byBranch slice
 // carries a bare branch CODE (string); bc() expects an object with `.code`, so wrap it.
 const brObj = (code) => ({ code: String(code || 'BOM') });

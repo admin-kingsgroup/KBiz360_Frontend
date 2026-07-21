@@ -10,7 +10,9 @@ export function RPT_StatutoryDues(){
   const rows=q.data?.rows||[];
   const t=q.data?.totals||{overdue:0,pending:0,upcoming:0,dueValue:0};
   // Money is per currency — ₹ India (GST/TDS) vs $ Africa (VAT/WHT), never blended.
-  const sym=(c)=>(!c||c==="INR")?"₹":"$";
+  // Only an explicit USD/$ prints $; anything else (INR, blank, '₹', case/whitespace variants)
+  // defaults to ₹ — so an India branch (AMD) can never fall through to a spurious $.
+  const sym=(c)=>{const t=String(c||'').trim().toUpperCase();return (t==='USD'||t==='$')?'$':'₹';};
   const dueParts=t.dueByCurrency&&Object.keys(t.dueByCurrency).length
     ? Object.entries(t.dueByCurrency).filter(([,v])=>Number(v)).map(([c,v])=>compactAmt(v,{currency:sym(c)}))
     : (Number(t.dueValue)?[fmtINR(t.dueValue)]:[]);

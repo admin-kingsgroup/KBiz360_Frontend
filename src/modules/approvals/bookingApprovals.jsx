@@ -45,7 +45,8 @@ import { SkeletonTable } from '../../shell/primitives';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', BLUE = '#2563eb';
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString(localeOf(activeCurrency()), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
+// Blank/unresolved branch → null (like core/voucher/ui.js), never a silent 'BOM' default.
+const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || null));
 
 /* ════════════════════════════════════════════════════════════════════════════
    Pending & Approved lists

@@ -98,7 +98,9 @@ const isReversalModule = (m) => m === 'RF' || m === 'RI';
 // Voucher module code → the module name used by the /api/markup-rules master
 // (the rule sheet stores 'Flight'/'Hotel'/…/'Misc' or 'ALL').
 const MARKUP_RULE_MODULE = { SF: 'Flight', SH: 'Holiday', SHT: 'Hotel', SV: 'Visa', SI: 'Insurance', SC: 'Car', SM: 'Misc' };
-const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
+// Blank/unresolved branch → null (like core/voucher/ui.js), so canSave blocks the post
+// instead of silently stamping 'BOM'. A specific branch (AMD) posts under itself.
+const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || null));
 // A supplier attracts the BRANCH's domestic tax + withholding only when it sits in the same
 // country the branch operates in (blank country = domestic to that branch). Mirrors the backend
 // isDomesticFor() in shared/util/gstSupplyType so the live PO grid drops the tax for a foreign
@@ -495,9 +497,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
   const [noSupplier, setNoSupplier] = useState(editing ? !!editBooking.noSupplier : false);
-  // Without-VAT mode (Africa/VAT branches only): zero-rate the booking tax (e.g.
-  // international air). Ignored on India branches (they always follow module GST).
-  const [noVat, setNoVat] = useState(editing ? !!editBooking.noVat : false);
+  // Without-VAT mode (Africa/VAT branches only): zero-rate the SALE-side booking tax.
+  // DEFAULT for a NEW voucher on a VAT branch (NBO/DAR/FBM) is Without VAT — VAT is billed
+  // only if the user consciously ticks "With VAT" on the toggle below. India branches ignore
+  // the flag (they always follow the per-module GST rule), and isVatBranch(brCode) is false
+  // there, so it opens With-VAT exactly as before. An edit keeps the voucher's saved choice.
+  const [noVat, setNoVat] = useState(editing ? !!editBooking.noVat : isVatBranch(brCode));
+  // The form is NOT remounted when the top-bar branch changes (App.jsx renders it with no
+  // per-branch key), so the initialiser above only reflects the branch present at mount. A
+  // voucher can't be raised under "ALL" (a banner blocks it), so the usual start is ALL → pick
+  // a specific branch AFTER mount — re-derive the default on every later branch switch for a
+  // NEW voucher so a VAT branch always opens Without VAT and India With VAT. A manual With/Without
+  // tick changes `noVat`, not `brCode`, so this never stomps a conscious choice; an edit is skipped.
+  useEffect(() => { if (!editing) setNoVat(isVatBranch(brCode)); }, [brCode, editing]); // eslint-disable-line react-hooks/exhaustive-deps
   // GST mode is set per leg: place of supply can differ (in-state sale → intra,
   // out-of-state supplier purchase → inter). Default sale=intra; on edit, prefer the
   // leg's own stored mode, falling back to the legacy booking-level gstMode.
@@ -1294,8 +1306,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         </div>
       )}
 
-      {/* Africa/VAT branches: VAT applies at the branch rate by default, OR tick
-          "Without VAT" to zero-rate this booking (e.g. international air). India
+      {/* Africa/VAT branches: a NEW booking opens WITHOUT VAT by default (sale-side
+          zero-rated) — VAT is billed only if the user ticks "With VAT" here. India
           branches always follow the per-module GST rule, so this is hidden there.
           HIDDEN on an inter-branch voucher too: the INB payload sends `billIgst`, never
           `noVat`, so this control changed nothing there — while still highlighting "With VAT"
