@@ -308,14 +308,14 @@ export function HrPayroll({branch}){
                 <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:e.side==="Dr"?"#f0f8ff":"#f0fff4"}}>
                   <td style={{padding:"8px 12px",fontWeight:800,color:e.side==="Dr"?"#185FA5":"#27500A",fontFamily:"monospace"}}>{e.side}</td>
                   <td style={{padding:"8px 12px",fontWeight:500,color:"#0d1326"}}>{e.ledger}</td>
-                  <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{Number(Math.round(e.amount)).toLocaleString()}</td>
+                  <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(e.amount)}</td>
                   <td style={{padding:"8px 12px",fontSize:10,color:"#5a6691"}}>{e.note}</td>
                 </tr>
               ))}</tbody>
               <tfoot><tr style={{background:"#0d1326"}}>
                 <td colSpan={2} style={{padding:"8px 12px",fontWeight:700,color:"#d4a437"}}>TOTAL Dr / Cr</td>
                 <td style={{padding:"8px 12px",textAlign:"right",fontWeight:800,color:"#fff"}}>
-                  ₹{jDr.toLocaleString()} / ₹{jCr.toLocaleString()}
+                  {f(jDr)} / {f(jCr)}
                 </td>
                 <td/>
               </tr></tfoot>

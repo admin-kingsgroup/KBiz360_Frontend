@@ -25,7 +25,7 @@ import { allocSummary, money2, GREEN, RED, settleSpec, DARK } from '../ui';
  *     (receipt) legs + one bank leg for the sum.
  */
 export function ReceiptPaymentFields({ state, setState, ctx, side }) {
-  const { branch, cur } = ctx;
+  const { branch, cur, branchCode } = ctx;
   const isReceipt = side === 'customer';
   const accent = isReceipt ? GREEN : RED;
   const patch = (p) => setState((s) => ({ ...s, ...p }));
@@ -46,7 +46,9 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   // Withholding is India TDS (statute section-driven) vs Africa/VAT-branch WHT (flat rate). A DAR
   // (VAT) receipt/payment must show "WHT" + a flat rate, never Indian 194x sections — the posting
   // engine already routes it to the branch's "WHT Payable/Receivable [DAR]" head regardless.
-  const isVat = isVatBranch(branch);
+  // Use branchCode (the resolved code STRING) — ctx.branch is the branch OBJECT in create mode, and
+  // isVatBranch stringifies its arg, so isVatBranch(object) is always false. Mirrors PurchaseExpenseFields.
+  const isVat = isVatBranch(branchCode);
   const whtLabel = isVat ? 'WHT' : 'TDS';
   useEffect(() => {
     if (!state.split && state.party && otherType && state.otherType !== otherType) setState((s) => ({ ...s, otherType }));
@@ -88,7 +90,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
     const remain = Math.max(0, Math.round((gross - others) * 100) / 100);
     setState((s) => ({ ...s, alloc: { ...s.alloc, [vno]: gross > 0 ? Math.min(out, remain) : out } }));
   };
-  const tdsRate = isVat ? (+state.whtRate || 0) : ((TDS_SECTIONS[state.tdsSection] || {}).rate || 0);
+  const tdsRate = isVat ? (+state.whtRate || 2) : ((TDS_SECTIONS[state.tdsSection] || {}).rate || 0);
   const autoTds = () => {
     if (tdsRate) patch({ tdsAmt: Math.round(net * tdsRate / (100 - tdsRate)) });
   };
@@ -252,7 +254,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
           {isParty && !isRefund && (
           <div style={{ padding: '10px 12px', borderRadius: 9, background: '#FAEEDA', border: '1px solid #FAC775', margin: '12px 0' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: state.tds ? 8 : 0 }}>
-              <input type="checkbox" checked={!!state.tds} onChange={(e) => patch({ tds: e.target.checked })} style={{ cursor: 'pointer', accentColor: '#854F0B' }} />
+              <input type="checkbox" checked={!!state.tds} onChange={(e) => patch({ tds: e.target.checked, ...(isVat && e.target.checked ? { tdsSection: '' } : {}) })} style={{ cursor: 'pointer', accentColor: '#854F0B' }} />
               <span style={{ fontSize: 11, fontWeight: 700, color: '#854F0B' }}>{isReceipt ? `Party has deducted ${whtLabel} before paying` : `Deduct ${whtLabel} at source before paying`}</span>
             </label>
             {state.tds && (isVat ? (

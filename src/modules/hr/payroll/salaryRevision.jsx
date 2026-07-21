@@ -10,7 +10,8 @@ import { fromRevisionDTO, toRevisionPayload } from '../hrMaps';
 import { buildRevisionDue } from '../hrReports';
 import { todayISO } from '../../../core/dates';
 import { toast } from '../../../core/ux/toast';
-import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
+import { FL, btnG, btnGh, card, inp, bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function SalaryRevision({branch}){
@@ -27,6 +28,10 @@ export function SalaryRevision({branch}){
   const revisions=((revQ.data)||[]).map(fromRevisionDTO);
   const {create}=useMasterMutations('salary-revisions');
   const vo=isViewOnly();
+  // Branch-currency aware: a USD branch (DAR/NBO/FBM) shows salary figures in $ with Western
+  // grouping, not a hardcoded ₹. Symbol from the branch CFG (bc), not the BRANCHES record.
+  const c=(bc(branch)||{}).cur||'₹';
+  const f=n=>c+Number(Math.round(+n||0)).toLocaleString(localeOf(c));
 
   const dueFiltered=buildRevisionDue(emps,revisions,todayISO());
   const overdue=dueFiltered.filter(e=>e.status==="OVERDUE");
@@ -81,7 +86,7 @@ export function SalaryRevision({branch}){
                 <tr key={e.empId} style={{borderBottom:"1px solid #dfe2e7",background:e.status==="OVERDUE"?"#fff5f5":i%2===0?"#fff":"#fafafa"}}>
                   <td style={{padding:"8px 12px",fontWeight:600,color:"#0d1326"}}>{e.empName}</td>
                   <td style={{padding:"8px 12px"}}><span style={{fontSize:10,padding:"2px 7px",borderRadius:999,background:"#E6F1FB",color:"#185FA5",fontWeight:700}}>{e.branch}</span></td>
-                  <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{e.currentBasic.toLocaleString()}</td>
+                  <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(e.currentBasic)}</td>
                   <td style={{padding:"8px 12px",color:"#5a6691",whiteSpace:"nowrap"}}>{e.lastRevision}</td>
                   <td style={{padding:"8px 12px",color:e.status==="OVERDUE"?"#A32D2D":"#5a6691",fontWeight:e.status==="OVERDUE"?700:400,whiteSpace:"nowrap"}}>{e.nextDue}</td>
                   <td style={{padding:"8px 12px"}}>
@@ -91,7 +96,7 @@ export function SalaryRevision({branch}){
                       {e.status==="OVERDUE"?`${e.daysPast}d OVERDUE`:`Due in ${Math.abs(e.daysPast)}d`}
                     </span>
                   </td>
-                  <td style={{padding:"8px 12px",fontWeight:700,color:"#27500A"}}>+₹{suggested.toLocaleString()}/mo → ₹{(e.currentBasic+suggested).toLocaleString()}</td>
+                  <td style={{padding:"8px 12px",fontWeight:700,color:"#27500A"}}>+{f(suggested)}/mo → {f(e.currentBasic+suggested)}</td>
                   <td style={{padding:"8px 12px"}}><button onClick={()=>openRevise(e)} style={{...btnG,padding:"3px 10px",fontSize:9.5,background:"#27500A",whiteSpace:"nowrap"}}>Process Revision</button></td>
                 </tr>
               );
@@ -123,8 +128,8 @@ export function SalaryRevision({branch}){
                 <tbody>{h.revisions.map((r,i)=>(
                   <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:i%2===0?"#fff":"#fafafa"}}>
                     <td style={{padding:"7px 10px",color:"#5a6691",whiteSpace:"nowrap"}}>{r.date}</td>
-                    <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{r.basic.toLocaleString()}</td>
-                    <td style={{padding:"7px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.incr>0?"#27500A":"#5a6691"}}>{r.incr>0?`+₹${r.incr.toLocaleString()}`:"Nil"}</td>
+                    <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(r.basic)}</td>
+                    <td style={{padding:"7px 10px",textAlign:"right",fontVariantNumeric:"tabular-nums",color:r.incr>0?"#27500A":"#5a6691"}}>{r.incr>0?`+${f(r.incr)}`:"Nil"}</td>
                     <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,color:r.pct>0?"#27500A":"#5a6691"}}>{r.pct>0?`${r.pct}%`:"—"}</td>
                     <td style={{padding:"7px 10px",color:"#384677"}}>{r.reason}</td>
                   </tr>
@@ -143,9 +148,9 @@ export function SalaryRevision({branch}){
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5a6691"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              <FL label="Current basic"><input value={"₹"+(form.currentBasic||0).toLocaleString()} disabled style={{...inp,background:"#f3f4f8",color:"#5a6691"}}/></FL>
+              <FL label="Current basic"><input value={f(form.currentBasic||0)} disabled style={{...inp,background:"#f3f4f8",color:"#5a6691"}}/></FL>
               <FL label="New basic"><input type="number" value={form.newBasic} onChange={e=>setForm(f=>({...f,newBasic:e.target.value}))} style={inp}/></FL>
-              <div style={{fontSize:11,color:"#27500A",fontWeight:700}}>Increment: +₹{Math.max(0,Math.round((+form.newBasic||0)-(form.currentBasic||0))).toLocaleString()} ({form.currentBasic>0?(((+form.newBasic||0)-form.currentBasic)/form.currentBasic*100).toFixed(1):0}%)</div>
+              <div style={{fontSize:11,color:"#27500A",fontWeight:700}}>Increment: +{f(Math.max(0,Math.round((+form.newBasic||0)-(form.currentBasic||0))))} ({form.currentBasic>0?(((+form.newBasic||0)-form.currentBasic)/form.currentBasic*100).toFixed(1):0}%)</div>
               <FL label="Reason"><input value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} placeholder="Annual review / promotion" style={inp}/></FL>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>

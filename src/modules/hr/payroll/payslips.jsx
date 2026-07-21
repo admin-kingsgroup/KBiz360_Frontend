@@ -4,7 +4,7 @@ import { BRANCHES, HR_BRANCHES_F } from '../../../core/data';
 import { useMasterList } from '../../../core/useMasters';
 import { fromEmpDTO } from '../employeeMap';
 import { usePayslips } from '../usePayroll';
-import { btnG, card, inp } from '../../../core/styles';
+import { btnG, card, inp, bc } from '../../../core/styles';
 import { SkeletonText } from '../../../shell/primitives';
 
 export function HrPayslips({branch}){
@@ -31,7 +31,7 @@ export function HrPayslips({branch}){
     </div>
   );
   const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{cur:"₹",entity:"Travkings Tours & Travels"};
-  const c=brCfg.cur;
+  const c=(bc({code:emp.branch})||{}).cur||'₹';   // symbol lives on the branch CFG (bc), not on the BRANCHES record
   const gross=slip?.gross||0;
   const deductions=slip?.totalDeductions||0;
   const net=slip?.net||0;

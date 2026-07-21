@@ -10,6 +10,7 @@ import { buildRefundReissueBody } from './fields/refundBody';
 import { RefundPartialFields } from './fields/RefundPartialFields';
 import { AdmAcmFields } from './fields/AdmAcmFields';
 import { r2, allocSummary, pxpTotals, dnTotals, settleSpec } from './ui';
+import { isVatBranch } from '../voucherSpecs';
 
 // Recover a saved income line's amount (Service Charge / SVC2) for the edit form.
 const lineAmt = (v, ledger) => {
@@ -125,7 +126,7 @@ function makeRcptPmt(side) {
         : [];
       return {
         date: v.date || '', party, otherType: looksParty ? guessType : '', bankRef, paymentMode: v.paymentMode || 'NEFT', utr: v.utr || '',
-        amount, tds: (+v.tdsAmt || 0) > 0, tdsAmt: +v.tdsAmt || 0, tdsSection: v.tdsSection || '194H', remarks: v.remarks || '',
+        amount, tds: (+v.tdsAmt || 0) > 0, tdsAmt: +v.tdsAmt || 0, tdsSection: v.tdsSection || (isVatBranch(v.branch) ? '' : '194H'), remarks: v.remarks || '',
         alloc, applyMode: v.applyMode || 'bills', parkOnAcc: (+v.onAccount || 0) > 0, _billIds: billIds,
         split: false, splitLines: [],
         hasCharges: chargeLegs.length > 0,

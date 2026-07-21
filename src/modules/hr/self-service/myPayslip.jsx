@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { BRANCHES } from '../../../core/data';
+import { bc } from '../../../core/styles';
 import { localeOf } from '../../../core/format';
 import { usePayslips, useMyEmployee } from '../usePayroll';
 import { isIndiaRegime as isIndiaRegimeCode, regimeName as regimeNameOf } from '../payrollMaps';
@@ -33,7 +34,7 @@ function MyPayslipBody({emp}){
   const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{entity:"Travkings Tours & Travels"};
   // Branch-currency aware payslip: a foreign (USD) branch employee must see their pay in $ with
   // Western grouping, not a hardcoded ₹ + Indian lakh/crore. `brCfg.cur` is the branch currency.
-  const c=brCfg.cur||'₹';
+  const c=(bc({code:emp.branch})||{}).cur||'₹';   // symbol lives on the branch CFG (bc), not on the BRANCHES record
   const fm=n=>c+Number(n||0).toLocaleString(localeOf(c));
   // Indian PF/ESI/PT/TDS apply to India branches only; a foreign branch's payslip carries zero of
   // them (its own statute is handled manually) — so show ONLY the deductions that actually apply,
