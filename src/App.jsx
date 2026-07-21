@@ -659,8 +659,8 @@ export default function KB360App(){
     if(route==="/finance/bank-balance")  return <BankBalanceDashboard branch={branch}/>;
     if(route==="/finance/tds-calculator")return <TDSCalculator/>;
     if(route==="/finance/interest-calc") return <InterestCalculator/>;
-    if(route==="/finance/recon-status")  return <ReconStatusPage/>;
-    if(route==="/tax/gstr2b-itc")        return <Gstr2bPage/>;
+    if(route==="/finance/recon-status")  return <ReconStatusPage branch={branch}/>;
+    if(route==="/tax/gstr2b-itc")        return <Gstr2bPage branch={branch}/>;
     if(route==="/finance/investments")   return <InvestmentRegister branch={branch}/>;
     if(route==="/finance/loan-amort")    return <LoanAmortization/>;
     if(route==="/finance/reco-queue")    return <ReconciliationQueue branch={branch} setRoute={navigate}/>;

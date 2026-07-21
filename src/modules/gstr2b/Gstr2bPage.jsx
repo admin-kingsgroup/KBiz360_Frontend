@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getGstr2bList, importGstr2b, setGstr2bStatus } from './api';
 import { BRANCHES, defaultPeriod, itcOf, statusTone, summarize } from './utils';
@@ -13,14 +13,20 @@ import { DataTable } from '../../shell/DataTable';
 // while any line is unmatched, passes when input credit ties out.
 const fmt = (n) => new Intl.NumberFormat('en-IN').format(Math.round(Number(n) || 0));
 
-export function Gstr2bPage() {
+export function Gstr2bPage({ branch: shellBranch } = {}) {
   const qc = useQueryClient();
-  const [branch, setBranch] = useState('BOM');
+  // Branch follows the top-right selector: a specific branch PINS this screen to it
+  // (dropdown disabled, single option), so ITC can't leak across branches; only a
+  // full-scope user on ALL may pick among branches — and until they do we show a
+  // "pick a branch" notice instead of silently defaulting to BOM.
+  const shellCode = shellBranch && shellBranch !== 'ALL' ? (shellBranch.code || shellBranch) : 'ALL';
+  const [branch, setBranch] = useState(shellCode === 'ALL' ? '' : shellCode);
+  useEffect(() => { setBranch(shellCode === 'ALL' ? '' : shellCode); }, [shellCode]);
   const [period, setPeriod] = useState(defaultPeriod());
   const [payload, setPayload] = useState('');
 
   const key = ['gstr2b', branch, period];
-  const { data: rows = [], isLoading, isError } = useQuery({ queryKey: key, queryFn: () => getGstr2bList({ branch, period }) });
+  const { data: rows = [], isLoading, isError } = useQuery({ queryKey: key, queryFn: () => getGstr2bList({ branch, period }), enabled: !!branch });
   const invalidate = () => qc.invalidateQueries({ queryKey: key });
   const imp = useMutation({ mutationFn: importGstr2b, onSuccess: () => { setPayload(''); invalidate(); } });
   const mark = useMutation({ mutationFn: ({ id, status }) => setGstr2bStatus(id, status), onSuccess: invalidate });
@@ -54,9 +60,20 @@ export function Gstr2bPage() {
       </p>
 
       <div className="flex flex-wrap items-end gap-3">
-        <FormField label="Branch"><Select value={branch} onChange={(e) => setBranch(e.target.value)}>{BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}</Select></FormField>
+        <FormField label="Branch">
+          <Select value={branch} disabled={shellCode !== 'ALL'} title={shellCode !== 'ALL' ? 'Scoped by the top-right branch — switch it there' : undefined} onChange={(e) => setBranch(e.target.value)}>
+            {shellCode === 'ALL' && <option value="">— Select branch —</option>}
+            {(shellCode === 'ALL' ? BRANCHES : [shellCode]).map((b) => <option key={b} value={b}>{b}</option>)}
+          </Select>
+        </FormField>
         <FormField label="Period"><Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></FormField>
       </div>
+
+      {!branch ? (
+        <div className="rounded-lg border border-[#dfe2e7] px-4 py-8 text-center text-sm text-ink-muted">
+          Pick a branch above to import and match its <b>GSTR-2B</b>. Each branch's input credit is kept separate — nothing loads until you choose one.
+        </div>
+      ) : (<>
 
       <ResponsiveGrid min="140px" gap="md">
         <KpiTile label="Invoices" value={`${s.total}`} sub={`${branch} · ${period}`} color="#1a1c22" />
@@ -89,6 +106,7 @@ export function Gstr2bPage() {
         showDensityToggle={false}
         zebra
       />
+      </>)}
     </div>
   );
 }

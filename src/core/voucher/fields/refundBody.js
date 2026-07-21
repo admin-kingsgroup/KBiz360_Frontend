@@ -35,6 +35,12 @@ export function buildRefundReissueBody(s, ctx, kind) {
     party: s.party, partyType: 'customer',
     counterParty: s.counterParty, counterPartyGroup: 'Sundry Creditors',
     supplierAmt, supplierSvc: supSvc, supplierGst: supGst,
+    // Carry the supplier service-charge HEAD so the live JV preview (and any re-post) names
+    // the real ledger, e.g. "IT-SVF [Pur]", not the "Purchase — Misc" fallback in the posting
+    // engine. The refund edit round-trip used to drop this, so the modal JV named a different
+    // head than the ledger statement did. Preserve-only: never emit an empty key that could
+    // clobber a stored value via the {...voucher, ...body} update merge.
+    ...(s.supplierSvcLedger ? { supplierSvcLedger: s.supplierSvcLedger } : {}),
     supplierCancel: supCancel, supplierCancelGst: supCancelGst, cancelRecover: s.cancelRecover !== false,
     incentiveAmt, incentiveGst, incentiveTds,
     lines, subtotal: ourIncome, taxAmt, otherTaxesGst, gstMode: s.gstMode, gstPct: +s.gstPct || 0, total,

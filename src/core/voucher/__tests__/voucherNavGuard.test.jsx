@@ -5,6 +5,7 @@
 // serialized-snapshot compare, so this proves the wiring for ALL categories at once.
 jest.mock('../../useAccounting', () => ({
   useVoucherPreview: jest.fn(() => ({ data: { postings: [], balanced: true, totalDebit: 0, totalCredit: 0, diff: 0 } })),
+  useVoucherJournal: jest.fn(() => ({ data: { postings: [], balanced: true, totalDebit: 0, totalCredit: 0, diff: 0 }, isLoading: false })),
   useCreateVoucher: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   useUpdateVoucher: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),
   useRevokeVoucher: jest.fn(() => ({ mutate: jest.fn(), isPending: false })),

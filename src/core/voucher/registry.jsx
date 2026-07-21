@@ -271,7 +271,7 @@ function makeRefundReissue(kind) {
       party: v.party || '', counterParty: v.counterParty || '', supplierAmt: v.supplierAmt ?? '',
       serviceCharge: lineAmt(v, 'SVF Income') || lineAmt(v, 'Service Charge Income'), markup: lineAmt(v, 'SVC2 Income') || lineAmt(v, 'Markup Income'),
       gstPct: v.gstPct != null && +v.gstPct ? +v.gstPct : 18,
-      supplierSvc: v.supplierSvc ?? '', supplierGst: v.supplierGst ?? '',
+      supplierSvc: v.supplierSvc ?? '', supplierGst: v.supplierGst ?? '', supplierSvcLedger: v.supplierSvcLedger || '',
       supplierCancel: v.supplierCancel ?? '', supplierCancelGst: v.supplierCancelGst ?? '', cancelRecover: v.cancelRecover !== false,
       incentiveAmt: v.incentiveAmt ?? '', incentiveGst: v.incentiveGst ?? '', incentiveTds: v.incentiveTds ?? '', remarks: v.remarks || '',
     }),
