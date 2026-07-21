@@ -462,6 +462,9 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                   <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontWeight: 700, whiteSpace: 'nowrap' }}>
                     {e.vno}
                     <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: '#eef2ff', color: '#3d4ea8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase' }}>{e.category === 'reissue' ? 'RI' : 'RF'}</span>
+                    {/* Was-posted-then-revoked provenance on the Pending tab (parity with the main
+                        voucher queue + the bookings table): shows who revoked it and why on hover. */}
+                    {pendingTab && e.revokedAt && <span title={`Revoked${e.revokedBy ? ' by ' + e.revokedBy : ''}${e.revokeReason ? ' — ' + e.revokeReason : ''}`} style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: '#FBF3DE', color: '#8a6d12', border: '1px solid #e3cd97', whiteSpace: 'nowrap' }}>⟲ Revoked</span>}
                   </td>
                   <td style={{ padding: '7px 12px', whiteSpace: 'nowrap', fontSize: 11, color: '#5b616e' }}>{e.date || '—'}</td>
                   <td style={{ padding: '7px 12px', fontFamily: 'monospace', fontSize: 11, color: '#5b616e' }}>{e.againstInvoice || e.linkNo || '—'}</td>
@@ -492,10 +495,16 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                       </td>
                     : <td style={{ padding: '7px 12px', color: '#5b616e', whiteSpace: 'nowrap' }}>
                         <span style={{ textTransform: 'capitalize' }}>{e.status}</span>
-                        {/* An approved refund/reissue is posted — offer Revoke (approver-only, not view-only),
-                            same preflight-guarded flow as the Voucher Approvals queue and the bookings table. */}
                         {isApprover && !vo && (e.status === 'approved' || e.status === 'saved' || e.status === 'posted') && (
-                          <button disabled={busy} onClick={() => doRevoke(e)} title="Revoke — un-post this refund / reissue and return it to Pending so it can be edited & re-approved (number kept)" style={{ marginLeft: 10, padding: '4px 10px', background: '#fff', color: GOLD, border: '1px solid #e3cd97', borderRadius: 5, fontWeight: 700, fontSize: 11, cursor: busy ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, verticalAlign: 'middle', opacity: busy ? 0.6 : 1 }}><RotateCcw size={12} /> Revoke</button>
+                          e.locked
+                            // A booking-driven (locked) refund/reissue CANNOT be voucher-revoked — the
+                            // /revoke endpoint 409s ("driven by booking …"). It must be un-posted on its
+                            // reversal booking (which un-posts both the voucher AND the booking in sync).
+                            // Point the approver there instead of a button that always errors.
+                            ? <span title={`Driven by booking ${e.bookingId || ''} — revoke it on the SO/PO/GP booking so both sides un-post in sync`} style={{ marginLeft: 10, fontSize: 10.5, fontWeight: 700, color: '#8a6d12', display: 'inline-flex', alignItems: 'center', gap: 4, verticalAlign: 'middle' }}>🔒 revoke on booking{e.bookingId ? ` ${e.bookingId}` : ''}</span>
+                            // A standalone / imported refund IS voucher-revocable — same preflight-guarded
+                            // flow as the main Voucher Approvals queue.
+                            : <button disabled={busy} onClick={() => doRevoke(e)} title="Revoke — un-post this refund / reissue and return it to Pending so it can be edited & re-approved (number kept)" style={{ marginLeft: 10, padding: '4px 10px', background: '#fff', color: GOLD, border: '1px solid #e3cd97', borderRadius: 5, fontWeight: 700, fontSize: 11, cursor: busy ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, verticalAlign: 'middle', opacity: busy ? 0.6 : 1 }}><RotateCcw size={12} /> Revoke</button>
                         )}
                       </td>}
                 </tr>
