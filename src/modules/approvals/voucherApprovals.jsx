@@ -253,7 +253,10 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   const lockedRevokeHint = (e) => {
     const p = voucherParent(e);
     const where = p ? `${p.label}${p.ref ? ` ${p.ref}` : ''}` : `its ${e.source || 'source'}${e.bookingId ? ` ${e.bookingId}` : ''}`;
-    return <span title={`Locked — revoke it on ${where} (un-posts both the voucher and its master in sync)`} style={{ fontSize: 10.5, fontWeight: 700, color: C.gold, whiteSpace: 'nowrap' }}>🔒 revoke on {where}</span>;
+    const msg = `Locked — revoke it on ${where} (un-posts both the voucher and its master in sync)`;
+    // Info text (no 409-producing button). Wraps within its cell (no nowrap → no overflow of
+    // the long master label in a narrow action column); aria-label so it isn't title-only.
+    return <span title={msg} aria-label={msg} style={{ fontSize: 10.5, fontWeight: 700, color: C.gold, display: 'inline-block' }}>🔒 revoke on {where}</span>;
   };
   const doApproveSelected = async () => {
     if (!sel.size) return;
