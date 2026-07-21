@@ -185,7 +185,7 @@ export function OutstandingOnAccount({ branch, side, initialTab, initialParty })
   return (
     <PageLayout
       title="Outstanding & On-Account"
-      subtitle="Unsettled bills + on-account advances awaiting bill-wise settlement. Bills clear only by an explicit allocation — nothing is auto-settled."
+      subtitle={`${(!branch || branch === 'ALL' ? 'All branches' : (branch.code || branch))} · ${cur} · Unsettled bills + on-account advances awaiting bill-wise settlement. Bills clear only by an explicit allocation — nothing is auto-settled.`}
     >
       {q.isLoading && <LoadingState />}
       {q.isError && <ErrorState message={q.error?.message || 'Failed to load'} onRetry={q.refetch} />}

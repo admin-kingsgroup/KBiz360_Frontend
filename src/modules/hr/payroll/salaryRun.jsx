@@ -7,6 +7,8 @@ import { usePayrollRegister, useProcessPayroll } from '../usePayroll';
 import { challanDueDate, regimeName as regimeNameOf, isIndiaRegime as isIndiaRegimeCode } from '../payrollMaps';
 import { toast } from '../../../core/ux/toast';
 import { B, btnG, card, inp } from '../../../core/styles';
+import { bc } from '../../../core/styleTokens';
+import { localeOf } from '../../../core/format';
 import { MiniBar } from '../../../core/insightsUI';
 import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
@@ -42,7 +44,11 @@ export function HrPayroll({branch}){
   const isIndiaRegime=isIndiaRegimeCode(reg.statutoryRegime);
   const regimeName=regimeNameOf(reg.statutoryRegime);
 
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  // Branch-currency aware: a foreign (Africa/USD) branch runs payroll here too (see the
+  // non-India-regime banner below), so amounts must print in the branch currency + its own
+  // digit grouping — never a hardcoded ₹ + Indian lakh/crore grouping.
+  const cur=(bc(branch)||{}).cur||'₹';
+  const f=n=>cur+Number(Math.round(n)).toLocaleString(localeOf(cur));
   const DUE_DATE=challanDueDate(period);
 
   /* Compute + persist this run server-side (idempotent — reprocessing swaps the

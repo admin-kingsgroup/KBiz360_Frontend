@@ -16,7 +16,7 @@ import { clickable } from '../../core/ux/clickable';
 import { toast } from '../../core/ux/toast';
 import { FocusBanner } from '../../core/ux/FocusBanner';
 import { useNavFocusStore } from '../../core/ux/navFocus';
-import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useRevokeVoucher, fetchRevokeCheck, useApproveMany, useApproveAll, branchCode } from '../../core/useAccounting';
+import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useRevokeVoucher, fetchRevokeCheck, useApproveMany, useApproveAll, branchCode, invalidateBooks } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 import { BookingApprovals, SoPoGpVoucherEntry } from '../bookingOrder';
 import { useInbDeal, useInbReconcile } from '../../core/useInterBranchVoucher';
@@ -1263,7 +1263,11 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     });
     if (!confirmed) return;
     setBusy(true);
-    try { await apiPost('/api/inter-branch/revoke', { linkNo: d.linkNo, reason }); toast(`Revoked ${d.linkNo} → Pending`); qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['inb'] }); }
+    // Revoke un-posts BOTH legs from the books — refresh EVERY books cache root, not just
+    // vouchers/accounting. invalidateBooks hits vouchers + accounting + groups + finance +
+    // bank-reco (the migrated /finance TB & registers read the 'finance' root, which the old
+    // three-line invalidation missed → stale balances after an INB revoke on the hub).
+    try { await apiPost('/api/inter-branch/revoke', { linkNo: d.linkNo, reason }); toast(`Revoked ${d.linkNo} → Pending`); invalidateBooks(qc); qc.invalidateQueries({ queryKey: ['inb'] }); }
     catch (e) { toast((e && e.message) || 'Revoke failed', 'error'); }
     finally { setBusy(false); }
   };

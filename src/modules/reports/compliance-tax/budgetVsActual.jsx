@@ -3,7 +3,8 @@ import { Download } from 'lucide-react';
 import { useMobile } from '../../../core/hooks';
 import { SampleBanner } from '../../../core/ux/SampleBanner';
 import { CONSOLIDATED_LABEL } from '../../../core/data';
-import { inp, btnGh, card } from '../../../core/styleTokens';
+import { inp, btnGh, card, bc } from '../../../core/styleTokens';
+import { localeOf } from '../../../core/format';
 
 export function BudgetPlanning({branch}){
   const mob=useMobile();
@@ -20,7 +21,8 @@ export function BudgetPlanning({branch}){
     {cat:"Expenses",gl:"Software Subscriptions",budget:336000,actual:56000,var:0},
     {cat:"Expenses",gl:"Other Expenses",budget:800000,actual:138000,var:0},
   ];
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  const cur=bc(branch).cur; // branch currency (₹ India / $ USD) — was hardcoded ₹
+  const f=n=>cur+Number(Math.round(n)).toLocaleString(localeOf(cur));
   const MONTHS=2; // Apr + May done
   const pct=n=>MONTHS>0?+(n/MONTHS/12*100).toFixed(1):0;
 

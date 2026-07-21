@@ -42,7 +42,13 @@ const SAP = {
 const SHADOW = '0 1px 4px rgba(0,0,0,0.12), 0 0 1px rgba(0,0,0,0.08)';
 const TALLY = { head: '#14396b', titlebar: '#dbe7f5', gold: '#b8860b', green: '#1a7a1a' };
 
-const curOf = (branch) => bc(typeof branch === 'string' && branch !== 'ALL' ? { code: branch } : branch).cur;
+const cfgOf = (branch) => bc(typeof branch === 'string' && branch !== 'ALL' ? { code: branch } : branch);
+const curOf = (branch) => cfgOf(branch).cur;
+// Currency CODE (USD/INR) and tax regime (VAT/GST) for the branch — so statement subtitles read
+// "$ USD (excl. VAT)" on a USD/VAT branch (DAR/NBO/FBM) instead of the hardcoded self-contradictory
+// "$ INR (excl. GST)". Falls back to India's INR/GST for a bare/consolidated branch.
+const curCodeOf = (branch) => cfgOf(branch).curCode || 'INR';
+const taxTypeOf = (branch) => cfgOf(branch).taxType || 'GST';
 const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
 // Branch-aware fallbacks: group in the OPERATING branch's currency (Western for USD
 // branches NBO/DAR/FBM, Indian lakh/crore for ₹). Components that know a specific section
@@ -465,7 +471,7 @@ function PnLMatrix({ branch, cur, fy, grain, onFocus }) {
   return (
     <FCard
       title={grain === 'month' ? `Month-wise Profit & Loss — FY ${fy}` : `Quarter-wise Profit & Loss — FY ${fy}`}
-      sub={`Each column is a ${grain === 'month' ? 'month' : 'quarter'} of the financial year · click a column header to drill into its full P&L → vouchers · ${cur} excl. GST`}
+      sub={`Each column is a ${grain === 'month' ? 'month' : 'quarter'} of the financial year · click a column header to drill into its full P&L → vouchers · ${cur} excl. ${taxTypeOf(branch)}`}
       badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{cols.length} {grain === 'month' ? 'months' : 'quarters'}</Badge>}
     >
       <div style={{ padding: '8px 12px 0', display: 'flex', justifyContent: 'flex-end' }}>
@@ -550,7 +556,7 @@ export function ReportPnLLive({ branch, forceView, hideSwitcher }) {
         title="Profit & Loss — Module-wise Gross Profit"
         sub={isAll && !isMatrix
           ? <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; each branch in its own currency · <strong>no cross-currency total</strong> &nbsp;|&nbsp; {periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>
-          : <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; {isMatrix ? `FY ${fy} · ${mode === 'month' ? 'month-wise' : 'quarter-wise'}` : periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>}
+          : <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} {curCodeOf(branch)} (excl. {taxTypeOf(branch)}) &nbsp;|&nbsp; {isMatrix ? `FY ${fy} · ${mode === 'month' ? 'month-wise' : 'quarter-wise'}` : periodTxt} &nbsp;|&nbsp; Tally double-entry · live</>}
       />
       <PnlPeriodBar
         mode={mode} setMode={setMode} fy={fy} setFy={setFy}
@@ -669,7 +675,7 @@ function PnLBody({ d, prev, cur, branch, period, view, mobile, classicPeriod }) 
 
             {/* Section A — module / sub-centre GP (cost-centre driven) */}
             <FCard title="Section A — Module-wise Sales, COGS & Gross Profit"
-              sub={`${(d.modules || []).length} modules · cost-centre driven · click a module → sub-centre → booking files · ${cur} excl. GST`}
+              sub={`${(d.modules || []).length} modules · cost-centre driven · click a module → sub-centre → booking files · ${cur} excl. ${taxTypeOf(branch)}`}
               badge={<Badge bg={SAP.blueBg} c={SAP.blue} bd="#b8d6ff">{(d.modules || []).length} Modules</Badge>}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -1758,7 +1764,7 @@ export function ReportBSLive({ branch, forceView, hideSwitcher }) {
         title={`Balance Sheet — ${curLabel}`}
         sub={isAll
           ? <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; each branch in its own currency · <strong>no cross-currency total</strong> &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; balances up to {asOn(to)}</>
-          : <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} INR (excl. GST) &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; balances from inception up to {asOn(to)}</>}
+          : <><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} {curCodeOf(branch)} (excl. {taxTypeOf(branch)}) &nbsp;|&nbsp; Tally 28-Group Master &nbsp;|&nbsp; balances from inception up to {asOn(to)}</>}
         right={<>
           {!hideSwitcher && <Segmented dark value={view} onChange={setView} options={[['fiori', '▪ Fiori'], ['classic', '▭ Classic'], ['vertical', '▤ Vertical']]} />}
           <button onClick={doPrint} disabled={!d} style={expBtn(!d)}>⤓ PDF</button>
@@ -1848,7 +1854,7 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
         open={open} setOpen={setOpen} openSub={openSub} setOpenSub={setOpenSub} />
 
       <div style={{ background: '#fff', border: `1px solid ${SAP.border}`, borderRadius: 8, padding: '10px 18px', fontSize: 11, color: SAP.sec, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, boxShadow: SHADOW }}>
-        <span><strong style={{ color: SAP.text }}>Group Master:</strong> Tally Default 28 Groups &nbsp;|&nbsp; <strong style={{ color: SAP.text }}>Net Profit:</strong> {cur}{inr(d.netProfit)} (from P&amp;L A/c) &nbsp;|&nbsp; <strong style={{ color: SAP.text }}>Tax:</strong> Excl. GST</span>
+        <span><strong style={{ color: SAP.text }}>Group Master:</strong> Tally Default 28 Groups &nbsp;|&nbsp; <strong style={{ color: SAP.text }}>Net Profit:</strong> {cur}{inr(d.netProfit)} (from P&amp;L A/c) &nbsp;|&nbsp; <strong style={{ color: SAP.text }}>Tax:</strong> Excl. {taxTypeOf(branch)}</span>
       </div>
       {drillLedger && <LedgerVoucherDrill ledger={drillLedger} branch={branch} to={to} cur={cur} mobile={mobile} onClose={() => setDrillLedger(null)} />}
     </>
@@ -2404,7 +2410,7 @@ function AgeingReport({ branch, side, setRoute, onAdjustAdvance, embedded, asOfP
       <FioriHead
         system="KBiz360 · Finance"
         title={isRec ? 'Accounts Receivable — Ageing' : 'Accounts Payable — Ageing'}
-        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} incl. GST &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; bill-wise · no FIFO · live double-entry</>}
+        sub={<><strong>{branchLabel(branch)}</strong> &nbsp;|&nbsp; {cur} incl. {taxTypeOf(branch)} &nbsp;|&nbsp; as of {d?.asOf || '—'} &nbsp;|&nbsp; bill-wise · no FIFO · live double-entry</>}
       />
       {dateControl}
       <div style={{ background: SAP.pageBg, padding: 16, border: `1px solid ${SAP.border}`, borderTop: 'none', borderRadius: '0 0 8px 8px' }}>

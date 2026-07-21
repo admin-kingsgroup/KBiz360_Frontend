@@ -92,7 +92,7 @@ export function MastersHotels(){
                 </td>
                 <td style={{padding:"8px 12px",textAlign:"center",fontWeight:600,
                   fontVariantNumeric:"tabular-nums"}}>
-                  {h.tariff>1000?`₹${(h.tariff/1000).toFixed(1)}K`:h.tariff<500?`$${h.tariff}`:`₹${h.tariff}`}
+                  {h.tariff>1000?`₹${(h.tariff/1000).toFixed(1)}K`:`₹${h.tariff}`}
                 </td>
                 <td style={{padding:"8px 12px",color:"#5b616e",fontSize:11}}>{h.chain}</td>
                 <td style={{padding:"8px 12px",textAlign:"center"}}>

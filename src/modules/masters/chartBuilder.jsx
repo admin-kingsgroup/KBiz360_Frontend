@@ -960,7 +960,7 @@ function TravkingsGroupTableView({ setRoute, setBranch, shellBranch }) {
 function PresenceToggles({ item, num, shellBranch }) {
   const vo = isViewOnly();                              // view-only → every presence / lock / deactivate toggle disabled with a reason
   const qc = useQueryClient();
-  const refresh = () => { qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['master', 'ledgers'] }); };
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['master', 'ledgers'] }); qc.invalidateQueries({ queryKey: ['finance'] }); };
   const m = useMutation({
     mutationFn: (body) => apiPost('/api/ledgers/branch-presence', body),
     onSuccess: (res, vars) => {
