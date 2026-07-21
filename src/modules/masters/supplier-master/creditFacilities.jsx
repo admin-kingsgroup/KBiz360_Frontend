@@ -14,7 +14,7 @@ import React from 'react';
 import { BRANCH_CODES } from '../../../core/data';
 import { useMasterList } from '../../../core/useMasters';
 import { branchCode } from '../../../core/useAccounting';
-import { MasterCrud } from '../shared/masterCrud';
+import { MasterCrud, ADMIN_WRITE_ROLES } from '../shared/masterCrud';
 
 /* ── Parties (live, backend-connected) ──────────────────────────────────── */
 // Party lists follow the TOP-BAR branch: a specific branch shows ITS parties plus
@@ -41,7 +41,7 @@ export const CreditFacilitiesMaster = ({ branch } = {}) => {
     .map((l) => l.name)
     .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
   return (
-  <MasterCrud title="Credit Facilities & Limits" subtitle="Supplier / BSP / card credit lines — drawn is read live from the ledgers" resource="credit-facilities"
+  <MasterCrud title="Credit Facilities & Limits" subtitle="Supplier / BSP / card credit lines — drawn is read live from the ledgers" resource="credit-facilities" writeRoles={ADMIN_WRITE_ROLES}
     rowFilter={scope.rowFilter}
     fields={[
       // Free text, no supplier master lookup — the facility is just a descriptive

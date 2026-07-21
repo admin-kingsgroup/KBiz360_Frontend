@@ -1,14 +1,7 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { flagRows, withToggled, isFlagOn, withBranchToggled } from '../utils/flags';
 import { FlagPanel } from '../FlagPanel';
-
-// api/flags pulls in core/api (Vite import.meta) → mock it for the container test.
-jest.mock('../api/flags', () => ({ getFlagState: jest.fn(), proposeFlags: jest.fn().mockResolvedValue({}) }));
-// eslint-disable-next-line import/first
-import { FlagAdmin } from '../control-configuration/FlagAdmin';
-// eslint-disable-next-line import/first
-import { getFlagState, proposeFlags } from '../api/flags';
 
 const state = {
   flags: {
@@ -70,15 +63,5 @@ describe('FlagPanel', () => {
     render(<FlagPanel rows={flagRows(state)} onToggle={onToggle} />);
     fireEvent.click(screen.getByLabelText('branch.hide_statements'));
     expect(onToggle).toHaveBeenCalledWith('branch.hide_statements', true);
-  });
-});
-
-describe('FlagAdmin container', () => {
-  beforeEach(() => { jest.clearAllMocks(); getFlagState.mockResolvedValue(state); });
-  test('toggling submits a change-request and confirms', async () => {
-    render(<FlagAdmin />);
-    fireEvent.click(await screen.findByLabelText('branch.hide_statements'));
-    await waitFor(() => expect(proposeFlags).toHaveBeenCalled());
-    expect(await screen.findByRole('status')).toHaveTextContent(/submitted for Owner approval/);
   });
 });

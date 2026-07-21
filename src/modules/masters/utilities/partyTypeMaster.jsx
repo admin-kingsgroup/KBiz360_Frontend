@@ -37,14 +37,24 @@ export const PartyTypeMaster = () => {
       resource="party-types"
       rowFilter={matchKind}
       toolbar={toolbar}
+      // Friendly Kind column ("Client Type" / "Supplier Category") without touching the
+      // edit form, which needs the raw 'customer'/'supplier' enum. kindLabel is a
+      // display-only derived column (input:false); the raw `kind` field is hidden from
+      // the table (table:false) but still editable in the modal.
+      mapRow={(r) => ({ ...r, kindLabel: KIND_LABEL[r.kind] || r.kind })}
+      // Read the list in the order end users see it: grouped by kind, then the same
+      // sortOrder the dropdowns use, then name — not raw creation order.
+      sortRows={(a, b) => String(a.kind).localeCompare(String(b.kind)) || (a.sortOrder || 0) - (b.sortOrder || 0) || String(a.name).localeCompare(String(b.name))}
       emptyMessage={({ total, hidden }) => (hidden > 0
         ? `No party types match the current filter — ${hidden} of ${total} hidden. Choose “All party types” to clear it.`
         : 'No party types yet — click “New” to add one (or run scripts/seed-party-types.js to load the defaults).')}
-      note="Deactivating a type keeps existing parties untouched — it just stops being offered in the Customer/Supplier dropdowns. A type name must be unique within its kind."
+      note="Prefer Deactivate over Delete: deactivating keeps existing parties untouched (their value stays — it just stops being offered in new dropdowns), while Delete removes it from the picklist entirely. Renaming a type does NOT rename it on existing customers/suppliers — they keep the old value (shown as “… (current)”) until edited. A type name must be unique within its kind."
       fields={[
-        // kind decides which master offers this value. Stored lowercase to match the
-        // backend enum; the toolbar/labels present the friendly names.
-        { key: 'kind', label: 'Kind', type: 'select', options: KINDS, required: true },
+        // Real kind — edited in the modal as a select; hidden from the table (the friendly
+        // kindLabel column shows it instead). Stored lowercase to match the backend enum.
+        { key: 'kind', label: 'Kind', type: 'select', options: KINDS, required: true, table: false },
+        // Display-only friendly label (derived via mapRow) — a table column, never edited.
+        { key: 'kindLabel', label: 'Kind', input: false },
         { key: 'name', label: 'Type Name', type: 'text', required: true },
         // Lower sortOrder shows first in the dropdown; blank/equal falls back to name order.
         { key: 'sortOrder', label: 'Sort Order', type: 'number', default: 100 },

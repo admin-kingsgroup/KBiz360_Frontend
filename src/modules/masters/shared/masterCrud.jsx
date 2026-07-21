@@ -22,9 +22,16 @@ import { confirmDialog } from '../../../core/ux/confirm';
 import { Kbd } from '../../../core/ux/widgets.jsx';
 import { PageLayout } from '../../../shell/PageLayout';
 import { Modal, Button, Select, Input, LoadingState, ErrorState } from '../../../shell/primitives';
-import { isViewOnly, VIEW_ONLY_REASON } from '../../../core/api';
+import { isViewOnly, VIEW_ONLY_REASON, currentRole } from '../../../core/api';
 
 const DARK = '#1a1c22', BLUE = '#2563eb', DIM = '#5b616e', RED = '#dc2626', GREEN = '#16a34a';
+
+// Roles allowed to mutate the control-plane Tally masters (Voucher Types, Cost
+// Categories, Budgets, Scenarios, Credit Facilities). Mirrors the backend
+// ADMIN_WRITE_ROLES (crudFactory.js) EXACTLY — same strings the server's requireRole
+// checks — so a master that opts in with `writeRoles={ADMIN_WRITE_ROLES}` pre-disables
+// its write controls for exactly the roles the server would 403.
+export const ADMIN_WRITE_ROLES = ['Super Admin', 'Senior Finance Manager', 'super_admin'];
 
 const blankFromFields = (fields) => fields.reduce((o, f) => {
   o[f.key] = f.type === 'bool' ? (f.default ?? false) : (f.type === 'tags' || f.type === 'multiselect') ? [] : f.type === 'number' ? (f.default ?? 0) : (f.default ?? '');
@@ -99,9 +106,16 @@ function FieldInput({ field, value, onChange, form }) {
     // list carries (several partyEnums lists lead with '') to avoid a double-blank.
     const raw = typeof field.options === 'function' ? (field.options(form) || []) : (field.options || []);
     const options = raw.filter((o) => o !== '' && o != null);
+    // Keep the CURRENT value selectable even when it's no longer in the source list —
+    // e.g. a party whose customerType/category was later renamed or deactivated in its
+    // master. Without this the <select> renders blank (no matching <option>) and a
+    // re-save could silently drop the value. Show it flagged so it reads as stale.
+    const cur = value == null ? '' : value;
+    const hasCur = cur === '' || options.some((o) => String(o) === String(cur));
     return (
-      <Select value={value} onChange={(e) => onChange(e.target.value)}>
+      <Select value={cur} onChange={(e) => onChange(e.target.value)}>
         <option value="">{field.emptyLabel || 'Select…'}</option>
+        {!hasCur && <option value={cur}>{`${cur} (current)`}</option>}
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </Select>
     );
@@ -214,7 +228,7 @@ function EditModal({ title, fields, record, onClose, onSave, saving, error }) {
   );
 }
 
-export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows, rowStyle, initialEditKey, emptyMessage }) {
+export function MasterCrud({ title, subtitle, resource, fields, params, readOnly = false, lockedRow, note, toolbar, rowFilter, mapRow, sortRows, rowStyle, initialEditKey, emptyMessage, writeRoles }) {
   const list = useMasterList(resource, params);
   const { create, update, remove } = useMasterMutations(resource);
   const [editing, setEditing] = useState(null); // record being edited, or {} for new
@@ -233,6 +247,17 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
   // View-only accounts see the row write actions (Edit / Deactivate / Delete) DISABLED
   // with a reason instead of live buttons that only 403 on the server.
   const vo = isViewOnly();
+  // Opt-in ROLE gate: a master whose backend restricts writes to certain roles
+  // (writeRoles) pre-disables its write controls for other roles — a disabled button
+  // with a reason, never a live button that only 403s on save. Mirrors the backend
+  // requireRole EXACTLY (same role strings). A blank/unknown role (dev / AUTH_OPTIONAL
+  // open mode) is NOT blocked, so open mode stays writable; masters that pass no
+  // writeRoles are unchanged (any authenticated user may write, matching their backend).
+  const role = typeof currentRole === 'function' ? currentRole() : ''; // guard: partial core/api test mocks
+  const roleBlocked = Array.isArray(writeRoles) && writeRoles.length > 0 && !!role && !writeRoles.includes(role);
+  const roleReason = `Only ${(writeRoles || []).filter((r) => r !== 'super_admin').join(' or ')} can change this master.`;
+  const blocked = vo || roleBlocked;
+  const blockReason = vo ? VIEW_ONLY_REASON : roleReason;
   // An empty list must say WHY it is empty, not just that it is. "No records yet" is a
   // lie when rowFilter hid every row — the records exist, they're just out of scope
   // (e.g. a per-branch master viewed from a branch that owns none). `emptyMessage` may
@@ -383,7 +408,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
         <>
           <Button variant="secondary" size="sm" icon={Download} onClick={exportSheet} disabled={rows.length === 0} title="Export all records to Excel">Export Excel</Button>
           <Button variant="secondary" size="sm" icon={Printer} onClick={printList} disabled={rows.length === 0} title="Print the current list">Print</Button>
-          {!readOnly && <Button write variant="primary" size="sm" icon={Plus} onClick={openNew}>New</Button>}
+          {!readOnly && <Button write disabled={roleBlocked} title={roleBlocked ? roleReason : undefined} variant="primary" size="sm" icon={Plus} onClick={openNew}>New</Button>}
         </>
       }
       // Toolbar filters (Branch/Group/…) get their own full-width bordered bar —
@@ -415,13 +440,13 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
                     {readOnly || (lockedRow && lockedRow(r))
                       ? <span title="Locked" style={{ color: '#c2c8d6', fontSize: 13 }}>🔒</span>
                       : (<>
-                          <button onClick={() => openEdit(r)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Edit'} style={{ background: 'none', border: 'none', cursor: vo ? 'not-allowed' : 'pointer', color: vo ? '#c2c8d6' : BLUE, padding: 4 }}><Pencil size={14} /></button>
+                          <button onClick={() => openEdit(r)} disabled={blocked} title={blocked ? blockReason : 'Edit'} style={{ background: 'none', border: 'none', cursor: blocked ? 'not-allowed' : 'pointer', color: blocked ? '#c2c8d6' : BLUE, padding: 4 }}><Pencil size={14} /></button>
                           {hasActive && (r.active === false
-                            ? <button onClick={() => toggleActive(r)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Reactivate'} style={{ background: 'none', border: 'none', cursor: vo ? 'not-allowed' : 'pointer', color: vo ? '#c2c8d6' : GREEN, padding: 4 }}><RotateCcw size={14} /></button>
-                            : <button onClick={() => toggleActive(r)} disabled={vo} title={vo ? VIEW_ONLY_REASON : 'Deactivate — keeps the record and its history; use instead of Delete'} style={{ background: 'none', border: 'none', cursor: vo ? 'not-allowed' : 'pointer', color: vo ? '#c2c8d6' : '#b45309', padding: 4 }}><Ban size={14} /></button>)}
-                          <button onClick={() => del(r)} disabled={isDerivedRow(r) || vo}
-                            title={vo ? VIEW_ONLY_REASON : (isDerivedRow(r) ? "Can't delete — no master record exists yet (past transactions still reference this name). Edit to create one, or Deactivate." : 'Delete')}
-                            style={{ background: 'none', border: 'none', padding: 4, cursor: (isDerivedRow(r) || vo) ? 'not-allowed' : 'pointer', color: (isDerivedRow(r) || vo) ? '#c2c8d6' : RED }}>
+                            ? <button onClick={() => toggleActive(r)} disabled={blocked} title={blocked ? blockReason : 'Reactivate'} style={{ background: 'none', border: 'none', cursor: blocked ? 'not-allowed' : 'pointer', color: blocked ? '#c2c8d6' : GREEN, padding: 4 }}><RotateCcw size={14} /></button>
+                            : <button onClick={() => toggleActive(r)} disabled={blocked} title={blocked ? blockReason : 'Deactivate — keeps the record and its history; use instead of Delete'} style={{ background: 'none', border: 'none', cursor: blocked ? 'not-allowed' : 'pointer', color: blocked ? '#c2c8d6' : '#b45309', padding: 4 }}><Ban size={14} /></button>)}
+                          <button onClick={() => del(r)} disabled={isDerivedRow(r) || blocked}
+                            title={blocked ? blockReason : (isDerivedRow(r) ? "Can't delete — no master record exists yet (past transactions still reference this name). Edit to create one, or Deactivate." : 'Delete')}
+                            style={{ background: 'none', border: 'none', padding: 4, cursor: (isDerivedRow(r) || blocked) ? 'not-allowed' : 'pointer', color: (isDerivedRow(r) || blocked) ? '#c2c8d6' : RED }}>
                             <Trash2 size={14} />
                           </button>
                         </>)}

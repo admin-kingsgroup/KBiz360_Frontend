@@ -964,11 +964,18 @@ export function hasFullMenu(currentUser){
   return !/accountant/i.test(currentUser?.role || '');
 }
 
+// India ERP branches (GST regime). Everything else with a real code is an Africa VAT
+// branch (NBO/DAR/FBM); "ALL" is the consolidated/central view (neither). `branch` may be
+// a branch object ({code,...}) or the "ALL" string.
+const INDIA_BRANCH_CODES = ["BOMMB", "BOM", "AMD"];
+const branchCodeOf = (branch) => (branch && typeof branch === 'object') ? branch.code : branch;
+export function isIndiaBranch(branch){ const c = branchCodeOf(branch); return !!c && c !== 'ALL' && INDIA_BRANCH_CODES.includes(c); }
+export function isVatBranch(branch){ const c = branchCodeOf(branch); return !!c && c !== 'ALL' && !INDIA_BRANCH_CODES.includes(c); }
+
 // Branch-regime tax section (GST / VAT / consolidated) for the given branch.
 function taxSectionFor(branch){
-  const isAll = branch==="ALL";
-  const isIndia = !isAll && branch?.code && ["BOMMB","BOM","AMD"].includes(branch.code);
-  return isAll ? TAX_ALL : isIndia ? TAX_INDIA : TAX_AFRICA;
+  if (branch === "ALL") return TAX_ALL;
+  return isIndiaBranch(branch) ? TAX_INDIA : TAX_AFRICA;
 }
 
 // The COMPLETE pill set a full-menu role sees. Also the source tree used to place a
@@ -1071,16 +1078,37 @@ export function getMenu(branch, currentUser){
 //   removed from the accountant surface). Any of these can be granted back per-page.
 const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'group-dashboard', 'dashboards', 'tax']);
 
+// India-GST-only tax screens — meaningless (and ₹/Section-194/GSTIN misleading) on an
+// Africa VAT branch. Blocked for a VAT branch regardless of role (a full-menu NBO Accounts
+// Exec / FM / even Owner focused on NBO). NOT listed — shared or Africa-appropriate, so
+// they stay reachable: /tax/vat (VAT return), /tax/reconciliation (VAT-vs-Books),
+// /tax/calendar, /reports/* and /finance/tds-calculator.
+const INDIA_ONLY_TAX_ROUTES = new Set([
+  '/tax/gstr1', '/tax/gstr3b', '/tax/gstr2b', '/tax/gstr2b-itc', '/tax/gstr2a', '/tax/gstr9c',
+  '/tax/tds', '/tax/tds-certs', '/tax/form26as', '/tax/eway', '/tax/rcm', '/tax/einvoice',
+  '/tax/audit-3cd', '/tax/gstr-1-prep', '/tax/gstr-3b-prep', '/tax/form-16a',
+]);
+function isIndiaOnlyTaxRoute(r){
+  if (INDIA_ONLY_TAX_ROUTES.has(r)) return true;
+  for (const p of INDIA_ONLY_TAX_ROUTES) if (r.startsWith(p + '/')) return true; // sub-routes
+  return false;
+}
+
 // Hard route-level lockout used by App.jsx: can this user OPEN this route directly?
 // Full-menu roles (Super Admin / Director / everyone who isn't an accountant) reach
-// everything. Restricted roles are blocked from the out-of-scope areas above.
-export function canReachRoute(route, currentUser){
-  if (hasFullMenu(currentUser)) return true;
+// everything — EXCEPT the branch-regime gate below. Restricted roles are additionally
+// blocked from the out-of-scope areas. `branch` (optional, back-compat) is the operating
+// branch used for the regime gate; omit it and the gate is a no-op (prior behaviour).
+export function canReachRoute(route, currentUser, branch){
   const r = String(route || '');
+  const granted = Array.isArray(currentUser?.granted) ? currentUser.granted : [];
+  // Regime gate (role-INDEPENDENT): a VAT/Africa branch must not open India-GST-only
+  // screens even by direct URL. An explicit per-user GRANT still overrides.
+  if (isVatBranch(branch) && isIndiaOnlyTaxRoute(r) && !granted.includes(r)) return false;
+  if (hasFullMenu(currentUser)) return true;
   if (r === '/dashboard') return true; // landing page is never blocked (avoids lockout)
   // An explicit per-user GRANT (Page Visibility Control) overrides the role lockout —
   // e.g. granting /hr/employees lets this accountant open it directly.
-  const granted = Array.isArray(currentUser?.granted) ? currentUser.granted : [];
   if (granted.includes(r)) return true;
   const seg = r.replace(/^\//, '').split('/')[0];
   return !RESTRICTED_ROLE_DENY_SEGMENTS.has(seg);

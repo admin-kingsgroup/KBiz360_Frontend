@@ -31,6 +31,19 @@ export { BRANCHES, BRANCH_CODES, CURRENCY_META, FX_RATES, ACTIVE_CURRENCIES, VAT
    drift between modules. The underlying selector value stays the string 'ALL'. */
 export const CONSOLIDATED_LABEL = 'TK Group Central';
 
+/* Chart-of-Accounts groups whose ledgers are BANK accounts — they own bank details
+   (name / A/c no. / IFSC) and an OD/credit limit. Kept in ONE place so the Ledger
+   editor (which exposes those fields) and the Bank Account Master register (which lists
+   them) can never drift. BANK_OD_GROUPS are the overdraft / cash-credit variants
+   (liabilities); some legacy imports file them as 'Bank OD A/c' / 'Bank OCC A/c' rather
+   than the canonical 'Bank OD Accounts', so all are covered. Matching is case- and
+   whitespace-insensitive. Cash-in-Hand is intentionally NOT here (cash has no bank fields). */
+export const BANK_OD_GROUPS = ['Bank OD Accounts', 'Bank OD A/c', 'Bank OCC A/c'];
+export const BANK_LEDGER_GROUPS = ['Bank Accounts', ...BANK_OD_GROUPS];
+const _normGroup = (g) => String(g || '').trim().toLowerCase();
+export const isBankLedgerGroup = (g) => BANK_LEDGER_GROUPS.some((x) => x.toLowerCase() === _normGroup(g));
+export const isBankODGroup = (g) => BANK_OD_GROUPS.some((x) => x.toLowerCase() === _normGroup(g));
+
 const _branchObj=(b)=> (b && typeof b==="object") ? b
   : BRANCHES.find(x=>x.code===b) || null;
 
@@ -121,7 +134,11 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
 export const TAX_AFRICA = {label:"Taxation — VAT", icon:FileText, _regime:"VAT", children:[
   {divider:true, label:"VAT Returns"},
   {label:"VAT Return (Monthly)",      href:"/tax/vat"},
-  {label:"Withholding Tax",           href:"/tax/tds"},
+  // NOTE: "Withholding Tax" formerly linked to /tax/tds — the INDIA TDS/TCS register
+  // (₹, Section 194, Form 26AS), the wrong regime for a VAT branch. Removed: Africa WHT
+  // is deducted per supplier `whtRate` and posts to the WHT ledger, visible in ledger
+  // statements / VAT reports. /tax/tds is also route-blocked for VAT branches now
+  // (menus.canReachRoute). A dedicated Kenya-WHT register is a separate build.
   {divider:true, label:"Reconciliation"},
   {label:"VAT Return vs Books",       href:"/tax/reconciliation"},
   {divider:true, label:"Compliance"},

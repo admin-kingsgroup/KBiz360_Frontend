@@ -11,7 +11,7 @@
 // scan's timestamp and labels these findings "from last build".
 export const DEV_SCAN = {
   "tree": "FE",
-  "filesScanned": 701,
+  "filesScanned": 702,
   "counts": {
     "total": 6,
     "bySeverity": {

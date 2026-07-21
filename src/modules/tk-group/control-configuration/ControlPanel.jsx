@@ -626,10 +626,13 @@ export function ControlPanel({ setRoute }) {
           </Badge>
           <span className={`text-[12px] ${headEngaged > 0 ? 'text-success' : 'text-warning'}`}>
             {stripScoped ? <><b>{branchLabel}</b> scope · </> : null}
-            {headEngaged > 0 && !showBranchBar
-              ? <>Live on one or more branches — <button type="button" className="underline" onClick={() => setScreen('active')}>Active Controls</button> shows exactly where.</>
-              : owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
-                : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.'}
+            {headEngaged === 0
+              ? (owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
+                : 'Nothing enforces beyond the always-on defaults — switch rules on one-by-one, at your pace.')
+              : !showBranchBar
+                ? <>Live on one or more branches — <button type="button" className="underline" onClick={() => setScreen('active')}>Active Controls</button> shows exactly where.</>
+                : (owner ? 'Flip any switch to apply it live — your change applies immediately and is logged.'
+                  : 'These controls are enforcing for this scope — you can propose further changes.')}
           </span>
           <button type="button" onClick={() => go('/tk/rules?tab=book')}
             className="ml-auto shrink-0 rounded-full border border-surface-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-ink-muted hover:bg-navy/5 hover:text-navy">

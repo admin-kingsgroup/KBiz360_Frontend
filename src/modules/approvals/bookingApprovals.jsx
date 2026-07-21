@@ -27,7 +27,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { card, btnG, btnGh, bc } from '../../core/styles.jsx';
 import { useModalEsc } from '../../core/ux/useModalEsc';
-import { localeOf } from '../../core/format';
+import { localeOf, activeCurrency } from '../../core/format';
 import { periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
@@ -44,7 +44,7 @@ import { SoPoGpVoucherEntry, GOLD_SOFT, GOLD_LINE, JournalView } from '../accoun
 import { SkeletonTable } from '../../shell/primitives';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', BLUE = '#2563eb';
-const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString(localeOf(activeCurrency()), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -70,6 +70,12 @@ function groupBookings(rows, by) {
   return [...map.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)));
 }
 const sumT = (rows, path) => rows.reduce((s, b) => s + ((b[path] && b[path].total) || 0), 0);
+// Purchase SHOWN = what is actually payable to the supplier. For Insurance (SI) carrying a
+// supplier commission the payable is NET of that commission (mirrors backend creditorNet and
+// the SO/PO/GP entry screen's net-payable total); every other module shows the gross PO total.
+const poNetPay = (po) => (Number(po?.total) || 0) - (Number(po?.incentiveAmt) || 0) - (Number(po?.incentiveGst) || 0) + (Number(po?.incentiveTds) || 0);
+const poShown = (b) => (b && b.module === 'SI' && (Number(b?.po?.incentiveAmt) || 0) > 0 ? poNetPay(b.po) : (b?.po?.total || 0));
+const sumPo = (rows) => rows.reduce((s, b) => s + poShown(b), 0);
 const gpPctOf = (gp, sale) => (sale ? (gp / sale) * 100 : 0);
 const gpPctTxt = (gp, sale) => `${gpPctOf(gp, sale).toFixed(1)}%`;
 
@@ -131,7 +137,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                 <tr style={{ background: '#eef1f8' }}>
                   <td colSpan={numStart} style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11.5, color: DARK }}>{g.label} <span style={{ color: '#9197a3', fontWeight: 600 }}>· {g.rows.length} bill{g.rows.length === 1 ? '' : 's'}</span></td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'so'))}</td>
-                  <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'po'))}</td>
+                  <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumPo(g.rows))}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(sumT(g.rows, 'gp'))}</td>
                   <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{gpPctTxt(sumT(g.rows, 'gp'), sumT(g.rows, 'so'))}</td>
                   <td colSpan={cols.length - numStart - 4}></td>
@@ -161,7 +167,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                     </>
                   )}
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.so?.total)}</td>
-                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.po?.total)}</td>
+                  <td style={{ padding: '8px 12px', textAlign: 'right', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }} title={b.module === 'SI' && (Number(b?.po?.incentiveAmt) || 0) > 0 ? `net payable to supplier · gross ${fmt(b.po?.total)} less commission ${fmt(b.po?.incentiveAmt)}` : undefined}>{fmt(poShown(b))}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{fmt(b.gp?.total)}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', color: DR, fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>{gpPctTxt(b.gp?.total || 0, b.so?.total || 0)}</td>
                   {mode !== 'pending' && <td style={{ padding: '8px 12px', fontSize: 11, color: '#5b616e' }}>{mode === 'approved' ? (b.approvedAt ? String(b.approvedAt).slice(0, 10) : '—') : mode === 'deleted' ? (b.deletedAt ? String(b.deletedAt).slice(0, 10) : '—') : b.date}</td>}
@@ -179,7 +185,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                             </button>;
                           }
                           const ok = !b.validation?.hasErrors && na.allowed;
-                          return <button disabled={busyId === b.id || !ok} onClick={() => onApprove(b)} title={!na.allowed ? na.hint : (b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : 'Level 3 — posts to the books')} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: ok ? DR : '#cfd6e4', cursor: ok ? 'pointer' : 'not-allowed' }}>
+                          return <button disabled={busyId === b.id || !ok} onClick={() => onApprove(b)} title={!na.allowed ? na.hint : (b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : 'Level 3 — posts to the books')} aria-label={ok ? undefined : `Approve disabled — ${!na.allowed ? na.hint : (b.validation?.hasErrors ? 'verification failed: ' + (b.validation.errors || []).join(' · ') : 'fix the error first')}`} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: ok ? DR : '#cfd6e4', cursor: ok ? 'pointer' : 'not-allowed' }}>
                             {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
                           </button>;
                         })()}
@@ -456,7 +462,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                             return <button disabled={busy || !na.allowed} title={na.hint} onClick={() => doReview(e, na.action)} style={{ margin: isApprover ? 0 : '0 0 0 6px', marginRight: 6, padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? BLUE : GOLD) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
                           }
                           const ok = e.postable && na.allowed;
-                          return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                          return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} aria-label={ok ? undefined : `Approve disabled — ${!na.allowed ? na.hint : (e.error || (e.errors && e.errors[0]) || 'fix the error first')}`} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
                         })()}
                         {isApprover && <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
                         {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
@@ -588,7 +594,18 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: (m, kind) => setMsg((kind === 'error' ? '⚠ ' : '✓ ') + m) });
   const onApproveSelected = async () => {
     if (!sel.size) return;
-    const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
+    // Pre-flight: how many of the selection failed verification and can't post? Warn up
+    // front instead of letting them land in the failed tally (mirrors the vouchers queue).
+    const blocked = rows.filter((b) => sel.has(b.id) && b.validation?.hasErrors).length;
+    const { confirmed } = await confirmDialog({
+      title: `Approve ${sel.size} selected voucher(s)?`,
+      message: blocked === 0
+        ? 'Each posts its linked Sales + Purchase.'
+        : blocked === sel.size
+          ? `None of the ${sel.size} selected pass verification yet — they'll stay in Pending. Fix them from the list first.`
+          : `Each posts its linked Sales + Purchase. ${blocked} of ${sel.size} fail verification and will stay in Pending — the rest will be approved.`,
+      confirmLabel: 'Approve',
+    });
     if (!confirmed) return;
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
     try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }

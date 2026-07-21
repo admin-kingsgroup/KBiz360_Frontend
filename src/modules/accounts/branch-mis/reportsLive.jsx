@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
 import { card, inp, bc } from '../../../core/styles';
-import { localeOf } from '../../../core/format';
+import { localeOf, activeCurrency } from '../../../core/format';
 import { periodRange } from '../../../core/period';
 import { useModulePL, useBalanceSheet, useLedgerStatement, useAgeing, branchCode } from '../../../core/useAccounting';
 import { computeNetAgeing } from './netAgeing';
@@ -44,8 +44,11 @@ const TALLY = { head: '#14396b', titlebar: '#dbe7f5', gold: '#b8860b', green: '#
 
 const curOf = (branch) => bc(typeof branch === 'string' && branch !== 'ALL' ? { code: branch } : branch).cur;
 const branchLabel = (branch) => (!branch || branch === 'ALL' ? CONSOLIDATED_LABEL : (branch.code || branch));
-const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString('en-IN') : '—'; };
-const paren = (n) => { const v = Math.round(Number(n) || 0); return v ? `(${v.toLocaleString('en-IN')})` : '—'; };
+// Branch-aware fallbacks: group in the OPERATING branch's currency (Western for USD
+// branches NBO/DAR/FBM, Indian lakh/crore for ₹). Components that know a specific section
+// currency shadow these with a local `inr`/`paren` that pass their own `localeOf(cur)`.
+const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(localeOf(activeCurrency())) : '—'; };
+const paren = (n) => { const v = Math.round(Number(n) || 0); return v ? `(${v.toLocaleString(localeOf(activeCurrency()))})` : '—'; };
 const compact = (cur, n) => {
   const v = Number(n) || 0, a = Math.abs(v);
   if (a >= 1e7) return `${cur}${(v / 1e7).toFixed(2)} Cr`;
@@ -1650,7 +1653,7 @@ function BSToolbar({ mode, setMode, quick, setQuick, customDate, setCustomDate, 
 
 // Prev / Difference / %-Change cells, shared by every comparison row. Renders
 // nothing when not comparing; three dashes when there is no prior figure.
-function DiffCells({ cur, prev, showPY, dark, loc = 'en-IN' }) {
+function DiffCells({ cur, prev, showPY, dark, loc = localeOf(activeCurrency()) }) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
   if (!showPY) return null;
   const sec = dark ? '#9fb4cc' : SAP.sec;
@@ -1848,7 +1851,7 @@ function FioriBS({ d, prev, prevMap, cur, showPY, curLabel, prevLabel, branch, t
   );
 }
 // A single leaf-ledger row (tap → drill into its postings → voucher → edit).
-function bsLedgerRow(l, i, indent, onPickLedger, showPY, loc = 'en-IN') {
+function bsLedgerRow(l, i, indent, onPickLedger, showPY, loc = localeOf(activeCurrency())) {
   const inr = (n) => { const v = Math.round(Number(n) || 0); return v ? v.toLocaleString(loc) : '—'; };
   return (
     <tr key={`${indent}-${i}-${l.name}`} {...keyActivate(() => onPickLedger && onPickLedger(l.name))}

@@ -248,7 +248,19 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   };
   const doApproveSelected = async () => {
     if (!sel.size) return;
-    const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} voucher(s)?`, message: 'They will post to the books.', confirmLabel: 'Approve' });
+    // Pre-flight: how many of the selection can't post yet? previewMany runs the SAME
+    // gate as posting, so `postable` here matches what approve-many will actually do —
+    // warn up front instead of letting them land silently in the failed tally.
+    const blocked = entries.filter((e) => sel.has(e.id) && !e.postable).length;
+    const { confirmed } = await confirmDialog({
+      title: `Approve ${sel.size} voucher(s)?`,
+      message: blocked === 0
+        ? 'They will post to the books.'
+        : blocked === sel.size
+          ? `None of the ${sel.size} selected are ready to post yet — they'll stay in Pending. Fix them from the list first.`
+          : `They will post to the books. ${blocked} of ${sel.size} aren't ready yet and will stay in Pending (fix them from the list) — the rest will be approved.`,
+      confirmLabel: 'Approve',
+    });
     if (confirmed) approveMany.mutate({ ids: [...sel], approver: 'admin' }, {
       // Read the server tally instead of blindly claiming success — some may fail the
       // posting gate / be out of branch scope. Surface "Approved X of Y · N failed (why)".
@@ -714,7 +726,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                                                 const na = nextActionFor(e, chainCfg);
                                                 if (na.action !== 'approve') return <button onClick={() => doReview(e.id, na.action)} disabled={busy || !na.allowed} title={na.hint} style={{ padding: '3px 9px', background: na.allowed ? (na.action === 'check' ? C.blue : C.gold) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: na.allowed ? 'pointer' : 'not-allowed', marginRight: 5 }}>{na.label}</button>;
                                                 const ok = e.postable && na.allowed;
-                                                return <button onClick={() => doApprove(e.id)} disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? '' : 'Fix the error (Edit) before approving')} style={{ padding: '3px 9px', background: ok ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: ok ? 'pointer' : 'not-allowed', marginRight: 5 }}>Approve</button>;
+                                                return <button onClick={() => doApprove(e.id)} disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (alertOf(e) || 'Fix the error (Edit) before approving'))} aria-label={ok ? undefined : `Approve disabled — ${!na.allowed ? na.hint : (alertOf(e) || 'fix the error (Edit) first')}`} style={{ padding: '3px 9px', background: ok ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: ok ? 'pointer' : 'not-allowed', marginRight: 5 }}>Approve</button>;
                                               })()}
                                               <button onClick={() => doReject(e.id)} disabled={busy} style={{ padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Reject</button>
                                               {adminDeleteBtn(e, { padding: '3px 9px', background: C.red, color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }, 'Delete — remove from Pending, view-only (number not reusable)')}
@@ -1526,7 +1538,7 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
                               return <button disabled={busy || !na.allowed} title={na.hint} onClick={() => doReviewRefund(e, na.action)} style={{ marginLeft: isApprover ? 0 : 6, marginRight: 6, padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? C.blue : C.gold) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
                             }
                             const ok = e.postable && na.allowed;
-                            return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} onClick={() => doApproveRefund(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                            return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} aria-label={ok ? undefined : `Approve disabled — ${!na.allowed ? na.hint : (e.error || (e.errors && e.errors[0]) || 'fix the error first')}`} onClick={() => doApproveRefund(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? C.green : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
                           })()}
                           {isApprover && <button disabled={busy} onClick={() => doRejectRefund(e)} style={{ padding: '5px 10px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
                           {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: C.red }}>blocked</span>}

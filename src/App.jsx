@@ -463,7 +463,7 @@ export default function KB360App(){
        out-of-scope admin areas (HR, Settings, Group dashboard) by
        direct link too. Full-menu roles (Super Admin/Director/…) reach everything;
        finer per-page control stays with the `hidden` deny-list above. ── */
-    if(!canReachRoute(route, currentUser)){
+    if(!canReachRoute(route, currentUser, branch)){
       return (
         <div style={{padding:30,maxWidth:600,margin:"40px auto",
           background:"#fff",borderRadius:10,border:"1px solid #cdd1d8",textAlign:"center"}}>

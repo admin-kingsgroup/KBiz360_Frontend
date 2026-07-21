@@ -55,6 +55,10 @@ describe('Party Type Master — Client Types + Supplier Categories', () => {
     expect(screen.getByText('B2B')).toBeInTheDocument();
     expect(screen.getByText('Inter Branch')).toBeInTheDocument();
     expect(screen.getByText('Airline')).toBeInTheDocument();
+    // Kind column shows the friendly label (derived), and the raw enum is hidden.
+    expect(screen.getAllByText('Client Type').length).toBeGreaterThan(0);
+    expect(screen.getByText('Supplier Category')).toBeInTheDocument();
+    expect(screen.queryByText('customer')).toBeNull();
   });
 
   test('the Kind filter narrows to one vocabulary', () => {

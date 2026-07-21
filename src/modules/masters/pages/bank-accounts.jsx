@@ -10,7 +10,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Upload, Plus } from 'lucide-react';
 import { useMasterList } from '../../../core/useMasters';
-import { BRANCH_CODES } from '../../../core/data';
+import { BRANCH_CODES, isBankLedgerGroup, isBankODGroup } from '../../../core/data';
 import { PageLayout } from '../../../shell/PageLayout';
 import { DataTable } from '../../../shell/DataTable';
 import { Input, Select, Button, StatusPill, ResponsiveGrid } from '../../../shell/primitives';
@@ -31,7 +31,7 @@ export function BankAccountMaster({ branch, setRoute }) {
   // instead of pulling every branch's bank ledgers and hiding rows in the browser.
   const { data: ledgers = [], isLoading, isError, error, refetch } = useMasterList('ledgers', filterBranch !== 'ALL' ? { branch: filterBranch } : {});
   const bankRows = useMemo(() => (ledgers || [])
-    .filter((l) => ['Bank Accounts', 'Cash-in-Hand'].includes(l.group))
+    .filter((l) => isBankLedgerGroup(l.group) || l.group === 'Cash-in-Hand')
     .map((l) => ({
       id: l._id || l.code,
       code: l.code || l._id || '',   // stable key for the deep-link edit (?edit=<code>)
@@ -40,11 +40,12 @@ export function BankAccountMaster({ branch, setRoute }) {
       branchAddr: l.subGroup || '',
       accountNo: l.bankAcNo || '',
       ifsc: l.bankIfsc || '',
-      type: l.group === 'Cash-in-Hand' ? 'Cash' : 'Bank',
+      type: l.group === 'Cash-in-Hand' ? 'Cash' : isBankODGroup(l.group) ? 'OD' : 'Bank',
       currency: l.currency || 'INR',
       openingBal: Number(l.openingBalance) || 0,
       limit: Number(l.creditLimit) || 0,
       status: l.active === false ? 'Inactive' : 'Active',
+      locked: !!l.locked,   // wired/system ledger — editable only in the DB (register Edit → 🔒)
     })), [ledgers]);
   const filtered = bankRows.filter((b) => {
     if (filterBranch !== 'ALL' && b.branch !== filterBranch) return false;
@@ -52,7 +53,11 @@ export function BankAccountMaster({ branch, setRoute }) {
     if (q && !(b.bank.toLowerCase().includes(q) || b.accountNo.toLowerCase().includes(q) || b.ifsc.toLowerCase().includes(q))) return false;
     return true;
   });
-  const totalByCurrency = filtered.reduce((acc, b) => { acc[b.currency] = (acc[b.currency] || 0) + b.openingBal; return acc; }, {});
+  // "Cash + Bank" is money HELD, so exclude OD/overdraft rows — they're liabilities
+  // (money owed), and folding their balance into the cash-position tile would overstate
+  // it. OD facilities still appear in the grid below (with their limit), just not in this
+  // asset total.
+  const totalByCurrency = filtered.filter((b) => b.type !== 'OD').reduce((acc, b) => { acc[b.currency] = (acc[b.currency] || 0) + b.openingBal; return acc; }, {});
 
   const columns = [
     { key: 'branch', header: 'Branch', render: (r, v) => <span className="rounded bg-[#e6e8f1] px-1.5 py-0.5 text-[10.5px] font-bold text-navy">{v}</span> },
@@ -63,13 +68,15 @@ export function BankAccountMaster({ branch, setRoute }) {
     { key: 'openingBal', header: 'Opening Bal', num: true, className: 'font-bold', render: (r, v) => `${r.currency} ${v.toLocaleString(localeOfCcy(r.currency))}` },
     { key: 'limit', header: 'Limit', num: true, className: 'text-ink-muted', render: (r, v) => `${r.currency} ${v.toLocaleString(localeOfCcy(r.currency))}` },
     { key: 'status', header: 'Status', align: 'center', render: (r, v) => <StatusPill tone={v === 'Active' ? 'success' : 'danger'} size="sm">{v}</StatusPill> },
-    { key: '__act', header: 'Action', align: 'center', sortable: false, exportable: false, hideable: false, render: (r) => <Button variant="secondary" size="xs" onClick={() => setRoute && setRoute(`/masters/ledgers?edit=${encodeURIComponent(r.code)}`)} title="Edit this account (a ledger under Bank Accounts)" disabled={!r.code}>Edit</Button> },
+    { key: '__act', header: 'Action', align: 'center', sortable: false, exportable: false, hideable: false, render: (r) => r.locked
+        ? <span title="Wired / locked ledger — editable only directly in the database" className="text-ink-subtle" style={{ fontSize: 13 }}>🔒</span>
+        : <Button variant="secondary" size="xs" onClick={() => setRoute && setRoute(`/masters/ledgers?edit=${encodeURIComponent(r.code)}`)} title="Edit this account (a ledger under Bank Accounts)" disabled={!r.code}>Edit</Button> },
   ];
 
   return (
     <PageLayout
       title="Bank Account Master"
-      subtitle="All bank accounts where Travkings holds money — per branch, per currency"
+      subtitle="All bank accounts & overdraft facilities — per branch, per currency"
       actions={
         <>
           <Button size="sm" variant="secondary" icon={Upload} onClick={() => setRoute && setRoute('/import')}>Import</Button>
@@ -87,6 +94,11 @@ export function BankAccountMaster({ branch, setRoute }) {
         </div>
       }
     >
+      {filtered.some((b) => b.type === 'OD') && (
+        <div className="mb-3 rounded-brand border border-info/25 bg-info-soft px-3.5 py-2.5 text-[11px] text-ink">
+          <b>OD / overdraft rows</b> show each account’s own sanctioned limit and are <b>excluded from the “Cash + Bank” totals</b> above (they’re liabilities). A full OD / credit facility with drawdown tracking across supplier ledgers is managed in <b>Masters ▸ Supplier ▸ Credit Facilities &amp; Limits</b>.
+        </div>
+      )}
       {Object.keys(totalByCurrency).length > 0 && (
         <ResponsiveGrid min="180px" gap="md" className="mb-4">
           {Object.entries(totalByCurrency).map(([ccy, amt]) => (

@@ -292,7 +292,7 @@ export function TkMasterControlPage() {
 
 export function TkGoLivePage({ setRoute }) {
   return (
-    <Page title="Go-Live" subtitle="Turn the TK Group control layer on. Each step shows its live status; the switch itself is proposed on Control Flags and dual-approved — fully reversible.">
+    <Page title="Go-Live" subtitle="Turn the TK Group control layer on. Each step shows its live status; the switch itself is proposed in the Control Panel (Owner Rules) and dual-approved — fully reversible.">
       <GoLive setRoute={setRoute} />
     </Page>
   );

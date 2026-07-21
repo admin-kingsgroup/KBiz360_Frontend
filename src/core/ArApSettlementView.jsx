@@ -4,9 +4,10 @@ import React, { useState } from 'react';
  * One reusable view, rendered twice on the AD (Owner) Dashboard (Receivable card +
  * Payable card) and again as the tabbed panel inside the Accounts Receivable /
  * Payable ageing reports. Settlement as six metric tabs and, below, the per-ledger
- * ageing of Unsettled Bills GROUPED BY LEDGER SUB-GROUP (B2B · B2E · B2C Reference ·
- * Inter Branch · Supplier B2B · Supplier Interbranch · Foreign Suppliers · …), each
- * group with a Subtotal and everything folding into a grand Final Total.
+ * ageing of Unsettled Bills GROUPED BY PARTY TYPE — Client Type for debtors (B2B ·
+ * B2C Reference · B2E · …) and Supplier Category for creditors (Airline · Hotel ·
+ * DMC · …), read from the party master; each group with a Subtotal and everything
+ * folding into a grand Final Total. A party with no type folds into "Unclassified".
  *
  * Per ledger: Unsettled Bills = Σ its ageing buckets ; Final = Unsettled Bills −
  * Unsettled Receipt (on-account). The footer Final Total reconciles THREE columns to
@@ -24,15 +25,23 @@ export const FINE_BUCKETS = [
 ];
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const OTHERS = 'Direct / Others';
+const UNCLASSIFIED = 'Unclassified';   // a party carrying no Client Type / Category
 // A ledger sitting directly under the primary head (or with no master) has no custom
 // sub-group — fold it into "Direct / Others" so nothing is lost and totals still tie.
 const PRIMARY = new Set(['', 'sundry debtors', 'sundry creditors', 'sundry debtor', 'sundry creditor']);
 const groupLabel = (sg) => { const s = String(sg || '').trim(); return PRIMARY.has(s.toLowerCase()) ? OTHERS : s; };
+// Group by the party ATTRIBUTE the backend emits as `groupKey` (Client Type / Category);
+// fall back to the legacy ledger sub-group when an older API omits it. A blank attribute
+// folds into "Unclassified"; a blank legacy sub-group into "Direct / Others".
+const groupKeyLabel = (r) => (r.groupKey !== undefined && r.groupKey !== null)
+  ? (String(r.groupKey).trim() || UNCLASSIFIED)
+  : groupLabel(r.subGroup);
 const blankSub = () => ({ a7: 0, a15: 0, a30: 0, a45: 0, a60: 0, a61: 0, unsettled: 0, receipt: 0, final: 0 });
 const addInto = (s, r) => { FINE_BUCKETS.forEach(([k]) => { s[k] = r2(s[k] + r[k]); }); s.unsettled = r2(s.unsettled + r.unsettled); s.receipt = r2(s.receipt + r.receipt); s.final = r2(s.final + r.final); return s; };
 
-// Pure — derive the six settlement metrics + the sub-group-grouped ageing of Unsettled
-// Bills from an ageing() side payload ({ totals, rows }). Import-free / unit-testable.
+// Pure — derive the six settlement metrics + the ageing of Unsettled Bills grouped by the
+// party attribute (Client Type / Category) from an ageing() side payload ({ totals, rows }).
+// Import-free / unit-testable.
 // `side` = 'receivable' | 'payable' (…s / plural tolerated).
 export function buildSettlement(side, totals = {}, rows = []) {
   const isRec = /^rec/i.test(side || '');
@@ -59,7 +68,7 @@ export function buildSettlement(side, totals = {}, rows = []) {
       const unsettled = r2(r.total);
       const receipt = r2(r.onAccount);
       return {
-        party: r.party || '—', subGroup: r.subGroup || '',
+        party: r.party || '—', subGroup: r.subGroup || '', groupKey: r.groupKey,
         a7: r2(r.a7), a15: r2(r.a15), a30: r2(r.a30), a45: r2(r.a45), a60: r2(r.a60), a61: r2(r.a61),
         unsettled, receipt, final: r.net != null ? r2(r.net) : r2(unsettled - receipt),
       };
@@ -67,14 +76,15 @@ export function buildSettlement(side, totals = {}, rows = []) {
 
   // Bucket ledgers by sub-group; each group carries its ledgers (sorted by open) + a subtotal.
   const byGroup = new Map();
-  keptRows.forEach((r) => { const g = groupLabel(r.subGroup); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(r); });
+  keptRows.forEach((r) => { const g = groupKeyLabel(r); if (!byGroup.has(g)) byGroup.set(g, []); byGroup.get(g).push(r); });
   const groups = [...byGroup.entries()].map(([group, ledgers]) => {
     ledgers.sort((a, b) => b.unsettled - a.unsettled);
     const subtotal = ledgers.reduce((s, r) => addInto(s, r), blankSub());
     return { group, ledgers, subtotal, count: ledgers.length };
   });
-  // Biggest exposure first; "Direct / Others" always sinks to the bottom.
-  groups.sort((a, b) => (a.group === OTHERS ? 1 : 0) - (b.group === OTHERS ? 1 : 0) || b.subtotal.unsettled - a.subtotal.unsettled);
+  // Biggest exposure first; the catch-all groups ("Unclassified" / "Direct / Others") sink to the bottom.
+  const sink = (g) => (g === OTHERS || g === UNCLASSIFIED ? 1 : 0);
+  groups.sort((a, b) => sink(a.group) - sink(b.group) || b.subtotal.unsettled - a.subtotal.unsettled);
 
   const footer = groups.reduce((f, g) => addInto(f, g.subtotal), blankSub());
   // Scale-aware tolerance: at least ₹1, growing with the total so accumulated per-ledger
@@ -128,7 +138,7 @@ export function ArApSettlementView({ side, totals = {}, rows = [], formatMoney =
 
       {/* per-ledger settlement grid, grouped by sub-group */}
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: '#374151', margin: '4px 0 8px' }}>
-        Ageing Summary — Unsettled Bills · by Sub-Group
+        Ageing Summary — Unsettled Bills · by {model.isRec ? 'Client Type' : 'Category'}
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 900 }}>

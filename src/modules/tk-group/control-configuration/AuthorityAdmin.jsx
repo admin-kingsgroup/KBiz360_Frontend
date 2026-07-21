@@ -58,8 +58,11 @@ export function AuthorityAdmin({ canManage = false }) {
   // shows this too, but the Owner types the emails HERE — warn where the mistake is made.
   const vRule = rules.find((r) => r.configKey === 'approval.verifyEmails');
   const aRule = rules.find((r) => r.configKey === 'approval.approveEmails');
-  const aSet = new Set(chips(aRule && aRule.value).map((e) => String(e).trim().toLowerCase()));
-  const sodOverlap = chips(vRule && vRule.value).filter((e) => e && aSet.has(String(e).trim().toLowerCase()));
+  // Compute the overlap from the CURRENT drafts (what the Owner is typing), not the saved
+  // value — so the warning appears live as the mistake is made, not only after Save.
+  const parseDraft = (s) => String(s == null ? '' : s).split(/[,;\s]+/).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const aSet = new Set(parseDraft(aRule && aRule.draft));
+  const sodOverlap = [...new Set(parseDraft(vRule && vRule.draft).filter((e) => aSet.has(e)))];
 
   return (
     <div className="mx-auto grid max-w-[660px] gap-3">

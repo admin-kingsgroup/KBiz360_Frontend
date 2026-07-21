@@ -19,7 +19,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Plus, Trash2, Save, ArrowRight, Check, Lock, RefreshCw, Clock, CheckCircle2,
-  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw,
+  XCircle, ChevronDown, ChevronRight, Link2, FileCheck2, Pencil, RotateCcw, AlertTriangle,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCanOriginate } from '../../tk-group/useCanOriginate';
@@ -182,10 +182,10 @@ export function inbRowsFromDeal(spec, deal) {
   const line = blankLine(spec);
   const cols = spec.fareCols || [];
   // A fare line whose label no longer has a column (a LEGACY deal captured before a
-  // module's fare columns were removed — insurance → service-only, 2026-07-18) must
-  // NOT be silently dropped: carry it on its legacy key so the entry screen can SEE
-  // the money and refuse the lossy re-save (legacyFareCarry gate) instead of quietly
-  // rebuilding the deal without it.
+  // module's fare columns were removed — insurance → service-only, 2026-07-18) is carried
+  // on its legacy key so the entry screen can compute `legacyFareCarry` and warn (the amber
+  // "premium removed on save" notice). On save those keys are STRIPPED from the rows (FE +
+  // backend stripDroppedFareKeys) — service-only, so the premium is dropped deliberately.
   const LEGACY_FARE_KEY = { 'base fare': 'base', 'k3 tax': 'k3', 'taxes': 'tax' };
   for (const f of (deal.fareLines || [])) {
     const col = cols.find((c) => String(c.label).trim().toLowerCase() === String(f.desc).trim().toLowerCase());
@@ -380,7 +380,7 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
               <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supp Comm/Inc Rcvd<br />
                 <input type="number" min="0" value={leg.line.incentive ?? ''} onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cell} /></label>
               {pkg && <span style={{ fontSize: 10, color: '#6b5a1e', fontStyle: 'italic', alignSelf: 'flex-end', paddingBottom: 8 }}>Supplier {isVatBranch(brCode) ? 'VAT' : 'GST'} auto-claimed as ITC</span>}
-              <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable {bc({ code: brCode }).cur}{fmt(po.total)}{num(po.gst) > 0 ? ` · ITC ${bc({ code: brCode }).cur}${fmt(po.gst)}` : ''}</div>
+              <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable {bc({ code: brCode }).cur}{fmt(num(po.total) - num(po.incentiveAmt) - num(po.incentiveGst) + num(po.incentiveTds))}{num(po.incentiveAmt) > 0 ? ` (gross ${bc({ code: brCode }).cur}${fmt(po.total)} − comm ${bc({ code: brCode }).cur}${fmt(po.incentiveAmt)})` : ''}{num(po.gst) > 0 ? ` · ITC ${bc({ code: brCode }).cur}${fmt(po.gst)}` : ''}</div>
             </div>
           </div>
         );
@@ -629,6 +629,19 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // `interBranch` rides the ctx so the SCREEN suppresses TCS exactly as the server does on an INB
   // leg (tcsAmt 0). It cannot be inferred from clientType — see the TCS gate in voucherSpecs.
   const totals = useMemo(() => bookingTotals(spec, lines, { packageType, noSupplier: isNoSupp, branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, supplierWhtRate: suppWhtRate, clientType, interBranch, date, vatRate: liveVatRate }), [spec, lines, packageType, isNoSupp, brCode, effNoVat, inbZeroRated, suppForeign, suppWhtRate, clientType, interBranch, date, liveVatRate]);
+  // ── Insurance net-payable display (2026-07-20) ───────────────────────────────
+  // On Insurance the supplier commission often rivals the premium, so the GROSS PO
+  // total (SSC + GST, commission-blind) badly overstates what we actually pay the
+  // supplier AND leaves the GP tiles irreconcilable with the GP shown. Surface the
+  // NET figures the engine already computes and the books already post:
+  //  · poNetPayable — mirrors backend creditorNet (posting.builder.js): the amount
+  //    that credits the supplier ledger = gross − commission − commission GST + the
+  //    TDS we withhold (claimed, not paid). Uses the ROUNDED po.total so the screen
+  //    equals the ledger to the paisa (the invoice round-off rides inside gross).
+  //  · GP tiles read totals.gp.saleNet / costNet → Net Sales − Net Purchase = GP.
+  // Insurance-only (moduleCode 'SI') for now — other modules keep the gross display.
+  const isInsurance = moduleCode === 'SI';
+  const poNetPayable = num(totals.po.total) - num(totals.po.incentiveAmt) - num(totals.po.incentiveGst) + (suppForeign ? 0 : num(totals.po.incentiveTds));
   // Effective TCS 206C(1G) rate for this booking's date (5% up to 31-03-2026, else 2%).
   const tcsRate = spec.tcs ? tcs206cRate(spec, date) : 0;
   // The TCS COLUMN itself is hidden on an inter-branch deal — not just zeroed. 206C(1G) can never
@@ -782,18 +795,28 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const originate = useCanOriginate(brCode, interBranch ? 'inb' : 'booking');
   const blockedNew = originate.blocked && !editing;
   // Legacy fare carry-over: rows captured BEFORE a module's fare columns were removed
-  // (insurance → service-only, 2026-07-18) hold money the grid can no longer show —
-  // re-saving would silently re-price the booking/deal without it. Block the save and
-  // say why; the file should be revoked/rejected and re-entered under the new rule.
-  const legacyFareCarry = editing ? round2(lines.reduce((s, l) =>
-    s + ['base', 'k3', 'tax'].filter((k) => !(spec.fareCols || []).some((c) => c.key === k))
-      .reduce((t, k) => t + num(l[k]), 0), 0)) : 0;
+  // (insurance → service-only, 2026-07-18) hold money on keys the grid no longer shows.
+  // Insurance is service-only and that premium must NOT be persisted, so instead of
+  // blocking the save we STRIP those keys from the rows on save (they never reach the
+  // backend) — the SO/PO/GP totals are already service-only. A non-blocking notice states
+  // the premium is dropped so it is never silent. `legacyFareKeys` are the present,
+  // now-dropped fare keys; `legacyFareCarry` is the ₹ amount being removed.
+  const legacyFareKeys = editing
+    ? ['base', 'k3', 'tax'].filter((k) => !(spec.fareCols || []).some((c) => c.key === k) && lines.some((l) => num(l[k])))
+    : [];
+  const legacyFareCarry = round2(lines.reduce((s, l) => s + legacyFareKeys.reduce((t, k) => t + num(l[k]), 0), 0));
 
+  // Negative gross profit is a HARD server block (bookingOrders.service.assertGpNotNegative,
+  // 422) on BOTH create and edit — a booking cannot post at a loss. Mirror it on the FE so the
+  // user is stopped HERE, with a reason, instead of filling the whole form and eating a save-time
+  // 422. gp.total is already rounded (r2), so `< 0` matches the server's round-then-compare. The
+  // INB path enforces its own floor server-side (svf − discount), so gate only the regular path.
+  const gpNegative = num(totals.gp.total) < 0;
   // No-supplier needs only a sale + a customer; otherwise a supplier + cost are required.
-  const canSave = !blockedNew && legacyFareCarry === 0 && (interBranch
+  const canSave = !blockedNew && (interBranch
     ? (!!brCode && !saving && !!toBranch && totals.so.total > 0 && !needsScope && (!crossCcy || fxRateNum > 0))  // INB: counterparty + sale value + Int'l/Domestic for Flights/Holiday + FX rate on a cross-currency deal
     : (!!brCode && !saving && !interBranchParty && totals.so.total > 0 && customer.name.trim() && hasCustLedger
-      && (isNoSupp || (totals.po.total > 0 && hasSuppLedger))));
+      && (isNoSupp || (totals.po.total > 0 && hasSuppLedger)) && !gpNegative));
   // View-only user: the Save (commit) button is pre-disabled with a reason — never a live
   // no-op that only 403s server-side. Collapses to the original when vo is false.
   const vo = isViewOnly();
@@ -878,7 +901,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     setError(''); setSaving(true);
     try {
       const gpLines = lines.map((l) => {
-        const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, vatRate: liveVatRate });
+        // Mirror the on-screen tables + the `totals` memo: a FOREIGN supplier charges no
+        // Indian GST and withholds no 194H TDS, so the stored per-line meta must carry the
+        // same flags or it overstates gstPur/tds for a foreign insurance/flight vendor.
+        const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign, supplierWhtRate: suppWhtRate, vatRate: liveVatRate });
         return { fn: l.fn, sn: l.sn, finalSales: c.finalSales, salesGST: c.salesGST, finalPurchase: c.finalPurchase, gstPur: c.gstPur, gp: c.gp, gpPct: c.gpPct };
       });
       const payload = {
@@ -888,7 +914,10 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         supplier: isNoSupp ? { name: '', gstin: '', address: '', email: '', contact: '', ledgerGroup: '' }
           : { name: supplier.name, gstin: supplier.gstin, address: supplier.address, email: supplier.email, contact: supplier.contact, ledgerGroup: supplier.ledgerGroup, country: countryOfSupplier(supplier.name) },
         gstMode: saleGstMode, packageType: hasPackage ? packageType : '',
-        headerRef, rows: lines.map((l) => syncLineRefs(spec, l)),
+        // Strip legacy fare keys (base/k3/tax the module no longer lists) so the premium
+        // is NOT persisted — insurance is service-only. The SO/PO/GP totals already exclude
+        // them; this drops them from the stored rows too, keeping the voucher consistent.
+        headerRef, rows: lines.map((l) => { const r = syncLineRefs(spec, l); if (!legacyFareKeys.length) return r; const c = { ...r }; legacyFareKeys.forEach((k) => { delete c[k]; }); return c; }),
         po: { ...totals.po, gstMode: purGstMode, vatRate: liveVatRate }, so: { ...totals.so, gstMode: saleGstMode, vatRate: liveVatRate },
         gp: { lines: gpLines, total: totals.gp.total, pct: totals.gp.pct },
         remarks, saleTallyRef, purTallyRef,
@@ -1194,7 +1223,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <td style={poTf}>{pkg && !suppForeign ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
-            <td style={{ ...poTf, color: CR }}>{fmt(totals.po.total)}{num(totals.po.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.po.roundOff > 0 ? '+' : ''}{fmt(totals.po.roundOff)}</span> : null}</td>
+            <td style={{ ...poTf, color: CR }}>
+              {isInsurance && num(totals.po.incentiveAmt) > 0
+                ? <>{fmt(poNetPayable)}<span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>net payable · gross {fmt(totals.po.total)} − comm {fmt(totals.po.incentiveAmt)}{num(totals.po.incentiveTds) ? ` + ${whtLabel} ${fmt(totals.po.incentiveTds)}` : ''}</span></>
+                : <>{fmt(totals.po.total)}{num(totals.po.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.po.roundOff > 0 ? '+' : ''}{fmt(totals.po.roundOff)}</span> : null}</>}
+            </td>
           </tr></tfoot>
         </table>
       </div>
@@ -1584,8 +1617,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* ③ Gross Profit */}
       <Section n="3" badge={interBranch ? 'INGP' : 'GP'} name={interBranch ? 'Inter-Branch Gross Profit' : 'Gross Profit'} sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
-          <GpCard k={'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(totals.so.total)} color={DARK} bg="#FFFDF7" />
-          <GpCard k={'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(totals.po.total)} color={CR} bg="#FFFAEC" />
+          <GpCard k={isInsurance ? 'Net Sales (ex ' + taxLabel + ')' : 'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(isInsurance ? totals.gp.saleNet : totals.so.total)} color={DARK} bg="#FFFDF7" />
+          <GpCard k={isInsurance ? 'Net Purchase (ex ' + taxLabel + ')' : 'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(isInsurance ? totals.gp.costNet : totals.po.total)} color={CR} bg="#FFFAEC" />
           <GpCard k={hasExtraLegs ? 'Gross Profit · all POs' : 'Gross Profit'} v={cur + ' ' + fmt(hasExtraLegs ? folderGpTotal : totals.gp.total)} color={DR} pct={(hasExtraLegs ? folderGpPct : totals.gp.pct) + '% margin'} bg="#FCF3DE" />
         </div>
         {hasExtraLegs && (
@@ -1649,9 +1682,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           longer has (e.g. an Insurance premium captured before insurance went
           service-only). Re-saving would silently re-price it without that money. */}
       {legacyFareCarry > 0 && (
-        <div style={{ ...card, background: '#fdecec', border: '1px solid #e8a6a6', color: '#8a1f1f', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <Lock size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-          <span><b>Save blocked — legacy fares this grid can no longer show.</b> This {interBranch ? 'deal' : 'booking'} carries {cur} {fmt(legacyFareCarry)} in fare columns that were removed from the {spec.name} voucher (service-only since 18-07-2026). Saving would silently drop that amount from the totals. Keep it as-is, or revoke/reject it and re-enter it under the new format.</span>
+        <div style={{ ...card, background: '#fef3e2', border: '1px solid #f0cc8a', color: '#8a5a12', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <RotateCcw size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span><b>Legacy premium will be removed on save.</b> This {interBranch ? 'deal' : 'booking'} still carries {cur} {fmt(legacyFareCarry)} of premium in fare columns that {spec.name} dropped when it went service-only (18-07-2026). Saving re-prices it as <b>service-only</b> — that premium is <b>not stored</b>, so the sale and purchase each shrink by it (<b>Gross Profit is unchanged</b>). If it is still an open receivable/payable you rely on this voucher to track, sort that out first.</span>
         </div>
       )}
 
@@ -1660,6 +1693,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <div style={{ ...card, background: '#fef3e2', border: '1px solid #f0cc8a', color: '#8a5a12', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span><b>Inter-branch customer detected</b> (a Travkings branch — you're selling to another branch). This is an inter-branch <b>sale</b> — it must be entered on the <b>INB Voucher</b> screen, not SO/PO/GP. Saving here is blocked. (Buying <i>from</i> another branch is fine here.)</span>
           <button onClick={() => setRoute && setRoute('/bookings/inter-branch')} style={{ ...btnG, background: GOLD, padding: '6px 12px', fontSize: 11.5, marginLeft: 'auto' }}><ArrowRight size={13} /> Go to INB Voucher</button>
+        </div>
+      )}
+
+      {gpNegative && !interBranch && !interBranchParty && (
+        <div style={{ ...card, background: '#fdecea', border: '1px solid #e6a99f', color: '#8a2418', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+          <span><b>Gross Profit is negative</b> — this booking is a loss of {cur} {fmt(Math.abs(num(totals.gp.total)))}. A booking cannot post at a loss, so <b>Save is blocked</b>. Raise the sale (SVC2 / Service Fee) or reduce the supplier cost so <b>Gross Profit is 0 or above</b>, then save.</span>
         </div>
       )}
 
@@ -1675,7 +1715,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
         )}
         <button disabled={!canSave || vo} onClick={() => save()} className="max-tablet:min-h-[44px]"
-          title={vo ? VIEW_ONLY_REASON : undefined}
+          title={vo ? VIEW_ONLY_REASON : (gpNegative && !interBranch ? 'Gross Profit is negative — a booking cannot post at a loss. Adjust the sale / supplier cost so GP ≥ 0.' : undefined)}
           style={{ ...btnG, background: canSave ? (editing ? DARK : GOLD) : '#9ca3af', cursor: canSave ? 'pointer' : 'not-allowed', opacity: canSave ? 1 : 0.7, ...(vo ? { background: '#cfd6e4', color: '#6b7280', cursor: 'not-allowed' } : {}) }}>
           {saving ? <RefreshCw size={14} className="spin" /> : <Save size={14} />} {saving ? 'Saving…' : (editing ? 'Save changes (Pending)' : 'Save voucher (Pending)')}
         </button>

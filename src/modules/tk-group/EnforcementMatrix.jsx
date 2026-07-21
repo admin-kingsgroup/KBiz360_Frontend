@@ -96,6 +96,13 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`sk-${i}`}><td colSpan={5} className="p-2.5"><Skeleton className="h-4 w-full" style={{ opacity: Math.max(0.4, 1 - i * 0.15) }} /></td></tr>
               ))
+            ) : q.isError ? (
+              <tr><td colSpan={5} className="p-4 text-center text-[12px] text-danger">
+                <b>Couldn’t load the enforcement matrix</b> — a load error, not an empty policy. Source: <code>/api/tk/voucher-policy</code>.{' '}
+                <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ['tk', 'voucherPolicy'] })} className="underline">↻ Retry</button>
+              </td></tr>
+            ) : categories.length === 0 ? (
+              <tr><td colSpan={5} className="p-4 text-center text-[12px] text-ink-muted">No voucher types are configured for the matrix.</td></tr>
             ) : categories.map((c) => {
               const r = rows[c.key] || { enforce: false, threshold: '', effectiveDate: '' };
               const isOv = hasCellOverride(store, branch, c.key);
@@ -117,13 +124,15 @@ export function EnforcementMatrix({ go, branch = 'default' }) {
                   </td>
                   <td className="p-2.5 text-center">
                     <input aria-label={`${c.label} threshold`} type="number" step="any" min="0" placeholder="0 = any"
+                      disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined}
                       value={r.threshold} onChange={(e) => setRows((s) => ({ ...s, [c.key]: { ...r, threshold: e.target.value } }))}
-                      className="w-[110px] rounded-md border border-surface-border bg-surface px-2 py-1 text-right font-mono text-[12px] text-ink" />
+                      className={`w-[110px] rounded-md border border-surface-border bg-surface px-2 py-1 text-right font-mono text-[12px] text-ink ${vo ? 'cursor-not-allowed opacity-50' : ''}`} />
                   </td>
                   <td className="p-2.5 text-center">
                     <input aria-label={`${c.label} effective date`} type="date"
+                      disabled={vo} title={vo ? VIEW_ONLY_REASON : undefined}
                       value={r.effectiveDate} onChange={(e) => setRows((s) => ({ ...s, [c.key]: { ...r, effectiveDate: e.target.value } }))}
-                      className="rounded-md border border-surface-border bg-surface px-2 py-1 font-mono text-[11px] text-ink" />
+                      className={`rounded-md border border-surface-border bg-surface px-2 py-1 font-mono text-[11px] text-ink ${vo ? 'cursor-not-allowed opacity-50' : ''}`} />
                   </td>
                   <td className="p-2.5 text-center">
                     <div className="flex items-center justify-center gap-1.5">
