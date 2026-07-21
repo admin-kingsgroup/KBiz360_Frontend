@@ -246,6 +246,15 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
     });
     if (confirmed) revoke.mutate({ id, reason }, { onSuccess: () => toast('Voucher revoked → Pending'), onError: (e) => toast(e?.message || 'Revoke failed', 'error') });
   };
+  // A booking/order-driven (locked) voucher CANNOT be voucher-revoked — the /revoke endpoint
+  // 409s ("driven by <master>"). It must be un-posted on its master (which un-posts both the
+  // voucher AND the master in sync). Point the approver there instead of a Revoke button that
+  // always errors — mirrors the SO/PO/GP refund queue and VoucherShell's locked-voucher UX.
+  const lockedRevokeHint = (e) => {
+    const p = voucherParent(e);
+    const where = p ? `${p.label}${p.ref ? ` ${p.ref}` : ''}` : `its ${e.source || 'source'}${e.bookingId ? ` ${e.bookingId}` : ''}`;
+    return <span title={`Locked — revoke it on ${where} (un-posts both the voucher and its master in sync)`} style={{ fontSize: 10.5, fontWeight: 700, color: C.gold, whiteSpace: 'nowrap' }}>🔒 revoke on {where}</span>;
+  };
   const doApproveSelected = async () => {
     if (!sel.size) return;
     // Pre-flight: how many of the selection can't post yet? previewMany runs the SAME
@@ -406,7 +415,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
       </>
     ) : status === 'approved' ? (
       <>
-        {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={ABTN(C.gold)}>Revoke</button>}
+        {isApprover && (e.locked ? lockedRevokeHint(e) : <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={ABTN(C.gold)}>Revoke</button>)}
         {adminDeleteBtn(e, ABTN(C.red), 'Reverse out of the books → view-only (number not reusable)')}
       </>
     ) : status === 'deleted' ? (
@@ -733,7 +742,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                                             </>
                                           ) : status === 'approved' ? (
                                             <>
-                                              {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ padding: '3px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Revoke</button>}
+                                              {isApprover && (e.locked ? lockedRevokeHint(e) : <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ padding: '3px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Revoke</button>)}
                                               {adminDeleteBtn(e, { padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }, 'Reverse out of the books → view-only (number not reusable)')}
                                             </>
                                           ) : status === 'deleted' ? (

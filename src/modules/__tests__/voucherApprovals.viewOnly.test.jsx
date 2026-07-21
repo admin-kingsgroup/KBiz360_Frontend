@@ -51,6 +51,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { VoucherApprovals } from '../approvals';
+import { useVoucherApprovals } from '../../core/useAccounting';
 
 const wrap = (ui) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -77,5 +78,26 @@ describe('Voucher Approvals — view-only gating', () => {
     expect(screen.queryByText(/👁 View only/)).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Reject$/ }).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /Approve all/ })).toBeInTheDocument();
+  });
+});
+
+describe('Voucher Approvals — Revoke gating on locked (booking-driven) vouchers', () => {
+  const leg = (party) => [
+    { ledger: party, group: 'Sundry Creditors', subGroup: 'Sundry Creditors', debit: 100, credit: 0 },
+    { ledger: 'ICICI Bank', group: 'Bank Accounts', subGroup: 'Bank Accounts', debit: 0, credit: 100 },
+  ];
+  test('approved tab: an UNLOCKED voucher shows Revoke; a booking-LOCKED one points to its master instead', () => {
+    mockVo = false;
+    const approved = [
+      { id: 'v1', vno: 'PMT/BOM/26/0001', date: '2026-01-01', category: 'payment', type: 'PMT', party: 'Alpha', total: 100, postable: true, errors: [], warnings: [], error: '', locked: false, postings: leg('Alpha') },
+      { id: 'v2', vno: 'RF/BOM/26/0021', date: '2026-03-12', category: 'refund', type: 'RF', party: 'NeuIQ', total: 100, postable: true, errors: [], warnings: [], error: '', locked: true, source: 'booking', bookingId: 'RF-BKG/BOM/26/0007', postings: leg('NeuIQ') },
+    ];
+    useVoucherApprovals.mockReturnValue({ data: { entries: approved, counts: { pending: { n: 0, amount: 0 }, approved: { n: 2, amount: 200 }, rejected: { n: 0, amount: 0 }, deleted: { n: 0, amount: 0 } } } });
+    wrap(<VoucherApprovals branch={'BOM'} currentUser={{ role: 'Director' }} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Approved/ })); // tab label carries a count suffix
+    fireEvent.click(screen.getByRole('button', { name: 'Entry wise' }));
+    // Exactly one Revoke button (the unlocked payment); the locked refund shows a pointer instead.
+    expect(screen.getAllByRole('button', { name: /^Revoke$/ })).toHaveLength(1);
+    expect(screen.getByText(/revoke on .*RF-BKG\/BOM\/26\/0007/i)).toBeInTheDocument();
   });
 });
