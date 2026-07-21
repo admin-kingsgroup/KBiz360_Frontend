@@ -1004,7 +1004,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
     const noSupp = !!result.noSupplier;
     const fields = [['Booking No', result.bookingNo], ['Link No', result.linkNo], ['Module', VSPECS[result.module]?.name || result.module], ['Status', (result.status || 'pending').toUpperCase()]];
     if (approved) { fields.push(['Sales invoice', result.saleVno || '—']); if (!noSupp) fields.push(['Purchase invoice', result.purchaseVno || '—']); }
-    else { fields.push(['Sales (incl GST)', cur + ' ' + fmt(result.so?.total)], ['Gross Profit', cur + ' ' + fmt(result.gp?.total) + ` (${result.gp?.pct ?? 0}%)`]); }
+    else { fields.push([`Sales (incl ${taxLabel})`, cur + ' ' + fmt(result.so?.total)], ['Gross Profit', cur + ' ' + fmt(result.gp?.total) + ` (${result.gp?.pct ?? 0}%)`]); }
     return (
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 12px' }}>
         <div style={{ ...card, textAlign: 'center', padding: 28 }}>
@@ -1221,7 +1221,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   {showVatCol && (pkg
                     ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
                         {suppForeign
-                          ? <span title="Overseas supplier — no Indian GST (import of service)" style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', color: '#9197a3', fontWeight: 700 }}>—</span>
+                          ? <span title={`Overseas supplier — no ${isVatBr ? 'VAT' : 'Indian GST'} (import of service)`} style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', color: '#9197a3', fontWeight: 700 }}>—</span>
                           : <input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} />}
                       </td>
                     : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>)}
