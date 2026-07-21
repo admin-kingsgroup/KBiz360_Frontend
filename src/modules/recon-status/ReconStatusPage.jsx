@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getReconList, saveRecon, deleteRecon } from './api';
 import { BRANCHES, ACCOUNT_TYPES, defaultPeriod, periodEndDate, statusTone, reconSummary } from './utils';
@@ -12,15 +12,21 @@ import { DataTable } from '../../shell/DataTable';
 // month (with the date). The Control Tower reads it to show, and gate, what's still
 // pending per branch. Nothing here posts to the books.
 
-export function ReconStatusPage() {
+export function ReconStatusPage({ branch: shellBranch } = {}) {
   const qc = useQueryClient();
-  const [branch, setBranch] = useState('BOM');
+  // Branch follows the top-right selector: a specific branch PINS this screen to it
+  // (dropdown disabled, single option), so one branch can't tick another's accounts;
+  // only a full-scope user on ALL may pick a branch — and until they do we show a
+  // "pick a branch" notice instead of silently defaulting to BOM.
+  const shellCode = shellBranch && shellBranch !== 'ALL' ? (shellBranch.code || shellBranch) : 'ALL';
+  const [branch, setBranch] = useState(shellCode === 'ALL' ? '' : shellCode);
+  useEffect(() => { setBranch(shellCode === 'ALL' ? '' : shellCode); }, [shellCode]);
   const [period, setPeriod] = useState(defaultPeriod());
   const [account, setAccount] = useState('');
   const [accountType, setAccountType] = useState('bank');
 
   const key = ['recon-status', branch, period];
-  const { data: rows = [], isLoading, isError } = useQuery({ queryKey: key, queryFn: () => getReconList({ branch, period }) });
+  const { data: rows = [], isLoading, isError } = useQuery({ queryKey: key, queryFn: () => getReconList({ branch, period }), enabled: !!branch });
   const invalidate = () => qc.invalidateQueries({ queryKey: key });
   const save = useMutation({ mutationFn: saveRecon, onSuccess: invalidate });
   const del = useMutation({ mutationFn: deleteRecon, onSuccess: invalidate });
@@ -28,7 +34,7 @@ export function ReconStatusPage() {
 
   const s = reconSummary(rows);
   const addAccount = () => {
-    if (!account.trim()) return;
+    if (!branch || !account.trim()) return;
     save.mutate({ branch, account: account.trim(), accountType, period, status: 'pending' });
     setAccount('');
   };
@@ -62,9 +68,20 @@ export function ReconStatusPage() {
       </p>
 
       <div className="flex flex-wrap items-end gap-3">
-        <FormField label="Branch"><Select value={branch} onChange={(e) => setBranch(e.target.value)}>{BRANCHES.map((b) => <option key={b} value={b}>{b}</option>)}</Select></FormField>
+        <FormField label="Branch">
+          <Select value={branch} disabled={shellCode !== 'ALL'} title={shellCode !== 'ALL' ? 'Scoped by the top-right branch — switch it there' : undefined} onChange={(e) => setBranch(e.target.value)}>
+            {shellCode === 'ALL' && <option value="">— Select branch —</option>}
+            {(shellCode === 'ALL' ? BRANCHES : [shellCode]).map((b) => <option key={b} value={b}>{b}</option>)}
+          </Select>
+        </FormField>
         <FormField label="Period"><Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} /></FormField>
       </div>
+
+      {!branch ? (
+        <div className="rounded-lg border border-[#dfe2e7] px-4 py-8 text-center text-sm text-ink-muted">
+          Pick a branch above to track its reconciliation. Each branch's bank / client / supplier accounts are kept separate — nothing loads until you choose one.
+        </div>
+      ) : (<>
 
       <ResponsiveGrid min="150px" gap="md">
         <KpiTile label="Accounts tracked" value={`${s.total}`} sub={`${branch} · ${period}`} color="#1a1c22" />
@@ -92,6 +109,7 @@ export function ReconStatusPage() {
         showDensityToggle={false}
         zebra
       />
+      </>)}
     </div>
   );
 }
