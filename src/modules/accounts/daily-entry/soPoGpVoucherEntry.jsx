@@ -26,7 +26,7 @@ import { useCanOriginate } from '../../tk-group/useCanOriginate';
 import { inp, card, btnG, btnGh, FL, bc } from '../../../core/styles.jsx';
 import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 import { useModalEsc } from '../../../core/ux/useModalEsc';
-import { localeOf } from '../../../core/format';
+import { localeOf, activeCurrency } from '../../../core/format';
 import { PeriodBar, periodRange } from '../../../core/period';
 import { printBookingInvoice } from '../../../core/printInvoice';
 import { apiGet, apiPost, apiPut } from '../../../core/api';
@@ -109,7 +109,10 @@ const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || null));
 // This was a LOCAL copy of isIndiaCountry: "foreign" meant "not Indian", which inverted on the
 // Africa branches (a Congolese vendor on FBM lost its input VAT; an Indian vendor fabricated it).
 const today = () => new Date().toISOString().slice(0, 10);
-const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Group by the ACTIVE branch currency (set in App.jsx when the operating branch changes) — Western
+// thousands for a USD branch (DAR/NBO/FBM), Indian lakh/crore for ₹ — instead of a hardcoded en-IN
+// that printed a $ total as $1,00,000. The currency symbol is prepended by callers via `cur`.
+const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString(localeOf(activeCurrency()), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (n) => (Number.isFinite(Number(n)) ? Number(n) : 0);
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 

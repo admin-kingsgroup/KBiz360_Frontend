@@ -82,6 +82,11 @@ function BranchSplit({ branch, byBranch, single, renderOne, emptyMsg = 'No branc
     });
   }
   const cur = (bc(branch) || {}).cur || '₹';
+  // Single-branch (e.g. DAR) path: distinguish still-loading / load-error from a genuine result,
+  // exactly like the group path above — never paint a silent $0 board on a failed/pending fetch
+  // (the "never leave a screen silent" rule).
+  if (loading) return <div style={{ padding: '14px 2px', fontSize: 12.5, color: C.dim }}>Loading…</div>;
+  if (error) return <div style={{ padding: '14px 2px', fontSize: 12.5, color: C.red }}>Couldn’t load this view — try refreshing. (Load error, not an empty result.)</div>;
   return renderOne(single, cur, branch?.code);
 }
 

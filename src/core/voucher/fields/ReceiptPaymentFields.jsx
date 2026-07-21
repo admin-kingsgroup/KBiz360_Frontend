@@ -43,6 +43,11 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
   const spec = settleSpec(side, otherType);
   const isParty = !state.split && spec.party;
   const isRefund = spec.mode === 'advances'; // Payment → Debtor: returning on-account money
+  // Withholding is India TDS (statute section-driven) vs Africa/VAT-branch WHT (flat rate). A DAR
+  // (VAT) receipt/payment must show "WHT" + a flat rate, never Indian 194x sections — the posting
+  // engine already routes it to the branch's "WHT Payable/Receivable [DAR]" head regardless.
+  const isVat = isVatBranch(branch);
+  const whtLabel = isVat ? 'WHT' : 'TDS';
   useEffect(() => {
     if (!state.split && state.party && otherType && state.otherType !== otherType) setState((s) => ({ ...s, otherType }));
   }, [otherType, state.party, state.split]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -83,7 +88,7 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
     const remain = Math.max(0, Math.round((gross - others) * 100) / 100);
     setState((s) => ({ ...s, alloc: { ...s.alloc, [vno]: gross > 0 ? Math.min(out, remain) : out } }));
   };
-  const tdsRate = (TDS_SECTIONS[state.tdsSection] || {}).rate || 0;
+  const tdsRate = isVat ? (+state.whtRate || 0) : ((TDS_SECTIONS[state.tdsSection] || {}).rate || 0);
   const autoTds = () => {
     if (tdsRate) patch({ tdsAmt: Math.round(net * tdsRate / (100 - tdsRate)) });
   };
@@ -248,17 +253,23 @@ export function ReceiptPaymentFields({ state, setState, ctx, side }) {
           <div style={{ padding: '10px 12px', borderRadius: 9, background: '#FAEEDA', border: '1px solid #FAC775', margin: '12px 0' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: state.tds ? 8 : 0 }}>
               <input type="checkbox" checked={!!state.tds} onChange={(e) => patch({ tds: e.target.checked })} style={{ cursor: 'pointer', accentColor: '#854F0B' }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#854F0B' }}>{isReceipt ? 'Party has deducted TDS before paying' : 'Deduct TDS at source before paying'}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#854F0B' }}>{isReceipt ? `Party has deducted ${whtLabel} before paying` : `Deduct ${whtLabel} at source before paying`}</span>
             </label>
-            {state.tds && (
+            {state.tds && (isVat ? (
+              <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr auto', gap: 8, alignItems: 'end' }}>
+                <FL label="WHT rate (%)"><input type="number" value={state.whtRate ?? 2} onChange={(e) => patch({ whtRate: +e.target.value || 0 })} style={inp} /></FL>
+                <FL label="WHT amount"><input type="number" value={state.tdsAmt || ''} onChange={(e) => patch({ tdsAmt: +e.target.value || 0 })} style={inp} /></FL>
+                <button onClick={autoTds} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
+              </div>
+            ) : (
               <div style={{ display: 'grid', gridTemplateColumns: mob ? '1fr' : '1fr 1fr 1fr auto', gap: 8, alignItems: 'end' }}>
                 <FL label="TDS Section"><select value={state.tdsSection} onChange={(e) => patch({ tdsSection: e.target.value })} style={inp}>{Object.entries(TDS_SECTIONS).filter(([k]) => k !== 'None').map(([k, s]) => <option key={k} value={k}>{k} ({s.rate}%)</option>)}</select></FL>
                 <FL label="Rate"><div style={{ ...inp, background: '#f9fafb', color: '#854F0B', fontWeight: 700, display: 'flex', alignItems: 'center' }}>{tdsRate}%</div></FL>
                 <FL label="TDS amount"><input type="number" value={state.tdsAmt || ''} onChange={(e) => patch({ tdsAmt: +e.target.value || 0 })} style={inp} /></FL>
                 <button onClick={autoTds} style={{ ...btnGh, fontSize: 10, padding: '7px 10px' }}>Auto-calc</button>
               </div>
-            )}
-            {state.tds && tds > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#854F0B' }}>Gross settlement <b>{money2(cur, gross)}</b> · {isReceipt ? 'TDS receivable' : 'TDS payable'} <b>{money2(cur, tds)}</b> · {isReceipt ? 'Net received' : 'Net paid'} <b>{money2(cur, net)}</b></p>}
+            ))}
+            {state.tds && tds > 0 && <p style={{ margin: '6px 0 0', fontSize: 10, color: '#854F0B' }}>Gross settlement <b>{money2(cur, gross)}</b> · {isReceipt ? `${whtLabel} receivable` : `${whtLabel} payable`} <b>{money2(cur, tds)}</b> · {isReceipt ? 'Net received' : 'Net paid'} <b>{money2(cur, net)}</b></p>}
           </div>
           )}
 
