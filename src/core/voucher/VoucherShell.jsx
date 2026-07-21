@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useVoucherPreview, useCreateVoucher, useUpdateVoucher } from '../useAccounting';
+import { useVoucherPreview, useVoucherJournal, useCreateVoucher, useUpdateVoucher } from '../useAccounting';
 import { openPrintPreview } from '../PrintPreview';
 import { B, bc, VWrap, VHead, FL, inp, card, btnG, btnGh } from '../styles';
 import { VOUCHER_REGISTRY } from './registry';
@@ -70,6 +70,17 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   // Live, backend-computed journal — identical engine for create and edit.
   const previewBody = { ...desc.toBody(state, ctx), sourceRef: state.sourceRef || '' };
   const pv = useVoucherPreview(previewBody).data || {};
+
+  // An approved / posted voucher is READ-ONLY, so its "Full Journal" shows the ACTUAL
+  // posted journal (the stored JournalEntry) — never a live re-preview. This is what makes
+  // it agree with the ledger statement, Day Book and Tally tie-out: a re-preview rebuilds
+  // from the (possibly lossy) edit-state and can name a different head than the books hold
+  // (e.g. the supplier service charge as "Purchase — Misc" instead of the posted "IT-SVF
+  // [Pur]"). Only editable states (create / pending / revoked) still show the live preview.
+  const posted = isEdit && (voucher?.status === 'approved' || voucher?.status === 'saved' || voucher?.status === 'posted');
+  const storedQ = useVoucherJournal(posted ? { id: editId, vno: voucher?.vno } : {});
+  const jv = posted ? (storedQ.data || {}) : pv;
+  const jvLoading = posted && storedQ.isLoading && !storedQ.data;
 
   const val = desc.validate(state);
   // View-only accounts can open and review vouchers but never post them; the
@@ -145,7 +156,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
 
   const printEntry = () => {
     const fmt = (n) => { const x = Math.round(Number(n) || 0); return x ? money(cur, x) : ''; };
-    const rows = (pv.postings || []).map((p) => `<tr><td>${escHtml(p.ledger)}</td><td>${escHtml(p.group || '')}</td><td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
+    const rows = (jv.postings || []).map((p) => `<tr><td>${escHtml(p.ledger)}</td><td>${escHtml(p.group || '')}</td><td class="r">${fmt(p.debit)}</td><td class="r">${fmt(p.credit)}</td></tr>`).join('');
     const html = `<style>
       .ve{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#141414}
       .ve h1{font-size:16px;margin:0 0 2px}
@@ -163,7 +174,7 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
       <table>
         <thead><tr><th>Ledger</th><th>Group</th><th class="r">Debit</th><th class="r">Credit</th></tr></thead>
         <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="2">Total</td><td class="r">${fmt(pv.totalDebit)}</td><td class="r">${fmt(pv.totalCredit)}</td></tr></tfoot>
+        <tfoot><tr><td colspan="2">Total</td><td class="r">${fmt(jv.totalDebit)}</td><td class="r">${fmt(jv.totalCredit)}</td></tr></tfoot>
       </table>
     </div>`;
     openPrintPreview({ title: `${desc.label} — ${isEdit ? (voucher.vno || '') : 'New'}`, recommend: 'portrait', html });
@@ -173,15 +184,17 @@ export function VoucherShell({ category, mode = 'create', branch, voucher, vouch
   const journalTable = (
     <div style={{ ...card, padding: 10, marginTop: 12, boxShadow: 'none', border: '1px solid #E8D9A8', background: '#FFFDF7' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ fontWeight: 700, color: '#6B4E0F', fontSize: 12 }}>Accounting Effect — Full Journal (where this hits the books)</div>
-        <span style={{ fontSize: 11, fontWeight: 800, color: pv.balanced ? GREEN : RED }}>{pv.error ? '⚠ ' + pv.error : pv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, pv.diff)}`}</span>
+        <div style={{ fontWeight: 700, color: '#6B4E0F', fontSize: 12 }}>Accounting Effect — Full Journal (where this hits the books){posted ? ' · as posted' : ''}</div>
+        {!jvLoading && <span style={{ fontSize: 11, fontWeight: 800, color: jv.balanced ? GREEN : RED }}>{jv.error ? '⚠ ' + jv.error : jv.balanced ? '✓ Balanced' : `✗ Out by ${money(cur, jv.diff)}`}</span>}
       </div>
-      {pv.missing?.length > 0 && (
+      {jv.missing?.length > 0 && (
         <div style={{ margin: '0 0 8px', padding: '6px 9px', borderRadius: 6, background: '#fbe9e9', border: '1px solid #f3c9c9', color: '#d97706', fontSize: 11, fontWeight: 600 }}>
-          ⚠ Ledger not in Chart of Accounts: <b>{pv.missing.join(', ')}</b>. Create it in Masters first.
+          ⚠ Ledger not in Chart of Accounts: <b>{jv.missing.join(', ')}</b>. Create it in Masters first.
         </div>
       )}
-      <JvBlock postings={pv.postings} />
+      {jvLoading
+        ? <div style={{ fontSize: 11, color: '#9197a3', padding: 12, textAlign: 'center' }}>Loading posted journal…</div>
+        : <JvBlock postings={jv.postings} empty={posted ? 'No posted journal found for this voucher — reopen it, or check Voucher Approvals.' : undefined} />}
     </div>
   );
 

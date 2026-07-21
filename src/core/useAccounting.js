@@ -717,6 +717,20 @@ export function useVoucherPreview(body) {
   });
 }
 
+// The ACTUAL posted journal for ONE voucher — read straight from the stored JournalEntry,
+// NOT rebuilt. An approved / read-only voucher shows THIS in its Full Journal so it always
+// matches the ledger statement, Day Book and Tally tie-out — a live re-preview can drift
+// when the edit round-trip drops a body field (it then falls back to a default head, e.g.
+// the supplier service charge showing "Purchase — Misc" instead of the real "IT-SVF [Pur]").
+export function useVoucherJournal({ id, vno } = {}) {
+  return useQuery({
+    queryKey: ['accounting', 'voucher-journal', id || '', vno || ''],
+    queryFn: () => apiGet('/api/accounting/voucher-journal', { id, vno }),
+    enabled: enabled() && !!(id || vno),
+    staleTime: 5_000,
+  });
+}
+
 // Create a new voucher (Receipt / Payment / Contra / Journal / Debit Note /
 // Purchase Expense). The backend posts a balanced double-entry,
 // so we invalidate every accounting report + register so the new voucher shows
