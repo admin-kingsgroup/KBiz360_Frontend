@@ -8,6 +8,7 @@ import { useLedgerRegistry } from '../../useReference';
 import { BillAllocPanel } from '../../../modules/transactions';
 import { LedgerPicker } from '../LedgerPicker';
 import { useVoucherRef } from '../useVoucherRef';
+import { isVatBranch } from '../../voucherSpecs';
 import { allocSummary, money2, GREEN, RED, settleSpec, DARK } from '../ui';
 
 /**

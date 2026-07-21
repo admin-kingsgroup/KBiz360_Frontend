@@ -149,7 +149,7 @@ export function ScheduleIIIBS({ branch, setRoute }) {
   return (
     <RptShell title="Balance Sheet — Schedule III" subtitle={byBranch
       ? `Companies Act 2013 prescribed format · As at ${fmtDate(todayISO())} · Consolidated — each branch in its own currency · no cross-currency total`
-      : `Companies Act 2013 prescribed format · As at ${fmtDate(todayISO())} · Live from posted vouchers`}>
+      : `Companies Act 2013 prescribed format · As at ${fmtDate(todayISO())} · ${branch?.code || branch} · Live from posted vouchers`}>
       {hasData && !byBranch && (
         <div className="mb-3">
           {d.balanced

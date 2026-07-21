@@ -32,7 +32,7 @@ export function WorkingCapitalDashboard({branch,setRoute}){
   return(
     <div style={{padding:"12px 10px",maxWidth:1600,margin:"0 auto"}}>
       <h2 style={{margin:0,fontSize:mob?16:19,fontWeight:800,color:"#0d1326"}}>💼 Working Capital Dashboard</h2>
-      <p style={{margin:"4px 0 8px",fontSize:11.5,color:"#5a6691"}}>Receivables + Inventory − Payables · Cash conversion cycle · 6-month trend</p>
+      <p style={{margin:"4px 0 8px",fontSize:11.5,color:"#5a6691"}}>{(branch?.code||'All branches')} · Receivables + Inventory − Payables · Cash conversion cycle · 6-month trend</p>
       <div role="note" style={{margin:"0 0 14px",padding:"8px 12px",background:"#FAEEDA",border:"1px solid #f0d28a",borderRadius:8,fontSize:11.5,color:"#854F0B",fontWeight:600}}>⚠ Sample figures — this layout isn’t wired to your live books yet. Do not use for reporting or decisions.</div>
 
       <div style={{display:"grid",gridTemplateColumns:mob?"repeat(2,1fr)":"repeat(4,1fr)",gap:10,marginBottom:14}}>
