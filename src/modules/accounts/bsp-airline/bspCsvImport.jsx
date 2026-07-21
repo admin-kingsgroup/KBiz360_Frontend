@@ -4,7 +4,7 @@
    ════════════════════════════════════════════════════════════════ */
 
 import { useState } from 'react';
-import { btnG, btnGh, card } from '../../../core/styles';
+import { btnG, btnGh, card, bc } from '../../../core/styles';
 
 export function BspCsvImport({branch}){
   const [file,setFile]=useState(null);
@@ -83,7 +83,7 @@ export function BspCsvImport({branch}){
                   <td style={{padding:"8px 11px",fontWeight:600,color:"#1a1c22"}}>{r.airline}</td>
                   <td style={{padding:"8px 11px",color:"#2e323c"}}>{r.pax}</td>
                   <td style={{padding:"8px 11px",color:"#5b616e"}}>{r.sector}</td>
-                  <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{r.currency === 'USD' ? '$' : '₹'}{Number(r.amount).toLocaleString()}</td>
+                  <td style={{padding:"8px 11px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{bc(branch).cur}{Number(r.amount).toLocaleString()}</td>
                   <td style={{padding:"8px 11px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,fontWeight:700,background:r.type==="SALE"?"#e8f0ff":"#fbeedb",color:r.type==="SALE"?"#2563eb":"#d97706"}}>{r.type}</span></td>
                   <td style={{padding:"8px 11px",textAlign:"center"}}>{r.inBooks?"✅":"❌"}</td>
                   <td style={{padding:"8px 11px"}}>{!r.inBooks?<button style={{...btnG,padding:"2px 8px",fontSize:9.5,background:"#dc2626",whiteSpace:"nowrap"}}>Create Entry</button>:<span style={{color:"#16a34a",fontSize:12}}>✔</span>}</td>

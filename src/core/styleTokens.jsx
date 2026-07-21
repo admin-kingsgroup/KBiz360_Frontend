@@ -21,7 +21,7 @@ export const B = new Proxy({}, {
   get: (_t, code) => branchCfg(code === "ALL" ? "ALL" : String(code)),
   has: () => true,
 });
-export function bc(branch){ return branch==="ALL"?B.ALL:B[branch?.code]||B.BOM; }
+export function bc(branch){ return branch==="ALL"?B.ALL:B[branch?.code]||B.ALL; } // unknown code → neutral 'ALL' config (₹), never a silent BOM fallback
 export function bcfmt(branch,n){ const b=bc(branch); const loc=(b.cur==="₹"||b.cur==="₨"||b.cur==="Rs")?"en-IN":"en-US"; return b.cur+Number(n).toLocaleString(loc,{maximumFractionDigits:0}); }
 
 /* ── Form / control style objects (KBiz360 Pro tokens) ── */

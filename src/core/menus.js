@@ -177,9 +177,7 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
   // Collections / Payables & Suppliers.
   {label:"Working Capital", children:[
     {label:"Cash Flow Forecast 90d", href:"/reports/cashflow-forecast"},
-    // "Working Capital Dashboard" (/reports/working-capital) is PULLED until wired: its screen
-    // renders hardcoded SAMPLE ₹ figures (no live data hook), which read as real branch numbers.
-    // Re-add this leaf once the component is bound to the live books.
+    {label:"Working Capital Dashboard", href:"/reports/working-capital"},   // live-wired to ageing (AR/AP/Net WC)
     {label:"Ratio Analysis", href:"/reports/ratios"},
   ]},
   {label:"Compliance & Tax", children:[
