@@ -15,6 +15,7 @@ import { Menu as StatusMenu } from '../../../core/ux/Menu';
 import { todayISO } from '../../../core/dates';
 import { useMobile } from '../../../core/hooks';
 import { FL, bc, btnG, btnGh, card, inp } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 // Leaf, test-safe view-only read (NOT core/api — no import.meta) to gate the raw write buttons.
 import { isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
@@ -46,7 +47,7 @@ export function AdmRegister({branch}){
   const [statusFilter,setStatusFilter]=useState("All");
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({airline:"Air India",airlineCode:"AI",ticketNo:"",passenger:"",
-    sector:"",reasonCode:"FD",amount:0,currency:"INR",branch:brCode||"BOM",consultant:"",remarks:""});
+    sector:"",reasonCode:"FD",amount:0,currency:(brCode&&branchMainCurrency(brCode))||"INR",branch:brCode||"BOM",consultant:"",remarks:""});
 
   const TODAY=todayISO();
   const daysLeft=(deadline)=>deadline?Math.ceil((new Date(deadline)-new Date(TODAY))/(1000*60*60*24)):0;
@@ -68,7 +69,7 @@ export function AdmRegister({branch}){
     .reduce((s,a)=>s+(a.amount||0),0);
   const totAccepted=filtered.filter(a=>a.status==="Accepted").reduce((s,a)=>s+(a.amount||0),0);
   const overdue   =filtered.filter(a=>!["Accepted","Rejected","Disputed"].includes(a.status)&&a.responseDeadline&&daysLeft(a.responseDeadline)<0);
-  const f=n=>cur+Number(Math.round(n)).toLocaleString("en-IN");
+  const f=n=>cur+Number(Math.round(n)).toLocaleString(localeOf(cur));
 
   const addAdm=()=>{
     createM.mutate({kind:"adm",...form,branch:form.branch},{

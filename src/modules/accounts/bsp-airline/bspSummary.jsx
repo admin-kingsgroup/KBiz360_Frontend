@@ -19,6 +19,7 @@ import { ACM_REASON_CODES } from '../../../core/helpers';
 import { useMobile } from '../../../core/hooks';
 import { Menu as StatusMenu } from '../../../core/ux/Menu';
 import { bc, card, inp } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { SkeletonTable } from '../../../shell/primitives';
 
 export function BspSummary({branch}){
@@ -75,7 +76,7 @@ export function BspSummary({branch}){
   const acmTotal=acmList.reduce((s,a)=>s+(Number(a.amount)||0),0);
   const netBsp  =ticketCost-commission-bspCharge-admTotal+acmTotal;
 
-  const f=n=>cur+Number(Math.round(n||0)).toLocaleString("en-IN");
+  const f=n=>cur+Number(Math.round(n||0)).toLocaleString(localeOf(cur));
 
   const rows=[
     {label:"Gross ticket sales (BSP)",               amt:grossSales,  type:"neutral",bold:false},

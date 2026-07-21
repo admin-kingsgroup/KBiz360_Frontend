@@ -12,7 +12,7 @@ import { useTaxCalendar } from '../../../core/useReference';
 import { useMasterMutations } from '../../../core/useMasters';
 import { toast } from '../../../core/ux/toast';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, fyRange, rangeNote } from '../../../core/dates';
-import { fmt, fmtINR } from '../../../core/format';
+import { fmt, fmtINR, localeOf } from '../../../core/format';
 import { _TCS_ENTRIES, _TDS_ENTRIES, cardStyle } from '../../../core/helpers';
 import { useTdsLedgerStatements, tdsAccrualEntries, tdsReliefTotal, taxableOf, gstOf, saleBills, fyQuarterOfISO } from '../taxLive';
 import { useMobile } from '../../../core/hooks';
@@ -58,7 +58,7 @@ export function TaxVat({branch}){
       {AFRICA_BRANCHES.length===0&&<div style={{...card,padding:"24px",textAlign:"center",color:"#5a6691",fontSize:11.5}}>No VAT jurisdictions — this entity operates under India GST only.</div>}
       {AFRICA_BRANCHES.map(ab=>{
         const d=getBranchData(ab.code,ab.rate);
-        const f=n=>ab.cur+" "+Number(Math.round(n)).toLocaleString("en-IN");
+        const f=n=>ab.cur+" "+Number(Math.round(n)).toLocaleString(localeOf(ab.cur));
         return (
           <div key={ab.code} style={{...card,padding:0,overflow:"hidden",marginBottom:14}}>
             <div style={{display:"grid",gridTemplateColumns:"auto 1fr auto",background:"#0d1326"}}>

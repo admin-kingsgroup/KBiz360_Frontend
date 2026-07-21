@@ -19,6 +19,9 @@ import { openPrintPreview } from '../../../core/PrintPreview';
  */
 function ArApAgeingSettlementPage({ side, branch, currentUser, setRoute }) {
   const isRec = side === 'receivable';
+  const key = isRec ? 'receivables' : 'payables';
+  const color = isRec ? '#dc2626' : '#16a34a';
+  const drill = () => setRoute?.(isRec ? '/reports/rec?tab=settlement' : '/reports/pay?tab=settlement');
   const cur = bc(branch).cur;
   const fmt = (n) => compactAmt(n, { currency: cur });
   const { data, isLoading, isError, error, refetch } = useAgeing(branch);
@@ -32,7 +35,12 @@ function ArApAgeingSettlementPage({ side, branch, currentUser, setRoute }) {
     return <DashboardSkeleton numKpis={6} columns={1} />;
   }
 
-  const slice = data[isRec ? 'receivables' : 'payables'] || {};
+  // Consolidated/Group scope: render ONE card PER BRANCH from `byBranch`, each in its own
+  // currency — never the merged top-level, which blends NBO/DAR/FBM USD bills with the
+  // India ₹ bills into a single ₹-labelled total (inter-branch FX is manual; we never sum
+  // currencies). Single-branch: the merged slice IS that branch, so render it as before.
+  const isAll = branch === 'ALL' || branch?.code === 'ALL' || !branch;
+  const perBranch = isAll && Array.isArray(data.byBranch) && data.byBranch.length ? data.byBranch : null;
 
   return (
     <PageLayout>
@@ -42,10 +50,23 @@ function ArApAgeingSettlementPage({ side, branch, currentUser, setRoute }) {
         user={currentUser}
         onExport={() => openPrintPreview({ selector: 'main', title, recommend: 'landscape' })}
       />
-      <WidgetCard title={title} subtitle={subtitle} color={isRec ? '#dc2626' : '#16a34a'}
-        onDrill={() => setRoute?.(isRec ? '/reports/rec?tab=settlement' : '/reports/pay?tab=settlement')}>
-        <ArApSettlementView side={side} totals={slice.totals || {}} rows={slice.rows || []} formatMoney={fmt} collapsed />
-      </WidgetCard>
+      {perBranch ? (
+        perBranch.map((b) => {
+          const bCur = bc({ code: b.branch }).cur;
+          const bFmt = (n) => compactAmt(n, { currency: bCur });
+          const bSlice = b[key] || {};
+          return (
+            <WidgetCard key={b.branch} title={`${title} — ${b.branch}`} subtitle={`${subtitle} · ${bCur}`}
+              color={color} onDrill={drill}>
+              <ArApSettlementView side={side} totals={bSlice.totals || {}} rows={bSlice.rows || []} formatMoney={bFmt} collapsed />
+            </WidgetCard>
+          );
+        })
+      ) : (
+        <WidgetCard title={title} subtitle={subtitle} color={color} onDrill={drill}>
+          <ArApSettlementView side={side} totals={(data[key] || {}).totals || {}} rows={(data[key] || {}).rows || []} formatMoney={fmt} collapsed />
+        </WidgetCard>
+      )}
     </PageLayout>
   );
 }

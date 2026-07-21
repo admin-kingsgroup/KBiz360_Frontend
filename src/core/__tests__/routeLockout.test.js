@@ -47,3 +47,43 @@ describe('canReachRoute — hard route-level lockout', () => {
     }
   });
 });
+
+// Regime gate (branch-country): India-GST-only screens are blocked on an Africa VAT branch
+// (NBO/DAR/FBM) even for full-menu roles and even by direct URL. India branches / the
+// consolidated ALL view are unaffected. The `branch` param is optional/back-compat.
+describe('canReachRoute — branch-regime (VAT vs GST) gate', () => {
+  const NBO = { code: 'NBO' }, DAR = { code: 'DAR' }, BOM = { code: 'BOM' };
+  const INDIA_ONLY = ['/tax/gstr1', '/tax/gstr3b', '/tax/gstr2b', '/tax/tds', '/tax/tds-certs',
+    '/tax/form26as', '/tax/rcm', '/tax/einvoice', '/tax/eway', '/tax/audit-3cd', '/tax/gstr-1-prep'];
+  const SHARED_OR_AFRICA = ['/tax/vat', '/tax/reconciliation', '/tax/calendar',
+    '/reports/tax-summary', '/finance/tds-calculator'];
+
+  test('India-GST-only routes are blocked on a VAT branch — even for full-menu roles', () => {
+    for (const r of INDIA_ONLY) {
+      expect(canReachRoute(r, EXEC, NBO)).toBe(false);
+      expect(canReachRoute(r, ADMIN, NBO)).toBe(false);
+      expect(canReachRoute(r, DAR && ADMIN, DAR)).toBe(false);
+    }
+  });
+
+  test('a VAT branch keeps its own VAT + shared tax/report screens', () => {
+    for (const r of SHARED_OR_AFRICA) expect(canReachRoute(r, EXEC, NBO)).toBe(true);
+  });
+
+  test('India branches and the consolidated ALL view reach India-GST screens', () => {
+    for (const r of INDIA_ONLY) {
+      expect(canReachRoute(r, EXEC, BOM)).toBe(true);
+      expect(canReachRoute(r, ADMIN, 'ALL')).toBe(true);
+    }
+  });
+
+  test('an explicit per-page grant overrides the regime gate', () => {
+    expect(canReachRoute('/tax/tds', EXEC, NBO)).toBe(false);
+    expect(canReachRoute('/tax/tds', { ...EXEC, granted: ['/tax/tds'] }, NBO)).toBe(true);
+  });
+
+  test('omitting the branch arg is a no-op (prior behaviour preserved)', () => {
+    expect(canReachRoute('/tax/gstr1', EXEC)).toBe(true);   // full-menu, no branch → reachable
+    expect(canReachRoute('/tax/gstr1', ACCT)).toBe(false);  // accountant still blocked by role
+  });
+});
