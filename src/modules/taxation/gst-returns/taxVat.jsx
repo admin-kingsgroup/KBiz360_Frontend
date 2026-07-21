@@ -25,6 +25,15 @@ import { TDS_SECTIONS } from '../../../core/taxSections';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { SampleBanner } from '../../../core/ux/SampleBanner';
+import { isVatBranch } from '../../../core/voucherSpecs';
+import { VAT_RATE } from '../../../core/referenceCache';
+
+// Tax-authority metadata per VAT branch — mirrors invoiceHtml's Africa VAT treatment.
+const VAT_META={
+  NBO:{name:'Kenya · Nairobi',    flag:'🇰🇪', auth:'KRA', portal:'iTax',       due:'20th'},
+  DAR:{name:'Tanzania · Dar es Salaam', flag:'🇹🇿', auth:'TRA', portal:'TRA Portal', due:'20th'},
+  FBM:{name:'DR Congo · Lubumbashi',    flag:'🇨🇩', auth:'DGI', portal:'DGI',        due:'15th'},
+};
 
 export function TaxVat({branch}){
   const mob=useMobile();
@@ -32,7 +41,13 @@ export function TaxVat({branch}){
   const PERIODS=MONTH_OPTIONS;
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
 
-  const AFRICA_BRANCHES=[];
+  // Was hardcoded []; the whole card renderer below rendered for nobody, so NBO/DAR/FBM — real
+  // VAT jurisdictions — wrongly saw "India GST only". Drive it off the SELECTED branch: a VAT
+  // branch shows its own return; India / consolidated stays GST-only (empty).
+  const brCode=String((branch&&branch.code)||branch||'').trim().toUpperCase();
+  const AFRICA_BRANCHES=isVatBranch(brCode)
+    ? [{code:brCode, rate:VAT_RATE[brCode]||16, cur:(bc(branch)||{}).cur||'$', ...VAT_META[brCode]}]
+    : [];
 
   const getBranchData=(brCode,rate)=>{
     const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
@@ -49,7 +64,9 @@ export function TaxVat({branch}){
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:14}}>
         <div>
           <h2 style={{margin:0,fontSize:17,fontWeight:700,color:"#0d1326"}}>VAT Returns</h2>
-          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>India is GST-only — no VAT jurisdictions configured · {PERIODS.find(p=>p.v===period)?.l}</p>
+          <p style={{margin:"2px 0 0",fontSize:10.5,color:"#5a6691"}}>{AFRICA_BRANCHES.length
+            ? `${AFRICA_BRANCHES[0].name} · ${AFRICA_BRANCHES[0].auth} · ${AFRICA_BRANCHES[0].rate}% VAT · ${PERIODS.find(p=>p.v===period)?.l}`
+            : `India is GST-only — no VAT jurisdictions configured · ${PERIODS.find(p=>p.v===period)?.l}`}</p>
         </div>
         <select value={period} onChange={e=>setPeriod(e.target.value)} style={{...inp,width:"auto",minHeight:32,fontSize:11}}>
           {PERIODS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}

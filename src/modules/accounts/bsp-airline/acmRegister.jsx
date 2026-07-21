@@ -57,7 +57,7 @@ export function AcmRegister({ branch }) {
   // New-ACM currency defaults to the BRANCH's main currency (NBO/DAR/FBM → USD), not a
   // hardcoded INR — else an NBO ACM is saved as INR and drops out of the currency-matched
   // BSP summary. Mirrors the ADM register fix.
-  const [form, setForm] = useState({ airline: 'Air India', airlineCode: 'AI', ticketNo: '', reasonCode: 'RC', amount: 0, currency: (brCode && branchMainCurrency(brCode)) || 'INR', branch: brCode || 'BOM', remarks: '' });
+  const [form, setForm] = useState({ airline: 'Air India', airlineCode: 'AI', ticketNo: '', reasonCode: 'RC', amount: 0, currency: (brCode && branchMainCurrency(brCode)) || 'INR', branch: brCode || '', remarks: '' });
 
   const filtered = acms.filter((a) => (
     (statusFilter === 'All' || a.status === statusFilter)
@@ -182,7 +182,7 @@ export function AcmRegister({ branch }) {
           footer={
             <>
               <Button variant="secondary" size="sm" onClick={() => setModal(false)}>Cancel</Button>
-              <Button variant="success" size="sm" write loading={createM.isPending} onClick={addAcm}>{createM.isPending ? 'Saving…' : 'Record ACM'}</Button>
+              <Button variant="success" size="sm" write disabled={!form.branch} title={!form.branch ? 'Select a branch first' : undefined} loading={createM.isPending} onClick={addAcm}>{createM.isPending ? 'Saving…' : 'Record ACM'}</Button>
             </>
           }
         >
@@ -201,7 +201,14 @@ export function AcmRegister({ branch }) {
             <div className="grid grid-cols-3 gap-2.5">
               <FormField label="Credit amount"><Input type="number" value={form.amount} onChange={(e) => setForm((s) => ({ ...s, amount: +e.target.value }))} /></FormField>
               <FormField label="Currency"><Select value={form.currency} onChange={(e) => setForm((s) => ({ ...s, currency: e.target.value }))}>{branchCurrencies(form.branch).map((c) => <option key={c}>{c}</option>)}</Select></FormField>
-              <FormField label="Branch"><Select value={form.branch} onChange={(e) => setForm((s) => ({ ...s, branch: e.target.value, currency: branchMainCurrency(e.target.value) }))}>{BRANCH_CODES.map((b) => <option key={b}>{b}</option>)}</Select></FormField>
+              {/* Lock to the selected branch (an ACM belongs to one branch/currency); only the
+                  consolidated ALL view offers a picker, and it must force an explicit choice. */}
+              <FormField label="Branch">{brCode
+                ? <Input value={form.branch} readOnly disabled title="Locked to the selected branch" />
+                : <Select value={form.branch} onChange={(e) => setForm((s) => ({ ...s, branch: e.target.value, currency: branchMainCurrency(e.target.value) }))}>
+                    <option value="">Select branch…</option>
+                    {BRANCH_CODES.map((b) => <option key={b}>{b}</option>)}
+                  </Select>}</FormField>
             </div>
             <FormField label="Remarks"><Textarea rows={2} value={form.remarks} onChange={(e) => setForm((s) => ({ ...s, remarks: e.target.value }))} /></FormField>
           </div>

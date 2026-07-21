@@ -47,7 +47,7 @@ export function AdmRegister({branch}){
   const [statusFilter,setStatusFilter]=useState("All");
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({airline:"Air India",airlineCode:"AI",ticketNo:"",passenger:"",
-    sector:"",reasonCode:"FD",amount:0,currency:(brCode&&branchMainCurrency(brCode))||"INR",branch:brCode||"BOM",consultant:"",remarks:""});
+    sector:"",reasonCode:"FD",amount:0,currency:(brCode&&branchMainCurrency(brCode))||"INR",branch:brCode||"",consultant:"",remarks:""});
 
   const TODAY=todayISO();
   const daysLeft=(deadline)=>deadline?Math.ceil((new Date(deadline)-new Date(TODAY))/(1000*60*60*24)):0;
@@ -284,7 +284,15 @@ export function AdmRegister({branch}){
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:10}}>
                 <FL label="ADM amount"><input type="number" value={form.amount} onChange={e=>setForm(f=>({...f,amount:+e.target.value}))} style={inp}/></FL>
                 <FL label="Currency"><select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))} style={inp}>{branchCurrencies(form.branch).map(c=><option key={c}>{c}</option>)}</select></FL>
-                <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value,currency:branchMainCurrency(e.target.value)}))} style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
+                {/* A specific branch is selected top-right → lock the memo to it (an ADM belongs to one
+                    branch, its own currency); only in the consolidated ALL view is this a free picker,
+                    and then it must force an explicit choice — never silently default to BOM. */}
+                <FL label="Branch">{brCode
+                  ? <input value={form.branch} readOnly disabled style={{...inp,background:"#f4f5f7",color:"#5a6691",cursor:"not-allowed"}} title="Locked to the selected branch"/>
+                  : <select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value,currency:branchMainCurrency(e.target.value)}))} style={inp}>
+                      <option value="">Select branch…</option>
+                      {BRANCH_CODES.map(b=><option key={b}>{b}</option>)}
+                    </select>}</FL>
               </div>
               <FL label="Remarks / Airline explanation"><textarea value={form.remarks} onChange={e=>setForm(f=>({...f,remarks:e.target.value}))} rows={2} style={{...inp,resize:"vertical"}}/></FL>
               <div style={{padding:"9px 12px",borderRadius:8,background:"#fbe9e9",border:"1px solid #f3c9c9",fontSize:9.5,color:"#dc2626",fontWeight:600}}>
@@ -293,7 +301,7 @@ export function AdmRegister({branch}){
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8,position:"sticky",bottom:0,background:"#fff"}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
-              <button onClick={addAdm} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,background:"#dc2626",...(vo?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{})}}>💾 Record ADM</button>
+              <button onClick={addAdm} disabled={vo||!form.branch} title={vo?VIEW_ONLY_REASON:(!form.branch?"Select a branch first":undefined)} style={{...btnG,background:"#dc2626",...((vo||!form.branch)?{background:"#cfd6e4",color:"#6b7280",cursor:"not-allowed"}:{})}}>💾 Record ADM</button>
             </div>
           </div>
         </div>
