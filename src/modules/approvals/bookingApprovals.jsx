@@ -27,7 +27,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { card, btnG, btnGh, bc } from '../../core/styles.jsx';
 import { useModalEsc } from '../../core/ux/useModalEsc';
-import { localeOf } from '../../core/format';
+import { localeOf, activeCurrency } from '../../core/format';
 import { periodRange } from '../../core/period';
 import { printBookingInvoice } from '../../core/printInvoice';
 import { apiGet, apiPost, isViewOnly, VIEW_ONLY_REASON } from '../../core/api';
@@ -44,7 +44,7 @@ import { SoPoGpVoucherEntry, GOLD_SOFT, GOLD_LINE, JournalView } from '../accoun
 import { SkeletonTable } from '../../shell/primitives';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', BLUE = '#2563eb';
-const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString(localeOf(activeCurrency()), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || 'BOM'));
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -185,7 +185,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                             </button>;
                           }
                           const ok = !b.validation?.hasErrors && na.allowed;
-                          return <button disabled={busyId === b.id || !ok} onClick={() => onApprove(b)} title={!na.allowed ? na.hint : (b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : 'Level 3 — posts to the books')} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: ok ? DR : '#cfd6e4', cursor: ok ? 'pointer' : 'not-allowed' }}>
+                          return <button disabled={busyId === b.id || !ok} onClick={() => onApprove(b)} title={!na.allowed ? na.hint : (b.validation?.hasErrors ? 'Verification failed — ' + (b.validation.errors || []).join(' · ') : 'Level 3 — posts to the books')} aria-label={ok ? undefined : `Approve disabled — ${!na.allowed ? na.hint : (b.validation?.hasErrors ? 'verification failed: ' + (b.validation.errors || []).join(' · ') : 'fix the error first')}`} style={{ ...btnG, padding: '4px 10px', fontSize: 10.5, background: ok ? DR : '#cfd6e4', cursor: ok ? 'pointer' : 'not-allowed' }}>
                             {busyId === b.id ? <RefreshCw size={12} className="spin" /> : <CheckCircle2 size={12} />} Approve
                           </button>;
                         })()}
@@ -462,7 +462,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                             return <button disabled={busy || !na.allowed} title={na.hint} onClick={() => doReview(e, na.action)} style={{ margin: isApprover ? 0 : '0 0 0 6px', marginRight: 6, padding: '5px 10px', background: na.allowed ? (na.action === 'check' ? BLUE : GOLD) : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: na.allowed ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
                           }
                           const ok = e.postable && na.allowed;
-                          return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
+                          return <button disabled={busy || !ok} title={!na.allowed ? na.hint : (e.postable ? 'Level 3 — posts to the books' : (e.error || (e.errors && e.errors[0]) || 'Fix the error before approving'))} aria-label={ok ? undefined : `Approve disabled — ${!na.allowed ? na.hint : (e.error || (e.errors && e.errors[0]) || 'fix the error first')}`} onClick={() => doApprove(e)} style={{ marginRight: 6, padding: '5px 10px', background: ok ? DR : '#cfd6e4', color: '#fff', border: 'none', borderRadius: 5, fontWeight: 700, cursor: ok ? 'pointer' : 'not-allowed' }}>{na.label}</button>;
                         })()}
                         {isApprover && <button disabled={busy} onClick={() => doReject(e)} style={{ padding: '5px 10px', background: '#fff', color: '#dc2626', border: '1px solid #f3c9c9', borderRadius: 5, fontWeight: 700, cursor: 'pointer' }}>Reject</button>}
                         {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
@@ -594,7 +594,18 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   const onRevoke = makeOnRevoke({ qc, setBusyId, setOpen, toastFn: (m, kind) => setMsg((kind === 'error' ? '⚠ ' : '✓ ') + m) });
   const onApproveSelected = async () => {
     if (!sel.size) return;
-    const { confirmed } = await confirmDialog({ title: `Approve ${sel.size} selected voucher(s)?`, message: 'Each posts its linked Sales + Purchase.', confirmLabel: 'Approve' });
+    // Pre-flight: how many of the selection failed verification and can't post? Warn up
+    // front instead of letting them land in the failed tally (mirrors the vouchers queue).
+    const blocked = rows.filter((b) => sel.has(b.id) && b.validation?.hasErrors).length;
+    const { confirmed } = await confirmDialog({
+      title: `Approve ${sel.size} selected voucher(s)?`,
+      message: blocked === 0
+        ? 'Each posts its linked Sales + Purchase.'
+        : blocked === sel.size
+          ? `None of the ${sel.size} selected pass verification yet — they'll stay in Pending. Fix them from the list first.`
+          : `Each posts its linked Sales + Purchase. ${blocked} of ${sel.size} fail verification and will stay in Pending — the rest will be approved.`,
+      confirmLabel: 'Approve',
+    });
     if (!confirmed) return;
     setBusyId('bulk'); setMsg(`⏳ Approving ${sel.size} voucher(s)… please wait.`);
     try { const res = await apiPost('/api/booking-orders/approve-many', { ids: [...sel] }); setMsg(`✓ Approved ${res.approved} of ${res.total}${res.failed ? ` · ${res.failed} failed${res.errors?.[0] ? ` — ${res.errors[0]}` : ''}` : ''}.`); setSel(new Set()); qc.invalidateQueries({ queryKey: ['booking-orders'] }); invalidateBooks(qc); }
