@@ -8,7 +8,8 @@
      • Report      — opens the Support ticket form pre-filled with this context
    Reads the current route from NavContext; needs no per-screen wiring.
    ════════════════════════════════════════════════════════════════════════════ */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Hash, Copy, Bug } from 'lucide-react';
 import { useNav } from '../core/ux/nav';
 import { toastSuccess } from '../core/ux/toast';
@@ -35,6 +36,32 @@ export function ScreenBadge({ currentUser, branch, route: routeProp, navigate: n
   const route = routeProp || nav.route;
   const navigate = navProp || nav.navigate;
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const triggerRef = useRef(null);
+
+  // Popover is portalled to <body> (see render below) so it isn't trapped inside the
+  // header's own stacking context (header is `sticky z-40`) — nested there, its z-index
+  // only wins against OTHER header children. Anything elsewhere in the app that's also
+  // `position + z-index` (e.g. ReportActionBar's sticky toolbar, also z-40) sits in its
+  // own stacking context and — tying on z-index — wins on DOM order instead, painting
+  // over this popover. Matches the same fixed+portal pattern as UserMenu next to it.
+  const place = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const reflow = () => place();
+    window.addEventListener('resize', reflow);
+    window.addEventListener('scroll', reflow, true);
+    return () => {
+      window.removeEventListener('resize', reflow);
+      window.removeEventListener('scroll', reflow, true);
+    };
+  }, [open, place]);
 
   const tag = screenTag(route);
   const context = { route, branch, role: currentUser?.role, name: currentUser?.name || currentUser?.email };
@@ -73,7 +100,8 @@ export function ScreenBadge({ currentUser, branch, route: routeProp, navigate: n
     <div style={{ position: 'relative' }}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        ref={triggerRef}
+        onClick={() => setOpen((o) => { if (!o) place(); return !o; })}
         title={`This screen is ${tag} — click to copy details or report an issue`}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -90,14 +118,14 @@ export function ScreenBadge({ currentUser, branch, route: routeProp, navigate: n
         {tag.replace('#', '')}
       </button>
 
-      {open && (
+      {open && pos && createPortal(
         <>
           <div aria-hidden="true" style={{ position: 'fixed', inset: 0, zIndex: 598 }} onClick={() => setOpen(false)} />
           <div
             role="dialog"
             aria-label={`Screen ${tag}`}
             style={{
-              position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 599,
+              position: 'fixed', top: pos.top, right: pos.right, zIndex: 599,
               width: 280, background: '#fff', border: '1px solid #cdd1d8', borderRadius: 10,
               boxShadow: '0 8px 28px rgba(13,19,38,0.16)', padding: 14,
               display: 'flex', flexDirection: 'column', gap: 10,
@@ -125,7 +153,8 @@ export function ScreenBadge({ currentUser, branch, route: routeProp, navigate: n
               </button>
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </div>
   );
