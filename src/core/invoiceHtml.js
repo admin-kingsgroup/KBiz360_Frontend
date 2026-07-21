@@ -47,14 +47,13 @@ const ISSUER_FALLBACK = {
     ],
   },
   AMD: {
-    // Cert-verified identity (GST REG-06, GSTIN 24AAMCT1096J1Z0). Live company-profile wins
-    // field-by-field; blank phone/email and NO bank on purpose — print nothing rather than a
-    // fabricated value. Add AMD's real bank to the profile to have it appear on invoices.
+    // Cert-verified identity (GST REG-06, GSTIN 24AAMCT1096J1Z0) + real ICICI AMD bank.
+    // (The company-profile has no `banks` field, so the invoice bank lives here.)
     entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '24AAMCT1096J1Z0', state: 'Gujarat', stateCode: '24',
     operAddr: '608, Floor B, Sun West Bank, Ashram Road, Ahmedabad, Gujarat 380009',
     phone: '', email: '', cur_sym: '₹',
     authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
-    banks: [],
+    banks: [{ bankName: 'ICICI Bank', acName: 'Travkings Tours & Travels Private Limited - AMD', branch: 'Railwaypura, Ahmedabad', acNo: '654805601193', ifsc: 'ICIC0006548', type: 'Current', primary: true }],
   },
 };
 
