@@ -17,6 +17,8 @@ import { Kbd } from '../core/ux/widgets.jsx';
 import { clickable } from '../core/ux/clickable';
 import { listKeyNav } from '../core/ux/listKeys';
 import { ReportIssueButton } from '../modules/support/components/ReportIssueButton';
+import { InboxBadgeLive } from '../modules/tk-group/InboxBadgeLive';
+import { ScreenBadge } from './ScreenBadge';
 import { useFyStore, FY_OPTIONS } from '../store/fy';
 import { Menu as DropdownMenu } from '../core/ux/Menu';
 
@@ -48,7 +50,7 @@ function FyMiniSelector() {
   );
 }
 
-export function ContextBar({ branch, route, unread, showNotif, onToggleNotif, onPrint }) {
+export function ContextBar({ branch, route, unread, showNotif, onToggleNotif, onPrint, currentUser }) {
   const nav = useNav();
   const { prefs, setPref } = usePrefs();
   const dock = useDock();
@@ -130,7 +132,10 @@ export function ContextBar({ branch, route, unread, showNotif, onToggleNotif, on
         ))}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, maxWidth: '52%', overflow: 'hidden' }}>
+      {/* padding: '4px 0' gives the corner count badges (Bell / Inbox — both sit at
+          top:-4px off a 26px-tall trigger) headroom against this row's own
+          overflow:hidden, which otherwise clips them flush with its top edge. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, maxWidth: '52%', overflow: 'hidden', padding: '4px 0' }}>
         {/* Minimized / parked items — restore by click or Ctrl/Cmd+1…9 */}
         {parked.map((it, i) => {
           const ok = canRestore(it);
@@ -173,6 +178,12 @@ export function ContextBar({ branch, route, unread, showNotif, onToggleNotif, on
             )}
           </span>
         )}
+
+        {/* TK Group pending-approvals badge — central roles only, hidden at 0 (dormant-safe) */}
+        <InboxBadgeLive currentUser={currentUser} setRoute={nav.navigate} />
+
+        {/* Stable screen number — click to copy report details or raise a ticket for THIS screen */}
+        <ScreenBadge currentUser={currentUser} branch={branch} route={route} navigate={nav.navigate} />
 
         <ReportIssueButton route={route}/>
 

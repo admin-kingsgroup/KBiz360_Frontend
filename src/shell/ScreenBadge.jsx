@@ -1,6 +1,6 @@
 /* ════════════════════════════════════════════════════════════════════════════
    SHELL/SCREENBADGE.JSX
-   The "SCREEN #142" pill in the top bar — present on every screen. It gives each
+   The "SCREEN #142" pill in the subheader (ContextBar) — present on every screen. It gives each
    screen a short, stable, spoken-aloud id so anyone can report a problem precisely
    ("Screen #142 is broken") and a developer can jump straight to the code.
    Click → a popover with the screen number, route and breadcrumb, plus:
@@ -40,11 +40,11 @@ export function ScreenBadge({ currentUser, branch, route: routeProp, navigate: n
   const triggerRef = useRef(null);
 
   // Popover is portalled to <body> (see render below) so it isn't trapped inside the
-  // header's own stacking context (header is `sticky z-40`) — nested there, its z-index
-  // only wins against OTHER header children. Anything elsewhere in the app that's also
-  // `position + z-index` (e.g. ReportActionBar's sticky toolbar, also z-40) sits in its
+  // ContextBar's own stacking context — nested there, its z-index only wins against
+  // OTHER ContextBar children. Anything elsewhere in the app that's also
+  // `position + z-index` (e.g. ReportActionBar's sticky toolbar, z-40) sits in its
   // own stacking context and — tying on z-index — wins on DOM order instead, painting
-  // over this popover. Matches the same fixed+portal pattern as UserMenu next to it.
+  // over this popover. Matches the same fixed+portal pattern as UserMenu in the app-bar.
   const place = useCallback(() => {
     const el = triggerRef.current;
     if (!el) return;

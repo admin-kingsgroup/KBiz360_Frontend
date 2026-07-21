@@ -956,7 +956,7 @@ export default function KB360App(){
         route={route} setRoute={navigate}
         currentUser={currentUser} setCurrentUser={setUser}
         embed={embed}
-        subBar={<ContextBar branch={branch} route={route}/>}
+        subBar={<ContextBar branch={branch} route={route} currentUser={currentUser}/>}
       >
         {/* App-wide Tally Export / Print / PDF toolbar — shown on every report,
             finance, tax & register screen. Excluded from the printout itself. */}

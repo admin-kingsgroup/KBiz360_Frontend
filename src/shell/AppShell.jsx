@@ -24,7 +24,6 @@ import { createPortal } from 'react-dom';
 import { Menu, X, ChevronDown, Eye } from 'lucide-react';
 import { KBIZ_LOGO } from '../core/brand';
 import { getVisibleMenu } from '../modules/tk-group/menu';
-import { InboxBadgeLive } from '../modules/tk-group/InboxBadgeLive';
 import { useHideStatements } from '../modules/tk-group/useHideStatements';
 import { useRelocateCentral } from '../modules/tk-group/useRelocateCentral';
 import { useAlerts } from '../core/useAccounting';
@@ -39,7 +38,6 @@ import { useCockpitFocusStore } from '../store/cockpitFocus';
 import { FxRateChip } from './FxRateChip';
 import { NotifPanel } from './NotifPanel';
 import { UserMenu } from './UserMenu';
-import { ScreenBadge } from './ScreenBadge';
 import { useFocusTrap, getFocusable } from '../core/ux/focus';
 import { pushModal } from '../core/ux/modalStore';
 
@@ -499,12 +497,6 @@ export function AppShell({ branch, setBranch, route, setRoute, currentUser, setC
           {!inCockpit && (
             <div className="hidden w-[150px] desktop:block 2xl:w-[168px]"><BranchSwitcher branch={branch} setBranch={setBranch} currentUser={currentUser} light /></div>
           )}
-
-          {/* TK Group pending-approvals badge — central roles only, hidden at 0 (dormant-safe) */}
-          <InboxBadgeLive currentUser={currentUser} setRoute={setRoute} />
-
-          {/* Stable screen number — click to copy report details or raise a ticket for THIS screen */}
-          <ScreenBadge currentUser={currentUser} branch={branch} route={route} navigate={setRoute} />
 
           <UserMenu currentUser={currentUser} setCurrentUser={setCurrentUser} setRoute={setRoute} onOpenNotifications={() => setShowNotif(true)} />
 
