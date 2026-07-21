@@ -38,7 +38,7 @@ import { confirmDialog } from '../../core/ux/confirm';
 import { usePager, Pager } from '../../core/ux/pager';
 import { VSPECS } from '../../core/voucherSpecs.js';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
-import { invalidateBooks, useVoucherApprovals, useApproveVoucher, useRejectVoucher } from '../../core/useAccounting';
+import { invalidateBooks, useVoucherApprovals, useApproveVoucher, useRejectVoucher, useRevokeVoucher, fetchRevokeCheck } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 import { SoPoGpVoucherEntry, GOLD_SOFT, GOLD_LINE, JournalView } from '../accounts/daily-entry/soPoGpVoucherEntry';
 import { SkeletonTable } from '../../shell/primitives';
@@ -362,6 +362,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
   const q = useVoucherApprovals(branch, status, { refundScope: 'sopogp' });
   const approveOne = useApproveVoucher();
   const reject = useRejectVoucher();
+  const revoke = useRevokeVoucher();
   const qc = useQueryClient();
   const chainCfg = useApprovalChain(); // three-level chain assignees (Check → Verify → Approve)
   const [busy, setBusy] = useState(false);
@@ -406,6 +407,27 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
     catch (err) { toast((err && err.message) || 'Reject failed', 'error'); }
     finally { setBusy(false); }
   };
+  // Revoke an APPROVED refund/reissue → back to Pending (un-posts the reversal). Runs the
+  // server preflight first so the dialog shows the blast radius (journal rows un-posted +
+  // warnings) and hard-blocks a locked / bank-reconciled / live-refund voucher. Mirrors the
+  // Voucher Approvals queue's doRevoke — the same capability the row's voucher view offers.
+  const doRevoke = async (e) => {
+    let pre = null;
+    try { pre = await fetchRevokeCheck(e.id); } catch (err) { toast((err && err.message) || 'Could not check this voucher', 'error'); return; }
+    if (pre && (pre.blocks || []).length) { toast(`Can't revoke — ${pre.blocks.map((b) => b.msg).join(' ')}`, 'error'); return; }
+    const warns = (pre?.warnings || []).map((w) => w.msg).filter(Boolean);
+    const rows = pre?.journalRows ? `This un-posts ${pre.journalRows} journal row${pre.journalRows === 1 ? '' : 's'}. ` : '';
+    const { confirmed, reason } = await confirmDialog({
+      title: `Revoke ${e.vno}?`,
+      message: `${rows}It returns to Pending for editing & re-approval (the number is kept).${warns.length ? ' Note: ' + warns.join(' ') : ''}`,
+      danger: true, reasonRequired: true, reasonLabel: 'Reason for revoke', confirmLabel: 'Revoke',
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    try { await revoke.mutateAsync({ id: e.id, reason }); toast(`Revoked ${e.vno} → Pending`); }
+    catch (err) { toast((err && err.message) || 'Revoke failed', 'error'); }
+    finally { setBusy(false); }
+  };
 
   // View-only action cell for a refund/reissue row — a disabled "👁 View only" indicator
   // (reason on hover) in place of Edit / Approve / Reject / Check / Verify, EXCEPT the
@@ -430,7 +452,7 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
         : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead><tr style={{ background: '#f3f4f8' }}>
-              {['Vch No', 'Voucher Date', 'Reverses (Sale)', 'Party', 'Amount', pendingTab ? 'Actions' : 'Status'].map((h, i) => (
+              {['Vch No', 'Voucher Date', 'Reverses (Sale)', 'Party', 'Amount', pendingTab ? 'Actions' : (status === 'approved' ? 'Status / Action' : 'Status')].map((h, i) => (
                 <th key={i} style={{ ...th, textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
               ))}
             </tr></thead>
@@ -468,7 +490,14 @@ function SopogpRefunds({ branch, status, needle, currentUser }) {
                         {!e.postable && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 800, color: '#dc2626' }}>blocked</span>}
                         </>}
                       </td>
-                    : <td style={{ padding: '7px 12px', color: '#5b616e', textTransform: 'capitalize' }}>{e.status}</td>}
+                    : <td style={{ padding: '7px 12px', color: '#5b616e', whiteSpace: 'nowrap' }}>
+                        <span style={{ textTransform: 'capitalize' }}>{e.status}</span>
+                        {/* An approved refund/reissue is posted — offer Revoke (approver-only, not view-only),
+                            same preflight-guarded flow as the Voucher Approvals queue and the bookings table. */}
+                        {isApprover && !vo && (e.status === 'approved' || e.status === 'saved' || e.status === 'posted') && (
+                          <button disabled={busy} onClick={() => doRevoke(e)} title="Revoke — un-post this refund / reissue and return it to Pending so it can be edited & re-approved (number kept)" style={{ marginLeft: 10, padding: '4px 10px', background: '#fff', color: GOLD, border: '1px solid #e3cd97', borderRadius: 5, fontWeight: 700, fontSize: 11, cursor: busy ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, verticalAlign: 'middle', opacity: busy ? 0.6 : 1 }}><RotateCcw size={12} /> Revoke</button>
+                        )}
+                      </td>}
                 </tr>
               ))}
             </tbody>
