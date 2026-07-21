@@ -35,7 +35,7 @@ const money = (n, cur = '₹') => (n == null || n === '' ? '' : Number(Math.roun
 const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'ALL'));
 // Per-branch currency + label for the consolidated (ALL) breakdown. A byBranch slice
 // carries a bare branch CODE (string); bc() expects an object with `.code`, so wrap it.
-const brObj = (code) => ({ code: String(code || 'BOM') });
+const brObj = (code) => ({ code: String(code || 'ALL') });
 const curOf = (code) => bc(brObj(code)).cur;
 const branchLabel = (b) => (!b || b === 'ALL' ? CONSOLIDATED_LABEL : (b.code || b));
 // Open by default (inception → today): a Balance Sheet must accumulate every

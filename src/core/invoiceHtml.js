@@ -169,7 +169,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   // Holiday (package) client invoice hides the SVC2 margin: it's folded into the Base
   // Fare line and its GST is folded into the regular GST — the books keep them separate.
   const isPkg = String(booking.module || '') === 'SH';
-  const code = String(branch?.code || booking.branch || 'BOM').toUpperCase();
+  const code = String(branch?.code || booking.branch || '').toUpperCase(); // never a silent BOM: a booking always carries its branch, so '' is an unreachable fail-safe (an empty issuer would surface the data error, not fake BOM's GSTIN)
   // Prefer the live company-profile, but fall back to the seeded issuer/bank constants
   // field-by-field, so the Issued-By block, Place of Supply and Bank details always
   // render even when the profile cache is empty at print time.

@@ -56,7 +56,7 @@ export function FixedAssetRegister({ branch, setRoute }) {
   const { create: createAsset } = useMasterMutations('fixed-assets');
   const { create: createCategory } = useMasterMutations('asset-categories');
   const NEW_CAT = '__new__';
-  const blankAsset = { name: '', code: '', purchaseDate: '', cost: 0, method: 'WDV', branch: brCode || 'BOM', newCatCode: '', newCatName: '', newCatRate: 15 };
+  const blankAsset = { name: '', code: '', purchaseDate: '', cost: 0, method: 'WDV', branch: brCode || '', newCatCode: '', newCatName: '', newCatRate: 15 };
   const [af, setAf] = useState(blankAsset);
 
   const FIXED_ASSETS_DATA = (useMasterList('fixed-assets').data || []).map((a) => ({ ...a, id: a.assetId || a.id })); // live /api/fixed-assets
