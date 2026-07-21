@@ -380,11 +380,11 @@ function ExtraPurchases({ parentModule, branch, brCode, noVat, legs, onChange, i
               ))}
               <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge<br />
                 <input type="number" min="0" value={leg.line.psvc ?? ''} onChange={(e) => setLine(i, 'psvc', e.target.value)} style={cell} /></label>
-              {pkg && <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge {isVatBranch(brCode) ? 'VAT' : 'GST'}<br />
+              {pkg && !noVat && <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supplier Service Charge {isVatBranch(brCode) ? 'VAT' : 'GST'}<br />
                 <input type="number" min="0" value={leg.line.psvcGst ?? ''} onChange={(e) => setLine(i, 'psvcGst', e.target.value)} style={cell} /></label>}
               <label style={{ fontSize: 10.5, color: '#5b616e' }}>Supp Comm/Inc Rcvd<br />
                 <input type="number" min="0" value={leg.line.incentive ?? ''} onChange={(e) => setLine(i, 'incentive', e.target.value)} style={cell} /></label>
-              {pkg && <span style={{ fontSize: 10, color: '#6b5a1e', fontStyle: 'italic', alignSelf: 'flex-end', paddingBottom: 8 }}>Supplier {isVatBranch(brCode) ? 'VAT' : 'GST'} auto-claimed as ITC</span>}
+              {pkg && !noVat && <span style={{ fontSize: 10, color: '#6b5a1e', fontStyle: 'italic', alignSelf: 'flex-end', paddingBottom: 8 }}>Supplier {isVatBranch(brCode) ? 'VAT' : 'GST'} auto-claimed as ITC</span>}
               <div style={{ marginLeft: 'auto', paddingBottom: 4, fontSize: 12, fontWeight: 700, color: '#1a1c22' }}>Net payable {bc({ code: brCode }).cur}{fmt(num(po.total) - num(po.incentiveAmt) - num(po.incentiveGst) + num(po.incentiveTds))}{num(po.incentiveAmt) > 0 ? ` (gross ${bc({ code: brCode }).cur}${fmt(po.total)} − comm ${bc({ code: brCode }).cur}${fmt(po.incentiveAmt)})` : ''}{num(po.gst) > 0 ? ` · ITC ${bc({ code: brCode }).cur}${fmt(po.gst)}` : ''}</div>
             </div>
           </div>
@@ -500,19 +500,21 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // No-supplier mode (Misc only): a sale with no purchase leg — full sale value is
   // income. Hides the Purchase Order + supplier fields and posts only the sale.
   const [noSupplier, setNoSupplier] = useState(editing ? !!editBooking.noSupplier : false);
-  // Without-VAT mode (Africa/VAT branches only): zero-rate the SALE-side booking tax.
-  // DEFAULT for a NEW voucher on a VAT branch (NBO/DAR/FBM) is Without VAT — VAT is billed
-  // only if the user consciously ticks "With VAT" on the toggle below. India branches ignore
-  // the flag (they always follow the per-module GST rule), and isVatBranch(brCode) is false
-  // there, so it opens With-VAT exactly as before. An edit keeps the voucher's saved choice.
-  const [noVat, setNoVat] = useState(editing ? !!editBooking.noVat : isVatBranch(brCode));
+  // Without-VAT mode (Africa/VAT branches only): a Without-VAT booking is VAT-free on the WHOLE
+  // voucher (sale OUTPUT and purchase INPUT/ITC — see voucherSpecs). DEFAULT for a NEW voucher on a
+  // VAT branch (NBO/DAR/FBM) is Without VAT — VAT is billed only if the user ticks "With VAT" below.
+  // India ignores it (isVatBranch false → With VAT as before). NOT applied to an INB deal: an
+  // inter-branch sale has its OWN tax mechanism (billIgst / inbZeroRated), so the toggle is hidden
+  // there and this default must stay false — else `effNoVat` would zero the INB purchase VAT the
+  // deal's own engine owns. An edit keeps the voucher's saved choice.
+  const [noVat, setNoVat] = useState(editing ? !!editBooking.noVat : (isVatBranch(brCode) && !interBranch));
   // The form is NOT remounted when the top-bar branch changes (App.jsx renders it with no
   // per-branch key), so the initialiser above only reflects the branch present at mount. A
   // voucher can't be raised under "ALL" (a banner blocks it), so the usual start is ALL → pick
   // a specific branch AFTER mount — re-derive the default on every later branch switch for a
   // NEW voucher so a VAT branch always opens Without VAT and India With VAT. A manual With/Without
   // tick changes `noVat`, not `brCode`, so this never stomps a conscious choice; an edit is skipped.
-  useEffect(() => { if (!editing) setNoVat(isVatBranch(brCode)); }, [brCode, editing]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!editing) setNoVat(isVatBranch(brCode) && !interBranch); }, [brCode, editing, interBranch]); // eslint-disable-line react-hooks/exhaustive-deps
   // GST mode is set per leg: place of supply can differ (in-state sale → intra,
   // out-of-state supplier purchase → inter). Default sale=intra; on edit, prefer the
   // leg's own stored mode, falling back to the legacy booking-level gstMode.
@@ -634,6 +636,11 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // touches the sale side only, so input tax keeps following the supplier's invoice either way.
   const inbZeroRated = interBranch && billIgst === false;
   const effNoVat = isVatBr && noVat;
+  // Hide the VAT column/labels entirely when the whole voucher is Without VAT (Africa) — the amounts
+  // are already 0, so a "VAT (0%)" column is just noise. India/With-VAT (effNoVat false) is unchanged,
+  // so column-count parity across thead/tbody/tfoot is untouched there; only the Africa Without-VAT
+  // render drops the VAT column, and it drops it from header, body AND footer together.
+  const showVatCol = !effNoVat;
   // Live VAT % from the branch config / VAT master (null → voucherSpecs static fallback),
   // so a Super-Admin rate amendment flows into the on-screen math and the saved booking.
   const liveVatRate = (bc({ code: brCode }) || {}).vatRate;
@@ -1187,9 +1194,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {refKeys.map((c) => <th key={c.key} style={{ ...poHdrL, width: 120 }}>{c.label}</th>)}
             {spec.fareCols.map((c) => <th key={c.key} style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
             <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge</th>
-            {pkg
+            {showVatCol && (pkg
               ? <th style={{ ...poHdr, width: 95, whiteSpace: 'normal' }}>Supplier Service Charge {taxLabel} ({activeRate}%)</th>
-              : <th style={{ ...poHdr, width: 95, whiteSpace: 'normal', background: '#FBF3DE', color: GOLD_DEEP }}>{taxLabel} ({activeRate}%)</th>}
+              : <th style={{ ...poHdr, width: 95, whiteSpace: 'normal', background: '#FBF3DE', color: GOLD_DEEP }}>{taxLabel} ({activeRate}%)</th>)}
             <th style={{ ...poHdr, width: 100, whiteSpace: 'normal' }}>Supp Comm/Inc Rcvd</th>
             <th style={{ ...poHdr, width: 85 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
             <th style={{ ...poHdr, width: 110 }}>Total</th>
@@ -1211,13 +1218,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                   <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
                     <input type="number" min="0" value={l.psvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvc', e.target.value, true)} style={cellInp} />
                   </td>
-                  {pkg
+                  {showVatCol && (pkg
                     ? <td style={{ padding: '6px 3px', width: 95, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
                         {suppForeign
                           ? <span title="Overseas supplier — no Indian GST (import of service)" style={{ display: 'block', padding: '6px 8px', fontSize: 12, textAlign: 'right', color: '#9197a3', fontWeight: 700 }}>—</span>
                           : <input type="number" min="0" value={l.psvcGst ?? ''} placeholder="0" onChange={(e) => setLine(i, 'psvcGst', e.target.value, true)} style={cellInp} />}
                       </td>
-                    : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>}
+                    : <td style={{ ...tdAuto, width: 95, background: '#FBF3DE', color: GOLD_DEEP, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>{fmt(c.gstPur)}</td>)}
                   <td style={{ padding: '6px 3px', width: 100, ...(spec.sectors ? { borderBottom: 'none' } : {}) }}>
                     <input type="number" min="0" value={l.incentive ?? ''} placeholder="0" onChange={(e) => setLine(i, 'incentive', e.target.value, true)} style={cellInp} />
                   </td>
@@ -1235,7 +1242,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             {refKeys.map((c) => <td key={c.key} style={poTf} />)}
             {spec.fareCols.map((c) => <td key={c.key} style={poTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
             <td style={poTf}>{fmt(lines.reduce((s, l) => s + num(l.psvc), 0))}</td>
-            <td style={poTf}>{pkg && !suppForeign ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>
+            {showVatCol && <td style={poTf}>{pkg && !suppForeign ? fmt(lines.reduce((s, l) => s + num(l.psvcGst), 0)) : fmt(totals.po.gst)}</td>}
             <td style={poTf}>{fmt(totals.po.incentiveAmt)}</td>
             <td style={poTf}>{fmt(totals.po.incentiveTds)}</td>
             <td style={{ ...poTf, color: CR }}>
@@ -1547,8 +1554,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         sub={interBranch
           ? `what ${toBranch || 'the buying branch'} pays · fares pass through at cost${pkg ? '' : ' · your margin is the Service Fee'}`
           : pkg
-            ? `what the customer pays · ${activeRate}% ${taxLabel} on the package${isVatBr ? '' : ` + ${tcsRate}% TCS (Intl)`}`
-            : `what the customer pays · Service Charge - 2 is ${taxLabel}-inclusive`}
+            ? `what the customer pays · ${effNoVat ? `no ${taxLabel} on the package` : `${activeRate}% ${taxLabel} on the package${isVatBr ? '' : ` + ${tcsRate}% TCS (Intl)`}`}`
+            : `what the customer pays${effNoVat ? '' : ` · Service Charge - 2 is ${taxLabel}-inclusive`}`}
         accent={SO_BAR}>
         <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #d8e0ea' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
@@ -1556,7 +1563,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
               {!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
-              {!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{pkg ? `${taxLabel} (5%)` : `${taxLabel}/Service Charge - 2 (${activeRate}%)`}</th>}{showTcsCol && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>TCS ({tcsRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
+              {!pkg && showVatCol && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && showVatCol && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{pkg ? `${taxLabel} (5%)` : `${taxLabel}/Service Charge - 2 (${activeRate}%)`}</th>}{showTcsCol && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>TCS ({tcsRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
             </tr></thead>
             <tbody>
               {lines.map((l, i) => {
@@ -1579,8 +1586,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                       : <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(l[col.key])}</td>))}
                     {!interBranch && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
-                    {!pkg && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
-                    {!interBranch && <td style={{ ...tdAuto, width: 95 }}>{fmt(pkg ? c.salesGST : c.gstMk)}</td>}
+                    {!pkg && showVatCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
+                    {!interBranch && showVatCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(pkg ? c.salesGST : c.gstMk)}</td>}
                     {showTcsCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(lineTcs)}</td>}
                     <td style={{ ...tdC, fontWeight: 800, color: DR, background: '#faf7ef', width: 110 }}>{fmt(c.finalSales + lineTcs)}</td>
                     <td style={{ ...tdC, textAlign: 'center', background: '#faf7ef', padding: 3, width: 45 }}><button onClick={() => delLine(i)} title="Remove" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b9b9b9' }}><Trash2 size={13} /></button></td>
@@ -1596,7 +1603,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               {spec.fareCols.map((c) => <td key={c.key} style={soTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
               {!interBranch && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
               {!pkg && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
-              {!pkg && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && <td style={soTf}>{fmt(pkg ? totals.so.gst + totals.so.otherTaxesGst : totals.so.otherTaxesGst)}</td>}
+              {!pkg && showVatCol && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && showVatCol && <td style={soTf}>{fmt(pkg ? totals.so.gst + totals.so.otherTaxesGst : totals.so.otherTaxesGst)}</td>}
               {showTcsCol && <td style={soTf}>{fmt(totals.so.tcs)}</td>}
               <td style={{ ...soTf, color: DR }}>{fmt(totals.so.total)}{num(totals.so.roundOff) ? <span style={{ display: 'block', fontSize: 9, fontWeight: 600, color: '#8a6d1e' }}>round off {totals.so.roundOff > 0 ? '+' : ''}{fmt(totals.so.roundOff)}</span> : null}</td><td style={soTf} />
             </tr></tfoot>
@@ -1632,8 +1639,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       {/* ③ Gross Profit */}
       <Section n="3" badge={interBranch ? 'INGP' : 'GP'} name={interBranch ? 'Inter-Branch Gross Profit' : 'Gross Profit'} sub="GP = net sales − net purchase · % on final sales value" accent={GP_BAR}>
         <div className="mb-3 grid grid-cols-1 gap-3 tablet:grid-cols-3">
-          <GpCard k={isInsurance ? 'Net Sales (ex ' + taxLabel + ')' : 'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')'} v={cur + ' ' + fmt(isInsurance ? totals.gp.saleNet : totals.so.total)} color={DARK} bg="#FFFDF7" />
-          <GpCard k={isInsurance ? 'Net Purchase (ex ' + taxLabel + ')' : 'Total Purchase (incl ' + taxLabel + ')'} v={cur + ' ' + fmt(isInsurance ? totals.gp.costNet : totals.po.total)} color={CR} bg="#FFFAEC" />
+          <GpCard k={isInsurance ? 'Net Sales (ex ' + taxLabel + ')' : (effNoVat ? 'Total Sales' : 'Total Sales (incl ' + taxLabel + (totals.so.tcs > 0 ? ' & TCS' : '') + ')')} v={cur + ' ' + fmt(isInsurance ? totals.gp.saleNet : totals.so.total)} color={DARK} bg="#FFFDF7" />
+          <GpCard k={isInsurance ? 'Net Purchase (ex ' + taxLabel + ')' : (effNoVat ? 'Total Purchase' : 'Total Purchase (incl ' + taxLabel + ')')} v={cur + ' ' + fmt(isInsurance ? totals.gp.costNet : totals.po.total)} color={CR} bg="#FFFAEC" />
           <GpCard k={hasExtraLegs ? 'Gross Profit · all POs' : 'Gross Profit'} v={cur + ' ' + fmt(hasExtraLegs ? folderGpTotal : totals.gp.total)} color={DR} pct={(hasExtraLegs ? folderGpPct : totals.gp.pct) + '% margin'} bg="#FCF3DE" />
         </div>
         {hasExtraLegs && (
@@ -1650,7 +1657,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
             <thead><tr style={{ background: '#f8fafc', borderBottom: '2px solid #cdd1d8' }}>
               <th style={{ ...thA, ...thL, width: 140 }}>First Name</th><th style={{ ...thA, ...thL, width: 140 }}>Surname</th>
-              <th style={{ ...thA, width: 110 }}>Final Sales</th><th style={{ ...thA, width: 85 }}>SVF {taxLabel} ({activeRate}%)</th><th style={{ ...thA, width: 85 }}>SVC2 {taxLabel} ({activeRate}%)</th><th style={{ ...thA, width: 110 }}>Final Purchase</th><th style={{ ...thA, width: 95 }}>Purchase {taxLabel} ({activeRate}%)</th>
+              <th style={{ ...thA, width: 110 }}>Final Sales</th>{showVatCol && <th style={{ ...thA, width: 85 }}>SVF {taxLabel} ({activeRate}%)</th>}{showVatCol && <th style={{ ...thA, width: 85 }}>SVC2 {taxLabel} ({activeRate}%)</th>}<th style={{ ...thA, width: 110 }}>Final Purchase</th>{showVatCol && <th style={{ ...thA, width: 95 }}>Purchase {taxLabel} ({activeRate}%)</th>}
               <th style={{ ...thA, width: 95 }}>Supp Comm/Inc Rcvd</th><th style={{ ...thA, width: 80 }}>{isVatBr ? 'WHT' : 'TDS (2%)'}</th>
               <th style={{ ...thA, width: 110 }}>Gross Profit</th><th style={{ ...thA, width: 80 }}>GP %</th>
             </tr></thead>
@@ -1660,8 +1667,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                 return (
                   <tr key={i}>
                     <td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.fn || '—'}</td><td style={{ ...tdAuto, textAlign: 'left', width: 140 }}>{l.sn || ''}</td>
-                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalSales)}</td><td style={{ ...tdAuto, width: 85 }}>{fmt(c.gstSvc)}</td><td style={{ ...tdAuto, width: 85 }}>{fmt(c.gstMk)}</td>
-                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalPurchase)}</td><td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>
+                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalSales)}</td>{showVatCol && <td style={{ ...tdAuto, width: 85 }}>{fmt(c.gstSvc)}</td>}{showVatCol && <td style={{ ...tdAuto, width: 85 }}>{fmt(c.gstMk)}</td>}
+                    <td style={{ ...tdAuto, width: 110 }}>{fmt(c.finalPurchase)}</td>{showVatCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstPur)}</td>}
                     <td style={{ ...tdAuto, width: 95 }}>{fmt(c.incentive)}</td><td style={{ ...tdAuto, width: 80 }}>{fmt(c.tds)}</td>
                     <td style={{ ...tdAuto, fontWeight: 800, color: DR, width: 110 }}>{fmt(c.gp)}</td>
                     <td style={{ ...tdAuto, fontWeight: 800, color: GOLD, width: 80 }}>{c.gpPct.toFixed(2)}%</td>
@@ -1671,8 +1678,8 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             </tbody>
             <tfoot><tr>
               <td style={{ ...tfTd, textAlign: 'left' }} colSpan={2}>TOTAL</td>
-              <td style={tfTd}>{fmt(totals.so.total)}</td><td style={tfTd}>{fmt(totals.so.gst)}</td><td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>
-              <td style={tfTd}>{fmt(totals.po.total)}</td><td style={tfTd}>{fmt(totals.po.gst)}</td>
+              <td style={tfTd}>{fmt(totals.so.total)}</td>{showVatCol && <td style={tfTd}>{fmt(totals.so.gst)}</td>}{showVatCol && <td style={tfTd}>{fmt(totals.so.otherTaxesGst)}</td>}
+              <td style={tfTd}>{fmt(totals.po.total)}</td>{showVatCol && <td style={tfTd}>{fmt(totals.po.gst)}</td>}
               <td style={tfTd}>{fmt(totals.po.incentiveAmt)}</td><td style={tfTd}>{fmt(totals.po.incentiveTds)}</td>
               <td style={{ ...tfTd, color: DR }}>{fmt(totals.gp.total)}</td><td style={{ ...tfTd, color: GOLD }}>{totals.gp.pct.toFixed(2)}%</td>
             </tr></tfoot>

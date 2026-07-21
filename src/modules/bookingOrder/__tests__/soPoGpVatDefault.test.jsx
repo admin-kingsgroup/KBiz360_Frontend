@@ -66,3 +66,30 @@ describe('SO/PO/GP — a new Africa voucher opens WITHOUT VAT by default', () =>
     expect(screen.queryByText(ZERO_RATED)).toBeNull();
   });
 });
+
+// The VAT column/labels are HIDDEN under Without VAT (the amounts are 0, so a "VAT (0%)" column is
+// just noise). "SVF <tax>" is the GP-breakdown VAT column header — a clean probe present only when
+// VAT applies. India (With GST) and a With-VAT Africa edit still render it.
+const editBooking = (over) => ({
+  id: 'v1', date: '2026-06-01', module: 'SF',
+  customer: { name: 'ACME', ledgerName: 'ACME' }, supplier: { name: 'X', ledgerName: 'X' },
+  so: { total: 1000 }, po: { total: 800 }, gp: { total: 200, pct: 20 }, rows: [], status: 'pending', ...over,
+});
+
+describe('SO/PO/GP — VAT columns/labels hidden under Without VAT (Africa)', () => {
+  test('fresh FBM (Without VAT) hides the VAT columns', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'FBM' }} setRoute={() => {}} />);
+    expect(screen.queryByText(/SVF VAT/i)).toBeNull();
+    expect(screen.queryByText(/Purchase VAT \(/i)).toBeNull();
+  });
+
+  test('India (BOM) keeps its GST columns — the hide is Africa-Without-VAT-scoped', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'BOM' }} setRoute={() => {}} />);
+    expect(screen.getByText(/SVF GST/i)).toBeInTheDocument();
+  });
+
+  test('an FBM voucher saved WITH VAT keeps the VAT columns', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'FBM' }} setRoute={() => {}} editBooking={editBooking({ branch: 'FBM', noVat: false })} />);
+    expect(screen.getByText(/SVF VAT/i)).toBeInTheDocument();
+  });
+});
