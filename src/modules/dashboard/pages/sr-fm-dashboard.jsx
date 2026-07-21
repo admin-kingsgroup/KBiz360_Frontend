@@ -48,7 +48,7 @@ export function SrFmDashboardPage({ currentUser, setRoute, branch }) {
     return <DashboardSkeleton numKpis={5} columns={3} hasCharts={true} />;
   }
 
-  const { cashForecast, bankAccounts, periodClose, arAgeing, apAgeing, varianceFlags, gstrFiling = [] } = data;
+  const { cashForecast, bankAccounts, periodClose = [], arAgeing, apAgeing, varianceFlags = [], gstrFiling = [] } = data;
 
   // Derive KPIs from the loaded data instead of hard-coded zeros, so figures
   // reflect reality (and populate automatically once the data sources fill in).

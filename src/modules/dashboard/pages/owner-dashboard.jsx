@@ -231,7 +231,7 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   );
 
   if (isError && !data) {
-    return <DashboardError error={error} onRetry={refetch} title="Could not load the AD Dashboard (All)." />;
+    return <DashboardError error={error} onRetry={refetch} title="Could not load the AD Dashboard." />;
   }
   if (isLoading || !data) {
     return <DashboardSkeleton numKpis={12} />;
@@ -366,10 +366,13 @@ export function OwnerDashboardPage({ currentUser, setRoute, branch, setBranch })
   };
 
   const pageSubtitle = effScope === 'ALL' ? 'Group view — all branches side by side, each in its own currency (never summed)' : `Branch view — ${effScope} only`;
+  // Title follows scope: the group view is "(All)"; a single-branch view names the branch
+  // (so a MHUB-only view reads "AD Dashboard — MHUB", matching the "Branch view — MHUB only" subtitle).
+  const pageTitle = effScope === 'ALL' ? 'AD Dashboard (All)' : `AD Dashboard — ${effScope}`;
 
   return (
     <PageLayout>
-      <DashboardHeader title="AD Dashboard (All)" subtitle={pageSubtitle} user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: 'AD Dashboard (All)', recommend: 'portrait' })} />
+      <DashboardHeader title={pageTitle} subtitle={pageSubtitle} user={currentUser} onExport={() => openPrintPreview({ selector: 'main', title: pageTitle, recommend: 'portrait' })} />
       {Controls}
 
       {/* ── Headline KPIs ──

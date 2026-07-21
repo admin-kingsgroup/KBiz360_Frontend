@@ -48,7 +48,7 @@ export function SrAeDashboardPage({ currentUser, setRoute, branch }) {
     return <DashboardSkeleton numKpis={4} columns={2} hasCharts={false} />;
   }
 
-  const { todayVouchers, reconStatus, topVendorsOverdue } = data;
+  const { todayVouchers = [], reconStatus, topVendorsOverdue = [] } = data;
   const recoIssues = (reconStatus || []).reduce((s, r) => s + (r.unmatched || 0), 0);
 
   return (
