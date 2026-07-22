@@ -2,14 +2,16 @@
 // Kept in its own dependency-light module (only ./ui) so it is unit-testable without
 // dragging in the styles/useReference/api import chain the JSX component needs.
 //
-// On a REFUND, "Our Service Fee" DEFAULTS to the ORIGINAL sale's service fee (Owner's
-// rule 2026-07-22): the fee retained on a refund mirrors what the sale charged, so the
-// refund invoice prints the same figure (e.g. ₹300 + its GST) — still editable, and a
-// fee the preparer already typed is never clobbered. Deliberately OMITS the supplier
-// service charge + its GST (the supplier keeps them — never returned to us); those
-// stay blank. Everything else carries over: the airline-refundable fare (PO total
-// less the supplier service fee & its GST) and the commission reversal
-// (clawback / GST / TDS).
+// On a REFUND, the Fetch adopts the ORIGINAL sale's retained charges (Owner's rule
+// 2026-07-22): "Our Service Fee" ← the SO's service fee (e.g. ₹300, so the refund
+// invoice prints the same fee + its GST) and "Our Service Charge - 2" ← the SO's NET
+// SVC2 (e.g. ₹30 → ₹35.40 with GST, exactly re-retaining the margin the sale reversal
+// would otherwise hand back) — the client is refunded ONLY the airline fare. Fetch is
+// an explicit action, so both fields are overwritten like Supplier Refund is; they
+// stay editable afterwards. Deliberately OMITS the supplier service charge + its GST
+// (the supplier keeps them — never returned to us); those stay blank. Everything else
+// carries over: the airline-refundable fare (PO total less the supplier service fee &
+// its GST) and the commission reversal (clawback / GST / TDS).
 //
 // The original SO SVC2 (margin) is handled by `isRefund`: on a REFUND it is refunded
 // to the client IN FULL (the sale reversal returns it), so we must NOT pre-load it as
@@ -151,13 +153,21 @@ export function refundPrefillFromBooking(b, state = {}, isRefund = true) {
     againstInvoice: b?.saleVno || '',
     againstPurchase: b?.purchaseVno || '',
     supplierAmt: supplierRefund,
-    // REFUND → blank: the original SO SVC2 is refunded to the client in full by the
-    // sale reversal, so it is NOT retained as our refund-markup (that would re-charge
-    // it and net it to zero). REISSUE → carries over the original SO margin.
-    markup: isRefund ? '' : blank(markupTotal),            // Our Service Charge - 2
-    // REFUND → Our Service Fee defaults to the ORIGINAL sale's service fee (see the
-    // module note) so the refund invoice shows the same retained fee the sale billed.
-    ...(isRefund && !num(state.serviceCharge)
+    // REFUND → retain the ORIGINAL sale's SVC2: fill the NET margin (heads-first — the
+    // per-line `markup` is stored GST-inclusive) so the form's GST-on-top reproduces the
+    // sale's exact SVC2 (+GST), cancelling what the sale reversal returns — the client
+    // is refunded only the airline fare. REISSUE → carries the SO margin as before.
+    markup: isRefund
+      ? blank((() => {
+        const heads = Array.isArray(so.heads) ? so.heads : [];
+        const h = heads.find((x) => x && x.key === 'markup');
+        if (h) return r2(num(h.amt));
+        return r2(soLines.reduce((s, l) => s + (num(l && l.markup) - num(l && l.gstMk)), 0));
+      })())
+      : blank(markupTotal),                                // Our Service Charge - 2
+    // REFUND → Our Service Fee ← the ORIGINAL sale's service fee (see the module note),
+    // so the refund invoice shows the same retained fee the sale billed.
+    ...(isRefund
       ? (() => { const f = r2(num(so.serviceCharge) || soLines.reduce((s, l) => s + num(l && l.ssvc), 0)); return f ? { serviceCharge: f } : {}; })()
       : {}),
     incentiveAmt: reverse ? blank(r2(num(po.incentiveAmt))) : '',   // Commission clawback ← PO incentive
