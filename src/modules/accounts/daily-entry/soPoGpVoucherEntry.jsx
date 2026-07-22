@@ -1122,7 +1122,9 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       // isB2C is declared further down (render scope) — same test inlined here.
       if (/b2c/i.test(customer.ledgerGroup || '') && !customer.name.trim()) miss.push('Customer (Bill to)');
     }
-    if (!isNoSupp && !hasSuppLedger) miss.push(interBranch ? 'Supplier ledger (airline / cost)' : 'Supplier ledger (Pay to)');
+    // INB may be a sale-only deal (no purchase leg — e.g. service-only Insurance): the
+    // supplier is required only once a purchase side is actually being entered.
+    if (!isNoSupp && !hasSuppLedger && (!interBranch || supplier.name.trim() || totals.po.total > 0)) miss.push(interBranch ? 'Supplier ledger (airline / cost)' : 'Supplier ledger (Pay to)');
     if (needsScope) miss.push('Package type (International / Domestic)');
     lines.forEach((l, i) => {
       const c = lineCalc(spec, l, { branch: brCode, noVat: effNoVat, saleZeroRated: inbZeroRated, foreignSupplier: suppForeign });
@@ -2181,11 +2183,18 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
         <span style={{ fontSize: 11, color: '#5b616e', marginRight: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
           {editing ? <><Pencil size={12} /> Editing returns this voucher to Pending — approve it from the Pending queue to post the books.</> : <><Clock size={12} /> Saving creates a Pending voucher — it posts to the books only after approval.</>}
         </span>
-        <FL label="Remarks"><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder="optional" /></FL>
-        <FL label="Sales Tally Ref"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>
-        {!isNoSupp && <FL label="Purchase Tally Ref"><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="optional" /></FL>}
+        <FL label={interBranch ? 'Remarks' : 'Remarks *'}><input value={remarks} onChange={(e) => setRemarks(e.target.value)} style={{ ...inp, width: 220 }} placeholder={interBranch ? 'optional' : 'required'} /></FL>
+        <FL label="Sales Tally Ref *"><input value={saleTallyRef} onChange={(e) => setSaleTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder="required" /></FL>
+        {!isNoSupp && <FL label={interBranch ? 'Purchase Tally Ref' : 'Purchase Tally Ref *'}><input value={purTallyRef} onChange={(e) => setPurTallyRef(e.target.value)} style={{ ...inp, width: 130 }} placeholder={interBranch ? 'optional' : 'required'} /></FL>}
         {editing && (
           <button onClick={() => (onDone ? onDone() : setRoute && setRoute('/bookings/pending'))} className="max-tablet:min-h-[44px]" style={btnGh}><XCircle size={14} /> Cancel</button>
+        )}
+        {/* Every field is mandatory — name exactly what's missing next to the disabled
+            Save button, instead of a dead grey button the user has to puzzle out. */}
+        {missingFields.length > 0 && !saving && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#b42318', alignSelf: 'center', maxWidth: 560, textAlign: 'right' }}>
+            ⚠ Required: {missingFields.slice(0, 6).join(' · ')}{missingFields.length > 6 ? ` · +${missingFields.length - 6} more` : ''}
+          </span>
         )}
         <button disabled={!canSave || vo} onClick={() => save()} className="max-tablet:min-h-[44px]"
           title={vo ? VIEW_ONLY_REASON : (gpNegative && !interBranch ? 'Gross Profit is negative — a booking cannot post at a loss. Adjust the sale / supplier cost so GP ≥ 0.' : undefined)}
