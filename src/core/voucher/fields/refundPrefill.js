@@ -2,11 +2,14 @@
 // Kept in its own dependency-light module (only ./ui) so it is unit-testable without
 // dragging in the styles/useReference/api import chain the JSX component needs.
 //
-// Deliberately OMITS our service charge + its GST (we retain them — never refunded
-// to the client) and the supplier service charge + its GST (the supplier keeps them
-// — never returned to us); those stay blank. Everything else carries over: the
-// airline-refundable fare (PO total less the supplier service fee & its GST) and the
-// commission reversal (clawback / GST / TDS).
+// On a REFUND, "Our Service Fee" DEFAULTS to the ORIGINAL sale's service fee (Owner's
+// rule 2026-07-22): the fee retained on a refund mirrors what the sale charged, so the
+// refund invoice prints the same figure (e.g. ₹300 + its GST) — still editable, and a
+// fee the preparer already typed is never clobbered. Deliberately OMITS the supplier
+// service charge + its GST (the supplier keeps them — never returned to us); those
+// stay blank. Everything else carries over: the airline-refundable fare (PO total
+// less the supplier service fee & its GST) and the commission reversal
+// (clawback / GST / TDS).
 //
 // The original SO SVC2 (margin) is handled by `isRefund`: on a REFUND it is refunded
 // to the client IN FULL (the sale reversal returns it), so we must NOT pre-load it as
@@ -152,6 +155,11 @@ export function refundPrefillFromBooking(b, state = {}, isRefund = true) {
     // sale reversal, so it is NOT retained as our refund-markup (that would re-charge
     // it and net it to zero). REISSUE → carries over the original SO margin.
     markup: isRefund ? '' : blank(markupTotal),            // Our Service Charge - 2
+    // REFUND → Our Service Fee defaults to the ORIGINAL sale's service fee (see the
+    // module note) so the refund invoice shows the same retained fee the sale billed.
+    ...(isRefund && !num(state.serviceCharge)
+      ? (() => { const f = r2(num(so.serviceCharge) || soLines.reduce((s, l) => s + num(l && l.ssvc), 0)); return f ? { serviceCharge: f } : {}; })()
+      : {}),
     incentiveAmt: reverse ? blank(r2(num(po.incentiveAmt))) : '',   // Commission clawback ← PO incentive
     incentiveGst: reverse ? blank(r2(num(po.incentiveGst))) : '',
     incentiveTds: reverse ? blank(r2(num(po.incentiveTds))) : '',
