@@ -26,12 +26,19 @@ describe('refundPrefillFromBooking', () => {
     expect(p.supplierAmt).toBe(79410); // 80000 - 500 - 90
   });
 
-  test('REFUND does NOT retain the SO SVC2 (markup blank — it is refunded to the client in full)', () => {
+  test('REFUND retains the SO SVC2: markup ← the sale\'s NET margin (Owner\'s rule 2026-07-22)', () => {
     const p = refundPrefillFromBooking(BOOKING, {});       // isRefund defaults true
-    expect(p.markup).toBe('');           // SO SVC2 returns to the client, never re-billed
+    expect(p.markup).toBe(120);          // net SVC2 (line markup 120, no gstMk) — re-retained so the client gets only the fare back
     expect(p.incentiveAmt).toBe(1275);   // Commission clawback ← PO incentive
     expect(p.incentiveGst).toBe('');     // 0 → blank (keeps 0.00 placeholder)
     expect(p.incentiveTds).toBe(25.5);
+  });
+
+  test('REFUND markup prefers the SO heads (authoritative net) over the GST-inclusive line markup', () => {
+    const withHeads = { ...BOOKING, so: { ...BOOKING.so, heads: [{ key: 'markup', amt: 30 }], lines: [{ ...BOOKING.so.lines[0], markup: 35.4, gstMk: 5.4 }] } };
+    expect(refundPrefillFromBooking(withHeads, {}).markup).toBe(30);
+    const noHeads = { ...BOOKING, so: { ...BOOKING.so, lines: [{ ...BOOKING.so.lines[0], markup: 35.4, gstMk: 5.4 }] } };
+    expect(refundPrefillFromBooking(noHeads, {}).markup).toBe(30); // fallback: line markup − its GST
   });
 
   test('REISSUE carries the SO SVC2 margin over to the amendment (markup ← SO markup)', () => {
@@ -44,9 +51,9 @@ describe('refundPrefillFromBooking', () => {
     expect(p.incentiveAmt).toBe('');
     expect(p.incentiveGst).toBe('');
     expect(p.incentiveTds).toBe('');
-    // the rest still fills (refund: markup blank)
+    // the rest still fills (refund: markup ← net SVC2)
     expect(p.supplierAmt).toBe(74227);
-    expect(p.markup).toBe('');
+    expect(p.markup).toBe(120);
   });
 
   test('Commission Reversal default / Yes → clawback fills as before', () => {
@@ -54,14 +61,14 @@ describe('refundPrefillFromBooking', () => {
     expect(refundPrefillFromBooking(BOOKING, { commissionReversal: true }).incentiveAmt).toBe(1275);
   });
 
-  test('REFUND: Our Service Fee defaults to the ORIGINAL sale\'s service fee (Owner\'s rule 2026-07-22)', () => {
+  test('REFUND: Our Service Fee ← the ORIGINAL sale\'s service fee (Owner\'s rule 2026-07-22)', () => {
     const p = refundPrefillFromBooking(BOOKING, {});
     expect(p.serviceCharge).toBe(250);                    // ← SO serviceCharge, so the refund invoice shows the same fee
   });
 
-  test('REFUND: a service fee the preparer already typed is never clobbered; REISSUE stays manual', () => {
-    const typed = refundPrefillFromBooking(BOOKING, { serviceCharge: 300 });
-    expect(typed).not.toHaveProperty('serviceCharge');
+  test('REFUND: an explicit Fetch OVERWRITES a previously saved/typed fee (like Supplier Refund); REISSUE stays manual', () => {
+    const refetched = refundPrefillFromBooking(BOOKING, { serviceCharge: 100 });
+    expect(refetched.serviceCharge).toBe(250);            // fixing an old wrong split = re-Fetch
     const ri = refundPrefillFromBooking(BOOKING, {}, false);
     expect(ri).not.toHaveProperty('serviceCharge');
   });
