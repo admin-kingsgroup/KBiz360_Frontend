@@ -46,7 +46,15 @@ async function resolvePartyMaster(booking, side, code, given = {}) {
 export async function printBookingInvoice({ booking, side, branch, master = {}, title }) {
   const code = branchCode(branch) || String(booking.branch || '').toUpperCase();
   const party = await resolvePartyMaster(booking, side, code, master);
-  const usd = buildBookingInvoice(booking, side, branch, party);
+  // A refund/reissue booking carries no passenger rows of its own — fetch the ORIGINAL
+  // sale it reverses (by-link, read-only) so the printed invoice can show the passengers
+  // and sectors being refunded/reissued. Best-effort: the invoice prints without it.
+  const base = {};
+  if (['RF', 'RI'].includes(String(booking.module || '').toUpperCase()) && booking.againstInvoice) {
+    try { base.original = await apiGet('/api/booking-orders/by-link', { link: booking.againstInvoice, branch: code }); }
+    catch { /* original not resolvable — print without passenger context */ }
+  }
+  const usd = buildBookingInvoice(booking, side, branch, party, base);
   const ttl = title || `${side === 'sale' ? 'Sales Invoice' : 'Purchase Invoice'} · ${booking.bookingNo || booking.linkNo || ''}`;
 
   // India / single-currency branch → one invoice, no toggle. FBM is VAT but USD-only
@@ -68,7 +76,7 @@ export async function printBookingInvoice({ booking, side, branch, master = {}, 
   if (fx && fx.set && Number(fx.rate) > 0) {
     variants.push({
       label: to,
-      html: buildBookingInvoice(booking, side, branch, party, { fxRate: fx.rate, localCurrency: to, fxDate: fx.date }),
+      html: buildBookingInvoice(booking, side, branch, party, { ...base, fxRate: fx.rate, localCurrency: to, fxDate: fx.date }),
     });
   } else {
     // No rate for today → block local printing (show a locked tab with the reason).
