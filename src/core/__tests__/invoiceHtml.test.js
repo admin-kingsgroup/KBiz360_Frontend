@@ -200,3 +200,64 @@ describe('buildBookingInvoice — Africa VAT branch (NBO)', () => {
     expect(html).toContain('146,900.00'); // 1130 × 130, western grouping
   });
 });
+
+describe('buildBookingInvoice — reversal (RF/RI) invoice', () => {
+  beforeEach(() => { companyProfile.mockReturnValue({}); hsnSacFor.mockReturnValue(''); });
+
+  // Mirrors the live Kesar Craft refund: supplierAmt 28,323 − charges (100+236)
+  // − their 18% GST (60.48) = net refund 27,926.52.
+  const refund = {
+    branch: 'AMD', module: 'RF', date: '2026-06-28', saleVno: 'AMD/0726/RF00001',
+    linkNo: 'AMD/0726/SF00098', gstMode: 'intra', againstInvoice: 'AMD/0726/SF00098',
+    customer: { name: 'KESAR CRAFT PACKAGING PRIVATE LIMITED', ledgerGroup: 'Sundry Debtors' },
+    reversal: {
+      supplierAmt: 28323, serviceCharge: 100, otherTaxes: 236, gstPct: 18, gstMode: 'intra',
+      supplierSvc: 0, supplierGst: 0, supplierCancel: 0, supplierCancelGst: 0,
+      cancelRecover: true, againstInvoice: 'AMD/0726/SF00098',
+    },
+    rows: [],
+  };
+
+  test('refund booking renders its reversal figures, not an empty table', () => {
+    const html = buildBookingInvoice(refund, 'sale', { code: 'AMD' }, {});
+    expect(html).toContain('REFUND INVOICE');
+    expect(html).toContain('Refund Breakdown');
+    expect(html).toContain('28,323.00');                 // refund value
+    expect(html).toContain('336.00');                    // service charges (svc + SVC2, folded)
+    expect(html).toContain('27,926.52');                 // net refund
+    expect(html).toContain('Less: CGST');                // intra split of the 60.48 charge GST
+    expect(html).toContain('30.24');
+    expect(html).toContain('NET REFUND (INR)');
+    expect(html).toContain('AMD/0726/SF00098');          // against invoice
+    expect(html).not.toContain('No line detail captured');
+    expect(html).not.toContain('Bank Details');          // refund pays OUT — settlement note instead
+    expect(html).toContain('Settlement');
+  });
+
+  test('passenger + sector context rides in from the original sale (opts.original)', () => {
+    const original = { rows: [{ fn: 'SUBASINI', sn: 'KUMBHAR', sectors: [{ sector: 'BBI-AMD', airline: 'INDIGO', pnr: '07W3KS', travelDate: '2026-07-01' }] }] };
+    const html = buildBookingInvoice(refund, 'sale', { code: 'AMD' }, {}, { original });
+    expect(html).toContain('Passengers');
+    expect(html).toContain('SUBASINI KUMBHAR');
+    expect(html).toContain('BBI-AMD');
+    expect(html).toContain('07W3KS');
+  });
+
+  test('recovered cancellation shows as its own deduction', () => {
+    const withCancel = { ...refund, reversal: { ...refund.reversal, supplierCancel: 1000, supplierCancelGst: 180 } };
+    const html = buildBookingInvoice(withCancel, 'sale', { code: 'AMD' }, {});
+    expect(html).toContain('Cancellation');
+    expect(html).toContain('1,180.00');                  // penalty + GST recovered from customer
+    expect(html).toContain('26,746.52');                 // 27,926.52 − 1,180
+  });
+
+  test('reissue (RI) bills the customer: charges ADD and total is NET PAYABLE', () => {
+    const reissue = { ...refund, module: 'RI', saleVno: 'AMD/0726/RI00001' };
+    const html = buildBookingInvoice(reissue, 'sale', { code: 'AMD' }, {});
+    expect(html).toContain('REISSUE INVOICE');
+    expect(html).toContain('Add: Service Charges');
+    expect(html).toContain('NET PAYABLE (INR)');
+    expect(html).toContain('28,719.48');                 // 28,323 + 336 + 60.48
+    expect(html).toContain('Bank Details');              // customer pays → bank block stays
+  });
+});

@@ -301,8 +301,62 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   };
   const fbCaption = isFlight ? `Ticket - ${booking.packageType || 'Domestic'}` : (CAPTION[moduleCode] || headerRef);
 
+  // ── Reversal (RF/RI) invoice — a refund/reissue booking has NO forward rows and NO
+  // `so` snapshot; its financials live on booking.reversal (same figures the spawned
+  // RF/RI voucher posts — buildReversalVoucherData). Customer refund = supplier refund
+  // value − our charges − their GST − recovered airline cancellation; a reissue is the
+  // mirror (difference + charges billed TO the customer). The SVC2 margin stays folded
+  // into one "Service Charges" figure (hidden-margin rule) — the split is never shown.
+  const isReversal = isSale && ['RF', 'RI'].includes(moduleCode) && !!booking.reversal;
+  const isRefundInv = isReversal && moduleCode === 'RF';
+  const rv = booking.reversal || {};
+  const rPct = effNoVat ? 0 : (rv.gstPct != null && String(rv.gstPct).trim() !== '' ? Number(rv.gstPct) : activeRate);
+  const rSvc = r2(rv.serviceCharge || 0), rOt = r2(rv.otherTaxes || 0);
+  const rCharges = r2(rSvc + rOt);
+  const rChargesGst = r2(r2(rSvc * rPct / 100) + r2(rOt * rPct / 100));
+  const rCancel = (isRefundInv && rv.cancelRecover !== false)
+    ? r2((Number(rv.supplierCancel) || 0) + (Number(rv.supplierCancelGst) || 0)) : 0;
+  const rBase = isRefundInv
+    ? r2((Number(rv.supplierAmt) || 0) + (Number(rv.supplierSvc) || 0) + (Number(rv.supplierGst) || 0))
+    : r2((Number(rv.supplierAmt) || 0) - (Number(rv.supplierSvc) || 0) - (Number(rv.supplierGst) || 0));
+  const rNet = isRefundInv
+    ? r2(rBase - rCharges - rChargesGst - rCancel)
+    : r2(rBase + rCharges + rChargesGst);
+
   let bkHead, bkBody, cols;
-  if (isSale) {
+  if (isReversal) {
+    // One financial line — the refund's own figures, never the original fares.
+    // Passenger/sector context comes from the ORIGINAL sale booking (opts.original,
+    // fetched by printInvoice via /api/booking-orders/by-link) or the reversal's own
+    // sector stamps when it carries them.
+    const head = [
+      '<th class="l">Description</th>',
+      '<th class="l">Against Invoice</th>',
+      `<th>${isRefundInv ? 'Refund Value' : 'Reissue Value'}</th>`,
+      '<th>Service Chg</th>',
+      `<th>${taxLabel}/Service (${rPct}%)</th>`,
+      rCancel ? '<th>Cancellation</th>' : '',
+      '<th>Total</th>',
+    ].filter(Boolean);
+    cols = head.length;
+    bkHead = head.join('');
+    const desc = `${MODULE_NAME[moduleCode] || 'Service'} ${isRefundInv ? 'Ticket Refund' : 'Ticket Reissue'}`;
+    const origRows = Array.isArray(opts.original?.rows) ? opts.original.rows : [];
+    const pax = origRows.map((p) => [p.fn, p.sn].filter(Boolean).join(' ').trim()).filter(Boolean);
+    const paxRow = pax.length
+      ? `<tr class="secrow"><td class="l" colspan="${cols}"><span class="seclab">Passengers</span><div class="secs"><div class="sub sec">${pax.map(esc).join(' · ')}</div></div></td></tr>` : '';
+    const secSrc = (Array.isArray(rv.sectors) && rv.sectors.length) ? [{ sectors: rv.sectors }] : origRows;
+    const cells = [
+      `<td class="l">${esc(desc)}</td>`,
+      `<td class="l gold">${esc(booking.againstInvoice || rv.againstInvoice || '—')}</td>`,
+      `<td>${n2(rBase)}</td>`,
+      `<td>${n2(rCharges)}</td>`,
+      `<td>${n2(rChargesGst)}</td>`,
+      rCancel ? `<td>${n2(rCancel)}</td>` : '',
+      `<td class="tf">${cur}${n2(rNet)}</td>`,
+    ].filter(Boolean).join('');
+    bkBody = `<tr>${cells}</tr>${paxRow}${secSrc.map((l) => sectorRow(l, cols)).join('')}`;
+  } else if (isSale) {
     // Sale mirrors the SO grid, but the agency margin is not shown as its own line:
     // the "Other Taxes" (markup) amount is FOLDED into a single "Taxes" column
     // (Taxes = fare tax + markup) and the per-line markup-GST column is dropped.
@@ -370,10 +424,10 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   // it never appears as its own line, and the displayed tax line shows the SVF/regular tax
   // ONLY. Still foots to NET because NET already contains otGst.
   const subTotal = r2(r2(snap.lineTotal || 0) + otGst), service = r2(snap.serviceCharge || 0);
-  const net = r2(snap.total || (r2(snap.lineTotal || 0) + service + gst + otGst + tcs));
+  const net = isReversal ? rNet : r2(snap.total || (r2(snap.lineTotal || 0) + service + gst + otGst + tcs));
   // VAT (Africa) → a single tax line, no place-of-supply split. India → CGST/SGST (intra)
   // or IGST (inter). The SVC2 margin tax is NOT shown (folded into Sub Total above).
-  const inter = booking.gstMode === 'inter';
+  const inter = (isReversal ? (rv.gstMode || booking.gstMode) : booking.gstMode) === 'inter';
   const half = r2(gst / 2);
   const gstRows = isVat
     ? `<div class="r"><span class="k">${taxLabel}</span><span class="v">${cur}${n2(gst)}</span></div>`
@@ -385,8 +439,24 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   // still foot to the clean NET TOTAL. Blank when the total already lands on a rupee.
   const roundOff = r2(snap.roundOff || 0);
   const roundRow = roundOff ? `<div class="r"><span class="k">Round Off</span><span class="v">${roundOff < 0 ? '-' : ''}${cur}${n2(Math.abs(roundOff))}</span></div>` : '';
-  const sumtbl = isSale
+  // Reversal summary — deductions carry an explicit minus for a refund; a reissue ADDS
+  // its charges (the customer pays the fare difference + our charges).
+  const rHalf = r2(rChargesGst / 2);
+  const rSign = isRefundInv ? 'Less: ' : 'Add: ', rMinus = isRefundInv ? '-' : '';
+  const rGstRows = isVat
+    ? `<div class="r"><span class="k">${rSign}${taxLabel}</span><span class="v">${rMinus}${cur}${n2(rChargesGst)}</span></div>`
+    : (inter
+      ? `<div class="r"><span class="k">${rSign}IGST</span><span class="v">${rMinus}${cur}${n2(rChargesGst)}</span></div>`
+      : `<div class="r"><span class="k">${rSign}CGST</span><span class="v">${rMinus}${cur}${n2(rHalf)}</span></div><div class="r"><span class="k">${rSign}SGST</span><span class="v">${rMinus}${cur}${n2(r2(rChargesGst - rHalf))}</span></div>`);
+  const sumtbl = isReversal
     ? `
+    <div class="r"><span class="k">${isRefundInv ? 'Refund' : 'Reissue'} Value</span><span class="v">${cur}${n2(rBase)}</span></div>
+    ${rCharges ? `<div class="r"><span class="k">${rSign}Service Charges</span><span class="v">${rMinus}${cur}${n2(rCharges)}</span></div>` : ''}
+    ${rChargesGst ? rGstRows : ''}
+    ${rCancel ? `<div class="r" style="color:#A32D2D"><span class="k">Less: Cancellation Charges</span><span class="v">-${cur}${n2(rCancel)}</span></div>` : ''}
+    <div class="net"><span class="k">NET ${isRefundInv ? 'REFUND' : 'PAYABLE'} (${esc(curCode)})</span><span class="v">${cur}${n2(rNet)}</span></div>`
+    : isSale
+      ? `
     <div class="r"><span class="k">Sub Total</span><span class="v">${cur}${n2(subTotal)}</span></div>
     ${service ? `<div class="r"><span class="k">Service Fee</span><span class="v">${cur}${n2(service)}</span></div>` : ''}
     ${gst ? gstRows : ''}${tcsRow}${roundRow}
@@ -409,12 +479,16 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     bank.branch ? `Branch: ${esc(bank.branch)}` : '',
   ].filter(Boolean).join('<br>') || 'Bank details on file.';
   const upiBlock = `<div class="upicol"><div class="lab2">UPI · Scan &amp; Pay</div><img class="upi-qr" src="${UPI_QR}" alt="UPI QR — ${esc(upiId)}" /><div class="upi-id">${esc(upiId)}</div></div>`;
-  const payBlock = isSale
-    ? `<div class="paygrid"><div class="bankcol"><div class="lab2">Bank Details</div><div class="pay">${bankLines}</div></div>${upiBlock}</div>`
-    : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input ${taxLabel} credit claimed against supplier ${idLabel}.<br>Link No referenced for invoice-wise GP.</div>`;
+  // A refund is money WE pay OUT — our bank/UPI collection block would invite a payment,
+  // so it is replaced with a settlement note. A reissue bills the customer → keep it.
+  const payBlock = isRefundInv
+    ? `<div class="lab2">Settlement</div><div class="pay">Refund payable to ${esc(party.name || 'the customer')} against Invoice ${esc(booking.againstInvoice || rv.againstInvoice || '')}.<br>Processed to the original mode of payment / party account.<br>Link No referenced for invoice-wise GP.</div>`
+    : isSale
+      ? `<div class="paygrid"><div class="bankcol"><div class="lab2">Bank Details</div><div class="pay">${bankLines}</div></div>${upiBlock}</div>`
+      : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input ${taxLabel} credit claimed against supplier ${idLabel}.<br>Link No referenced for invoice-wise GP.</div>`;
 
   const sheet = `<div class="iv"><div class="sheet">
-    <div class="titlebar"><div class="title">${isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><div class="iata-box"><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /><div class="iata-no">IATA No: ${esc(iataNo)}</div></div></div><div class="title-rule"></div>
+    <div class="titlebar"><div class="title">${isReversal ? (isRefundInv ? 'REFUND INVOICE' : 'REISSUE INVOICE') : isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><div class="iata-box"><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /><div class="iata-no">IATA No: ${esc(iataNo)}</div></div></div><div class="title-rule"></div>
     <div class="tophead">
       <div class="brandcol">
         <img class="tk-logo" src="${TK_LOGO}" alt="${esc(company.name)}" />
@@ -431,7 +505,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     <div class="parties">${isSale
       ? partyBlock('Billed To', party, cur, idLabel) + partyBlock('Issued By', company, cur, idLabel)
       : partyBlock('Supplier', party, cur, idLabel) + partyBlock('Billed To (Buyer)', company, cur, idLabel)}</div>
-    <div class="fb-label">${isSale ? 'Fare Breakdown' : 'Cost Breakdown'}${fbCaption ? ` <span class="fb-ref">· ${esc(fbCaption)}</span>` : ''}</div>
+    <div class="fb-label">${isReversal ? (isRefundInv ? 'Refund Breakdown' : 'Reissue Breakdown') : isSale ? 'Fare Breakdown' : 'Cost Breakdown'}${fbCaption ? ` <span class="fb-ref">· ${esc(fbCaption)}</span>` : ''}</div>
     <table class="bk"><thead><tr>${bkHead}</tr></thead><tbody>${bkBody || emptyRow}</tbody></table>
     <div class="summary">
       <div class="sumleft"><div class="lab2">HSN / SAC</div><div class="hsnval">${esc(sac)}</div></div>
