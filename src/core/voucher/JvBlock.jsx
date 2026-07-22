@@ -1,5 +1,6 @@
 import React from 'react';
 import { consolidateLegs } from './ui';
+import { localeOf, activeCurrency } from '../format';
 
 // ────────────────────────────────────────────────────────────────────────────
 // JvBlock — the ONE shared JV renderer for the whole app. A side-by-side T-account:
@@ -15,7 +16,10 @@ import { consolidateLegs } from './ui';
 //   empty    : message when there are no legs yet
 // ────────────────────────────────────────────────────────────────────────────
 const num = (v) => (Number(v) || 0);
-const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Branch-currency-aware digit grouping: Indian lakh/crore for ₹, Western thousands for
+// USD branches (NBO/DAR/FBM). Follows the active branch currency (set in App.jsx) so a
+// USD voucher's JV legs read "485,000.00", not "4,85,000.00".
+const fmtN = (v) => num(v).toLocaleString(localeOf(activeCurrency()), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const r2 = (x) => Math.round((Number(x) || 0) * 100) / 100;
 
 const HEAD = { padding: '3px 8px', fontSize: 9.5, fontWeight: 700, color: '#5a6691', background: '#eef1f7', letterSpacing: '0.3px' };

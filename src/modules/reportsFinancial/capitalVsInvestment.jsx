@@ -11,7 +11,11 @@ import { bc } from '../../core/styleTokens';
 import { SkeletonText } from '../../shell/primitives';
 
 const DEFAULT_HURDLE = 18; // initial cost-of-capital benchmark % — user-editable on screen
-const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'BOM'));
+// A blank/unresolved branch defaults to CONSOLIDATED ('ALL' → '' param), never 'BOM' — this
+// value feeds the query key AND the capital-analysis / credit-capacity API params, so a 'BOM'
+// default would silently load Mumbai's capital bridge for the current view. Matches the
+// pnlTally / balanceSheetTally / branchCode() convention (blank ⇒ all, never a specific branch).
+const brCodeOf = (b) => (b === 'ALL' ? 'ALL' : (b?.code || 'ALL'));
 const dmy = (s) => { const d = new Date(s); return Number.isNaN(d.getTime()) ? s : `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })} ${d.getFullYear()}`; };
 
 // Branch-aware money formatters. India branches keep ₹ + Indian grouping (Cr/L);

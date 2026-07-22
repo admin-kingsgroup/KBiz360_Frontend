@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { BRANCHES } from '../../../core/data';
+import { bc } from '../../../core/styles';
+import { localeOf } from '../../../core/format';
 import { usePayslips, useMyEmployee } from '../usePayroll';
 import { isIndiaRegime as isIndiaRegimeCode, regimeName as regimeNameOf } from '../payrollMaps';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
@@ -30,6 +32,10 @@ function MyPayslipBody({emp}){
   const curMonth=months.includes(selMonth)?selMonth:months[0]||"";
   const slip=slips.find(s=>s.month===curMonth)||null;
   const brCfg=BRANCHES.find(b=>b.code===emp.branch)||{entity:"Travkings Tours & Travels"};
+  // Branch-currency aware payslip: a foreign (USD) branch employee must see their pay in $ with
+  // Western grouping, not a hardcoded ₹ + Indian lakh/crore. `brCfg.cur` is the branch currency.
+  const c=(bc({code:emp.branch})||{}).cur||'₹';   // symbol lives on the branch CFG (bc), not on the BRANCHES record
+  const fm=n=>c+Number(n||0).toLocaleString(localeOf(c));
   // Indian PF/ESI/PT/TDS apply to India branches only; a foreign branch's payslip carries zero of
   // them (its own statute is handled manually) — so show ONLY the deductions that actually apply,
   // never a misleading "Provident Fund ₹0" row, and surface a one-line note explaining net = gross.
@@ -78,29 +84,29 @@ function MyPayslipBody({emp}){
               <p style={{margin:"12px 0 8px",fontSize:11,fontWeight:700,color:"#155724",textTransform:"uppercase",letterSpacing:"0.4px"}}>Earnings</p>
               {earnings.map(([desc,amount])=>(
                 <div key={desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
-                  <span style={{color:"#0d1326"}}>{desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>₹{Number(amount).toLocaleString("en-IN")}</span>
+                  <span style={{color:"#0d1326"}}>{desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>{fm(amount)}</span>
                 </div>
               ))}
               <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:"2px solid #0d1326",marginTop:4,fontWeight:700}}>
-                <span>Gross Earnings</span><span style={{fontFamily:"monospace",color:"#22c55e"}}>₹{Number(slip.gross).toLocaleString("en-IN")}</span>
+                <span>Gross Earnings</span><span style={{fontFamily:"monospace",color:"#22c55e"}}>{fm(slip.gross)}</span>
               </div>
             </div>
             <div style={{paddingLeft:16}}>
               <p style={{margin:"12px 0 8px",fontSize:11,fontWeight:700,color:"#A32D2D",textTransform:"uppercase",letterSpacing:"0.4px"}}>Deductions</p>
               {deductions.map(([desc,amount])=>(
                 <div key={desc} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #dfe2e7",fontSize:11.5}}>
-                  <span style={{color:"#0d1326"}}>{desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>₹{Number(amount).toLocaleString("en-IN")}</span>
+                  <span style={{color:"#0d1326"}}>{desc}</span><span style={{fontFamily:"monospace",fontWeight:600}}>{fm(amount)}</span>
                 </div>
               ))}
               <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderTop:"2px solid #0d1326",marginTop:4,fontWeight:700}}>
-                <span>Total Deductions</span><span style={{fontFamily:"monospace",color:"#A32D2D"}}>₹{Number(slip.totalDeductions).toLocaleString("en-IN")}</span>
+                <span>Total Deductions</span><span style={{fontFamily:"monospace",color:"#A32D2D"}}>{fm(slip.totalDeductions)}</span>
               </div>
             </div>
           </div>
           {/* Net pay */}
           <div style={{padding:"16px 22px",background:"#fff8e8",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div><p style={{margin:0,fontSize:13,fontWeight:700,color:"#0d1326"}}>Net Pay</p><p style={{margin:"2px 0 0",fontSize:11,color:"#5a6691"}}>{SS_MONTH_LABEL(curMonth)} · {emp.branch}</p></div>
-            <p style={{margin:0,fontSize:26,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>₹{Number(slip.net).toLocaleString("en-IN")}</p>
+            <p style={{margin:0,fontSize:26,fontWeight:700,color:"#0d1326",fontFamily:"monospace"}}>{fm(slip.net)}</p>
           </div>
         </div>
         </>)}

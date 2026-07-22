@@ -665,7 +665,7 @@ export const RECON_STATUS_DATA = [];
 
 
 export const TODAY_VOUCHERS_BY_BR = {
-  BOMMB: [],
+  MHUB: [],
   BOM: [],
   AMD: [],
 };
@@ -962,7 +962,7 @@ export const STATUTORY_FILINGS = [];
 
 
 export const PERIOD_LOCK_STATE = {
-  "BOMMB": {},
+  "MHUB": {},
   "BOM": {},
   "AMD": {},
 };

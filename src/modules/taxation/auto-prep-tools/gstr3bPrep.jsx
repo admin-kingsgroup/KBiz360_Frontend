@@ -24,6 +24,7 @@ import { MiniBar, share, pctText } from '../../../core/insightsUI';
 import { TDS_SECTIONS } from '../../../core/taxSections';
 import { PHASE2_Page } from '../../../shell/PHASE2_Page';
 import { openPrintPreview } from '../../../core/PrintPreview';
+import { companyProfile } from '../../../core/referenceCache';
 import { SampleBanner } from '../../../core/ux/SampleBanner';
 
 // BUSINESS SUB-MODULE REORG (2026-07-14): left behind in taxation/legacy.jsx
@@ -43,7 +44,12 @@ export const GSTR3B_SUMMARY = {
   interestPenalty:0,
 };
 
-export function GSTR3BPrep(){
+export function GSTR3BPrep({branch}){
+  // Filing entity/GSTIN from the ACTIVE branch's company profile (was a hardcoded
+  // "27AAACT1234A1ZF (Head Office)" placeholder — BOM's GSTIN on every branch).
+  const brCode=branch&&branch!=="ALL"?(branch.code||branch):null;
+  const gstin=(companyProfile(brCode)||{}).gstin||"";
+  const entityLabel=brCode?`${brCode}${gstin?` · ${gstin}`:" · (GSTIN not set in Company Profile)"}`:"All branches";
   const d=GSTR3B_SUMMARY;
   const Section=({no,title,rows,highlight})=>(
     <div style={{...cardStyle,marginBottom:12}}>
@@ -62,7 +68,7 @@ export function GSTR3BPrep(){
     </div>
   );
   return(
-    <PHASE2_Page title="GSTR-3B Auto-Prep" subtitle="Summary return auto-built from vouchers · April 2026 · 27AAACT1234A1ZF (Head Office)"
+    <PHASE2_Page title="GSTR-3B Auto-Prep" subtitle={`Summary return auto-built from vouchers · ${entityLabel}`}
       toolbar={<><button style={{padding:"7px 14px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:12,fontWeight:700,cursor:"pointer"}}>📥 Download JSON</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📤 File on GST Portal</button></>}>
       <SampleBanner note="this GSTR-3B summary is sample data, not a live return." />
       {/* Liability summary */}

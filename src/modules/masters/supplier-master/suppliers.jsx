@@ -101,7 +101,10 @@ export const SuppliersMaster = ({ branch } = {}) => {
       // State = 'Others' (a foreign party has no Indian GST state, but State stays mandatory).
       { key: 'country', label: 'Country', type: 'select', options: COUNTRIES, emptyLabel: 'India (default)', table: false, required: true,
         onSet: (v, next) => { next.state = (v && v !== 'India') ? 'Others' : ''; } },
-      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false, required: true },
+      // State (place of supply) is an Indian GST concept (decides CGST/SGST vs IGST) — hidden and
+      // not required on a VAT branch (DAR/NBO/FBM). Mirrors the Customer master; without the gate a
+      // VAT-branch supplier import that omits state was hard-rejected by the BE validator.
+      { key: 'state', label: 'State (place of supply)', type: 'select', options: STATE_NAMES, table: false, show: (f) => !isVatBranch(f.branch), required: (f) => !isVatBranch(f.branch) },
       { key: 'gstTreatment', label: 'GST Treatment', type: 'select', options: GST_TREATMENTS, table: false, show: (f) => !isVatBranch(f.branch) },
       { key: 'tdsSection', label: 'TDS Section', type: 'select', options: TDS_SECTIONS, table: false, show: (f) => !isVatBranch(f.branch) },
       // VAT-branch tax identity (Africa) — shown only for a VAT branch, hidden for India.

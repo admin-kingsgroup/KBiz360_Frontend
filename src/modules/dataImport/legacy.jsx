@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, Upload, CheckCircle2, AlertTriangle, FileSpreadsheet, ShieldAlert, Eye, X } from 'lucide-react';
 import { card } from '../../core/styles';
 import { apiPost, apiGet } from '../../core/api';
-import { VSPECS } from '../../core/voucherSpecs';
+import { VSPECS, isVatBranch } from '../../core/voucherSpecs';
 import { useModalEsc } from '../../core/ux/useModalEsc';
 import { clickable } from '../../core/ux/clickable';
 import { isViewOnly, VIEW_ONLY_REASON } from '../../shell/primitives';
@@ -257,7 +257,7 @@ const GROUPS = ['Masters', 'Parties', 'SO/PO/GP Voucher', 'Vouchers'];
    regime (VAT Output/Input for Africa, CGST/SGST for India), so a VAT file just
    works. Sub-groups and non-tax columns are identical across regimes. */
 const REGIMES = [
-  { key: 'GST', label: 'India · GST', hint: 'BOM · AMD · BOMMB' },
+  { key: 'GST', label: 'India · GST', hint: 'BOM · AMD · MHUB' },
   { key: 'VAT', label: 'Africa · VAT', hint: 'NBO · DAR · FBM' },
 ];
 const isGstCol = (c) => /cgst|sgst|igst/i.test(c);
@@ -513,7 +513,13 @@ function PreviewModal({ spec, data, onClose }) {
   const [open, setOpen] = useState(null);
   const d = data.detail || {};
   const rows = d.rows || [];
-  const fmt = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  // Preview currency follows the imported branch — a VAT branch (NBO/DAR/FBM) previews USD ($),
+  // not ₹. This is the exact go-live action (Owner previewing NBO's incoming USD records), so a
+  // hardcoded ₹ misrendered every line. Import files are single-branch in practice → take the
+  // first row carrying a branch.
+  const _pvBranch = (rows.find((r) => r.branch) || {}).branch || '';
+  const _pvVat = isVatBranch(_pvBranch);
+  const fmt = (n) => (_pvVat ? '$' : '₹') + (Number(n) || 0).toLocaleString(_pvVat ? 'en-US' : 'en-IN', { maximumFractionDigits: 2 });
   const errCount = rows.filter((r) => r.error || r._error).length;
   const missingCount = rows.filter((r) => r.jv?.missing?.length).length;
   const th = { padding: '7px 8px', borderBottom: '2px solid #cdd1d8', textAlign: 'left', color: DIM, fontWeight: 700, position: 'sticky', top: 0, background: '#fff', whiteSpace: 'nowrap' };
@@ -753,7 +759,7 @@ export function DataImportPage({ currentUser }) {
         <span style={{ fontSize: 10.5, color: DIM }}>
           {regime === 'VAT'
             ? 'VAT branches (NBO/DAR/FBM): one VAT column, USD, no GST/TCS/TDS.'
-            : 'GST branches (BOM/AMD/BOMMB): CGST/SGST/IGST + TCS/TDS as applicable.'}
+            : 'GST branches (BOM/AMD/MHUB): CGST/SGST/IGST + TCS/TDS as applicable.'}
         </span>
       </div>
 

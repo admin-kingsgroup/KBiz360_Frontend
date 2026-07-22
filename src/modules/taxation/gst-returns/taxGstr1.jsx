@@ -9,6 +9,7 @@ import { AlertTriangle, Calendar, ChevronDown, Download, Plus, Settings, Users }
 import { Menu as DropdownMenu } from '../../../core/ux/Menu';
 import { useGpBills, useRcmLiability, useProfitAndLoss, useTaxSummary, useConfigValue, useSaveConfigValue } from '../../../core/useAccounting';
 import { useTaxCalendar } from '../../../core/useReference';
+import { isVatBranch } from '../../../core/voucherSpecs';
 import { useMasterMutations } from '../../../core/useMasters';
 import { toast } from '../../../core/ux/toast';
 import { CUR_MONTH, MONTH_OPTIONS, monthLabel, monthLabelLong, todayISO, CUR_FY, fyOptions, fyRange, rangeNote } from '../../../core/dates';
@@ -33,7 +34,8 @@ export function TaxGstr1({branch}){
   const PERIODS=MONTH_OPTIONS;
 
   const GP=useGpBills(branch).data||[];   // live booking bills (/api/accounting/gp-bills)
-  const bills=GP.filter(b=>(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
+  // India GST return — EXCLUDE Africa/VAT branches (USD, own VAT Return) so their bills never enter an India ₹ GSTR.
+  const bills=GP.filter(b=>!isVatBranch(b.branch)&&(!brCode||b.branch===brCode)&&(b.date||'').startsWith(period));
   const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag
 
   const b2b=bills.filter(b=>B2B_CLIENTS.includes(b.client));

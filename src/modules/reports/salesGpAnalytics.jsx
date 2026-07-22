@@ -313,7 +313,7 @@ export function SalesGpAnalytics({ branch }) {
           <button onClick={() => setVoucher(null)} className="font-semibold text-info hover:underline">Sales &amp; GP Analytics</button>
           <span className="text-ink-subtle"> ▸ </span><span className="font-bold text-ink">Voucher</span>
         </div>
-        <Card><VoucherEditor voucherId={voucher.id} cur="₹" onBack={() => setVoucher(null)} /></Card>
+        <Card><VoucherEditor voucherId={voucher.id} cur={bc(branch).cur} onBack={() => setVoucher(null)} /></Card>
       </PageLayout>
     );
   }

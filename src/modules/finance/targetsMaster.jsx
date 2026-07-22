@@ -16,7 +16,7 @@ import { branchList, fyStr, MOD_OPTS, Card } from '../dashboard/director/shared'
 
 // ── Targets master (set targets that the vs-Target dashboards compare to) ──────
 export function TargetsMaster({ branch }) {
-  const [brCode, setBrCode] = useState((branch && branch.code) || 'BOM');
+  const [brCode, setBrCode] = useState((branch && branch.code) || '');
   const [fy, setFy] = useState(fyStr());
   const [metric, setMetric] = useState('sales');
   const [draft, setDraft] = useState({});

@@ -139,7 +139,10 @@ export function GroupDashboard(){
               <th style={{padding:"9px 14px",textAlign:"left",color:"#d4a437",fontWeight:700,fontSize:10}}>Branch</th>
               {METRICS.map(m=><th key={m.k} style={{padding:"9px 14px",textAlign:"center",color:"#d4a437",fontWeight:700,fontSize:10}}>{m.l}</th>)}
               <th style={{padding:"9px 14px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:10}}>Local Revenue</th>
-              <th style={{padding:"9px 14px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:10}}>INR Equiv.</th>
+              {/* This column renders fmtKC(b.rev,b.cur) — the branch's OWN-currency revenue, just
+                  compacted. There is no FX conversion (the group runs no cross-currency rate), so it
+                  is not an "INR Equiv." at all; for NBO/DAR/FBM it is dollars. Label it honestly. */}
+              <th style={{padding:"9px 14px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:10}}>Revenue (short)</th>
               <th style={{padding:"9px 14px",textAlign:"right",color:"#d4a437",fontWeight:700,fontSize:10}}>Contribution</th>
             </tr>
           </thead>

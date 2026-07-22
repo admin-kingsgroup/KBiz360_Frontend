@@ -2,9 +2,9 @@
 // signed Dr/Cr display, and the tie/off status vocabulary. Kept in one place so
 // the board, the voucher drawer and the Defect Register read identically.
 
-export const BRANCHES = ['BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+export const BRANCHES = ['BOM', 'AMD', 'MHUB', 'NBO', 'DAR', 'FBM'];
 export const AFRICA = new Set(['NBO', 'DAR', 'FBM']);
-export const CUR = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
+export const CUR = { BOM: '₹', AMD: '₹', MHUB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 export const localeOf = (c) => (c === '₹' ? 'en-IN' : 'en-US');
 export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 

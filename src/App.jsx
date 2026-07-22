@@ -640,8 +640,8 @@ export default function KB360App(){
     if(route==="/hr/feedback-360")         return <Feedback360/>;
     if(route==="/hr/skills")               return <SkillMatrix/>;
     /* Taxation */
-    if(route==="/tax/gstr-1-prep")         return <GSTR1Prep/>;
-    if(route==="/tax/gstr-3b-prep")        return <GSTR3BPrep/>;
+    if(route==="/tax/gstr-1-prep")         return <GSTR1Prep branch={branch}/>;
+    if(route==="/tax/gstr-3b-prep")        return <GSTR3BPrep branch={branch}/>;
     if(route==="/tax/form-16a")            return <Form16AGenerator branch={branch}/>;
     if(route==="/tax/calendar")            return <TaxCalendarV2/>;
     /* Settings */
@@ -673,7 +673,7 @@ export default function KB360App(){
     if(route==="/masters/bank-accounts")  return <BankAccountMaster branch={branch} setRoute={navigate}/>;
     if(route==="/masters/currency")       return <CurrencyMaster setRoute={navigate}/>;
     if(route==="/masters/cost-centers")   return <CostCenterMasterLive currentUser={currentUser} shellBranch={branch}/>;
-    if(route==="/masters/projects")       return <ProjectMaster/>;
+    if(route==="/masters/projects")       return <ProjectMaster branch={branch}/>;
     if(route==="/masters/doc-types")      return <DocumentTypeMaster/>;
     if(route==="/masters/party-types")    return <PartyTypeMaster/>;
     if(route==="/masters/approval-limits")return <ApprovalLimitsMaster/>;

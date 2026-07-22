@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { useMobile } from '../../../core/hooks';
-import { FL, card, inp, btnG, btnGh } from '../../../core/styles';
+import { FL, card, inp, btnG, btnGh, bc } from '../../../core/styles';
 
 export function GdsPnrImport({branch,setRoute}){
   const mob=useMobile();
@@ -64,8 +64,8 @@ export function GdsPnrImport({branch,setRoute}){
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))",gap:12,marginBottom:12}}>
             {[{l:"Airline",v:parsed.airline},{l:"Fare Class",v:`${parsed.fareClass} (${parsed.fareBasis})`},
-              {l:"Base Fare",v:`${parsed.currency==='USD'?'$':'₹'}${parsed.fare.toLocaleString()}`},{l:"Taxes & Fees",v:`${parsed.currency==='USD'?'$':'₹'}${parsed.taxes.toLocaleString()}`},
-              {l:"Total",v:`${parsed.currency==='USD'?'$':'₹'}${parsed.total.toLocaleString()}`},{l:"Currency",v:parsed.currency},
+              {l:"Base Fare",v:`${bc(branch).cur}${parsed.fare.toLocaleString()}`},{l:"Taxes & Fees",v:`${bc(branch).cur}${parsed.taxes.toLocaleString()}`},
+              {l:"Total",v:`${bc(branch).cur}${parsed.total.toLocaleString()}`},{l:"Currency",v:parsed.currency},
             ].map((k,i)=>(
               <div key={i} style={{padding:"8px 12px",borderRadius:8,background:"#f4f5f7"}}>
                 <p style={{margin:0,fontSize:9,color:"#5b616e",textTransform:"uppercase"}}>{k.l}</p>

@@ -51,7 +51,7 @@ export function TaxCalendarV2(){
   const filtered=filter==="ALL"?TAX_CALENDAR_EVENTS:TAX_CALENDAR_EVENTS.filter(e=>e.type===filter);
   const overdue=TAX_CALENDAR_EVENTS.filter(e=>e.status==="Overdue").length;
   const dueToday=TAX_CALENDAR_EVENTS.filter(e=>e.status==="Due Today").length;
-  const upcoming7=TAX_CALENDAR_EVENTS.filter(e=>e.status==="Upcoming"&&new Date(e.date)<=new Date("2026-05-27")).length;
+  const upcoming7=TAX_CALENDAR_EVENTS.filter(e=>e.status==="Upcoming"&&new Date(e.date)<=new Date(Date.now()+7*86400000)).length;
   return(
     <PHASE2_Page title="Tax Calendar — Reminders" subtitle="All compliance filing dates · GST · TDS · PF · ESI · Advance Tax · VAT · ROC"
       toolbar={<><select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"7px 10px",border:"1px solid #cdd1d8",borderRadius:6,fontSize:12,background:"#fff"}}><option value="ALL">All types</option>{types.map(t=><option key={t}>{t}</option>)}</select><button onClick={()=>setModal(true)} style={{padding:"7px 12px",background:"#d4a437",color:"#0d1326",border:"none",borderRadius:6,fontSize:11.5,fontWeight:700,cursor:"pointer"}}>＋ Add Due Date</button><button style={{padding:"7px 12px",background:"#fff",border:"1px solid #cdd1d8",color:"#5a6691",borderRadius:6,fontSize:11.5,fontWeight:600,cursor:"pointer"}}>📅 Export to Calendar</button></>}>
@@ -64,7 +64,7 @@ export function TaxCalendarV2(){
         <table style={{width:"100%",borderCollapse:"collapse",fontSize:11.5}}>
           <thead><tr><th style={RPT_thStyle}>Due Date</th><th style={RPT_thStyle}>Type</th><th style={RPT_thStyle}>Filing / Payment</th><th style={RPT_thStyle}>Entity</th><th style={{...RPT_thStyle,textAlign:"right"}}>Amount</th><th style={{...RPT_thStyle,textAlign:"center"}}>Days</th><th style={{...RPT_thStyle,textAlign:"center"}}>Status</th><th style={{...RPT_thStyle,textAlign:"center"}}>Action</th></tr></thead>
           <tbody>{filtered.map((e,i)=>{
-            const days=Math.round((new Date(e.date)-new Date("2026-05-20"))/86400000);
+            const days=Math.round((new Date(e.date)-new Date())/86400000);
             return(
               <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:e.status==="Due Today"?"#fff8e8":"#fff"}}>
                 <td style={{...RPT_tdStyle,fontFamily:"monospace",fontWeight:600,color:days<=0?"#A32D2D":days<=7?"#f97316":"#0d1326"}}>{e.date}</td>

@@ -18,7 +18,7 @@ function vDate(){
    and re-exported here so the dozens of existing call-sites — including
    synchronous ones like FX_RATES[code] and Object.keys(CURRENCY_META) — keep
    working unchanged.
-     India  (BOMMB/BOM/AMD): INR
+     India  (MHUB/BOM/AMD): INR
      Kenya  (NBO):     USD (main) + KES
      Tanzania (DAR):   USD (main) + TZS
      DR Congo (FBM):   USD only (no secondary currency)
@@ -80,7 +80,7 @@ export const _VNO_SEED={
 
 
 export function genVNo(branch,pfx){
-  const brCode=branch==="ALL"?"CONS":(branch?.code||"BOM");
+  const brCode=branch==="ALL"?"CONS":(branch?.code||"");
   const key=brCode+"_"+pfx;
   if(_VNO_COUNTERS[key]===undefined){
     _VNO_COUNTERS[key]=(_VNO_SEED[brCode]&&_VNO_SEED[brCode][pfx])||1;
@@ -134,11 +134,11 @@ export const TAX_INDIA = {label:"Taxation — GST", icon:FileText, _regime:"GST"
 export const TAX_AFRICA = {label:"Taxation — VAT", icon:FileText, _regime:"VAT", children:[
   {divider:true, label:"VAT Returns"},
   {label:"VAT Return (Monthly)",      href:"/tax/vat"},
-  // NOTE: "Withholding Tax" formerly linked to /tax/tds — the INDIA TDS/TCS register
-  // (₹, Section 194, Form 26AS), the wrong regime for a VAT branch. Removed: Africa WHT
-  // is deducted per supplier `whtRate` and posts to the WHT ledger, visible in ledger
-  // statements / VAT reports. /tax/tds is also route-blocked for VAT branches now
-  // (menus.canReachRoute). A dedicated Kenya-WHT register is a separate build.
+  // "Withholding Tax" → /tax/tds, which FORKS by regime (taxTdsTcs.jsx): a VAT branch gets the
+  // Africa WHT register (USD / branch currency, per-supplier whtRate, WHT Payable/Receivable —
+  // NOT the India Section-194 / Form-26AS register). So it belongs on the VAT pill and stays
+  // reachable (removed from the India-only route gate). India branches see the TDS/TCS register.
+  {label:"Withholding Tax",           href:"/tax/tds"},
   {divider:true, label:"Reconciliation"},
   {label:"VAT Return vs Books",       href:"/tax/reconciliation"},
   {divider:true, label:"Compliance"},
@@ -273,7 +273,7 @@ export const HR_EMPLOYEES_DATA=[];
 
 export const HR_DEPTS=["All","Operations","Sales","Accounts","IT","HR & Admin"];
 
-export const HR_BRANCHES_F=["All","BOMMB","BOM","AMD","NBO","DAR","FBM"];
+export const HR_BRANCHES_F=["All","MHUB","BOM","AMD","NBO","DAR","FBM"];
 
 /* ── Employee Master ──────────────────────────────────────────── */
 

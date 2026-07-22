@@ -7,7 +7,7 @@
 // the group-wide baseline every branch inherits. `ccy` drives the money-field symbol.
 export const LIMIT_BRANCHES = [
   { code: 'default', label: 'Group default', hint: 'all branches', ccy: '₹' },
-  { code: 'BOMMB', label: 'BOMMB', hint: 'Mumbai', ccy: '₹' },
+  { code: 'MHUB', label: 'MHUB', hint: 'Mumbai', ccy: '₹' },
   { code: 'BOM', label: 'BOM', hint: 'Mumbai', ccy: '₹' },
   { code: 'AMD', label: 'AMD', hint: 'Ahmedabad', ccy: '₹' },
   { code: 'NBO', label: 'NBO', hint: 'Nairobi', ccy: '$' },

@@ -11,7 +11,7 @@
 // scan's timestamp and labels these findings "from last build".
 export const DEV_SCAN = {
   "tree": "FE",
-  "filesScanned": 702,
+  "filesScanned": 703,
   "counts": {
     "total": 6,
     "bySeverity": {
@@ -91,7 +91,7 @@ export const DEV_SCAN = {
       "source": "build"
     },
     {
-      "id": "FE:modules/taxation/gst-returns/taxGstr1.jsx:37:todo",
+      "id": "FE:modules/taxation/gst-returns/taxGstr1.jsx:39:todo",
       "tree": "FE",
       "rule": "todo",
       "category": "broken-code",
@@ -99,7 +99,7 @@ export const DEV_SCAN = {
       "title": "Unresolved TODO / FIXME / HACK",
       "remark": "A TODO/FIXME/HACK/XXX marker flags known-incomplete work at this line. Resolve it or track it so it is not forgotten.",
       "file": "modules/taxation/gst-returns/taxGstr1.jsx",
-      "line": 37,
+      "line": 39,
       "snippet": "const B2B_CLIENTS=[]; // TODO: derive B2B/B2C split from the customer master's GST-registration flag",
       "source": "build"
     }

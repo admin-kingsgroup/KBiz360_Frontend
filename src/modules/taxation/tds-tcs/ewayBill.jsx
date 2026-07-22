@@ -64,7 +64,7 @@ export function EWayBill({branch}){
         🔌 {GSP_NOTE}. Candidate invoices below are live from the books; EWB numbers fill in once the provider is connected.
       </div>
       <div style={{marginBottom:12,padding:"9px 14px",borderRadius:9,background:"#E6F1FB",border:"1px solid #B5D4F4",fontSize:10.5,color:"#185FA5"}}>
-        <b>When required:</b> Movement of goods valued ≥ ₹50,000 between states or within state (Maharashtra). Applicable for MICE materials, tour kits, and promotional goods — NOT for pure service invoices. Validity: 200 km/day; expires at midnight.
+        <b>When required:</b> Movement of goods valued ≥ ₹50,000 between states or within the same state. Applicable for MICE materials, tour kits, and promotional goods — NOT for pure service invoices. Validity: 200 km/day; expires at midnight.
       </div>
 
       <div style={{...card,padding:0,overflow:"hidden"}}>

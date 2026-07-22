@@ -19,7 +19,7 @@ import { COUNTRIES } from '../partyEnums.js';
 
 describe('homeCountryOf — every branch knows the country it operates in', () => {
   test('the map covers all six branches', () => {
-    expect(BRANCH_COUNTRY).toEqual({ BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' });
+    expect(BRANCH_COUNTRY).toEqual({ BOM: 'IN', AMD: 'IN', MHUB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' });
   });
   test('resolves case-insensitively and defaults an unknown branch to India', () => {
     expect(homeCountryOf('fbm')).toBe('CD');
@@ -48,7 +48,7 @@ describe('isDomesticFor — the predicate that gates input VAT and withholding',
   test('India branches are unchanged — the control', () => {
     expect(isDomesticFor('India', 'BOM')).toBe(true);
     expect(isDomesticFor('India', 'AMD')).toBe(true);
-    expect(isDomesticFor('India', 'BOMMB')).toBe(true);
+    expect(isDomesticFor('India', 'MHUB')).toBe(true);
     expect(isDomesticFor('Singapore', 'BOM')).toBe(false);
     expect(isDomesticFor('United Arab Emirates', 'BOM')).toBe(false);
   });
@@ -106,9 +106,9 @@ describe('supplyTypeOf — foreign is branch-relative; intra/inter stays an INDI
     expect(supplyTypeOf({ country: 'India' }, 'BOM')).toBe('');   // state not captured
   });
 
-  test('BOMMB is Mumbai by DECLARATION, not by falling through the default', () => {
-    expect(homeStateForBranch('BOMMB')).toBe('27');
-    expect(supplyTypeOf({ country: 'India', state: 'Maharashtra' }, 'BOMMB')).toBe('intra');
+  test('MHUB is Mumbai by DECLARATION, not by falling through the default', () => {
+    expect(homeStateForBranch('MHUB')).toBe('27');
+    expect(supplyTypeOf({ country: 'India', state: 'Maharashtra' }, 'MHUB')).toBe('intra');
   });
 });
 

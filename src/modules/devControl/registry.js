@@ -55,7 +55,7 @@ export const DEV_REGISTRY = [
       { name: 'P&L period system (YTD default, matrix, compare)', status: 'live', modules: ['accounting'], routes: ['/reports/pnl'], note: 'Indirect expenses split Fixed/Variable via Group.expenseType — classify with `npm run seed:expense-types`, then restart backend.' },
       { name: 'Notes to Financial Statements', status: 'live', modules: ['accounting'], routes: ['/reports/fs-notes'], note: 'Frontend-computed from BS/P&L/TB/ageing (notesEngine.js) — reconciles by construction.' },
       { name: 'Groups / Ledgers masters (DB-backed CoA)', status: 'live', modules: ['groups', 'ledgers'], routes: ['/masters/groups', '/masters/ledgers', '/masters/accounts-tree'], api: ['/api/groups', '/api/subgroups', '/api/ledgers'], note: '28 Tally groups seeded + locked; custom groups/sub-groups editable. OPEN ITEM: Sales/Purchase ledgers are still edit-only in places.' },
-      { name: 'Branch chart replication (shared-chart model)', status: 'live', modules: ['ledgers', 'branches'], api: ['/api/ledgers'], note: 'VERIFIED ON PROD 2026-07-10: all 6 branches (BOMMB/BOM/AMD/NBO/DAR/FBM) carry an identical 436-ledger chart in branch currency (GST vs VAT+WHT). TKHO was RENAMED to BOMMB — zero TKHO remnants remain (no branch doc, no ledgers), so the old "TKHO stale" note is obsolete.' },
+      { name: 'Branch chart replication (shared-chart model)', status: 'live', modules: ['ledgers', 'branches'], api: ['/api/ledgers'], note: 'VERIFIED ON PROD 2026-07-10: all 6 branches (MHUB/BOM/AMD/NBO/DAR/FBM) carry an identical 436-ledger chart in branch currency (GST vs VAT+WHT). TKHO was RENAMED to MHUB — zero TKHO remnants remain (no branch doc, no ledgers), so the old "TKHO stale" note is obsolete.' },
       { name: 'Dynamic CoA — infinite nesting + recursive rollup', status: 'live', modules: ['groups', 'ledgers'], api: ['/api/subgroups', '/api/groups'], note: 'ALL PHASES COMPLETE 2026-07-10 (docs/dynamic-chart-of-accounts.md): Phases 1-2 were already live (hierarchy fields, recursive resolveGroup, tree API + rollup — consumed by the BS/P&L drill trees); Phase 3-6 built today: POST /api/subgroups/:id/move (cycle guard, subtree re-stamp + rebuildHierarchy, names never change so postings stay valid) + /:id/clone (zero-opening ledgers, fresh codes) + bulk-import/export; Trial Balance ?view=grouped (subtotals ARE sums of the flat rows — ties by construction); Accounts Tree Move to…/Clone… for custom nodes (system stay locked); admin-role RBAC on all new verbs. Restart backend.' },
       { name: 'Module cost centres / module-wise GP', status: 'live', modules: ['cost-centers'], api: ['/api/module-pl', '/api/cost-centers'], note: 'VERIFIED ON PROD 2026-07-10: every entry path stamps voucher.costCenter (booking orders + per-leg, data-import via importLeafCode + explicit column, CRM read-bridge from service_type, INB leaves), POST /api/accounting/backfill-cost-centers exists (admin-only), and the approval gate blocks untagged Flights/Holiday vouchers. Live check: 0 of 1362 product vouchers resolve to an Unspecified bucket.' },
     ],
@@ -111,7 +111,7 @@ export const DEV_REGISTRY = [
   {
     area: 'Taxation',
     items: [
-      { name: 'Per-branch tax regime (GST India / VAT+WHT Africa)', status: 'live', modules: ['branches', 'hsn-codes'], note: 'taxRegime on branch drives menus (TAX_INDIA/TAX_AFRICA/TAX_ALL) and posting. India: BOMMB/BOM/AMD. Africa: NBO/DAR/FBM.' },
+      { name: 'Per-branch tax regime (GST India / VAT+WHT Africa)', status: 'live', modules: ['branches', 'hsn-codes'], note: 'taxRegime on branch drives menus (TAX_INDIA/TAX_AFRICA/TAX_ALL) and posting. India: MHUB/BOM/AMD. Africa: NBO/DAR/FBM.' },
       { name: 'GST screens on live GP bills (GSTR-1/3B views)', status: 'live', modules: ['tax-reconciliation'], routes: ['/tax/gstr1', '/tax/gstr3b'], note: 'Wired to live useGpBills (previously read empty GP_BILLS seed).' },
       { name: 'GSTR-2B import + ITC matching', status: 'live', modules: ['gstr2b'], routes: ['/tax/gstr2b-itc'], api: ['/api/gstr2b'], note: 'Control Tower gates on unmatched input credit.' },
       { name: 'Tax reconciliation (3B/VAT vs books, 1 vs 3B, TDS vs 26AS)', status: 'live', modules: ['tax-reconciliation'], routes: ['/tax/reconciliation'], api: ['/api/tax-reconciliation'] },
@@ -274,7 +274,7 @@ export const KNOWN_ISSUES = [
   'HR PF-ESI challan "Mark Paid" and payroll register PF/ESI/PT/TDS lines are client-side only — challan payment records and payslip lines are never persisted.',
   'Sales segments in Sales & GP Analytics are derived by regex on voucher.partyGroup — renaming party groups silently reclassifies history.',
   'Never raw status-flip a posted voucher — always unpostLeg (see the 2026-07-02 INB revert batch: un-post refund BEFORE its INB sale).',
-  'TKHO was RENAMED to BOMMB — any doc/script still referring to a TKHO branch is stale (verified on prod 2026-07-10: no TKHO branch doc or ledgers exist).',
+  'TKHO was RENAMED to MHUB — any doc/script still referring to a TKHO branch is stale (verified on prod 2026-07-10: no TKHO branch doc or ledgers exist).',
   'ERP and CRM share ONE MongoDB — destructive ERP scripts damage the CRM too.',
 ];
 

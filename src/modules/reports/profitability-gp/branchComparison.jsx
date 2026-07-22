@@ -42,11 +42,15 @@ export function ReportBranch({ branch }) {
   }, [bills]);
 
   const hasData = BR_D.length > 0;
-  const maxR = Math.max(...BR_D.map((b) => b.rev), 1);
-  const totR = BR_D.reduce((s, b) => s + b.rev, 0) || 1;
   // Each branch's figures are in its OWN currency — show them so, and only footer a
   // grand total when every branch shares one currency (₹+$ can't be summed).
   const curOf = (code) => (bc({ code }) || {}).cur || '₹';
+  // Revenue-share % and bar widths are computed WITHIN a currency — never against a blended
+  // ₹+$ denominator, which would distort an India row (AMD, ₹) against a USD-branch row.
+  const totRByCur = {}, maxRByCur = {};
+  BR_D.forEach((b) => { const c = curOf(b.branch); totRByCur[c] = (totRByCur[c] || 0) + b.rev; maxRByCur[c] = Math.max(maxRByCur[c] || 0, b.rev); });
+  const totRof = (code) => totRByCur[curOf(code)] || 1;
+  const maxRof = (code) => maxRByCur[curOf(code)] || 1;
   const cm = (v, code) => compactAmt(v, { currency: curOf(code) });
   const curs = [...new Set(BR_D.map((b) => curOf(b.branch)))];
   const oneCur = curs.length === 1;
@@ -78,7 +82,7 @@ export function ReportBranch({ branch }) {
     { key: 'rev', header: 'Revenue', num: true, render: (r, v) => cm(v, r.branch), footer: (rs) => totalCell(rs, 'rev') },
     { key: 'gp', header: 'Gross Profit', num: true, className: 'text-[#16a34a]', render: (r, v) => cm(v, r.branch), footer: (rs) => totalCell(rs, 'gp') },
     { key: 'gpPct', header: 'GP %', num: true, className: 'font-semibold text-[#16a34a]', render: (r, v) => `${v}%` },
-    { key: 'share', header: 'Revenue share', num: true, sortValue: (r) => r.rev / totR, render: (r) => `${((r.rev / totR) * 100).toFixed(1)}%` },
+    { key: 'share', header: 'Revenue share', num: true, sortValue: (r) => r.rev / totRof(r.branch), render: (r) => `${((r.rev / totRof(r.branch)) * 100).toFixed(1)}%` },
   ];
 
   return (
@@ -101,10 +105,10 @@ export function ReportBranch({ branch }) {
               <span className="font-semibold tabular-nums text-navy">{cm(b.rev, b.branch)}</span>
             </div>
             <div className="mb-1 h-2.5 overflow-hidden rounded-full bg-surface-alt">
-              <div className="h-full rounded-full" style={{ width: (b.rev / maxR * 100) + '%', background: b.color }} />
+              <div className="h-full rounded-full" style={{ width: (b.rev / maxRof(b.branch) * 100) + '%', background: b.color }} />
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-surface-alt">
-              <div className="h-full rounded-full opacity-45" style={{ width: (b.gp / maxR * 100) + '%', background: b.color }} />
+              <div className="h-full rounded-full opacity-45" style={{ width: (b.gp / maxRof(b.branch) * 100) + '%', background: b.color }} />
             </div>
           </div>
         ))}

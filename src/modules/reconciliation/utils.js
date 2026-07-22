@@ -4,7 +4,7 @@
 // components stay thin over these.
 import { localeOf } from '../../core/format';
 
-export const BRANCHES = ['BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+export const BRANCHES = ['BOM', 'AMD', 'MHUB', 'NBO', 'DAR', 'FBM'];
 
 /** The app passes `branch` as either a code string OR a branch OBJECT
  *  ({code, city…}) — and 'ALL' in group mode. Normalize to a valid code or ''. */
@@ -16,7 +16,7 @@ export function branchCodeOf(branch) {
 // FE currency map — mirrors the BOOKS currency. ALL 3 Africa branches keep their
 // books in USD ($); KES/TZS are print-only secondary currencies (NBO/DAR local
 // invoice printing), never a books/report currency. FBM is USD-only.
-export const BRANCH_CURRENCY = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
+export const BRANCH_CURRENCY = { BOM: '₹', AMD: '₹', MHUB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 export const currencyOf = (branch) => BRANCH_CURRENCY[branch] || '₹';
 
 // The five tiers — kept in ladder order. `chain` mirrors the backend service

@@ -9,7 +9,7 @@ import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { fromEmpDTO, toEmpPayload, BLANK_EMP } from '../employeeMap';
 import { fromShiftDTO } from '../hrMaps';
 import { toast } from '../../../core/ux/toast';
-import { FL, btnG, btnGh, card, inp } from '../../../core/styles';
+import { FL, btnG, btnGh, card, inp, bc } from '../../../core/styles';
 import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
 export function HrEmployees({branch}){
@@ -41,7 +41,10 @@ export function HrEmployees({branch}){
   const saving=create.isPending||update.isPending;
   useEffect(()=>{ setBrFilter(branch==="ALL"?"All":branch?.code||"All"); },[branch]);
 
-  const openNew=()=>{ setSelected(null); setForm({...BLANK_EMP,branch:brScope||"BOM"}); setModal(true); };
+  // Seed the active branch (AMD when AMD is focused); on the ALL view leave it blank so the
+  // `!form.branch` save-guard forces an explicit pick — never a silent BOM default that would
+  // land an Ahmedabad hire in Mumbai's payroll/headcount.
+  const openNew=()=>{ setSelected(null); setForm({...BLANK_EMP,branch:brScope}); setModal(true); };
   const openEdit=(e)=>{ setSelected(e); setForm(e); setModal(true); };
   const closeModal=()=>{ setModal(false); setSelected(null); };
   const setF=(k,v)=>setForm(f=>({...f,[k]:v}));
@@ -75,7 +78,7 @@ export function HrEmployees({branch}){
   ));
 
   const DEPT_CLR={"Operations":"#185FA5","Sales":"#27500A","Accounts":"#854F0B","IT":"#384677","HR & Admin":"#A32D2D"};
-  const brCfg=e=>BRANCHES.find(b=>b.code===e.branch)||{cur:"₹",curCode:"INR"};
+  const brCfg=e=>bc({code:e.branch})||{cur:"₹",curCode:"INR"};   // bc gives the CFG (has .cur); BRANCHES records don't
 
   const gross=e=>(+e.basic||0)+(+e.hra||0)+(+e.da||0)+(+e.travel||0)+(+e.medical||0);
   const deductions=e=>(+e.pf||0)+(+e.esi||0)+(+e.tds||0);
@@ -257,7 +260,7 @@ export function HrEmployees({branch}){
                     borderTop:"2px solid #0d1326",gridColumn:"1/-1",fontWeight:800,fontSize:12}}>
                     <span>Gross Salary</span>
                     <span style={{color:"#185FA5",fontVariantNumeric:"tabular-nums"}}>
-                      {BRANCHES.find(b=>b.code===form.branch)?.cur||"₹"}{gross(form).toLocaleString()}
+                      {(bc({code:form.branch})||{}).cur||"₹"}{gross(form).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -270,7 +273,7 @@ export function HrEmployees({branch}){
                     borderTop:"2px solid #A32D2D",gridColumn:"1/-1",fontWeight:800,fontSize:12}}>
                     <span>Net Take-home</span>
                     <span style={{color:"#27500A",fontVariantNumeric:"tabular-nums"}}>
-                      {BRANCHES.find(b=>b.code===form.branch)?.cur||"₹"}{net(form).toLocaleString()}
+                      {(bc({code:form.branch})||{}).cur||"₹"}{net(form).toLocaleString()}
                     </span>
                   </div>
                 </div>

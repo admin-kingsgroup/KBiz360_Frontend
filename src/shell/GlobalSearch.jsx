@@ -10,6 +10,8 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { BRANCHES } from '../core/data';
+import { bc } from '../core/styles';
+import { localeOf } from '../core/format';
 import { ALL_TIME_FROM, todayISO } from '../core/dates';
 import { apiGet } from '../core/api';
 import { filterGpBills } from '../core/registerSearch';
@@ -34,7 +36,7 @@ export function GlobalSearch(){
 
   const results = useMemo(() => filterGpBills(bills, q), [q, bills]);
 
-  const cfg2=b=>BRANCHES.find(x=>x.code===b)||{cur:"₹"};
+  const cfg2=b=>bc({code:b})||{cur:"₹"};   // bc gives the CFG (has .cur); a BRANCHES record only has .currency
 
   return (
     <div style={{padding:"12px 10px",maxWidth:1100,margin:"0 auto"}}>
@@ -74,7 +76,7 @@ export function GlobalSearch(){
                   <td style={{padding:"8px 10px",fontSize:10,color:"#5a6691"}}>{r.airline||r.supplier}</td>
                   <td style={{padding:"8px 10px",fontSize:10,color:"#5a6691"}}>{r.consultant}</td>
                   <td style={{padding:"8px 10px"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,background:"#EAF3DE",color:"#27500A",fontWeight:700}}>{r.branch}</span></td>
-                  <td style={{padding:"8px 10px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{bc2.cur}{Number(r.sell).toLocaleString()}</td>
+                  <td style={{padding:"8px 10px",textAlign:"right",fontWeight:600,fontVariantNumeric:"tabular-nums"}}>{bc2.cur}{Number(r.sell).toLocaleString(localeOf(bc2.cur))}</td>
                   <td style={{padding:"8px 10px",textAlign:"right"}}><span style={{fontSize:9.5,padding:"2px 6px",borderRadius:999,fontWeight:800,background:r.gpPct>=12?"#EAF3DE":"#FAEEDA",color:r.gpPct>=12?"#27500A":"#854F0B"}}>{r.gpPct}%</span></td>
                   <td style={{padding:"8px 10px"}}><button onClick={(e)=>{e.stopPropagation();openDeal(r);}} style={{...btnGh,padding:"2px 8px",fontSize:9}}>Open</button></td>
                 </tr>

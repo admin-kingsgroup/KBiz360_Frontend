@@ -803,7 +803,7 @@ function TravkingsGroupView() {
 // Total = Core + Own + ~* (all active — equal across branches).
 const SIGN_CLR = { fixed: P_GREEN, own: BLUE, ll: '#7c3aed', wired: P_AMBER, nf: '#3f5a86', hidden: '#64748b', deact: P_RED };
 
-const P_CUR = { BOM: '₹', AMD: '₹', BOMMB: '₹', NBO: '$', DAR: '$', FBM: '$' };
+const P_CUR = { BOM: '₹', AMD: '₹', MHUB: '₹', NBO: '$', DAR: '$', FBM: '$' };
 const sameScope = (a, b) => !!a && !!b && a.tier === b.tier && a.branch === b.branch && a.cat === b.cat;
 
 function TravkingsGroupTableView({ setRoute, setBranch, shellBranch }) {
@@ -960,7 +960,7 @@ function TravkingsGroupTableView({ setRoute, setBranch, shellBranch }) {
 function PresenceToggles({ item, num, shellBranch }) {
   const vo = isViewOnly();                              // view-only → every presence / lock / deactivate toggle disabled with a reason
   const qc = useQueryClient();
-  const refresh = () => { qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['master', 'ledgers'] }); };
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['master', 'ledgers'] }); qc.invalidateQueries({ queryKey: ['finance'] }); };
   const m = useMutation({
     mutationFn: (body) => apiPost('/api/ledgers/branch-presence', body),
     onSuccess: (res, vars) => {

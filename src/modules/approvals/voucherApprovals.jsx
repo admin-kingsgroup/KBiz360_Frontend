@@ -16,7 +16,7 @@ import { clickable } from '../../core/ux/clickable';
 import { toast } from '../../core/ux/toast';
 import { FocusBanner } from '../../core/ux/FocusBanner';
 import { useNavFocusStore } from '../../core/ux/navFocus';
-import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useRevokeVoucher, fetchRevokeCheck, useApproveMany, useApproveAll, branchCode } from '../../core/useAccounting';
+import { useVoucherApprovals, useApproveVoucher, useRejectVoucher, useDeleteVoucher, useRevokeVoucher, fetchRevokeCheck, useApproveMany, useApproveAll, branchCode, invalidateBooks } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
 import { BookingApprovals, SoPoGpVoucherEntry } from '../bookingOrder';
 import { useInbDeal, useInbReconcile } from '../../core/useInterBranchVoucher';
@@ -246,6 +246,18 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
     });
     if (confirmed) revoke.mutate({ id, reason }, { onSuccess: () => toast('Voucher revoked → Pending'), onError: (e) => toast(e?.message || 'Revoke failed', 'error') });
   };
+  // A booking/order-driven (locked) voucher CANNOT be voucher-revoked — the /revoke endpoint
+  // 409s ("driven by <master>"). It must be un-posted on its master (which un-posts both the
+  // voucher AND the master in sync). Point the approver there instead of a Revoke button that
+  // always errors — mirrors the SO/PO/GP refund queue and VoucherShell's locked-voucher UX.
+  const lockedRevokeHint = (e) => {
+    const p = voucherParent(e);
+    const where = p ? `${p.label}${p.ref ? ` ${p.ref}` : ''}` : `its ${e.source || 'source'}${e.bookingId ? ` ${e.bookingId}` : ''}`;
+    const msg = `Locked — revoke it on ${where} (un-posts both the voucher and its master in sync)`;
+    // Info text (no 409-producing button). Wraps within its cell (no nowrap → no overflow of
+    // the long master label in a narrow action column); aria-label so it isn't title-only.
+    return <span title={msg} aria-label={msg} style={{ fontSize: 10.5, fontWeight: 700, color: C.gold, display: 'inline-block' }}>🔒 revoke on {where}</span>;
+  };
   const doApproveSelected = async () => {
     if (!sel.size) return;
     // Pre-flight: how many of the selection can't post yet? previewMany runs the SAME
@@ -406,7 +418,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
       </>
     ) : status === 'approved' ? (
       <>
-        {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={ABTN(C.gold)}>Revoke</button>}
+        {isApprover && (e.locked ? lockedRevokeHint(e) : <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={ABTN(C.gold)}>Revoke</button>)}
         {adminDeleteBtn(e, ABTN(C.red), 'Reverse out of the books → view-only (number not reusable)')}
       </>
     ) : status === 'deleted' ? (
@@ -525,7 +537,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
   // use shows 0 (column never hidden). Party (debtor) + Supplier (creditor) get
   // their own columns. Branch tags ([BOM]…) are trimmed from headers (full name on
   // hover); [Pur] is kept so sale vs purchase heads stay distinct.
-  const shortHead = (h) => String(h).replace(/\s*\[(BOMMB|BOM|AMD|NBO|DAR|FBM)\]/gi, '').trim();
+  const shortHead = (h) => String(h).replace(/\s*\[(MHUB|BOM|AMD|NBO|DAR|FBM)\]/gi, '').trim();
   const columnarWise = () => {
     const byCat = {};
     flatEntries.forEach((e) => { (byCat[e.category] || (byCat[e.category] = [])).push(e); });
@@ -733,7 +745,7 @@ export function VoucherApprovals({ branch, currentUser, category = '' }) {
                                             </>
                                           ) : status === 'approved' ? (
                                             <>
-                                              {isApprover && <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ padding: '3px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Revoke</button>}
+                                              {isApprover && (e.locked ? lockedRevokeHint(e) : <button onClick={() => doRevoke(e.id)} disabled={busy} title="Revoke — un-post this voucher and return it to Pending so it can be edited & re-approved (number kept)" style={{ padding: '3px 9px', background: '#fff', color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer', marginRight: 5 }}>Revoke</button>)}
                                               {adminDeleteBtn(e, { padding: '3px 9px', background: '#fff', color: C.red, border: `1px solid ${C.red}`, borderRadius: 5, fontWeight: 700, fontSize: 10.5, cursor: 'pointer' }, 'Reverse out of the books → view-only (number not reusable)')}
                                             </>
                                           ) : status === 'deleted' ? (
@@ -1251,7 +1263,11 @@ export function InbApprovals({ branch, setRoute, currentUser, initialSearch = ''
     });
     if (!confirmed) return;
     setBusy(true);
-    try { await apiPost('/api/inter-branch/revoke', { linkNo: d.linkNo, reason }); toast(`Revoked ${d.linkNo} → Pending`); qc.invalidateQueries({ queryKey: ['vouchers'] }); qc.invalidateQueries({ queryKey: ['accounting'] }); qc.invalidateQueries({ queryKey: ['inb'] }); }
+    // Revoke un-posts BOTH legs from the books — refresh EVERY books cache root, not just
+    // vouchers/accounting. invalidateBooks hits vouchers + accounting + groups + finance +
+    // bank-reco (the migrated /finance TB & registers read the 'finance' root, which the old
+    // three-line invalidation missed → stale balances after an INB revoke on the hub).
+    try { await apiPost('/api/inter-branch/revoke', { linkNo: d.linkNo, reason }); toast(`Revoked ${d.linkNo} → Pending`); invalidateBooks(qc); qc.invalidateQueries({ queryKey: ['inb'] }); }
     catch (e) { toast((e && e.message) || 'Revoke failed', 'error'); }
     finally { setBusy(false); }
   };

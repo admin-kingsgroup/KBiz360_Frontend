@@ -9,7 +9,7 @@ import { ALL_ITEMS, isCleared } from '../../devControl/registry';
 // from the backend's live DB checks; development issues come from the dev
 // registry. The FE only merges, scopes, splits and numbers.
 
-const BRANCHES = ['BOM', 'BOMMB', 'AMD', 'NBO', 'DAR', 'FBM'];
+const BRANCHES = ['BOM', 'MHUB', 'AMD', 'NBO', 'DAR', 'FBM'];
 const D = {
   branches: BRANCHES,
   tasks: [

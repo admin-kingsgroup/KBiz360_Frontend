@@ -8,6 +8,7 @@ import { LedgerPicker } from '../LedgerPicker';
 import { apiGet } from '../../api';
 import { useVoucherPreview } from '../../useAccounting';
 import { money, money2, r2 } from '../ui';
+import { localeOf, activeCurrency } from '../../format';
 import { refundPrefillFromBooking, refundPrefillFromLeg, poSnapForView, splitRefundJv, clientNetFromJv } from './refundPrefill';
 import { buildRefundReissueBody } from './refundBody';
 import { JvBlock } from '../JvBlock';
@@ -17,7 +18,9 @@ const num = (v) => (Number(v) || 0);
 // refund can post at the correct rate (holiday 5%, most services 18%, exempt 0%) rather
 // than a hardcoded 18%.
 const GST_SLABS = [0, 5, 12, 18, 28];
-const fmtN = (v) => num(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Branch-currency-aware grouping (Western for USD branches, Indian for ₹) — follows the
+// active branch currency so a USD refund/reissue snapshot reads "485,000.00".
+const fmtN = (v) => num(v).toLocaleString(localeOf(activeCurrency()), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const lockedInp = { ...inp, background: '#f3f4f7', color: '#444b5e', cursor: 'not-allowed' };
 
 // Read-only grid that renders EVERY column present across the snapshot lines —
@@ -86,15 +89,19 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   const vatPct = isVatBr ? (_brVatRaw != null ? num(_brVatRaw) : (VAT_FALLBACK[String(brCode).toUpperCase()] || 16)) : 0;
   const taxLabel = isVatBr ? 'VAT' : 'GST';
   const whtLabel = isVatBr ? 'WHT' : 'TDS';
-  const rateSlabs = isVatBr ? [vatPct] : GST_SLABS;
+  const rateSlabs = isVatBr ? [0, vatPct] : GST_SLABS;   // Africa: 0 (Without VAT, default) or the branch rate
   // Place-of-supply split is an Indian-GST concept; a VAT branch shows one 'VAT' line.
   const splitTax = isVatBr ? 'VAT' : (state.gstMode === 'inter' ? 'IGST' : 'CGST/SGST');
   const splitTaxPlus = isVatBr ? 'VAT' : (state.gstMode === 'inter' ? 'IGST' : 'CGST + SGST');
 
-  // A VAT branch bills at its one VAT rate — seed it over the India-default 18 so both
-  // the posted tax and the read-only VAT captions use the branch rate (not a stray 18%).
+  // Seed the branch-appropriate default the FIRST time the rate is UNSET (a fresh manual refund
+  // inits gstPct='' — see registry). VAT branches (incl DAR at 18%) open WITHOUT VAT (0) per the
+  // Owner's rule (2026-07-21: no VAT until physically selected); India opens at 18. A real stored or
+  // entered rate — INCLUDING a deliberate 0 or the branch rate like 16 — is never touched, so an EDIT
+  // keeps its saved rate even after the branch VAT rate is amended, and the SO/PO/GP reversal (which
+  // seeds a concrete 0/18 itself) is left alone. Keys on isVatBr/vatPct so it settles once branch loads.
   useEffect(() => {
-    if (isVatBr && vatPct && num(state.gstPct) !== vatPct) patch({ gstPct: vatPct });
+    if (state.gstPct === '' || state.gstPct == null) patch({ gstPct: isVatBr ? 0 : 18 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVatBr, vatPct]);
 
@@ -211,7 +218,9 @@ export function RefundReissueFields({ state, setState, ctx, kind }) {
   // at the voucher's GST rate (the "GST on our charges" slab, 18% by default), so the
   // accountant doesn't key it by hand. Still editable — a manual override sticks until
   // the base or the slab changes again.
-  const gstRate = num(state.gstPct) || (isVatBr ? vatPct : 18);
+  // Respect an explicit 0% (Without VAT) — `|| fallback` used to coerce a real 0 back to the rate,
+  // so the supplier-fee/cancellation GST kept computing under Without VAT. Fall back only when unset.
+  const gstRate = (state.gstPct === '' || state.gstPct == null) ? (isVatBr ? vatPct : 18) : num(state.gstPct);
   const gstOf = (base) => r2(num(base) * gstRate / 100);
 
   // Commission Reversal (refund only): the "clawback" IS the commission reversal.

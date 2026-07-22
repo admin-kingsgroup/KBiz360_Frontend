@@ -1,4 +1,4 @@
-// A branch withholds under the law of where it OPERATES. India (BOM/AMD/BOMMB) withholds
+// A branch withholds under the law of where it OPERATES. India (BOM/AMD/MHUB) withholds
 // 194H at the statutory 2%; an Africa branch (NBO Kenya, DAR Tanzania, FBM DR Congo)
 // withholds that country's WHT.
 //

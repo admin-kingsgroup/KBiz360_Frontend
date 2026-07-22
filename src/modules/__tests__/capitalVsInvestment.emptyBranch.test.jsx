@@ -7,7 +7,7 @@ jest.mock('../../core/period', () => ({
 jest.mock('../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve({})) }));
 jest.mock('../../core/styleTokens', () => ({ bc: () => ({ cur: '$' }) }));
 
-// All-zero payload — exactly what the backend returns for BOMMB / NBO / DAR / FBM / AMD.
+// All-zero payload — exactly what the backend returns for MHUB / NBO / DAR / FBM / AMD.
 const zeroData = {
   totals: {
     capitalInvested: 0, capitalEmployed: 0, capitalBlocked: 0, inflowCapital: 0,

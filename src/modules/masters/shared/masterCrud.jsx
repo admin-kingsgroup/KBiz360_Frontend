@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Pencil, Trash2, Download, Printer, Ban, RotateCcw } from 'lucide-react';
 import { useMasterList, useMasterMutations } from '../../../core/useMasters';
+import { localeOf, activeCurrency } from '../../../core/format';
 import { exportToExcel } from '../../../core/exportExcel';
 import { openPrintPreview } from '../../../core/PrintPreview';
 import { useFormKeys } from '../../../core/ux/forms';
@@ -363,7 +364,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
       const v = r[f.key];
       if (f.type === 'bool') return v ? 'Yes' : 'No';
       if (f.type === 'tags') return Array.isArray(v) ? v.join(', ') : (v || '');
-      if (f.type === 'number') return v ? Number(v).toLocaleString('en-IN') : '0';
+      if (f.type === 'number') return v ? Number(v).toLocaleString(localeOf(activeCurrency())) : '0';
       return v ?? '';
     };
     const head = cols.map((f) => `<th style="text-align:${f.type === 'number' ? 'right' : 'left'};padding:6px 9px;border-bottom:2px solid #0d1326;font-size:9pt;text-transform:uppercase;letter-spacing:.4px;color:#0d1326;white-space:nowrap">${esc(f.label)}</th>`).join('');
@@ -385,7 +386,7 @@ export function MasterCrud({ title, subtitle, resource, fields, params, readOnly
     const v = r[f.key];
     if (f.type === 'bool') return v ? <span style={{ color: GREEN, fontWeight: 700 }}>✓</span> : <span style={{ color: '#c2c8d6' }}>—</span>;
     if (f.type === 'tags') return Array.isArray(v) ? v.join(', ') || '—' : (v || '—');
-    if (f.type === 'number') return v ? Number(v).toLocaleString('en-IN') : '—';
+    if (f.type === 'number') return v ? Number(v).toLocaleString(localeOf(activeCurrency())) : '—';
     // A wired/system ledger (locked) carries the `~*` marker on its name — ~ = engine-
     // wired, * = non-editable/non-deletable (changed only in the database).
     if (f.key === 'name' && r.locked) return (<>{v || '—'} <span title="Wired ledger — locked; editable only directly in the database" style={{ color: '#dc2626', fontWeight: 800, fontSize: 11 }}>~*</span></>);

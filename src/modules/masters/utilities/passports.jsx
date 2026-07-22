@@ -5,7 +5,7 @@
    utilities/). Live register from /api/passports. Logic unchanged.
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { todayISO } from '../../../core/dates';
 import { confirmDialog } from '../../../core/ux/confirm';
@@ -21,7 +21,9 @@ export function PassportManager({branch}){
   const brCode=branch==="ALL"?null:branch?.code;
   const [search,setSearch]=useState("");
   const [modal,setModal]=useState(false);
-  const [form,setForm]=useState({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});
+  const [form,setForm]=useState({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:brCode||""});
+  // Pin a new passport to the active branch (never hardcoded BOM); ALL forces an explicit pick.
+  useEffect(()=>{setForm(f=>({...f,branch:brCode||f.branch}));},[brCode]);
   // Live register from /api/passports (was a local-state _PASSPORTS array, so records
   // saved here never reached the DB and the Tower's passports milestone never cleared).
   const { data: passports = [] } = useMasterList('passports');
@@ -126,7 +128,7 @@ export function PassportManager({branch}){
                 <FL label="Issue date"><input type="date" value={form.issued} onChange={e=>setForm(f=>({...f,issued:e.target.value}))} style={inp}/></FL>
                 <FL label="Expiry date"><input type="date" value={form.expiry} onChange={e=>setForm(f=>({...f,expiry:e.target.value}))} style={inp}/></FL>
               </div>
-              <FL label="Branch"><select value={form.branch} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{BRANCH_CODES.map(b=><option key={b}>{b}</option>)}</select></FL>
+              <FL label="Branch"><select value={form.branch} disabled={!!brCode} onChange={e=>setForm(f=>({...f,branch:e.target.value}))} style={inp}>{brCode?<option value={brCode}>{brCode}</option>:[<option key="" value="">Select branch…</option>,...BRANCH_CODES.map(b=><option key={b}>{b}</option>)]}</select></FL>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>
@@ -136,8 +138,12 @@ export function PassportManager({branch}){
                   await confirmDialog({title:"Missing details",message:"Person name and passport number are required.",confirmLabel:"OK",cancelLabel:"Close"});
                   return;
                 }
+                if(!form.branch){
+                  await confirmDialog({title:"Select a branch",message:"Pick a branch for this passport (a specific operating branch, not All).",confirmLabel:"OK",cancelLabel:"Close"});
+                  return;
+                }
                 create.mutate({...form,passport:form.passport.toUpperCase(),visas:[]},{
-                  onSuccess:()=>{setModal(false);setForm({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:"BOM"});},
+                  onSuccess:()=>{setModal(false);setForm({client:"",person:"",passport:"",nationality:"Indian",issued:"",expiry:"",branch:brCode||""});},
                   onError:(e)=>confirmDialog({title:"Save failed",message:`Could not save the passport — ${e?.message||'unknown error'}.`,confirmLabel:"OK",cancelLabel:"Close"}),
                 });
               }} disabled={vo} title={vo?VIEW_ONLY_REASON:undefined} style={{...btnG,...(vo?{background:'#cfd6e4',color:'#6b7280',cursor:'not-allowed'}:{})}}>💾 Save Passport</button>

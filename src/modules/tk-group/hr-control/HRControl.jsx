@@ -10,7 +10,7 @@ import { DataTable } from '../../../shell/DataTable';
 // Raise an HR governance item (new hire / salary revision / payroll release) centrally.
 // Filed as a Farhan + Owner change-request; nothing is actioned in HR until approved
 // (the approval is the governance record). Mirrors Master Control.
-const DEFAULT_BRANCHES = ['', 'BOM', 'AMD', 'BOMMB', 'NBO', 'DAR', 'FBM'];
+const DEFAULT_BRANCHES = ['', 'BOM', 'AMD', 'MHUB', 'NBO', 'DAR', 'FBM'];
 
 const COLS = [
   { key: 'kind', header: 'Item', render: (cr) => hrKindLabel(((cr.payload && cr.payload.after) || {}).kind) },

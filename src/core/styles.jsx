@@ -111,7 +111,7 @@ export function VLinked({branch,type,vNo,setRoute}){
 
   /* Find settled PURCHASE_REGISTRY entries for this sale's voucher number */
   const matchedPurchases=isSale
-    ? (PURCHASE_REGISTRY[purchMod]||[]).filter(e=>e.settled&&e.branch===(branch?.code||"BOM"))
+    ? (PURCHASE_REGISTRY[purchMod]||[]).filter(e=>e.settled&&e.branch===(branch?.code||""))
     : [];
 
   /* For purchase side — find settled entries matching this purchase voucher */
@@ -205,7 +205,7 @@ export function VWrap({title,icon,vNo,branch,children,type,setRoute,saleMod,sale
   const isIndia=cfg.taxType==="GST";
   const taxBadge=isIndia?"GST":"VAT "+cfg.vatRate+"%";
   const brFlag=branch==="ALL"?"🌐":branch?.flag||"🇮🇳";
-  const brCode=branch==="ALL"?"ALL":branch?.code||"BOM";
+  const brCode=branch==="ALL"?"ALL":branch?.code||"ALL";
   return (
     <div style={{padding:"12px 10px",maxWidth:1160,margin:"0 auto",paddingBottom:80,fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:"#1F2328",WebkitFontSmoothing:"antialiased"}}>
       <div style={{background:"#fff",border:"1px solid #dfe2e7",borderLeft:"4px solid #A07828",borderRadius:4,overflow:"hidden",boxShadow:"0 3px 16px rgba(0,0,0,.10)"}}>

@@ -8,7 +8,7 @@
    created from this screen, so the Tower's projects milestone starved).
    ──────────────────────────────────────────────────────────────────── */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, Plus } from 'lucide-react';
 import { useMasterList, useMasterMutations } from '../../../core/useMasters';
 import { BRANCH_CODES } from '../../../core/data';
@@ -20,17 +20,24 @@ import { Input, Select, Button, StatusPill, ResponsiveGrid, Modal, FormField } f
 const STATUS_TONE = { Active: 'info', Quoted: 'warning', Booked: 'success', Completed: 'neutral', Cancelled: 'danger' };
 const k = (n) => '₹' + (n / 1000).toFixed(0) + 'K';
 
-const BLANK = { code: '', name: '', client: '', startDate: '', endDate: '', manager: '', budget: 0, branch: 'BOM', status: 'Active' };
+const BLANK = { code: '', name: '', client: '', startDate: '', endDate: '', manager: '', budget: 0, branch: '', status: 'Active' };
 
-export function ProjectMaster() {
+export function ProjectMaster({ branch }) {
+  // Active operating branch from the shell. A specific branch (e.g. AMD) LOCKS new projects
+  // to it and scopes the list; 'ALL' forces an explicit pick on save (never silent BOM).
+  const shellCode = branch && branch !== 'ALL' ? (branch.code || branch) : 'ALL';
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [modal, setModal] = useState(false);
-  const [form, setForm] = useState(BLANK);
+  const [form, setForm] = useState({ ...BLANK, branch: shellCode === 'ALL' ? '' : shellCode });
+  // Keep the new-project branch pinned to the active branch as the shell switches.
+  useEffect(() => { setForm((s) => ({ ...s, branch: shellCode === 'ALL' ? s.branch : shellCode })); }, [shellCode]);
   // Live project costing master (/api/projects).
   const { data: PROJECTS_DATA = [] } = useMasterList('projects');
   const { create } = useMasterMutations('projects');
   const filtered = PROJECTS_DATA.filter((p) => {
+    // Scope to the active branch (keep org-wide/unbranched rows visible).
+    if (shellCode !== 'ALL' && p.branch && p.branch !== shellCode && p.branch !== 'ALL') return false;
     if (filterStatus !== 'ALL' && p.status !== filterStatus) return false;
     if (!search) return true;
     const q = search.toLowerCase();
@@ -42,8 +49,9 @@ export function ProjectMaster() {
   const save = () => {
     if (create.isPending) return;
     if (!form.code.trim() || !form.name.trim()) { toast('Project code and name are required', 'error'); return; }
+    if (!form.branch) { toast('Select a branch for this project', 'error'); return; } // never post branchless (would default to BOM server-side)
     create.mutate({ ...form, code: form.code.trim().toUpperCase(), budget: +form.budget || 0, actual: 0 }, {
-      onSuccess: () => { toast(`Project ${form.code.toUpperCase()} created`); setModal(false); setForm(BLANK); },
+      onSuccess: () => { toast(`Project ${form.code.toUpperCase()} created`); setModal(false); setForm({ ...BLANK, branch: shellCode === 'ALL' ? '' : shellCode }); },
       onError: (e) => toast('Could not create — ' + (e?.message || 'unknown error'), 'error'),
     });
   };
@@ -120,9 +128,16 @@ export function ProjectMaster() {
               <FormField label="End date"><Input type="date" value={form.endDate} onChange={(e) => setForm((s) => ({ ...s, endDate: e.target.value }))} /></FormField>
               <FormField label="Budget (₹)"><Input type="number" value={form.budget} onChange={(e) => setForm((s) => ({ ...s, budget: e.target.value }))} /></FormField>
             </div>
-            <FormField label="Branch">
-              <Select value={form.branch} onChange={(e) => setForm((s) => ({ ...s, branch: e.target.value }))}>
-                {BRANCH_CODES.map((b) => <option key={b}>{b}</option>)}
+            <FormField label="Branch" required>
+              {/* Locked to the active branch so a project can't be misfiled to another branch;
+                  only the group (ALL) view lets you pick, and save() blocks a blank choice. */}
+              <Select value={form.branch} disabled={shellCode !== 'ALL'} onChange={(e) => setForm((s) => ({ ...s, branch: e.target.value }))}>
+                {shellCode !== 'ALL'
+                  ? <option value={shellCode}>{shellCode}</option>
+                  : <>
+                    <option value="">Select branch…</option>
+                    {BRANCH_CODES.map((b) => <option key={b}>{b}</option>)}
+                  </>}
               </Select>
             </FormField>
           </div>

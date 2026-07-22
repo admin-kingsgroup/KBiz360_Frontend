@@ -24,7 +24,7 @@ import { branchCode } from '../../../core/useAccounting';
 import { usePartyTypes } from '../../../core/useReference';
 import {
   GOLD, DIM, DARK, GREEN,
-  tabPanel, usePartyMaster, numOf, rupee,
+  tabPanel, usePartyMaster, numOf, rupee, curOfBranch,
   ArrayEditor, Field, SelectField, CheckField, EmptyHint,
   LinkedVouchersTab, OutstandingTab, HistoryTab, PartyShell, CustomFieldsTab,
   ADDR_COLS, CONTACT_COLS, BANK_COLS, DOC_COLS, NOTE_COLS,
@@ -86,8 +86,10 @@ export function CustomerMasterTabbed({ branch } = {}) {
           <Field label="Account Manager" value={f.accountManager} onChange={(v) => set('accountManager', v)} />
           <Field label="Phone" value={f.phone} onChange={(v) => set('phone', v)} />
           <Field label="Email" value={f.email} onChange={(v) => set('email', v)} />
-          <Field label="Revenue (YTD)" value={f.rev} readOnly />
-          <Field label="Outstanding" value={f.out} readOnly />
+          {/* rev/out are legacy pre-formatted strings that default to ₹ — reformat to the
+              record's branch currency ($ for NBO) via numOf (strips the old symbol) + rupee. */}
+          <Field label="Revenue (YTD)" value={rupee(numOf(f.rev), f.branch)} readOnly />
+          <Field label="Outstanding" value={rupee(numOf(f.out), f.branch)} readOnly />
           <CheckField label="Overdue Flag" checked={!!f.ov} onChange={(v) => set('ov', v)} onText="Marked overdue" offText="In good standing" danger />
         </div>
       )}
@@ -162,7 +164,7 @@ export function CustomerMasterTabbed({ branch } = {}) {
           <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Credit Configuration</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
-              <Field label="Credit Limit (₹)" type="number" value={f.creditLimit} onChange={(v) => set('creditLimit', v)} />
+              <Field label={`Credit Limit (${curOfBranch(f.branch)})`} type="number" value={f.creditLimit} onChange={(v) => set('creditLimit', v)} />
               <Field label="Credit Days" type="number" value={f.creditDays} onChange={(v) => set('creditDays', v)} />
               <SelectField label="Payment Terms" value={f.paymentTerms} onChange={(v) => set('paymentTerms', v)} options={PAY_TERMS} />
               <Field label="Late Payment Interest" value={f.interestRate} onChange={(v) => set('interestRate', v)} placeholder="e.g. 18% pa" />
@@ -171,7 +173,7 @@ export function CustomerMasterTabbed({ branch } = {}) {
           <div style={{ padding: 14, background: '#fafbfd', borderRadius: 6, border: '1px solid #cdd1d8' }}>
             <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: GOLD, textTransform: 'uppercase' }}>Current Exposure</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,220px),1fr))', gap: 10, marginTop: 10 }}>
-              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Outstanding</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: DARK }}>{f.out || rupee(0, f.branch)}</p></div>
+              <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Outstanding</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: DARK }}>{rupee(numOf(f.out), f.branch)}</p></div>
               <div><p style={{ margin: 0, fontSize: 10.5, color: DIM, fontWeight: 700, textTransform: 'uppercase' }}>Available</p><p style={{ margin: '3px 0 0', fontSize: 18, fontWeight: 700, color: GREEN }}>{rupee(available, f.branch)}</p></div>
             </div>
             {(Number(f.creditLimit) || 0) > 0 && (

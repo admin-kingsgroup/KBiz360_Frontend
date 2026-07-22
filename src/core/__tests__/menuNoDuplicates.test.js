@@ -44,6 +44,22 @@ describe('HR is its own top-level pill with masters + reports', () => {
   });
 });
 
+describe('VAT-branch nav prunes India-only statutory leaves (no dead-end links)', () => {
+  it('a VAT branch drops /hr/pf-esi & /finance/tds-calculator but KEEPS /tax/tds (WHT fork) + /hr/payroll', () => {
+    const hrefs = new Set(hrefsOf(getMenu({ code: 'NBO' }, { role: 'Super Admin' })));
+    expect(hrefs.has('/hr/pf-esi')).toBe(false);          // India PF/ESI — gated + pruned
+    expect(hrefs.has('/finance/tds-calculator')).toBe(false);
+    expect(hrefs.has('/tax/tds')).toBe(true);             // Africa "Withholding Tax" → WHT register
+    expect(hrefs.has('/hr/payroll')).toBe(true);          // payroll runs on every branch
+    expect(hrefs.has('/tax/vat')).toBe(true);
+  });
+  it('an India branch keeps the India statutory leaves', () => {
+    const hrefs = new Set(hrefsOf(getMenu({ code: 'BOM' }, { role: 'Super Admin' })));
+    expect(hrefs.has('/hr/pf-esi')).toBe(true);
+    expect(hrefs.has('/hr/payroll')).toBe(true);
+  });
+});
+
 describe('account reports live under Accounts, not Reports', () => {
   const accounts = new Set(leafHrefs(MENU_ACCOUNTS));
   const reports = new Set(leafHrefs(MENU_REPORTS));

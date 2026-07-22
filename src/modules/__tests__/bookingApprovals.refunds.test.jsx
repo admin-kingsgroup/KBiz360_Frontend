@@ -117,4 +117,47 @@ describe('SO/PO/GP Approvals — merged Refunds & Reissues section', () => {
     expect(screen.queryByRole('button', { name: /✎ Edit/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
   });
+
+  test('APPROVED tab: an approver gets a Revoke button on an UNLOCKED refund → preflights then un-posts', async () => {
+    useVoucherApprovals.mockReturnValue({ isLoading: false, data: { entries: [
+      { ...ENTRIES[0], status: 'approved', reviewStage: 'done', locked: false, source: 'manual' },
+    ] } });
+    wrap(<BookingApprovals branch={{ code: 'BOM' }} currentUser={{ role: 'Super Admin' }} initialStatus="approved" />);
+    await screen.findByText('RF/BOM/26/0021');
+    fireEvent.click(await screen.findByRole('button', { name: /Revoke/i }));
+    // preflight GET /revoke-check → confirm (mocked) → POST /revoke with the reason
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalledWith(expect.stringContaining('/revoke-check')));
+    await waitFor(() => expect(mockApiPost).toHaveBeenCalledWith('/api/vouchers/rf1/revoke', expect.objectContaining({ reason: 'wrong fare' })));
+  });
+
+  test('APPROVED tab: a booking-LOCKED refund shows NO voucher-Revoke — points to its booking instead', async () => {
+    // A locked (source:booking) refund would 409 on the voucher /revoke endpoint, so the row
+    // must NOT offer voucher-revoke; it directs the approver to un-post it on its booking.
+    useVoucherApprovals.mockReturnValue({ isLoading: false, data: { entries: [
+      { ...ENTRIES[0], status: 'approved', reviewStage: 'done', locked: true, source: 'booking', bookingId: 'RF-BKG/BOM/26/0007' },
+    ] } });
+    wrap(<BookingApprovals branch={{ code: 'BOM' }} currentUser={{ role: 'Super Admin' }} initialStatus="approved" />);
+    await screen.findByText('RF/BOM/26/0021');
+    expect(screen.queryByRole('button', { name: /Revoke/i })).toBeNull();
+    expect(screen.getByText(/revoke on booking RF-BKG\/BOM\/26\/0007/i)).toBeInTheDocument();
+  });
+
+  test('APPROVED tab: a non-approver gets NO Revoke button', async () => {
+    localStorage.setItem('kb360-user', JSON.stringify({ email: 'exec@travkings.com', role: 'Accounts Executive' }));
+    useVoucherApprovals.mockReturnValue({ isLoading: false, data: { entries: [
+      { ...ENTRIES[0], status: 'approved', reviewStage: 'done', locked: false },
+    ] } });
+    wrap(<BookingApprovals branch={{ code: 'BOM' }} currentUser={{ role: 'Accounts Executive' }} initialStatus="approved" />);
+    await screen.findByText('RF/BOM/26/0021');
+    expect(screen.queryByRole('button', { name: /Revoke/i })).toBeNull();
+  });
+
+  test('PENDING tab: a refund revoked-back-to-Pending shows the ⟲ Revoked provenance chip', async () => {
+    useVoucherApprovals.mockReturnValue({ isLoading: false, data: { entries: [
+      { ...ENTRIES[0], status: 'pending', reviewStage: 'check', revokedAt: '2026-07-21T00:00:00Z', revokedBy: 'admin', revokeReason: 'wrong fare' },
+    ] } });
+    wrap(<BookingApprovals branch={{ code: 'BOM' }} currentUser={{ role: 'Super Admin' }} />);
+    await screen.findByText('RF/BOM/26/0021');
+    expect(screen.getByText(/⟲ Revoked/)).toBeInTheDocument();
+  });
 });

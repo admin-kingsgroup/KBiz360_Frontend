@@ -10,9 +10,9 @@ import { IN_STATES } from './partyEnums';
 
 // GST registration state of each INDIA branch (its place of business). India-only by nature —
 // a GST state is meaningless for NBO/DAR/FBM, and supplyTypeOf now returns before reaching this
-// for a non-India branch. BOMMB is listed explicitly rather than riding the default: it is
+// for a non-India branch. MHUB is listed explicitly rather than riding the default: it is
 // Mumbai, so it was right only by luck.
-export const HOME_STATE_BY_BRANCH = { BOM: '27', AMD: '24', BOMMB: '27' }; // Maharashtra, Gujarat, Maharashtra
+export const HOME_STATE_BY_BRANCH = { BOM: '27', AMD: '24', MHUB: '27' }; // Maharashtra, Gujarat, Maharashtra
 const DEFAULT_HOME_STATE = '27';                              // HO — Maharashtra
 export const homeStateForBranch = (branch) =>
   HOME_STATE_BY_BRANCH[String(branch || '').trim().toUpperCase()] || DEFAULT_HOME_STATE;
@@ -24,7 +24,7 @@ export const homeStateNameForBranch = (branch) => stateNameOf(homeStateForBranch
 // map, which had this right all along) — keep the three in step. The FE/BE pair MUST agree:
 // approvalChecks recomputes foreignSupplier server-side and rejects a booking whose purchase
 // GST disagrees with its own recompute.
-export const BRANCH_COUNTRY = { BOM: 'IN', AMD: 'IN', BOMMB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' };
+export const BRANCH_COUNTRY = { BOM: 'IN', AMD: 'IN', MHUB: 'IN', NBO: 'KE', DAR: 'TZ', FBM: 'CD' };
 export const homeCountryOf = (branch) => BRANCH_COUNTRY[String(branch || '').trim().toUpperCase()] || 'IN';
 
 // Free-text country NAME/alias → ISO code; '' when unmapped (→ treated as foreign, fail safe).

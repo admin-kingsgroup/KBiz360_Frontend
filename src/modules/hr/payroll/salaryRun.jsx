@@ -7,6 +7,8 @@ import { usePayrollRegister, useProcessPayroll } from '../usePayroll';
 import { challanDueDate, regimeName as regimeNameOf, isIndiaRegime as isIndiaRegimeCode } from '../payrollMaps';
 import { toast } from '../../../core/ux/toast';
 import { B, btnG, card, inp } from '../../../core/styles';
+import { bc } from '../../../core/styleTokens';
+import { localeOf } from '../../../core/format';
 import { MiniBar } from '../../../core/insightsUI';
 import { Skeleton, isViewOnly, VIEW_ONLY_REASON } from '../../../shell/primitives';
 
@@ -42,7 +44,11 @@ export function HrPayroll({branch}){
   const isIndiaRegime=isIndiaRegimeCode(reg.statutoryRegime);
   const regimeName=regimeNameOf(reg.statutoryRegime);
 
-  const f=n=>"₹"+Number(Math.round(n)).toLocaleString("en-IN");
+  // Branch-currency aware: a foreign (Africa/USD) branch runs payroll here too (see the
+  // non-India-regime banner below), so amounts must print in the branch currency + its own
+  // digit grouping — never a hardcoded ₹ + Indian lakh/crore grouping.
+  const cur=(bc(branch)||{}).cur||'₹';
+  const f=n=>cur+Number(Math.round(n)).toLocaleString(localeOf(cur));
   const DUE_DATE=challanDueDate(period);
 
   /* Compute + persist this run server-side (idempotent — reprocessing swaps the
@@ -302,14 +308,14 @@ export function HrPayroll({branch}){
                 <tr key={i} style={{borderBottom:"1px solid #dfe2e7",background:e.side==="Dr"?"#f0f8ff":"#f0fff4"}}>
                   <td style={{padding:"8px 12px",fontWeight:800,color:e.side==="Dr"?"#185FA5":"#27500A",fontFamily:"monospace"}}>{e.side}</td>
                   <td style={{padding:"8px 12px",fontWeight:500,color:"#0d1326"}}>{e.ledger}</td>
-                  <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>₹{Number(Math.round(e.amount)).toLocaleString()}</td>
+                  <td style={{padding:"8px 12px",textAlign:"right",fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{f(e.amount)}</td>
                   <td style={{padding:"8px 12px",fontSize:10,color:"#5a6691"}}>{e.note}</td>
                 </tr>
               ))}</tbody>
               <tfoot><tr style={{background:"#0d1326"}}>
                 <td colSpan={2} style={{padding:"8px 12px",fontWeight:700,color:"#d4a437"}}>TOTAL Dr / Cr</td>
                 <td style={{padding:"8px 12px",textAlign:"right",fontWeight:800,color:"#fff"}}>
-                  ₹{jDr.toLocaleString()} / ₹{jCr.toLocaleString()}
+                  {f(jDr)} / {f(jCr)}
                 </td>
                 <td/>
               </tr></tfoot>

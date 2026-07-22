@@ -47,11 +47,13 @@ const ISSUER_FALLBACK = {
     ],
   },
   AMD: {
-    entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '24AABCT1234H1Z2', state: 'Gujarat', stateCode: '24',
-    operAddr: '202, Shapath IV, SG Highway, Ahmedabad 380 054',
-    phone: '+91 79 4000 5678', email: 'ahmedabad@travkings.com', cur_sym: '₹',
+    // Cert-verified identity (GST REG-06, GSTIN 24AAMCT1096J1Z0) + real ICICI AMD bank.
+    // (The company-profile has no `banks` field, so the invoice bank lives here.)
+    entity: 'Travkings Tours & Travels Pvt. Ltd.', gstin: '24AAMCT1096J1Z0', state: 'Gujarat', stateCode: '24',
+    operAddr: '608, Floor B, Sun West Bank, Ashram Road, Ahmedabad, Gujarat 380009',
+    phone: '', email: '', cur_sym: '₹',
     authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
-    banks: [{ bankName: 'ICICI Bank', branch: 'CG Road', acNo: '987654321098', ifsc: 'ICIC0005678', type: 'Current', primary: true }],
+    banks: [{ bankName: 'ICICI Bank', acName: 'Travkings Tours & Travels Private Limited - AMD', branch: 'Railwaypura, Ahmedabad', acNo: '654805601193', ifsc: 'ICIC0006548', type: 'Current', primary: true }],
   },
 };
 
@@ -167,7 +169,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   // Holiday (package) client invoice hides the SVC2 margin: it's folded into the Base
   // Fare line and its GST is folded into the regular GST — the books keep them separate.
   const isPkg = String(booking.module || '') === 'SH';
-  const code = String(branch?.code || booking.branch || 'BOM').toUpperCase();
+  const code = String(branch?.code || booking.branch || '').toUpperCase(); // never a silent BOM: a booking always carries its branch, so '' is an unreachable fail-safe (an empty issuer would surface the data error, not fake BOM's GSTIN)
   // Prefer the live company-profile, but fall back to the seeded issuer/bank constants
   // field-by-field, so the Issued-By block, Place of Supply and Bank details always
   // render even when the profile cache is empty at print time.
@@ -311,7 +313,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
       ...fareNoTax.map((c) => `<th>${esc(c.label)}</th>`),
       '<th>Taxes</th>',
       pkg ? '' : '<th>Service Chg</th>',
-      pkg ? '' : `<th>GST/Service (${activeRate}%)</th>`,
+      pkg ? '' : `<th>${taxLabel}/Service (${activeRate}%)</th>`,
       '<th>Total</th>',
     ];
     cols = head.filter(Boolean).length;
@@ -336,7 +338,7 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
       ...refKeys.map((c) => `<th class="l">${esc(c.label)}</th>`),
       ...spec.fareCols.map((c) => `<th>${esc(c.label)}</th>`),
       '<th>Supplier Service</th>',
-      pkg ? '' : `<th>GST (${activeRate}%)</th>`, // package: supplier-service GST shows only in the Net Cost summary
+      pkg ? '' : `<th>${taxLabel} (${activeRate}%)</th>`, // package: supplier-service tax shows only in the Net Cost summary
       '<th>Supplier Incentive</th>',
       '<th>TDS (2%)</th>',
       '<th>Total</th>',

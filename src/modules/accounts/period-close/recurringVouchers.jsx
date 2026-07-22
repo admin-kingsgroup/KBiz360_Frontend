@@ -24,7 +24,10 @@ export function RecurringVouchers({branch}){
   const mob=useMobile();
   const qc=useQueryClient();
   const vo=isViewOnly();   // view-only user: write actions disabled with a reason
-  const { data: masterRows = [] } = useMasterList('recurring-vouchers');
+  // A recurring template is branch-OWNED (create stamps branch.code). Scope the LIST to the
+  // selected branch and branch-KEY the cache — else an NBO user sees BOM (₹) templates rendered
+  // with NBO's $, and a branch switch serves the stale prior-branch list from a shared cache key.
+  const { data: masterRows = [] } = useMasterList('recurring-vouchers', { branch: branch?.code });
   const { create, update } = useMasterMutations('recurring-vouchers');
   const CAT_LABEL={journal:"Journal",payment:"Payment",receipt:"Receipt"};
   const templates=(masterRows||[]).map(t=>({...t,type:CAT_LABEL[t.category]||t.category,lastRun:t.lastRun||"—"}));
@@ -86,7 +89,9 @@ export function RecurringVouchers({branch}){
               <th key={i} style={{padding:"9px 12px",textAlign:i===6?"center":i===5?"right":"left",color:"#c2a04a",fontWeight:700,fontSize:9.5,whiteSpace:"nowrap"}}>{h}</th>
             ))}
           </tr></thead>
-          <tbody>{templates.map((t,i)=>(
+          <tbody>{templates.length===0?(
+            <tr><td colSpan={9} style={{padding:"18px 12px",textAlign:"center",color:"#5b616e",fontSize:11}}>No recurring templates yet — click <b>New Template</b> to add one for this branch.</td></tr>
+          ):templates.map((t,i)=>(
             <tr key={t.id} style={{borderBottom:"1px solid #dfe2e7",background:t.nextRun<=TODAY?"#fffaf0":i%2===0?"#fff":"#fafafa",opacity:t.active?1:0.5}}>
               <td style={{padding:"8px 12px",fontWeight:600,color:"#1a1c22"}}>{t.name}</td>
               <td style={{padding:"8px 12px"}}><span style={{fontSize:9.5,padding:"2px 7px",borderRadius:999,background:"#e8f0ff",color:"#2563eb",fontWeight:700}}>{t.type}</span></td>
@@ -115,7 +120,7 @@ export function RecurringVouchers({branch}){
               <button onClick={()=>setModal(false)} style={{background:"transparent",border:"none",cursor:"pointer",fontSize:20,color:"#5b616e"}}>✕</button>
             </div>
             <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:12}}>
-              <FL label="Template name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={inp} placeholder="e.g. Office Rent — BOM"/></FL>
+              <FL label="Template name"><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={inp} placeholder="e.g. Office Rent"/></FL>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,160px),1fr))",gap:10}}>
                 <FL label="Voucher type"><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} style={inp}><option>Journal</option><option>Payment</option><option>Receipt</option></select></FL>
                 <FL label="Frequency"><select value={form.freq} onChange={e=>setForm(f=>({...f,freq:e.target.value}))} style={inp}><option>Monthly</option><option>Quarterly</option><option>Annual</option><option>Weekly</option></select></FL>
@@ -126,9 +131,9 @@ export function RecurringVouchers({branch}){
                     chart, and a head picked from another branch won't resolve in ledgerNameOf
                     (branch-scoped registry) — the template saves with a blank ledger name. */}
                 <FL label="Debit ledger"><LedgerSelect branch={branch} value={form.dr} onChange={v=>setForm(f=>({...f,dr:v}))} placeholder="e.g. Office Rent"/></FL>
-                <FL label="Credit ledger"><LedgerSelect branch={branch} value={form.cr} onChange={v=>setForm(f=>({...f,cr:v}))} placeholder="e.g. HDFC Bank"/></FL>
+                <FL label="Credit ledger"><LedgerSelect branch={branch} value={form.cr} onChange={v=>setForm(f=>({...f,cr:v}))} placeholder="e.g. Bank / Cash"/></FL>
               </div>
-              <FL label="Amount (₹)"><input type="number" value={form.amt} onChange={e=>setForm(f=>({...f,amt:+e.target.value}))} style={inp}/></FL>
+              <FL label={`Amount (${cur})`}><input type="number" value={form.amt} onChange={e=>setForm(f=>({...f,amt:+e.target.value}))} style={inp}/></FL>
             </div>
             <div style={{padding:"12px 18px",borderTop:"1px solid #cdd1d8",display:"flex",justifyContent:"flex-end",gap:8}}>
               <button onClick={()=>setModal(false)} style={btnGh}>Cancel</button>

@@ -20,7 +20,7 @@ import { branchCode } from '../../../core/useAccounting';
 import { usePartyTypes } from '../../../core/useReference';
 import {
   GOLD,
-  tabPanel, usePartyMaster, PartyShell,
+  tabPanel, usePartyMaster, PartyShell, curOfBranch,
   ArrayEditor, Field, SelectField, CheckField, EmptyHint,
   LinkedVouchersTab, OutstandingTab, HistoryTab, CustomFieldsTab,
   ADDR_COLS, CONTACT_COLS, BANK_COLS, DOC_COLS, NOTE_COLS,
@@ -160,7 +160,7 @@ export function SupplierMasterTabbed({ branch } = {}) {
               <SelectField label="Settlement Cycle" value={f.settlementCycle} onChange={(v) => set('settlementCycle', v)} options={SETTLE_CYCLES} />
               <Field label="Credit Days" type="number" value={f.creditDays} onChange={(v) => set('creditDays', v)} />
               <SelectField label="Payment Method" value={f.paymentMethod} onChange={(v) => set('paymentMethod', v)} options={PAY_METHODS} />
-              <Field label="Credit Limit (₹)" type="number" value={f.creditLimit} onChange={(v) => set('creditLimit', v)} />
+              <Field label={`Credit Limit (${curOfBranch(f.branch)})`} type="number" value={f.creditLimit} onChange={(v) => set('creditLimit', v)} />
             </div>
           </div>
         </div>

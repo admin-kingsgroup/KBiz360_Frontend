@@ -55,9 +55,19 @@ export function PurchaseExpenseFields({ state, setState, ctx }) {
   // and move it to the wrong bucket. An old rate-less voucher self-corrects instead via the
   // "amount is 0" warning → Auto-calc, which sets both together.
   // Functional setState → no-op when already correct, so no render loop.
+  // A fresh Africa expense opens WITHOUT VAT (gstApplicable OFF) — Owner's rule (2026-07-21: no VAT
+  // until physically ticked; the user ticks "VAT applicable" for a genuine local-VAT expense/ITC).
+  // Still seed the branch rate so ticking it on uses 16/18, not a stray India 18. The default-off is
+  // applied ONCE (ref-guarded) so it never overrides the user's later tick.
+  const vatDefaulted = React.useRef(false);
   React.useEffect(() => {
     if (!isVat || editId) return;
-    setState((s) => (+s.gstPct === effGstRate ? s : { ...s, gstPct: effGstRate }));
+    setState((s) => {
+      const next = {};
+      if (+s.gstPct !== effGstRate) next.gstPct = effGstRate;
+      if (!vatDefaulted.current) { next.gstApplicable = false; vatDefaulted.current = true; }
+      return Object.keys(next).length ? { ...s, ...next } : s;
+    });
   }, [isVat, editId, effGstRate, setState]);
   const cgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt / 2);
   const sgst = state.gstMode === 'inter' ? 0 : r2(t.gstAmt - cgst);

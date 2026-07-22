@@ -177,7 +177,7 @@ export const MENU_REPORTS = {label:"Reports", icon:BarChart2, children:[
   // Collections / Payables & Suppliers.
   {label:"Working Capital", children:[
     {label:"Cash Flow Forecast 90d", href:"/reports/cashflow-forecast"},
-    {label:"Working Capital Dashboard", href:"/reports/working-capital"},
+    {label:"Working Capital Dashboard", href:"/reports/working-capital"},   // live-wired to ageing (AR/AP/Net WC)
     {label:"Ratio Analysis", href:"/reports/ratios"},
   ]},
   {label:"Compliance & Tax", children:[
@@ -967,7 +967,7 @@ export function hasFullMenu(currentUser){
 // India ERP branches (GST regime). Everything else with a real code is an Africa VAT
 // branch (NBO/DAR/FBM); "ALL" is the consolidated/central view (neither). `branch` may be
 // a branch object ({code,...}) or the "ALL" string.
-const INDIA_BRANCH_CODES = ["BOMMB", "BOM", "AMD"];
+const INDIA_BRANCH_CODES = ["MHUB", "BOM", "AMD"];
 const branchCodeOf = (branch) => (branch && typeof branch === 'object') ? branch.code : branch;
 export function isIndiaBranch(branch){ const c = branchCodeOf(branch); return !!c && c !== 'ALL' && INDIA_BRANCH_CODES.includes(c); }
 export function isVatBranch(branch){ const c = branchCodeOf(branch); return !!c && c !== 'ALL' && !INDIA_BRANCH_CODES.includes(c); }
@@ -1050,18 +1050,38 @@ function mergeMenus(a, b){
   return out;
 }
 
+// Drop India-only statutory leaves (GST / TDS / PF-ESI) from a VAT/Africa branch's nav so it
+// never offers a link that canReachRoute's regime gate will block — no dead-end clicks. Narrow
+// to isRegimeBlockedRoute (regime, NOT role): India branches / ALL are a no-op, and a page the
+// user was explicitly GRANTED is kept (the grant overrides the gate, mirroring canReachRoute).
+function pruneRegime(nodes, branch, granted = new Set()){
+  if (!isVatBranch(branch)) return nodes; // India / ALL / no-branch → unchanged
+  const walk = (node) => {
+    if (!node || node.divider) return node || null;
+    if (node.children){
+      const kids = cleanDividers(node.children.map(walk).filter(Boolean));
+      const hasLeaf = kids.some((k) => k && (k.href || (k.children && k.children.length)));
+      if (!hasLeaf && !node.href) return null; // empty container → drop
+      return { ...node, children: kids };
+    }
+    if (node.href && isRegimeBlockedRoute(node.href, branch) && !granted.has(node.href)) return null;
+    return node;
+  };
+  return nodes.map(walk).filter(Boolean);
+}
+
 export function getMenu(branch, currentUser){
   // Role picks the menu shape; then strip each user's hidden pages/reports.
   const roleMenu = applyHidden(roleMenuRoots(branch, currentUser), currentUser);
-  if (hasFullMenu(currentUser)) return roleMenu; // full roles already see everything
+  if (hasFullMenu(currentUser)) return pruneRegime(roleMenu, branch); // full roles: hide India-only leaves on a VAT branch
   // GRANTS: pages the admin turned ON beyond the role (Page Visibility Control). Show
   // each under its natural pill (from the full tree), minus anything also hidden, and
   // merge into the role menu so it appears in nav.
   const hidden = new Set(Array.isArray(currentUser?.hidden) ? currentUser.hidden : []);
   const granted = (Array.isArray(currentUser?.granted) ? currentUser.granted : []).filter((g) => !hidden.has(g));
-  if (!granted.length) return roleMenu;
+  if (!granted.length) return pruneRegime(roleMenu, branch);
   const grantMenu = fullMenuRoots(branch, currentUser).map((r) => keepPrune(r, new Set(granted))).filter(Boolean);
-  return mergeMenus(roleMenu, grantMenu);
+  return pruneRegime(mergeMenus(roleMenu, grantMenu), branch, new Set(granted));
 }
 
 // Top-level route areas a RESTRICTED role (Branch Accountant) may NOT open — even by
@@ -1085,10 +1105,14 @@ const RESTRICTED_ROLE_DENY_SEGMENTS = new Set(['hr', 'settings', 'group-dashboar
 // /reports/* and /hr/payroll (payroll runs on every branch; PF/ESI just reads zero there).
 const INDIA_ONLY_TAX_ROUTES = new Set([
   '/tax/gstr1', '/tax/gstr3b', '/tax/gstr2b', '/tax/gstr2b-itc', '/tax/gstr2a', '/tax/gstr9c',
-  '/tax/tds', '/tax/tds-certs', '/tax/form26as', '/tax/eway', '/tax/rcm', '/tax/einvoice',
+  '/tax/tds-certs', '/tax/form26as', '/tax/eway', '/tax/rcm', '/tax/einvoice',
   '/tax/audit-3cd', '/tax/gstr-1-prep', '/tax/gstr-3b-prep', '/tax/form-16a',
-  // India-only statutory tools outside /tax/* — the TDS calculator (Sections 194 / PAN /
-  // Challan 281) and the PF/ESI challan register. /hr/payroll deliberately stays reachable.
+  // India-only statutory tools outside /tax/*: the TDS calculator (Sections 194 / PAN /
+  // Challan 281) and the PF/ESI challan register. NOTE: /tax/tds is deliberately NOT here — it
+  // FORKS to the Africa WHT register for VAT branches (taxTdsTcs.jsx → WhtRegister), so it must
+  // stay reachable and the Africa VAT pill links it as "Withholding Tax". /hr/payroll also
+  // stays (payroll runs on every branch). getMenu's regime-prune hides these still-gated leaves
+  // from a VAT branch's nav so a blocked route is never offered (no dead-end clicks).
   '/finance/tds-calculator', '/hr/pf-esi',
 ]);
 function isIndiaOnlyTaxRoute(r){

@@ -9,7 +9,7 @@ const PER_BRANCH = [
   { code: 'BOM', cur: '₹', counts: { pending: { n: 11, amount: 800000 }, approved: { n: 387, amount: 0 }, rejected: { n: 5, amount: 0 }, deleted: { n: 7, amount: 0 } } },
   { code: 'AMD', cur: '₹', counts: { pending: { n: 5, amount: 200000 }, approved: { n: 40, amount: 0 } } },
   { code: 'NBO', cur: '$', counts: { pending: { n: 6, amount: 9000 } } },
-  { code: 'BOMMB', cur: '₹', counts: {} }, // no counts at all
+  { code: 'MHUB', cur: '₹', counts: {} }, // no counts at all
 ];
 
 describe('aggregateApprovals', () => {
@@ -30,7 +30,7 @@ describe('aggregateApprovals', () => {
   });
 
   test('a branch with no counts is safe (all zeros)', () => {
-    const bommb = agg.byBranch.find((b) => b.code === 'BOMMB');
+    const bommb = agg.byBranch.find((b) => b.code === 'MHUB');
     expect(bommb.pending).toEqual({ n: 0, amount: 0 });
   });
 
@@ -204,7 +204,7 @@ describe('pipelineEntries — the three queues merge; funnel total = sum of the 
 describe('branchesWithPending', () => {
   test('only branches with a backlog, worst first', () => {
     const rows = branchesWithPending(aggregateApprovals(PER_BRANCH));
-    expect(rows.map((b) => b.code)).toEqual(['BOM', 'NBO', 'AMD']); // 11, 6, 5 — BOMMB (0) excluded
+    expect(rows.map((b) => b.code)).toEqual(['BOM', 'NBO', 'AMD']); // 11, 6, 5 — MHUB (0) excluded
   });
   test('safe on empty', () => {
     expect(branchesWithPending(aggregateApprovals([]))).toEqual([]);

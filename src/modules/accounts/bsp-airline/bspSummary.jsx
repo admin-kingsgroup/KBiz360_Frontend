@@ -70,8 +70,14 @@ export function BspSummary({branch}){
   // 4) ADM / ACM memos for the period (same live store the ADM register uses).
   const admMemos=useAdmMemos("adm",branch).data||[];
   const acmMemos=useAdmMemos("acm",branch).data||[];
-  const admList=admMemos.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
-  const acmList=acmMemos.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&(!a.currency||a.currency===cur));
+  // A memo stores its currency as a CODE (admMemos.model default 'INR'); older/blank rows may
+  // carry a symbol or nothing. Match the branch currency by EITHER the code (cfg.curCode e.g.
+  // 'USD') or the symbol (cur e.g. '$'), so a branch-scoped memo is never wrongly dropped from
+  // the settlement — the old `a.currency===cur` compared a stored CODE against a SYMBOL and
+  // silently excluded every form-created ADM/ACM (NBO 'USD'≠'$', even India 'INR'≠'₹').
+  const curMatch=a=>(!a.currency||a.currency===cur||a.currency===cfg.curCode);
+  const admList=admMemos.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&curMatch(a));
+  const acmList=acmMemos.filter(a=>(!brCode||a.branch===brCode)&&String(a.date||"").startsWith(period)&&curMatch(a));
   const admTotal=admList.reduce((s,a)=>s+(Number(a.amount)||0),0);
   const acmTotal=acmList.reduce((s,a)=>s+(Number(a.amount)||0),0);
   const netBsp  =ticketCost-commission-bspCharge-admTotal+acmTotal;
@@ -236,7 +242,7 @@ export function BspSummary({branch}){
                   <p style={{margin:0,fontSize:9.5,color:"#5b616e"}}>{a.airline} · {ADM_REASON_CODES[a.reasonCode]?.label}</p>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <p style={{margin:0,fontWeight:700,color:"#dc2626",fontVariantNumeric:"tabular-nums"}}>{a.currency}{a.amount.toLocaleString()}</p>
+                  <p style={{margin:0,fontWeight:700,color:"#dc2626",fontVariantNumeric:"tabular-nums"}}>{f(a.amount)}</p>
                   <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#fbe9e9",color:"#dc2626",fontWeight:700}}>{a.status}</span>
                 </div>
               </div>
@@ -254,7 +260,7 @@ export function BspSummary({branch}){
                   <p style={{margin:0,fontSize:9.5,color:"#5b616e"}}>{a.airline} · {ACM_REASON_CODES[a.reasonCode]?.label}</p>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <p style={{margin:0,fontWeight:700,color:"#16a34a",fontVariantNumeric:"tabular-nums"}}>+{a.currency}{a.amount.toLocaleString()}</p>
+                  <p style={{margin:0,fontWeight:700,color:"#16a34a",fontVariantNumeric:"tabular-nums"}}>+{f(a.amount)}</p>
                   <span style={{fontSize:9,padding:"1px 6px",borderRadius:999,background:"#e8f6ed",color:"#16a34a",fontWeight:700}}>{a.status}</span>
                 </div>
               </div>

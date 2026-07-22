@@ -300,12 +300,12 @@ export const LedgersMaster = ({ branch }) => {
           // Changing Branch re-defaults Currency to that branch's main currency
           // (INR for India, USD elsewhere) — matches what a fresh form already
           // defaults to below, so switching branch mid-form stays consistent.
-          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: shellLocked ? topBarView : 'BOM',
+          { key: 'branch', label: 'Branch', type: 'select', options: branchOptions, default: shellLocked ? topBarView : 'ALL',
             onSet: (v, next) => { next.currency = branchMainCurrency(v); } },
           // Display-only flag column, shown only when hidden/inactive rows are in the
           // list — Hidden = presence-toggled off for its branch, Inactive = deactivated.
           ...(showHidden ? [{ key: 'visibility', label: 'Visibility', type: 'text', input: false, export: false }] : []),
-          { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: branchMainCurrency(shellLocked ? topBarView : 'BOM') },
+          { key: 'currency', label: 'Currency', type: 'select', options: ACTIVE_CURRENCIES, default: branchMainCurrency(shellLocked ? topBarView : 'ALL') },
           { key: 'openingBalance', label: 'Opening Balance', type: 'number', default: 0 },
           { key: 'drCr', label: 'Dr/Cr', type: 'select', options: ['Dr', 'Cr'], default: 'Dr' },
           { key: 'active', label: 'Active', type: 'bool', default: true },

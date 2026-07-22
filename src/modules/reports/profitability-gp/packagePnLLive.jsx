@@ -104,7 +104,7 @@ export function PackagePnL({ branch }) {
           <div style={{ width: 40, height: 40, borderRadius: 10, background: '#FAEEDA', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>📦</div>
           <div>
             <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0d1326' }}>Package P&amp;L by Tour Code</h2>
-            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#5a6691' }}>{bills.length} holiday bookings{isAll ? ` · ${(groups || []).length} branch(es) · each in its own currency` : ' · GP per package'}</p>
+            <p style={{ margin: '2px 0 0', fontSize: 10.5, color: '#5a6691' }}>{bills.length} holiday bookings{isAll ? ` · ${(groups || []).length} branch(es) · each in its own currency` : ` · ${branch?.code || branch} · GP per package`}</p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

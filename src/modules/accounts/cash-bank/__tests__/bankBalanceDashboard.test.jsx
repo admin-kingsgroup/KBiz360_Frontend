@@ -10,7 +10,7 @@ jest.mock('../../../../core/styles', () => ({
 }));
 jest.mock('../../../../core/format', () => ({ money: (n, cur) => `${cur}${Math.round(Number(n) || 0)}` }));
 jest.mock('../../../../core/helpers', () => ({ cardStyle: {} }));
-jest.mock('../../../../core/data', () => ({ BRANCH_CODES: ['BOM', 'AMD', 'DAR', 'FBM', 'NBO', 'BOMMB'] }));
+jest.mock('../../../../core/data', () => ({ BRANCH_CODES: ['BOM', 'AMD', 'DAR', 'FBM', 'NBO', 'MHUB'] }));
 jest.mock('../../../../shell/PHASE2_Page', () => ({ PHASE2_Page: ({ children, toolbar }) => <div>{toolbar}{children}</div> }));
 
 const TB = {
