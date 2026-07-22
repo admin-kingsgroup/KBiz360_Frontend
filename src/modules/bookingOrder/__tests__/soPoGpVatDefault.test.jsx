@@ -93,3 +93,37 @@ describe('SO/PO/GP — VAT columns/labels hidden under Without VAT (Africa)', ()
     expect(screen.getByText(/SVF VAT/i)).toBeInTheDocument();
   });
 });
+
+// A VAT branch hides the K3 fare column (India's airline tax) for FRESH entry — but a file
+// being EDITED can hold K3 money: an INB deal pushed from an Indian branch seeds the seller's
+// K3 onto the buyer's grid (buildInbBuyerBookingPayload maps 'K3 Tax' → k3). Hiding the column
+// then re-priced the booking minus that K3 on save: the hidden key was flagged as "legacy
+// premium", stripped, and the recomputed purchase no longer matched the INB-locked cost —
+// INB-GATE-08 (423) blocked EVERY save, even sale-side-only edits.
+describe('SO/PO/GP — K3 kept visible when an edited VAT-branch booking carries K3 (INB-pushed)', () => {
+  const inbBuyerBooking = () => editBooking({
+    branch: 'DAR', noVat: true, linkNo: 'INB/BOM-DAR/26/0001',
+    supplier: { name: 'Travkings Tours and Travels BOM', ledgerName: 'Travkings Tours and Travels BOM', ledgerGroup: 'Sundry Creditors' },
+    rows: [{ fn: 'KUNAL', sn: 'CHAUHAN', base: 115.67, k3: 6.15, tax: 11.45, psvc: 1.36, psvcGst: 0 }],
+    po: { lines: [{ base: 115.67, k3: 6.15, tax: 11.45, psvc: 1.36, psvcGst: 0 }], total: 134.63 },
+    so: { total: 0 }, gp: { total: 0, pct: 0 },
+  });
+
+  test('DAR edit of an INB-seeded flight booking with K3: column shown, no "legacy premium" strip warning', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'DAR' }} setRoute={() => {}} editBooking={inbBuyerBooking()} />);
+    expect(screen.getAllByText(/K3 Tax/i).length).toBeGreaterThan(0);          // column back on the grid
+    expect(screen.queryByText(/Legacy premium will be removed/i)).toBeNull();  // nothing to strip
+  });
+
+  test('DAR fresh voucher still hides the K3 column (the keep is edit-with-K3-scoped)', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'DAR' }} setRoute={() => {}} />);
+    expect(screen.queryByText(/K3 Tax/i)).toBeNull();
+  });
+
+  test('DAR edit of a booking WITHOUT K3 money still hides the column', () => {
+    wrap(<SoPoGpVoucherEntry branch={{ code: 'DAR' }} setRoute={() => {}} editBooking={editBooking({
+      branch: 'DAR', noVat: true, rows: [{ fn: 'A', sn: 'B', base: 100, tax: 10, psvc: 5 }],
+    })} />);
+    expect(screen.queryByText(/K3 Tax/i)).toBeNull();
+  });
+});

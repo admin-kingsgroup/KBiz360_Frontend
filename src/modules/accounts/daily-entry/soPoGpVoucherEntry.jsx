@@ -413,8 +413,22 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   const specRaw = VSPECS[moduleCode] || VSPECS.SF;
   // Africa/VAT branches don't levy India's K3 (airline) tax on international air — drop
   // the K3 fare column so the whole SO/PO/GP grid (header/body/footer/sectors/GP) hides
-  // it consistently. K3 is always 0 there, so the totals & posted heads are unchanged.
-  const spec = isVatBranch(brCode) && (specRaw.fareCols || []).some((c) => c.key === 'k3')
+  // it consistently. K3 is always 0 there for FRESH entry — but a file being EDITED can
+  // legitimately hold K3 money: an INB deal pushed from an Indian branch seeds the
+  // seller's K3 onto the buyer's grid (buildInbBuyerBookingPayload maps 'K3 Tax' → k3).
+  // Hiding the column then re-prices the booking minus that K3 on save: the hidden key
+  // is flagged as "legacy premium", stripped, and the recomputed purchase no longer
+  // matches the INB-locked cost — INB-GATE-08 (423) blocks EVERY save, even sale-side
+  // edits. So keep the column whenever the loaded file already carries K3.
+  const editHasK3 = editing && (
+    [
+      ...(Array.isArray(editBooking.rows) ? editBooking.rows : []),
+      ...((editBooking.po && Array.isArray(editBooking.po.lines)) ? editBooking.po.lines : []),
+    ].some((r) => num(r && r.k3) !== 0)
+    || (interBranch && (Array.isArray(editBooking.fareLines) ? editBooking.fareLines : [])
+      .some((f) => /\bk3\b/i.test(String((f && f.desc) || '')) && num(f && f.amt) !== 0))
+  );
+  const spec = isVatBranch(brCode) && !editHasK3 && (specRaw.fareCols || []).some((c) => c.key === 'k3')
     ? { ...specRaw, fareCols: specRaw.fareCols.filter((c) => c.key !== 'k3') }
     : specRaw;
 
