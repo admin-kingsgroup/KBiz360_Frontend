@@ -53,7 +53,7 @@ const ISSUER_FALLBACK = {
     operAddr: '608, Floor B, Sun West Bank, Ashram Road, Ahmedabad, Gujarat 380009',
     phone: '', email: '', cur_sym: '₹',
     authSignatory: 'Afshin Dhanani', authDesignation: 'Founder & Director',
-    banks: [{ bankName: 'ICICI Bank', acName: 'Travkings Tours & Travels Private Limited - AMD', branch: 'Railwaypura, Ahmedabad', acNo: '654805601193', ifsc: 'ICIC0006548', type: 'Current', primary: true }],
+    banks: [{ bankName: 'ICICI Bank', acName: 'Travkings Tours & Travels Private Limited', branch: 'Railwaypura, Ahmedabad', acNo: '654805601193', ifsc: 'ICIC0006548', type: 'Current', primary: true }],
   },
 };
 
