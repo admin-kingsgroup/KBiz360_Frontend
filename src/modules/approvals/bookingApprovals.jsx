@@ -665,7 +665,7 @@ export function BookingApprovals({ branch, setRoute, currentUser, initialSearch 
   );
 
   return (
-    <div style={{ maxWidth: 1600, margin: '0 auto', padding: '12px 10px' }}>
+    <div style={{ padding: '12px 6px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 17, color: DARK }}>SO/PO/GP Approvals</h2>
