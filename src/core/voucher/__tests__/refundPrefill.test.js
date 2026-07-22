@@ -54,9 +54,20 @@ describe('refundPrefillFromBooking', () => {
     expect(refundPrefillFromBooking(BOOKING, { commissionReversal: true }).incentiveAmt).toBe(1275);
   });
 
-  test('NEVER fills our service charge / the supplier service charge / its GST (amounts are retained, not refunded)', () => {
+  test('REFUND: Our Service Fee defaults to the ORIGINAL sale\'s service fee (Owner\'s rule 2026-07-22)', () => {
     const p = refundPrefillFromBooking(BOOKING, {});
-    expect(p).not.toHaveProperty('serviceCharge');
+    expect(p.serviceCharge).toBe(250);                    // ← SO serviceCharge, so the refund invoice shows the same fee
+  });
+
+  test('REFUND: a service fee the preparer already typed is never clobbered; REISSUE stays manual', () => {
+    const typed = refundPrefillFromBooking(BOOKING, { serviceCharge: 300 });
+    expect(typed).not.toHaveProperty('serviceCharge');
+    const ri = refundPrefillFromBooking(BOOKING, {}, false);
+    expect(ri).not.toHaveProperty('serviceCharge');
+  });
+
+  test('NEVER fills the supplier service charge / its GST (the supplier keeps them)', () => {
+    const p = refundPrefillFromBooking(BOOKING, {});
     expect(p).not.toHaveProperty('supplierSvc');
     expect(p).not.toHaveProperty('supplierGst');
   });
