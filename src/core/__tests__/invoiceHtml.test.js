@@ -222,16 +222,17 @@ describe('buildBookingInvoice — reversal (RF/RI) invoice', () => {
     const html = buildBookingInvoice(refund, 'sale', { code: 'AMD' }, {});
     expect(html).toContain('REFUND INVOICE');
     expect(html).toContain('Refund Breakdown');
-    expect(html).toContain('28,323.00');                 // refund value
-    expect(html).toContain('336.00');                    // service charges (svc + SVC2, folded)
-    expect(html).toContain('27,926.52');                 // net refund
-    expect(html).toContain('Less: CGST');                // intra split of the 60.48 charge GST
-    expect(html).toContain('30.24');
+    expect(html).toContain('28,044.52');                 // refund value with SVC2 (+its GST) folded in: 28,323 − 236 − 42.48
+    expect(html).toContain('100.00');                    // service charge line = ONLY the service charge
+    expect(html).not.toContain('336.00');                // the SVC2 fold is never revealed
+    expect(html).toContain('27,926.52');                 // net refund (unchanged by the fold)
+    expect(html).toContain('Less: CGST');                // intra split of the 18.00 service-charge GST
+    expect(html).toContain('9.00');
     expect(html).toContain('NET REFUND (INR)');
     expect(html).toContain('AMD/0726/SF00098');          // against invoice
     expect(html).not.toContain('No line detail captured');
-    expect(html).not.toContain('Bank Details');          // refund pays OUT — settlement note instead
-    expect(html).toContain('Settlement');
+    expect(html).toContain('Bank Details');              // bank + UPI stay on the refund print
+    expect(html).toContain('UPI');
   });
 
   test('passenger + sector context rides in from the original sale (opts.original)', () => {
@@ -255,9 +256,10 @@ describe('buildBookingInvoice — reversal (RF/RI) invoice', () => {
     const reissue = { ...refund, module: 'RI', saleVno: 'AMD/0726/RI00001' };
     const html = buildBookingInvoice(reissue, 'sale', { code: 'AMD' }, {});
     expect(html).toContain('REISSUE INVOICE');
+    expect(html).toContain('28,601.48');                 // reissue value with SVC2 (+its GST) folded in: 28,323 + 236 + 42.48
     expect(html).toContain('Add: Service Charges');
     expect(html).toContain('NET PAYABLE (INR)');
-    expect(html).toContain('28,719.48');                 // 28,323 + 336 + 60.48
+    expect(html).toContain('28,719.48');                 // 28,323 + 336 + 60.48 (net unchanged by the fold)
     expect(html).toContain('Bank Details');              // customer pays → bank block stays
   });
 });

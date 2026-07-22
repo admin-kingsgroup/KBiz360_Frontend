@@ -312,8 +312,9 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const rv = booking.reversal || {};
   const rPct = effNoVat ? 0 : (rv.gstPct != null && String(rv.gstPct).trim() !== '' ? Number(rv.gstPct) : activeRate);
   const rSvc = r2(rv.serviceCharge || 0), rOt = r2(rv.otherTaxes || 0);
+  const rSvcGst = r2(rSvc * rPct / 100), rOtGst = r2(rOt * rPct / 100);
   const rCharges = r2(rSvc + rOt);
-  const rChargesGst = r2(r2(rSvc * rPct / 100) + r2(rOt * rPct / 100));
+  const rChargesGst = r2(rSvcGst + rOtGst);
   const rCancel = (isRefundInv && rv.cancelRecover !== false)
     ? r2((Number(rv.supplierCancel) || 0) + (Number(rv.supplierCancelGst) || 0)) : 0;
   const rBase = isRefundInv
@@ -322,6 +323,10 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const rNet = isRefundInv
     ? r2(rBase - rCharges - rChargesGst - rCancel)
     : r2(rBase + rCharges + rChargesGst);
+  // Hidden-margin rule on reversals too: the SVC2 margin (+ its GST) FOLDS into the
+  // displayed Refund/Reissue Value — the visible charge lines show ONLY the service
+  // charge and ITS GST. The net is unchanged; the fold cancels out by construction.
+  const rDispBase = isRefundInv ? r2(rBase - rOt - rOtGst) : r2(rBase + rOt + rOtGst);
 
   let bkHead, bkBody, cols;
   if (isReversal) {
@@ -349,9 +354,9 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     const cells = [
       `<td class="l">${esc(desc)}</td>`,
       `<td class="l gold">${esc(booking.againstInvoice || rv.againstInvoice || '—')}</td>`,
-      `<td>${n2(rBase)}</td>`,
-      `<td>${n2(rCharges)}</td>`,
-      `<td>${n2(rChargesGst)}</td>`,
+      `<td>${n2(rDispBase)}</td>`,
+      `<td>${n2(rSvc)}</td>`,
+      `<td>${n2(rSvcGst)}</td>`,
       rCancel ? `<td>${n2(rCancel)}</td>` : '',
       `<td class="tf">${cur}${n2(rNet)}</td>`,
     ].filter(Boolean).join('');
@@ -441,18 +446,18 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
   const roundRow = roundOff ? `<div class="r"><span class="k">Round Off</span><span class="v">${roundOff < 0 ? '-' : ''}${cur}${n2(Math.abs(roundOff))}</span></div>` : '';
   // Reversal summary — deductions carry an explicit minus for a refund; a reissue ADDS
   // its charges (the customer pays the fare difference + our charges).
-  const rHalf = r2(rChargesGst / 2);
+  const rHalf = r2(rSvcGst / 2);
   const rSign = isRefundInv ? 'Less: ' : 'Add: ', rMinus = isRefundInv ? '-' : '';
   const rGstRows = isVat
-    ? `<div class="r"><span class="k">${rSign}${taxLabel}</span><span class="v">${rMinus}${cur}${n2(rChargesGst)}</span></div>`
+    ? `<div class="r"><span class="k">${rSign}${taxLabel}</span><span class="v">${rMinus}${cur}${n2(rSvcGst)}</span></div>`
     : (inter
-      ? `<div class="r"><span class="k">${rSign}IGST</span><span class="v">${rMinus}${cur}${n2(rChargesGst)}</span></div>`
-      : `<div class="r"><span class="k">${rSign}CGST</span><span class="v">${rMinus}${cur}${n2(rHalf)}</span></div><div class="r"><span class="k">${rSign}SGST</span><span class="v">${rMinus}${cur}${n2(r2(rChargesGst - rHalf))}</span></div>`);
+      ? `<div class="r"><span class="k">${rSign}IGST</span><span class="v">${rMinus}${cur}${n2(rSvcGst)}</span></div>`
+      : `<div class="r"><span class="k">${rSign}CGST</span><span class="v">${rMinus}${cur}${n2(rHalf)}</span></div><div class="r"><span class="k">${rSign}SGST</span><span class="v">${rMinus}${cur}${n2(r2(rSvcGst - rHalf))}</span></div>`);
   const sumtbl = isReversal
     ? `
-    <div class="r"><span class="k">${isRefundInv ? 'Refund' : 'Reissue'} Value</span><span class="v">${cur}${n2(rBase)}</span></div>
-    ${rCharges ? `<div class="r"><span class="k">${rSign}Service Charges</span><span class="v">${rMinus}${cur}${n2(rCharges)}</span></div>` : ''}
-    ${rChargesGst ? rGstRows : ''}
+    <div class="r"><span class="k">${isRefundInv ? 'Refund' : 'Reissue'} Value</span><span class="v">${cur}${n2(rDispBase)}</span></div>
+    ${rSvc ? `<div class="r"><span class="k">${rSign}Service Charges</span><span class="v">${rMinus}${cur}${n2(rSvc)}</span></div>` : ''}
+    ${rSvcGst ? rGstRows : ''}
     ${rCancel ? `<div class="r" style="color:#A32D2D"><span class="k">Less: Cancellation Charges</span><span class="v">-${cur}${n2(rCancel)}</span></div>` : ''}
     <div class="net"><span class="k">NET ${isRefundInv ? 'REFUND' : 'PAYABLE'} (${esc(curCode)})</span><span class="v">${cur}${n2(rNet)}</span></div>`
     : isSale
@@ -479,13 +484,9 @@ export function buildBookingInvoice(booking = {}, side = 'sale', branch, master 
     bank.branch ? `Branch: ${esc(bank.branch)}` : '',
   ].filter(Boolean).join('<br>') || 'Bank details on file.';
   const upiBlock = `<div class="upicol"><div class="lab2">UPI · Scan &amp; Pay</div><img class="upi-qr" src="${UPI_QR}" alt="UPI QR — ${esc(upiId)}" /><div class="upi-id">${esc(upiId)}</div></div>`;
-  // A refund is money WE pay OUT — our bank/UPI collection block would invite a payment,
-  // so it is replaced with a settlement note. A reissue bills the customer → keep it.
-  const payBlock = isRefundInv
-    ? `<div class="lab2">Settlement</div><div class="pay">Refund payable to ${esc(party.name || 'the customer')} against Invoice ${esc(booking.againstInvoice || rv.againstInvoice || '')}.<br>Processed to the original mode of payment / party account.<br>Link No referenced for invoice-wise GP.</div>`
-    : isSale
-      ? `<div class="paygrid"><div class="bankcol"><div class="lab2">Bank Details</div><div class="pay">${bankLines}</div></div>${upiBlock}</div>`
-      : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input ${taxLabel} credit claimed against supplier ${idLabel}.<br>Link No referenced for invoice-wise GP.</div>`;
+  const payBlock = isSale
+    ? `<div class="paygrid"><div class="bankcol"><div class="lab2">Bank Details</div><div class="pay">${bankLines}</div></div>${upiBlock}</div>`
+    : `<div class="lab2">Settlement</div><div class="pay">Payable to supplier per agreed credit terms.<br>Input ${taxLabel} credit claimed against supplier ${idLabel}.<br>Link No referenced for invoice-wise GP.</div>`;
 
   const sheet = `<div class="iv"><div class="sheet">
     <div class="titlebar"><div class="title">${isReversal ? (isRefundInv ? 'REFUND INVOICE' : 'REISSUE INVOICE') : isSale ? 'INVOICE' : 'PURCHASE INVOICE'}</div><div class="iata-box"><img class="iata-badge" src="${IATA_LOGO}" alt="IATA Accredited Agent" /><div class="iata-no">IATA No: ${esc(iataNo)}</div></div></div><div class="title-rule"></div>
