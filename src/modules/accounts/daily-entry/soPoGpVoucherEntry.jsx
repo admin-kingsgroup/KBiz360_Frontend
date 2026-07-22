@@ -688,6 +688,14 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
   // the moment the scope flips to International — that one must stay.
   const showTcsCol = !!spec.tcs && !interBranch;
   const hasPackage = moduleCode === 'SF' || moduleCode === 'SH';
+  // INB margin fields: normally the Service Fee ALONE — SVC2 is hidden on an inter-branch
+  // deal (the backend posts no SVC2 head there). EXCEPT a service-only module (Insurance:
+  // no fare columns): its whole deal value IS margin, so the INB entry also offers
+  // Service Charge - 2. On save its NET amount (gross minus the embedded output tax,
+  // which is zero on a zero-rated deal) folds into the Service Fee — the backend's
+  // documented contract ("any SVC2 markup is folded INTO SVF by the caller"), so the
+  // posted total matches the grid: net + tax-on-SVF = the GST-inclusive SVC2 entered.
+  const inbSvc2 = interBranch && spec.model !== 'package' && (spec.fareCols || []).length === 0;
   // The SALE-side rate — drives the "{taxLabel}/Service Fee ({activeRate}%)" captions. Mirrors
   // svcRateOf: zero when the fee isn't billed, whether that's the Africa Without-VAT toggle or a
   // zero-rated inter-branch export (which applies to an India seller too).
@@ -870,7 +878,12 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
       const fareLines = (spec.fareCols || [])
         .map((c) => ({ ledger: 'Inter-Branch Sales', amt: round2(lines.reduce((s, l) => s + num(l[c.key]), 0)), desc: c.label }))
         .filter((l) => l.amt > 0);
-      const serviceFee = round2(lines.reduce((s, l) => s + num(l.ssvc), 0));
+      // Service-only INB (Insurance): fold the NET SVC2 (gross minus its embedded output
+      // tax, totals.so.otherTaxesGst — zero when zero-rated) into the Service Fee. The
+      // server re-levies tax ON the SVF, so net + tax reproduces the GST-inclusive SVC2
+      // the user keyed and the posted total matches the grid to the cent.
+      const svc2Net = inbSvc2 ? round2(lines.reduce((s, l) => s + num(l.markup), 0) - num(totals.so.otherTaxesGst)) : 0;
+      const serviceFee = round2(lines.reduce((s, l) => s + num(l.ssvc), 0) + svc2Net);
       const pax = lines.map((l) => [l.fn, l.sn].filter(Boolean).join(' ')).filter(Boolean).join(', ');
       if (!fareLines.length && !serviceFee) { setError('Enter the fares and/or a Service Fee'); return; }
       // Supplier (airline) PURCHASE leg — booked through the INB voucher under the same
@@ -1562,11 +1575,13 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
           section bills. On FBM it is VAT at 16%, and TCS never applies to a VAT branch at all.
           The 2%/5% TCS split is date-based (tcsRate), so the flat "2%" was also wrong for a booking
           dated on or before 31-03-2026.
-          INB names no margin field: Service Charge - 2 is hidden there, and for a package module the
-          Service Fee is hidden too — so it states only what is true (fares pass at cost). */}
+          INB names no margin field: Service Charge - 2 is hidden there (EXCEPT a service-only
+          module — Insurance — where SVC2 is offered and folds into the SVF on save, see
+          `inbSvc2`), and for a package module the Service Fee is hidden too — so it states
+          only what is true (fares pass at cost). */}
       <Section n="1" badge={interBranch ? 'INSO' : 'SO'} name={interBranch ? 'Inter-Branch Sales Order' : 'Sales Order'}
         sub={interBranch
-          ? `what ${toBranch || 'the buying branch'} pays · fares pass through at cost${pkg ? '' : ' · your margin is the Service Fee'}`
+          ? `what ${toBranch || 'the buying branch'} pays · ${inbSvc2 ? 'your margin is Service Charge - 2 + Service Fee' : `fares pass through at cost${pkg ? '' : ' · your margin is the Service Fee'}`}`
           : pkg
             ? `what the customer pays · ${effNoVat ? `no ${taxLabel} on the package` : `${activeRate}% ${taxLabel} on the package${isVatBr ? '' : ` + ${tcsRate}% TCS (Intl)`}`}`
             : `what the customer pays${effNoVat ? '' : ` · Service Charge - 2 is ${taxLabel}-inclusive`}`}
@@ -1576,7 +1591,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
             <thead><tr style={{ borderBottom: '2px solid ' + SO_BAR }}>
               {spec.idCols.map((c) => <th key={c.key} style={{ ...soHdrL, width: c.key === 'fn' || c.key === 'sn' ? 140 : 120 }}>{c.label}</th>)}
               {spec.fareCols.map((c) => <th key={c.key} style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{c.label}</th>)}
-              {!interBranch && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
+              {(!interBranch || inbSvc2) && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Charge - 2</th>}{!pkg && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>Service Fee</th>}
               {!pkg && showVatCol && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{taxLabel}/Service Fee ({activeRate}%)</th>}{!interBranch && showVatCol && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>{pkg ? `${taxLabel} (5%)` : `${taxLabel}/Service Charge - 2 (${activeRate}%)`}</th>}{showTcsCol && <th style={{ ...soHdr, width: 95, whiteSpace: 'normal' }}>TCS ({tcsRate}%)</th>}<th style={{ ...soHdr, width: 110, whiteSpace: 'normal' }}>Total</th><th style={{ ...soHdr, width: 45 }}></th>
             </tr></thead>
             <tbody>
@@ -1598,7 +1613,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
                     {spec.fareCols.map((col) => (isNoSupp
                       ? <td key={col.key} style={{ padding: 3, width: 95 }}><input type="number" min="0" value={l[col.key] ?? ''} placeholder="0" onChange={(e) => setLine(i, col.key, e.target.value, true)} style={cellInp} /></td>
                       : <td key={col.key} style={{ ...tdAuto, width: 95 }}>{fmt(l[col.key])}</td>))}
-                    {!interBranch && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>}
+                    {(!interBranch || inbSvc2) && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.markup ?? ''} placeholder="0" onChange={(e) => setLine(i, 'markup', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && <td style={{ padding: 3, width: 95, background: '#faf7ef' }}><input type="number" min="0" value={l.ssvc ?? ''} placeholder="0" onChange={(e) => setLine(i, 'ssvc', e.target.value, true)} style={cellInp} /></td>}
                     {!pkg && showVatCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(c.gstSvc)}</td>}
                     {!interBranch && showVatCol && <td style={{ ...tdAuto, width: 95 }}>{fmt(pkg ? c.salesGST : c.gstMk)}</td>}
@@ -1615,7 +1630,7 @@ export function SoPoGpVoucherEntry({ branch, setRoute, editBooking = null, onDon
               <td style={{ ...soTf, textAlign: 'left' }}>TOTAL</td>
               {spec.idCols.slice(1).map((c) => <td key={c.key} style={soTf} />)}
               {spec.fareCols.map((c) => <td key={c.key} style={soTf}>{fmt(lines.reduce((s, l) => s + num(l[c.key]), 0))}</td>)}
-              {!interBranch && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
+              {(!interBranch || inbSvc2) && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.markup), 0))}</td>}
               {!pkg && <td style={soTf}>{fmt(lines.reduce((s, l) => s + num(l.ssvc), 0))}</td>}
               {!pkg && showVatCol && <td style={soTf}>{fmt(totals.so.gst)}</td>}{!interBranch && showVatCol && <td style={soTf}>{fmt(pkg ? totals.so.gst + totals.so.otherTaxesGst : totals.so.otherTaxesGst)}</td>}
               {showTcsCol && <td style={soTf}>{fmt(totals.so.tcs)}</td>}
