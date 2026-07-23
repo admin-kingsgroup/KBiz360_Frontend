@@ -43,25 +43,28 @@ const voucher = {
   lines: [{ ledger: 'IT-Base Fare', amt: 26234, meta: { detail: { a: 1 }, serviceCharge: 500 } }],
 };
 
-describe('VoucherLines — full JV with zeros shown as ₹0', () => {
+describe('VoucherLines — full JV, every ledger on BOTH sides', () => {
   test('renders every ledger of the full journal (party + heads + GST)', () => {
     render(<VoucherLines voucher={voucher} cur="₹" />);
     // Party shows in both the header field AND as the debit ledger row → at least 2.
     expect(screen.getAllByText('B2C Ref Lamya').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('IT-Base Fare')).toBeInTheDocument();     // head credit
-    expect(screen.getByText('CGST Output [AMD]')).toBeInTheDocument(); // tax credit
+    expect(screen.getAllByText('IT-Base Fare').length).toBeGreaterThanOrEqual(1);     // head credit
+    expect(screen.getAllByText('CGST Output [AMD]').length).toBeGreaterThanOrEqual(1); // tax credit
     expect(screen.getByText('✓ Balanced')).toBeInTheDocument();
   });
 
-  test('renders each leg once on its Dr/Cr side (shared T-account, no ₹0 fillers)', () => {
+  test('Dr pane mirrors the Cr pane — every ledger on both sides, zero side an explicit dimmed 0.00', () => {
     render(<VoucherLines voucher={voucher} cur="₹" />);
-    // The unified JvBlock shows each ledger once on its side with a 2-decimal amount;
-    // there are no zero-fillers (a leg simply doesn't appear on its empty side).
+    // Each ledger appears in BOTH panes (its side's amount + a dimmed 0.00 on the other),
+    // so the Debit side always lists the same rows as the Credit side.
+    expect(screen.getAllByText('IT-Base Fare')).toHaveLength(2);       // Cr leg + its Dr 0.00 mirror
+    expect(screen.getAllByText('B2C Ref Lamya').length).toBeGreaterThanOrEqual(3); // header + Dr leg + Cr mirror
+    // Zero mirrors: 3 credit heads mirrored in the Dr pane + the party in the Cr pane = 4.
+    expect(screen.getAllByText('0.00')).toHaveLength(4);
     expect(screen.getAllByText('46,284.00').length).toBeGreaterThanOrEqual(1); // party Dr (+ totals)
     expect(screen.getByText('26,234.00')).toBeInTheDocument();                 // base fare Cr
     expect(screen.getByText('Dr · Debit')).toBeInTheDocument();
     expect(screen.getByText('Cr · Credit')).toBeInTheDocument();
-    expect(screen.queryByText('₹0')).toBeNull();
   });
 
   test('does NOT dump raw line meta as "[object Object]" (full JV replaces head-line cards)', () => {
@@ -73,8 +76,8 @@ describe('VoucherLines — full JV with zeros shown as ₹0', () => {
     // status:'approved' → the popup reads useVoucherJournal (stored) instead of the preview,
     // so it shows the posted head (IT-SVF [Pur]) and NOT the re-preview ledgers.
     render(<VoucherLines voucher={{ ...voucher, id: 'v1', status: 'approved', category: 'refund' }} cur="₹" />);
-    expect(screen.getByText('IT-SVF [Pur]')).toBeInTheDocument();   // from the stored journal
-    expect(screen.getByText('Sales Refunds')).toBeInTheDocument();
+    expect(screen.getAllByText('IT-SVF [Pur]').length).toBeGreaterThanOrEqual(1);   // from the stored journal
+    expect(screen.getAllByText('Sales Refunds').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('IT-Base Fare')).toBeNull();          // a re-preview-only ledger must NOT appear
     expect(screen.getByText('✓ Balanced')).toBeInTheDocument();
   });
