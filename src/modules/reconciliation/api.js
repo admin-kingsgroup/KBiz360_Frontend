@@ -67,8 +67,9 @@ export function freezeSnapshot(id, { statementBalance, adjustments }) {
 // ── Freeze-from-screen (Statement Matching "Freeze" tab) ─────────────────────
 // Per-ledger freeze straight off a matching screen: read the freeze state (status +
 // unreconciled-entry count so the button can disable with a reason), freeze one
-// ledger for a month (BE refuses unless every entry is reconciled), or un-freeze
-// (SOFT-lock release while unsigned). Ledger keyed by CODE or NAME.
+// ledger for a period — tier daily/weekly/month (BE refuses unless every entry is
+// reconciled), or un-freeze (SOFT-lock release while unsigned; the release path the
+// revoke lock guard points to, for ANY frozen tier). Ledger keyed by CODE or NAME.
 export async function getLedgerFreeze({ branch, code, name, period, tier = 'month' } = {}) {
   // apiGet's response interceptor already unwraps the { success, data } envelope,
   // so this resolves to the freeze-state object directly — do NOT re-read `.data`
