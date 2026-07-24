@@ -20,6 +20,17 @@ import { DataTable } from '../../../shell/DataTable';
 import { ResponsiveGrid, StatusPill, Button, Select } from '../../../shell/primitives';
 import { openPrintPreview } from '../../../core/PrintPreview';
 
+// Ledger-line category → Type-column label. A credit-side line on a debtor ledger can
+// come from an actual cash receipt OR a refund/credit-note reversing a sale — those are
+// not the same thing, so don't collapse them by Dr/Cr sign alone (see accounting.service.js
+// setlCats). Debit-side categories fall back to the sign check for any category not listed.
+const TYPE_LABEL = {
+  sale: 'Invoice', reissue: 'Invoice', adm: 'Invoice', purchase: 'Invoice', 'purchase-expense': 'Invoice',
+  receipt: 'Receipt', acm: 'Receipt', payment: 'Payment',
+  refund: 'Refund', 'debit-note': 'Debit Note',
+  journal: 'Journal', contra: 'Contra',
+};
+
 export function ClientStatement({ branch }) {
   const cur = bc(branch).cur;
   // Allow deep-linking a client via ?party= (the "Statement" drill from Collections).
@@ -36,9 +47,12 @@ export function ClientStatement({ branch }) {
   const stmtQ = useLedgerStatement(client, branch, { from: range.from || undefined, to: range.to || undefined });
   const stmt = stmtQ.data;
 
+  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
+  const balText = (v) => `${f(Math.abs(v))}${v > 0 ? ' Dr' : v < 0 ? ' Cr' : ''}`;
+
   const txnsWithBal = (stmt?.lines || []).map((p) => ({
     date: p.date,
-    type: p.debit > 0 ? 'Invoice' : 'Receipt',
+    type: TYPE_LABEL[p.category] || (p.debit > 0 ? 'Invoice' : 'Receipt'),
     ref: p.vno,
     desc: p.narration || p.entryNarration || (p.particulars && p.particulars[0]?.ledger) || p.category || '—',
     supplier: p.supplier || '',
@@ -57,9 +71,6 @@ export function ClientStatement({ branch }) {
     if (days <= 30) ageing.a0 += t.dr; else if (days <= 60) ageing.a30 += t.dr; else if (days <= 90) ageing.a60 += t.dr; else ageing.a90 += t.dr;
   });
 
-  const f = (n) => cur + Number(Math.round(n)).toLocaleString(localeOf(cur));
-  const balText = (v) => `${f(Math.abs(v))}${v > 0 ? ' Dr' : v < 0 ? ' Cr' : ''}`;
-
   const KPIS = [
     { l: 'Total Invoiced', v: f(totDr), c: '#2563eb' },
     { l: 'Total Received', v: f(totCr), c: '#16a34a' },
@@ -72,7 +83,7 @@ export function ClientStatement({ branch }) {
 
   const columns = [
     { key: 'date', header: 'Date', className: 'whitespace-nowrap text-ink-muted' },
-    { key: 'type', header: 'Type', render: (r, v) => <StatusPill tone={v === 'Invoice' ? 'info' : 'success'} size="sm">{v}</StatusPill> },
+    { key: 'type', header: 'Type', render: (r, v) => <StatusPill tone={v === 'Invoice' ? 'info' : (v === 'Refund' || v === 'Debit Note') ? 'warning' : 'success'} size="sm">{v}</StatusPill> },
     { key: 'ref', header: 'Reference', className: 'font-mono text-[10px] text-[#2563eb]' },
     { key: 'desc', header: 'Description', className: 'text-role-hr' },
     { key: 'supplier', header: 'Supplier', className: 'text-ink-muted', render: (r, v) => v || '—' },
