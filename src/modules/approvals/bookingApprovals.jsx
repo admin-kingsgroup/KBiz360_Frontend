@@ -40,13 +40,18 @@ import { VSPECS } from '../../core/voucherSpecs.js';
 import { useRefundLiveAmount } from '../../core/voucher/useRefundLiveAmount';
 import { invalidateBooks, useVoucherApprovals, useApproveVoucher, useRejectVoucher, useRevokeVoucher, fetchRevokeCheck } from '../../core/useAccounting';
 import { VoucherEditor } from '../accountingLive';
-import { SoPoGpVoucherEntry, GOLD_SOFT, GOLD_LINE, JournalView } from '../accounts/daily-entry/soPoGpVoucherEntry';
+import { SoPoGpVoucherEntry, GOLD_SOFT, GOLD_LINE, JournalView, REVERSAL_CHIPS } from '../accounts/daily-entry/soPoGpVoucherEntry';
 import { SkeletonTable } from '../../shell/primitives';
 
 const GOLD = '#A07828', DARK = '#141414', DR = '#1A7A42', BLUE = '#2563eb';
 const fmt = (n) => Number(Math.round((Number(n) || 0) * 100) / 100).toLocaleString(localeOf(activeCurrency()), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 // Blank/unresolved branch → null (like core/voucher/ui.js), never a silent 'BOM' default.
 const brCodeOf = (branch) => (branch === 'ALL' ? null : (branch?.code || null));
+// Module display spec for a booking: fare-grid modules (Flight/Hotel/…) live in VSPECS;
+// reversal modules (RF/RI) have no fare-grid shape so they're kept out of VSPECS (see
+// soPoGpVoucherEntry.jsx) and looked up in REVERSAL_CHIPS instead — this is the shared
+// {icon, name} lookup for both, so the raw code never leaks into the UI.
+const moduleSpec = (code) => VSPECS[code] || REVERSAL_CHIPS.find((r) => r.code === code);
 
 /* ════════════════════════════════════════════════════════════════════════════
    Pending & Approved lists
@@ -65,7 +70,7 @@ function groupBookings(rows, by) {
   if (by === 'recent') return [{ key: '__all', label: null, rows: [...rows].sort((a, b) => new Date(b.approvedAt || 0) - new Date(a.approvedAt || 0)) }];
   if (by !== 'client' && by !== 'supplier' && by !== 'module') return [{ key: '__all', label: null, rows }];
   const keyOf = (b) => (by === 'client' ? (b.customer?.name || '—') : by === 'supplier' ? (b.supplier?.name || '—') : (b.module || '—'));
-  const labelOf = (b) => (by === 'module' ? ((VSPECS[b.module] && VSPECS[b.module].name) || b.module || '—') : keyOf(b));
+  const labelOf = (b) => (by === 'module' ? ((moduleSpec(b.module) && moduleSpec(b.module).name) || b.module || '—') : keyOf(b));
   const map = new Map();
   for (const b of rows) { const k = keyOf(b); if (!map.has(k)) map.set(k, { key: k, label: labelOf(b), rows: [] }); map.get(k).rows.push(b); }
   return [...map.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)));
@@ -145,7 +150,7 @@ function BookingTable({ rows, isLoading, cur, open, setOpen, mode, groupBy = 'no
                 </tr>
               )}
               {g.rows.map((b) => {
-            const sp = VSPECS[b.module];
+            const sp = moduleSpec(b.module);
             const isOpen = open === b.id;
             return (
               <React.Fragment key={b.id}>
