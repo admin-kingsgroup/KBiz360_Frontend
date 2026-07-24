@@ -93,7 +93,7 @@ export { GOLD_SOFT, GOLD_LINE, PO_BAR };
 // Reversal modules (Refund / Reissue) act on an existing sale — picked from the same
 // module bar as Flight/Hotel, but they open the reversal entry (ReversalEntry) instead
 // of the fare grid and spawn one RF/RI voucher on approval.
-const REVERSAL_CHIPS = [{ code: 'RF', name: 'Refund', icon: '↩️' }, { code: 'RI', name: 'Reissue', icon: '🔁' }];
+export const REVERSAL_CHIPS = [{ code: 'RF', name: 'Refund', icon: '↩️' }, { code: 'RI', name: 'Reissue', icon: '🔁' }];
 const isReversalModule = (m) => m === 'RF' || m === 'RI';
 // Voucher module code → the module name used by the /api/markup-rules master
 // (the rule sheet stores 'Flight'/'Hotel'/…/'Misc' or 'ALL').
