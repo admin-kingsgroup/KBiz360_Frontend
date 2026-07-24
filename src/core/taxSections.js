@@ -12,6 +12,7 @@ export const TDS_SECTIONS = {
   '194H': { label: '194H - Commission/BSP', rate: 2, threshold: 15000, payable: 'tds_pay_h' },
   '194J': { label: '194J - Professional Svc', rate: 10, threshold: 30000, payable: 'tds_pay_j' },
   '194D': { label: '194D - Insurance', rate: 5, threshold: 15000, payable: 'tds_pay_d' },
+  '194I': { label: '194I - Rent', rate: 10, threshold: 240000, payable: 'tds_pay_i' },
   'None': { label: 'No TDS', rate: 0, threshold: 0, payable: null },
 };
 
