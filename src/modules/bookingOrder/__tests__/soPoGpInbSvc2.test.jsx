@@ -8,7 +8,7 @@
 // ON the SVF: net + tax reproduces the GST-inclusive SVC2 keyed. Other INB modules are
 // unchanged (margin = Service Fee alone), and the offline SO/PO/GP grid keeps SVC2 as-is.
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 jest.mock('../../../core/api', () => ({ apiGet: jest.fn(() => Promise.resolve([])), apiPost: jest.fn(), apiPut: jest.fn(), apiDelete: jest.fn(), getAuthToken: jest.fn() }));
@@ -63,7 +63,13 @@ describe('INB voucher — Service Charge - 2 for the service-only Insurance modu
       isInterBranch: true, branch: 'BOM', toBranch: 'AMD', module: 'SI', status: 'pending',
       linkNo: 'INB/BOM-AMD/26/0001', date: '2026-06-01', billIgst: true,
       serviceFee: 100, fareLines: [], purchaseHeads: [], passenger: 'SARA KHAN',
+      travelDate: '2026-06-10', headerRef: 'TATA AIG', saleTallyRef: 'TR-01',
     }} />);
+    // Every entry field is mandatory — fill the per-line Plan / Policy No refs the
+    // gate requires (SO grid textboxes in DOM order: First Name, Surname, Plan, Policy No).
+    const soRefs = within(screen.getAllByRole('table')[0]).getAllByRole('textbox');
+    fireEvent.change(soRefs[2], { target: { value: 'Travel Care' } });
+    fireEvent.change(soRefs[3], { target: { value: 'POL-9' } });
     // SO grid inputs (in DOM order): Service Charge - 2, then Service Fee (loaded 100).
     const numInputs = screen.getAllByPlaceholderText('0');
     fireEvent.change(numInputs[0], { target: { value: '118' } });
